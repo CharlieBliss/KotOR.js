@@ -292,7 +292,14 @@ export class MenuCharacter extends GameMenu {
 
     this.SLD_ALIGN?.setValue(creature.getGoodEvil()/100);
 
-    const portraitAttachRoot = this._3dViewModel?.getRootOdysseyNode?.() || this._3dViewModel;
+    // The backdrop's "dummy02" node marks where the character stands; it is rotated and offset so the
+    // character's own rotation below stands them upright facing the camera. The backdrop root has no
+    // such rotation, so attaching there lays the character on its side out of frame.
+    const portraitAttachRoot =
+      this._3dViewModel?.getObjectByName?.('dummy02') ||
+      this._3dViewModel?.children?.[0]?.children?.[0] ||
+      this._3dViewModel?.getRootOdysseyNode?.() ||
+      this._3dViewModel;
 
     if (this.char) {
       this.char.removeFromParent();
