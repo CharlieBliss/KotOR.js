@@ -410,37 +410,37 @@ export class ModuleArea extends ModuleObject {
 
     //update triggers
     for(let i = 0; i < trigCount; i++){
-      this.triggers[i].update(delta);
+      this.triggers[i]?.update(delta);
     }
 
     //update encounters
     for(let i = 0; i < encounterCount; i++){
-      this.encounters[i].update(delta);
+      this.encounters[i]?.update(delta);
     }
     
     //update aoe
     for(let i = 0; i < aoeCount; i++){
-      this.areaOfEffects[i].update(delta);
+      this.areaOfEffects[i]?.update(delta);
     }
 
     //update party
     for(let i = 0; i < partyCount; i++){
-      GameState.PartyManager.party[i].update(delta);
+      GameState.PartyManager.party[i]?.update(delta);
     }
     
     //update creatures
     for(let i = 0; i < creatureCount; i++){
-      this.creatures[i].update(delta);
+      this.creatures[i]?.update(delta);
     }
     
     //update placeables
     for(let i = 0; i < placeableCount; i++){
-      this.placeables[i].update(delta);
+      this.placeables[i]?.update(delta);
     }
     
     //update doors
     for(let i = 0; i < doorCount; i++){
-      this.doors[i].update(delta);
+      this.doors[i]?.update(delta);
     }
 
     //unset party controlled
@@ -454,12 +454,12 @@ export class ModuleArea extends ModuleObject {
 
     //update rooms
     for(let i = 0; i < roomCount; i++){
-      this.rooms[i].update(delta);
+      this.rooms[i]?.update(delta);
       // this.rooms[i].hide();
     }
 
     for(let i = 0, spellCount = this.spellInstances.length; i < spellCount; i++){
-      this.spellInstances[i].update(delta);
+      this.spellInstances[i]?.update(delta);
     }
 
     let spellIndex = this.spellInstances.length;
@@ -498,9 +498,9 @@ export class ModuleArea extends ModuleObject {
     }
 
     this.updateRoomVisibility(delta);
-    FollowerCamera.update(delta, this);
+    if(GameState.Mode != EngineMode.FREELOOK && !GameState.gmMode) FollowerCamera.update(delta, this);
 
-    this.weather.update(delta);
+    this.weather?.update(delta);
 
     if(this.path){
       this.path.update(delta);
@@ -521,37 +521,37 @@ export class ModuleArea extends ModuleObject {
 
     //update triggers
     for(let i = 0; i < trigCount; i++){
-      this.triggers[i].updatePaused(delta);
+      this.triggers[i]?.updatePaused(delta);
     }
 
     //update encounters
     for(let i = 0; i < encounterCount; i++){
-      this.encounters[i].updatePaused(delta);
+      this.encounters[i]?.updatePaused(delta);
     }
 
     //update aoe
     for(let i = 0; i < aoeCount; i++){
-      this.areaOfEffects[i].updatePaused(delta);
+      this.areaOfEffects[i]?.updatePaused(delta);
     }
 
     //update party
     for(let i = 0; i < partyCount; i++){
-      GameState.PartyManager.party[i].updatePaused(delta);
+      GameState.PartyManager.party[i]?.updatePaused(delta);
     }
     
     //update creatures
     for(let i = 0; i < creatureCount; i++){
-      this.creatures[i].updatePaused(delta);
+      this.creatures[i]?.updatePaused(delta);
     }
     
     //update placeables
     for(let i = 0; i < placeableCount; i++){
-      this.placeables[i].updatePaused(delta);
+      this.placeables[i]?.updatePaused(delta);
     }
     
     //update doors
     for(let i = 0; i < doorCount; i++){
-      this.doors[i].updatePaused(delta);
+      this.doors[i]?.updatePaused(delta);
     }
 
     if(GameState.Mode == EngineMode.MINIGAME){
@@ -564,7 +564,7 @@ export class ModuleArea extends ModuleObject {
     // }
 
     this.updateRoomVisibility(delta);
-    FollowerCamera.update(delta, this);
+    if(GameState.Mode != EngineMode.FREELOOK && !GameState.gmMode) FollowerCamera.update(delta, this);
 
     this.updateMusic(delta);
   }
@@ -634,6 +634,7 @@ export class ModuleArea extends ModuleObject {
   updateMusic(delta: number = 0){
     const audioEngine = AudioEngine.GetAudioEngine();
     const oPC = GameState.getCurrentPlayer();
+    if(!oPC) return;
     if(oPC.excitedDuration > 0 && audioEngine.bgmMode == BackgroundMusicMode.AREA && audioEngine.battleMusicLoaded){
       audioEngine.bgmMode = BackgroundMusicMode.BATTLE;
       audioEngine.areaMusicDayAudioEmitter.stop();
@@ -790,7 +791,7 @@ export class ModuleArea extends ModuleObject {
 
   attachSpellInstance(spellInstance: SpellCastInstance){
     if(!spellInstance) return;
-    GameState.group.spell_instances.add(spellInstance.container);
+    if(GameState.group?.spell_instances && spellInstance.container) GameState.group.spell_instances.add(spellInstance.container);
     this.spellInstances.push(spellInstance);
   }
 
@@ -832,7 +833,13 @@ export class ModuleArea extends ModuleObject {
       case EngineMode.FREELOOK:
       default:
         const player = GameState.getCurrentPlayer();
-        if(!player){ return; }
+        if(!player || GameState.Mode == EngineMode.FREELOOK || GameState.gmMode){
+          this.lastRoom = undefined;
+          for(let i = 0, len = this.rooms.length; i < len; i++){
+            this.rooms[i]?.show(false);
+          }
+          return;
+        }
         //Check to see if the player has moved to a new room
         if(this.lastRoom && this.lastRoom == player.room){
           return;
@@ -1367,11 +1374,11 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(10);
       
-      try { await this.loadPlayer(); } catch(e){ console.error(e); }
+      if(!GameState.gmMode){ try { await this.loadPlayer(); } catch(e){ console.error(e); } }
 
       try { await this.loadCameras(); } catch(e){ console.error(e); }
 
-      try { await this.loadPlaceables(); } catch(e){ console.error(e); }
+      if(GameState.gmMode && GameState.GMManager?.keepDefaultPlaceables === false){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(20);
 
@@ -1380,8 +1387,8 @@ export class ModuleArea extends ModuleObject {
       GameState.MenuManager.LoadScreen.setProgress(30);
 
       try { await this.loadAreaEffects(); } catch(e){ console.error(e); }
-      try { await this.loadCreatures(); } catch(e){ console.error(e); }
-      try { await this.loadParty(); } catch(e){ console.error(e); }
+      if(GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
+      if(!GameState.gmMode){ try { await this.loadParty(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(40);
 
@@ -1389,9 +1396,9 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(50);
 
-      try { await this.loadTriggers(); } catch(e){ console.error(e); }
+      if(GameState.gmMode && !GameState.GMManager?.keepDefaultTriggers){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
 
-      try { await this.loadEncounters(); } catch(e){ console.error(e); }
+      if(GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(60);
 
@@ -1419,7 +1426,7 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(100);
 
-      FollowerCamera.facing = Utility.NormalizeRadian(GameState.PartyManager.party[0].getFacing() - Math.PI/2);
+      if(GameState.PartyManager.party[0]) FollowerCamera.facing = Utility.NormalizeRadian(GameState.PartyManager.party[0].getFacing() - Math.PI/2);
 
       try { await this.weather.load(); } catch(e){ console.error(e); }
 
@@ -2078,7 +2085,7 @@ export class ModuleArea extends ModuleObject {
       this.miniGame.initMiniGameObjects();
     }
 
-    this.runStartScripts();
+    if(!GameState.gmMode) this.runStartScripts();
   }
 
   runOnEnterScripts(){

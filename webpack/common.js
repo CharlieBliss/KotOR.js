@@ -115,6 +115,20 @@ function makeWebpackBar(name, color) {
 function makeDevServer() {
   return {
     port: 8080,
+    host: '0.0.0.0',
+    allowedHosts: 'all',
+    setupMiddlewares: (middlewares, devServer) => {
+      try {
+        const { startGMRelayServer } = require('../scripts/gm-server');
+        startGMRelayServer({ port: 7878, httpServer: devServer?.server });
+      } catch (e) {
+        console.warn('Could not start GM WebSocket relay:', e);
+      }
+      // Dev-only: serve locally installed game folders so the browser build can skip the folder picker
+      const { devGameFilesMiddleware } = require('../scripts/dev-game-files');
+      middlewares.unshift({ name: 'dev-game-files', path: '/__dev-game', middleware: devGameFilesMiddleware });
+      return middlewares;
+    },
     hot: true,
     liveReload: false,
     compress: true,
@@ -138,6 +152,8 @@ function makeDevServer() {
       'Cache-Control': 'no-store',
     },
     client: {
+      // host is 0.0.0.0 for LAN GM sessions; connect HMR back to whatever host served the page
+      webSocketURL: 'auto://0.0.0.0:0/ws',
       overlay: {
         errors: true,
         warnings: false,

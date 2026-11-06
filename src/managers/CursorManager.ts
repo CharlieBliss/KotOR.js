@@ -246,7 +246,7 @@ export class CursorManager {
 	 * @param object The module object to mark as selected
 	 */
 	public static setReticleSelectedObject( object: ModuleObject ){
-		GameState.getCurrentPlayer().lookAt(object);
+		GameState.getCurrentPlayer()?.lookAt(object);
 		if(object){
 			CursorManager.selected = object.getReticleNode();
 			if(CursorManager.selected){
@@ -407,7 +407,7 @@ export class CursorManager {
 
 		CursorManager.arrow.visible = false;
 		if(CursorManager.selectedObject){
-			if(CursorManager.selectedObject.position.distanceToSquared(GameState.getCurrentPlayer().position) > maxSelectableDistanceSquared){
+			if(GameState.getCurrentPlayer() && CursorManager.selectedObject.position.distanceToSquared(GameState.getCurrentPlayer().position) > maxSelectableDistanceSquared){
 				CursorManager.selectedObject = undefined;
 				CursorManager.selected = undefined;
 			}
@@ -419,7 +419,7 @@ export class CursorManager {
 		}
 
 		if(CursorManager.hoveredObject){
-			if(CursorManager.hoveredObject.position.distanceToSquared(GameState.getCurrentPlayer().position) > maxSelectableDistanceSquared){
+			if(GameState.getCurrentPlayer() && CursorManager.hoveredObject.position.distanceToSquared(GameState.getCurrentPlayer().position) > maxSelectableDistanceSquared){
 				CursorManager.hoveredObject = undefined;
 				CursorManager.hovered = undefined;
 			}

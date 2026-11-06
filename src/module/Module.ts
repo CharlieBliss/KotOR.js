@@ -385,6 +385,12 @@ export class Module {
     GameState.group.effects.add(object.model);
   }
 
+  removeEffect(effect: GameEffect){
+    if(!effect) return;
+    const idx = this.effects.indexOf(effect);
+    if(idx >= 0) this.effects.splice(idx, 1)[0]?.onRemove();
+  }
+
   addEvent(event: GameEvent){
     if(this.eventQueue.indexOf(event) >= 0){ return; }
     this.eventQueue.push(event);
@@ -408,7 +414,7 @@ export class Module {
       //Process EffectList
       let elLen = this.effects.length - 1;
       for(let i = elLen; i >= 0; i--){
-        this.effects[i].update(delta);
+        this.effects[i]?.update(delta);
       }
 
       if(this.area){
@@ -454,7 +460,8 @@ export class Module {
       GameState.camera.position.setX(this.entryX);
       GameState.camera.position.setY(this.entryY);
       GameState.camera.position.setZ(this.entryZ + 2);
-      GameState.camera.rotation.set(Math.PI / 2, -Math.atan2(this.entryDirectionX, this.entryDirectionY), 0);
+      GameState.camera.rotation.order = 'YZX';
+      GameState.camera.rotation.set(Math.PI / 2, 0, -Math.atan2(this.entryDirectionX, this.entryDirectionY));
 
       //this.camera.pitch = THREE.MathUtils.radToDeg(this.camera.rotation.y) * -1;
       //this.camera.yaw = THREE.MathUtils.radToDeg(this.camera.rotation.x);

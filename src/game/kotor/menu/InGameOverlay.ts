@@ -936,6 +936,7 @@ export class InGameOverlay extends GameMenu {
     if (GameState.module.area.miniGame) { return; }
 
     const oPC = GameState.getCurrentPlayer();
+    if (!oPC) return;
     GameState.ActionMenuManager.SetPC(oPC);
     GameState.ActionMenuManager.SetTarget(GameState.CursorManager.selectedObject);
     GameState.ActionMenuManager.UpdateMenuActions();

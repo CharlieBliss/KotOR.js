@@ -722,6 +722,7 @@ export class ModuleObjectManager {
   static #losZOffset = 1;
 
   static GetSelectableObjectsInRange(player: ModuleObject): ModuleObject[] {
+    if(!player || !GameState.module?.area) return [];
 
     const objects = [
       ...GameState.PartyManager.party,
@@ -819,7 +820,7 @@ export class ModuleObjectManager {
     this.tUpdateSelectable -= delta;
     if(this.tUpdateSelectable <= 0){
       //Update the cache of selectable objects
-      GameState.ModuleObjectManager.GetSelectableObjectsInRange(PartyManager.party[0]);
+      GameState.ModuleObjectManager.GetSelectableObjectsInRange(PartyManager.party[0] || GameState.getCurrentPlayer());
       this.tUpdateSelectable = UPDATE_SELECTABLE_OBJECTS_INTERVAL;
     }
   }

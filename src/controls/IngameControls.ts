@@ -232,7 +232,7 @@ export class IngameControls {
 
       if(event.button == 0){
         Mouse.leftDown = true;
-      }else if(event.button == 1){
+      }else if(event.button == 1 || event.button == 2){
         Mouse.rightDown = true;
       }
     });
@@ -359,7 +359,9 @@ export class IngameControls {
                 const distanceThreshold = 20;
 
                 if(GameState.CursorManager.selectedObject == moduleObject && distance <= distanceThreshold){
-                  if(typeof moduleObject.onClick === 'function'){
+                  if(GameState.gmMode && GameState.GMManager.interceptInteraction(GameState.getCurrentPlayer(), moduleObject)){
+                    // GM multiplayer client: the host performs this interaction for us
+                  }else if(typeof moduleObject.onClick === 'function'){
                     GameState.getCurrentPlayer().clearAllActions();
                     moduleObject.onClick(GameState.getCurrentPlayer());
                   }else{
@@ -391,7 +393,7 @@ export class IngameControls {
         Mouse.leftDown = false;
         Mouse.downItem = undefined;
         Mouse.clickItem = undefined;
-      }else if(event.button == 1){
+      }else if(event.button == 1 || event.button == 2){
         Mouse.rightDown = false;
       }
     });
@@ -445,6 +447,7 @@ export class IngameControls {
       if(!followee) return;
       if(!followee.canMove()) return;
 
+      if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing + Math.PI/2), false, TURN_SPEED_FAST);
@@ -462,6 +465,7 @@ export class IngameControls {
       if(!followee) return;
       if(!followee.canMove()) return;
       
+      if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing - Math.PI/2), false, TURN_SPEED_FAST);
@@ -536,6 +540,7 @@ export class IngameControls {
 
     KeyMapper.Actions[KeyMapAction.Freelook].setProcessor( (keymap) => {
       if(!keymap.keyboardInput?.pressed && !keymap.gamepadInput?.pressed) return;
+      if(GameState.gmMode) return;
       GameState.SetEngineMode(GameState.Mode == EngineMode.FREELOOK ? EngineMode.INGAME : EngineMode.FREELOOK);
     });
 
@@ -926,6 +931,7 @@ export class IngameControls {
         if(followee){
           if(followee.canMove()){
             if( this.gamePad.stick_l_x.value || this.gamePad.stick_l_y.value ){
+              if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
               followee.clearAllActions(true);
               followee.force = 1;
               followee.setFacing( Utility.NormalizeRadian( Math.atan2(-this.gamePad.stick_l_x.value, -this.gamePad.stick_l_y.value) + FollowerCamera.facing + Math.PI/2 ) , false, TURN_SPEED_FAST);
@@ -938,6 +944,52 @@ export class IngameControls {
       }
     }
     
+    if(GameState.Mode == EngineMode.FREELOOK){
+      if(this.keyboard.action.Escape?.pressed){
+        GameState.MenuManager.MenuOptions.open();
+      }
+      const dx = Mouse.MouseX - Mouse.OldMouseX;
+      const dy = Mouse.MouseY - Mouse.OldMouseY;
+      if((Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy)){
+        GameState.currentCamera.rotation.order = 'YZX';
+        GameState.currentCamera.rotation.z -= dx * 0.005;
+        GameState.currentCamera.rotation.x = THREE.MathUtils.clamp(GameState.currentCamera.rotation.x - dy * 0.005, 0.05, Math.PI - 0.05);
+      }
+      const turnSpeed = 2.0 * delta;
+      if(this.keyboard.action.LeftArrow?.down){
+        GameState.currentCamera.rotation.order = 'YZX';
+        GameState.currentCamera.rotation.z += turnSpeed;
+      }
+      if(this.keyboard.action.RightArrow?.down){
+        GameState.currentCamera.rotation.order = 'YZX';
+        GameState.currentCamera.rotation.z -= turnSpeed;
+      }
+      const fast = this.keyboard.action.ShiftLeft?.down || this.keyboard.action.ShiftRight?.down;
+      const moveSpeed = (fast ? 30.0 : 12.0) * delta;
+      GameState.currentCamera.updateMatrixWorld();
+      const forward = new THREE.Vector3();
+      GameState.currentCamera.getWorldDirection(forward);
+      const right = new THREE.Vector3().crossVectors(forward, GameState.camera.up).normalize();
+      if(this.keyboard.action.KeyW?.down || this.keyboard.action.UpArrow?.down){
+        GameState.currentCamera.position.addScaledVector(forward, moveSpeed);
+      }
+      if(this.keyboard.action.KeyS?.down || this.keyboard.action.DownArrow?.down){
+        GameState.currentCamera.position.addScaledVector(forward, -moveSpeed);
+      }
+      if(this.keyboard.action.KeyA?.down || this.keyboard.action.KeyZ?.down){
+        GameState.currentCamera.position.addScaledVector(right, -moveSpeed);
+      }
+      if(this.keyboard.action.KeyD?.down || this.keyboard.action.KeyC?.down){
+        GameState.currentCamera.position.addScaledVector(right, moveSpeed);
+      }
+      if(this.keyboard.action.KeyE?.down || this.keyboard.action.Space?.down || this.keyboard.action.PageUp?.down || this.keyboard.action.NumpadAdd?.down){
+        GameState.currentCamera.position.z += moveSpeed;
+      }
+      if(this.keyboard.action.KeyQ?.down || this.keyboard.action.PageDown?.down || this.keyboard.action.NumpadSubtract?.down){
+        GameState.currentCamera.position.z -= moveSpeed;
+      }
+    }
+
     KeyMapper.ProcessMappings(GameState.Mode, delta);
 
     //Keyboard: onFrameEnd

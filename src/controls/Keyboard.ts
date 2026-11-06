@@ -128,7 +128,7 @@ export class Keyboard {
 
   onKeyDown(e: KeyboardEvent) {
     const code = e.code as KeyboardAction;
-    if(e.shiftKey || e.ctrlKey || e.altKey || e.metaKey){
+    if(e.ctrlKey || e.altKey || e.metaKey){
       return;
     }
 
@@ -144,7 +144,7 @@ export class Keyboard {
 
   onKeyUp(e: KeyboardEvent){
     const code = e.code as KeyboardAction;
-    if(e.shiftKey || e.ctrlKey || e.altKey || e.metaKey){
+    if(e.ctrlKey || e.altKey || e.metaKey){
       return;
     }
 

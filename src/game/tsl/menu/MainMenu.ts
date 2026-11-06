@@ -50,7 +50,12 @@ export class MainMenu extends K1_MainMenu {
     return new Promise<void>((resolve, reject) => {
       this.LB_MODULES.hide();
       this.LBL_NEWCONTENT.hide();
-      this.BTN_WARP.hide();
+      this.BTN_WARP.setText('GM Mode');
+      this.BTN_WARP.show();
+      this.BTN_WARP.addEventListener('click', (e) => {
+        e.stopPropagation();
+        GameState.EnterGMMode('danm14aa');
+      });
 
       this.BTN_NEWGAME.addEventListener('click', (e) => {
         e.stopPropagation();

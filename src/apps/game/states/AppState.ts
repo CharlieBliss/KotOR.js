@@ -66,6 +66,7 @@ export class AppState {
 
     console.log('gameEULAConfig', gameEULAConfig);
     console.log('eulaState', eulaState);
+    await AppState.attachDevGameDirectory();
     AppState.directoryLocated = await AppState.checkGameDirectory();
     AppState.processEventListener('on-ready', [AppState.eulaAccepted]);
     // Only start loading once EULA is accepted and a game directory is available.
@@ -75,6 +76,23 @@ export class AppState {
     }else{
       AppState.loaderHide();
     }
+  }
+
+  /**
+   * Development: when the dev server exposes a locally installed copy of this game, use it instead of
+   * asking for a folder. Kept in memory only so it never replaces a real folder grant in IndexedDB.
+   */
+  static async attachDevGameDirectory(){
+    if(AppState.env !== ApplicationEnvironment.BROWSER){
+      return;
+    }
+    const handle = await KotOR.DevGameDirectory.open(AppState.appProfile?.key);
+    if(!handle){
+      return;
+    }
+    console.log('Using dev server game directory for', AppState.appProfile?.key);
+    KotOR.ApplicationProfile.directoryHandle = handle;
+    AppState.appProfile.directory_handle = handle;
   }
 
   /**

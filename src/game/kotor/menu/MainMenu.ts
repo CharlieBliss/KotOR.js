@@ -58,7 +58,12 @@ export class MainMenu extends GameMenu {
       this.LBL_BW.hide();
       this.LBL_LUCAS.hide();
       this.LBL_NEWCONTENT.hide();
-      this.BTN_WARP.hide();
+      this.BTN_WARP.setText('GM Mode');
+      this.BTN_WARP.show();
+      this.BTN_WARP.addEventListener('click', (e) => {
+        e.stopPropagation();
+        GameState.EnterGMMode('danm14aa');
+      });
 
       this.BTN_NEWGAME.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -132,6 +137,7 @@ export class MainMenu extends GameMenu {
 
   Start(){
     return new Promise<void>( (resolve, reject) => {
+      GameState.gmMode = false;
       this.manager.ClearMenus(); 
       AudioLoader.LoadMusic(this.bgMusicResRef).then((data: Uint8Array) => {
         AudioEngine.GetAudioEngine().setAudioBuffer('BACKGROUND_MUSIC_DAY', data.buffer as ArrayBuffer, this.bgMusicResRef);

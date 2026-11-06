@@ -126,15 +126,17 @@ export class GameFileSystem {
     }else{
       if(!(handle)) throw new Error('No file handle supplied!');
       
-      if(!(handle instanceof FileSystemFileHandle)) throw new Error('FileSystemFileHandle expected but one was not supplied!');
-      
+      // Duck-typed so non-native handles (e.g. DevGameDirectory in development) work too
+      const fileHandle = handle as FileSystemFileHandle;
+      if(typeof fileHandle.getFile !== 'function') throw new Error('FileSystemFileHandle expected but one was not supplied!');
+
       if(!(output instanceof Uint8Array)) throw new Error('No output buffer supplied!');
 
-      let file = GameFileSystem.fileSnapshotCache.get(handle);
+      let file = GameFileSystem.fileSnapshotCache.get(fileHandle);
       if(!file){
-        file = await handle.getFile();
+        file = await fileHandle.getFile();
         if(file){
-          GameFileSystem.fileSnapshotCache.set(handle, file);
+          GameFileSystem.fileSnapshotCache.set(fileHandle, file);
         }
       }
       if(!file) throw new Error('Failed to read file from handle!');

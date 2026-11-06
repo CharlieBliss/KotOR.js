@@ -12,7 +12,7 @@ import { BinaryReader } from "@/utility/binary/BinaryReader";
 import { Utility } from "@/utility/Utility";
 import EngineLocation from "@/engine/EngineLocation";
 import { GameFileSystem } from "@/utility/GameFileSystem";
-import { ResourceTypes } from "@/KotOR";
+import { ResourceTypes } from "@/resource/ResourceTypes";
 import { exists } from "fs";
 
 const winEpoch = new Date("01-01-1601 UTC").getTime();

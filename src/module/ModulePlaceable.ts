@@ -233,7 +233,7 @@ export class ModulePlaceable extends ModuleObject {
           if(!this.animStateInfo.started){
             this.animStateInfo.started = true;
             const aLooping = (!parseInt(animation.fireforget) && parseInt(animation.looping) == 1);
-            this.getModel().playAnimation(animation.name?.toLowerCase(), aLooping);
+            this.getModel()?.playAnimation(animation.name?.toLowerCase(), aLooping);
           }else{
             //Animation completed
             switch(this.animStateInfo.currentAnimState){
@@ -252,7 +252,7 @@ export class ModulePlaceable extends ModuleObject {
           }
         }
       }else{
-        console.error('Animation Missing', this.getTag(), this.getName(), this.animState);
+        if(this.animStateInfo.currentAnimState !== ModulePlaceableAnimState.DEFAULT) this.setAnimationState(ModulePlaceableAnimState.DEFAULT); return;
         this.setAnimationState(ModulePlaceableAnimState.DEFAULT);
       }
     }
@@ -477,6 +477,10 @@ export class ModulePlaceable extends ModuleObject {
     }
   
     const instance = this.scripts[ModuleObjectScript.PlaceableOnUsed];
+    if((this as any).gmBarkText || (GameState.gmMode && !this.hasInventory && !this.isLocked() && !instance)){
+      this.playObjectSound(ModulePlaceableObjectSound.USED);
+      GameState.MenuManager.InGameBark?.barkFromString((this as any).gmBarkText || `Used ${this.getName() || 'Object'}.`);
+    }
     if(!instance){ return; }
     instance.run(this);
   }
@@ -578,7 +582,7 @@ export class ModulePlaceable extends ModuleObject {
   }
 
   async loadModel(): Promise<OdysseyModel3D> {
-    const modelName = this.getAppearance().modelname.replace(/\0[\s\S]*$/g,'').toLowerCase();
+    const modelName = (this.getAppearance()?.modelname || 'plc_footlker').replace(/\0[\s\S]*$/g,'').toLowerCase();
     try {
       const mdl = await MDLLoader.loader.load(modelName);
       const plc = await OdysseyModel3D.FromMDL(mdl, {

@@ -418,6 +418,10 @@ export class ModuleCreature extends ModuleObject {
       return;
     }
 
+    // GM multiplayer: replicas are simulated by the host; motion-driven creatures follow streamed positions
+    const netReplica = GameState.gmMode && GameState.GMManager.isNetReplica(this);
+    const netMotion = GameState.gmMode && GameState.GMManager.isNetMotionDriven(this);
+
     if(this.audioEmitter){
       this.audioEmitter.setPosition(this.position.x, this.position.y, this.position.z + 1.0);
       this.footstepEmitter.setPosition(this.position.x, this.position.y, this.position.z);
@@ -427,7 +431,9 @@ export class ModuleCreature extends ModuleObject {
     this.sphere.center.copy(this.position);
     this.sphere.radius = this.getHitDistance() * 2;
 
-    if(GameState.Mode == EngineMode.INGAME || GameState.Mode == EngineMode.MINIGAME || GameState.Mode == EngineMode.DIALOG){
+    // The GM's free camera still runs the world so player intents and NPCs resolve while the GM is not possessing anyone
+    const gmFreeLook = GameState.gmMode && GameState.Mode == EngineMode.FREELOOK;
+    if(GameState.Mode == EngineMode.INGAME || GameState.Mode == EngineMode.MINIGAME || GameState.Mode == EngineMode.DIALOG || gmFreeLook){
 
       if(this.animationState.index == ModuleCreatureAnimState.IDLE){
         this.footstepEmitter.isLooping = false;
@@ -492,7 +498,7 @@ export class ModuleCreature extends ModuleObject {
 
         this.deathStarted = false;
         
-        if(this.animationState.index != ModuleCreatureAnimState.DEAD){
+        if(!netReplica && this.animationState.index != ModuleCreatureAnimState.DEAD){
           this.updateActionQueue(delta);
         }
 
@@ -546,7 +552,7 @@ export class ModuleCreature extends ModuleObject {
           this.deathAnimationPlayed = false;
           this.deathStarted = true;
           this.clearAllActions();
-          this.onDeath();
+          if(!netReplica) this.onDeath();
           this.playSoundSet(SSFType.DEAD);
           this.resetOverlayAnimationState();
           this.setAnimationState(ModuleCreatureAnimState.DIE);
@@ -564,6 +570,7 @@ export class ModuleCreature extends ModuleObject {
       //-------------------------//
 
       if(
+        netMotion ||
         this.isDead() ||
         (
           this.animationState.index == ModuleCreatureAnimState.DIE ||
@@ -618,7 +625,7 @@ export class ModuleCreature extends ModuleObject {
         this.speed = 0;
       }
 
-      if(!this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING )){
+      if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING )){
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
         this.speed = 0;
         this.force = 0;
@@ -628,13 +635,19 @@ export class ModuleCreature extends ModuleObject {
       // END: Move Speed Logic //
       //-----------------------//
 
+      if(netMotion){
+        GameState.GMManager.updateNetMotion(this, delta);
+      }
+
       if(this.combatData.combatState && this.animationState.index == ModuleCreatureAnimState.PAUSE){
         this.setAnimationState(ModuleCreatureAnimState.READY);
       }
 
       this.updateExcitedDuration(delta);
-      this.updateCombat(delta);
-      this.updateCasting(delta);
+      if(!netReplica){
+        this.updateCombat(delta);
+        this.updateCasting(delta);
+      }
       this.updateAnimationState();
       this.updateItems(delta);
       
@@ -689,12 +702,14 @@ export class ModuleCreature extends ModuleObject {
       if(this.forceVector.length())
         this.collisionManager.updateCollision(delta);
 
-      this.updatePerceptionList(delta);
-      this.updateListeningPatterns();
+      if(!netReplica){
+        this.updatePerceptionList(delta);
+        this.updateListeningPatterns();
+      }
 
 
       //If a non controlled party member is stuck, warp them to their follow position
-      if(this.npcId != undefined && this != (GameState.getCurrentPlayer() as any) && this.collisionTimer >= 1){
+      if(!netMotion && this.npcId != undefined && this != (GameState.getCurrentPlayer() as any) && this.collisionTimer >= 1){
         this.setPosition(GameState.PartyManager.GetFollowPosition(this));
         this.collisionTimer = 0;
       }
@@ -798,7 +813,9 @@ export class ModuleCreature extends ModuleObject {
       this.updateItems(delta);
     }
 
-    this.updateRegen(delta);
+    if(!netReplica){
+      this.updateRegen(delta);
+    }
 
     this.collisionTimer -= delta;
     if(this.collisionTimer < 0)
@@ -840,9 +857,11 @@ export class ModuleCreature extends ModuleObject {
     if(!(this.action)){
       const currentPlayer = GameState.getCurrentPlayer();
       if(
-        !this.combatData.combatState && 
-        this.isPartyMember() && 
-        this != currentPlayer && 
+        !this.combatData.combatState &&
+        this.isPartyMember() &&
+        !(this as any).gmOwnerPeerId &&
+        currentPlayer &&
+        this != currentPlayer &&
         !this.facingAnim
       ){
         this.lookAtObject = currentPlayer;
@@ -2189,8 +2208,17 @@ export class ModuleCreature extends ModuleObject {
       GameState.getCurrentPlayer().actionUseObject(this);
     }else if(!this.isDead()){
       this.clearAllActions();
-      if(this.getConversation() && this.getConversation().resref){
+      if(true){
+      if(this.getConversation() && this.getConversation().resref && !(this as any).gmBarkText){
         GameState.getCurrentPlayer().actionDialogObject(this, this.getConversation().resref, false, undefined, undefined, true);
+      }else{
+        this.setFacingObject(callee);
+        (callee as any)?.setFacingObject?.(this);
+        this.playSoundSet(SSFType.SELECT_1);
+        this.setAnimationState(ModuleCreatureAnimState.GREETING);
+        const barkText = (this as any).gmBarkText || `${this.getName() || 'Actor'}: Greetings.`;
+        GameState.MenuManager.InGameBark?.barkFromString(barkText);
+      }
       }
     }
     

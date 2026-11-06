@@ -480,6 +480,11 @@ export class ModuleDoor extends ModuleObject {
     }
 
     this.playObjectSound(ModulePlaceableObjectSound.OPENED);
+    if(GameState.gmMode && object !== this && GameState.GMNetworkManager?.role !== 'offline'){
+      setTimeout(() => {
+        GameState.GMNetworkManager.broadcastDoorState({ netId: (this as any).gmNetId || `door_${this.id}`, tag: this.getTag(), x: this.position.x, y: this.position.y, locked: this.isLocked(), openState: this.openState });
+      }, 0);
+    }
 
     // if(GameState.selectedObject == this){
     //   GameState.selectedObject = GameState.selected = undefined;
