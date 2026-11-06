@@ -61,8 +61,13 @@ describe("GM relay server", () => {
 
     alice.send({ type: "actor.remove", senderId: "alice", payload: { netId: "cre_1" } });
     alice.send({ type: "world.tick", senderId: "alice", payload: { actors: [] } });
+    alice.send({ type: "fx.event", senderId: "alice", payload: { kind: "text", netId: "cre_1", text: "999" } });
+    alice.send({ type: "container.loot", senderId: "alice", targetPeerId: "bob", payload: { items: [] } });
     host.send({ type: "actor.remove", senderId: "gm", payload: { netId: "cre_1" } });
     await settle();
+
+    expect(types(bob)).not.toContain("fx.event");
+    expect(types(bob)).not.toContain("container.loot");
 
     expect(types(bob).filter((t) => t === "actor.remove")).toHaveLength(1);
     expect(bob.received.find((p) => p.type === "actor.remove")?.senderId).toBe("gm");

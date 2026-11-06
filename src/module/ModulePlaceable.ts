@@ -406,6 +406,7 @@ export class ModulePlaceable extends ModuleObject {
   }
 
   retrieveInventory(){
+    if(GameState.gmMode && GameState.GMManager.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       const item = this.inventory.pop();
       const stackSize = item.getStackSize();
@@ -442,8 +443,10 @@ export class ModulePlaceable extends ModuleObject {
       break;
       case ModulePlaceableEvent.OPEN_END:
         if(this.hasInventory){
-          GameState.MenuManager.MenuContainer.AttachContainer(this);
-          GameState.MenuManager.MenuContainer.open();
+          if(!(GameState.gmMode && GameState.GMManager.routeContainerOpen(this, this.lastUsedBy))){
+            GameState.MenuManager.MenuContainer.AttachContainer(this);
+            GameState.MenuManager.MenuContainer.open();
+          }
         }
     
         this.scripts[ModuleObjectScript.PlaceableOnOpen]?.run(this)

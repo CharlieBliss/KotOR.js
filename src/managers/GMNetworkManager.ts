@@ -29,13 +29,58 @@ export class GMEventEmitter {
 
 export type GMNetworkRole = 'offline' | 'host' | 'client';
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'cancel';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel';
+
+/** Intents where the host walks and acts for the player, so it takes over the actor's position */
+const HOST_DRIVEN_INTENTS: GMIntentKind[] = ['open', 'use', 'attack'];
+
+/**
+ * A visual the host just showed on a networked object, replayed on clients
+ * - anim: a 2DA animation (attack swings, hit/dodge/parry reactions, casting)
+ * - text: floating combat text (damage numbers, miss, deflected)
+ * - vfx.add / vfx.remove: a visualeffects.2da effect (Force power impacts, auras, shields)
+ */
+export type GMFxEvent =
+  | { kind: 'anim'; netId: string; anim: string; index: number }
+  | { kind: 'text'; netId: string; text: string; style: number; timer: number }
+  | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number }
+  | { kind: 'vfx.remove'; netId: string; fxId: string };
+
+export interface GMLootItem {
+  resRef: string;
+  stack: number;
+}
+
+/**
+ * A player's character as the host has it: what combat actually uses, and what the
+ * player's character sheet, equipment screen and inventory should show
+ */
+export interface GMPlayerSheet {
+  netId: string;
+  classes: { id: number; level: number; spells: number[] }[];
+  attributes: { str: number; dex: number; con: number; int: number; wis: number; cha: number };
+  feats: number[];
+  skills: number[];
+  hp: number;
+  maxHp: number;
+  forcePoints: number;
+  maxForcePoints: number;
+  currentForce: number;
+  xp: number;
+  /** equipment slot name (RIGHTHAND, ARMOR...) -> item resref */
+  equipment: Record<string, string>;
+  inventory: GMLootItem[];
+}
 
 export interface GMClientIntent {
   netId: string;
   kind: GMIntentKind;
   targetNetId?: string;
   seq: number;
+  /** equip / unequip: the equipment slot (ModuleCreatureArmorSlot) */
+  slot?: number;
+  /** equip: which inventory item to put in the slot */
+  resRef?: string;
 }
 
 export interface GMPeerInfo {
@@ -119,6 +164,10 @@ export interface GMPacket {
     | 'client.input'
     | 'client.intent'
     | 'chat.message'
+    | 'fx.event'
+    | 'container.open'
+    | 'container.loot'
+    | 'player.sheet'
     | 'relay.error';
   senderId: string;
   targetPeerId?: string;
@@ -589,6 +638,34 @@ export class GMNetworkManager {
         break;
       }
 
+      case 'fx.event': {
+        if (this.role === 'client' && this.gmManager && packet.payload) {
+          this.gmManager.applyFxEventOnClient(packet.payload as GMFxEvent);
+        }
+        break;
+      }
+
+      case 'container.open': {
+        if (this.role === 'client' && packet.targetPeerId === this.peerId && this.gmManager && packet.payload) {
+          await this.gmManager.openNetworkContainer(packet.payload.containerNetId, packet.payload.items || []);
+        }
+        break;
+      }
+
+      case 'player.sheet': {
+        if (this.role === 'client' && packet.targetPeerId === this.peerId && this.gmManager && packet.payload) {
+          await this.gmManager.applyPlayerSheetOnClient(packet.payload as GMPlayerSheet);
+        }
+        break;
+      }
+
+      case 'container.loot': {
+        if (this.role === 'client' && packet.targetPeerId === this.peerId && this.gmManager && packet.payload) {
+          await this.gmManager.receiveNetworkLoot(packet.payload.items || []);
+        }
+        break;
+      }
+
       case 'chat.message': {
         if (packet.payload?.text) {
           this.appendChat(packet.payload.sender || 'Player', packet.payload.text);
@@ -603,15 +680,19 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
-    this.awaitingHost = kind !== 'cancel';
+    if (HOST_DRIVEN_INTENTS.includes(kind)) {
+      this.awaitingHost = true;
+    } else if (kind === 'cancel') {
+      this.awaitingHost = false;
+    }
     this.sendPacket({
       type: 'client.intent',
       senderId: this.peerId,
       timestamp: Date.now(),
-      payload: { netId: this.assignedActorNetId, kind, targetNetId, seq: this.localIntentSeq }
+      payload: { netId: this.assignedActorNetId, kind, targetNetId, seq: this.localIntentSeq, ...extra }
     });
   }
 
@@ -622,6 +703,14 @@ export class GMNetworkManager {
     if (this.role === 'client' && this.awaitingHost) {
       this.sendIntent('cancel');
     }
+  }
+
+  /**
+   * Host: replay a visual on every client
+   */
+  static broadcastFx(event: GMFxEvent) {
+    if (this.role !== 'host') return;
+    this.sendPacket({ type: 'fx.event', senderId: this.peerId, timestamp: Date.now(), payload: event });
   }
 
   static sendWorldSnapshot(targetPeerId?: string) {

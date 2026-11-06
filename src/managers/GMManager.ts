@@ -20,6 +20,11 @@ import { CreatureClass } from "@/combat/CreatureClass";
 import { TalentFeat, TalentSpell } from "@/talents";
 import { ModuleObject, ModuleCreature, ModulePlayer, ModulePlaceable, ModuleDoor, ModuleItem } from "@/module";
 import { OdysseyModel3D } from "@/three/odyssey";
+import { OdysseyModelAnimation } from "@/odyssey";
+import { TextSprite3D } from "@/engine/TextSprite3D";
+import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
+import type { GameEffect } from "@/effects/GameEffect";
+import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { BitWise } from "@/utility/BitWise";
 import { Utility } from "@/utility/Utility";
 import { GameFileSystem } from "@/utility/GameFileSystem";
@@ -30,7 +35,10 @@ import {
   GMSerializedDoorState,
   GMWorldSnapshot,
   GMPlayerJoinPreset,
-  GMClientIntent
+  GMClientIntent,
+  GMFxEvent,
+  GMLootItem,
+  GMPlayerSheet
 } from "@/managers/GMNetworkManager";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
@@ -167,6 +175,30 @@ export class GMManager {
   // Replica motion smoothing (higher = snappier) and the distance beyond which we teleport instead
   static NET_SMOOTHING: number = 12;
   static NET_SNAP_DISTANCE: number = 6;
+
+  // Animation states set alongside a replayed 2DA animation (see applyFxEventOnClient)
+  static FX_DRIVEN_ANIM_STATES: number[] = [
+    ModuleCreatureAnimState.ATTACK,
+    ModuleCreatureAnimState.DAMAGE,
+    ModuleCreatureAnimState.DODGE,
+    ModuleCreatureAnimState.PARRY,
+  ];
+
+  // How close a player must be to a container for the host to hand over its items
+  static LOOT_RANGE: number = 4;
+
+  // Equipment slots shown on a player's character sheet and kept in sync by the host
+  static PLAYER_EQUIP_SLOTS: string[] = ['HEAD', 'ARMS', 'ARMOR', 'BELT', 'IMPLANT', 'LEFTARMBAND', 'RIGHTARMBAND', 'RIGHTHAND', 'LEFTHAND'];
+
+  // Host: how often player sheets are checked for changes and resent
+  static SHEET_SYNC_INTERVAL: number = 1.0;
+  static sheetSyncTimer: number = 0;
+
+  // Client: set while applying the host's sheet, so our own equip calls aren't sent back as requests
+  static applyingHostSheet: boolean = false;
+  // Client: a sheet that arrived before our character finished spawning
+  static pendingPlayerSheet: GMPlayerSheet | null = null;
+  static lastAppliedInventoryJson: string = '';
 
   // Pending spawn configurations for 3D viewport click-to-place
   static pendingCreatureConfig: GMCreatureSpawnConfig = {
@@ -1544,6 +1576,7 @@ export class GMManager {
 
   static init() {
     GMNetworkManager.Init(GMManager);
+    TextSprite3D.onCreateOnObject = (object, text, style, timer) => this.onHostTextSprite(object, text, style, timer);
     this.init3DIndicators();
     this.attachViewportListeners();
     this.scanAvailableModules();
@@ -2528,9 +2561,16 @@ export class GMManager {
       }
     }
 
-    // Also add helpful items to inventory (Medpacs, Security Spikes, Lightsabers)
-    GameState.InventoryManager.addItem(await this.createItemFromResRefAsync('g_i_medeqpmnt02'));
-    GameState.InventoryManager.addItem(await this.createItemFromResRefAsync('g_i_secspike01'));
+    // Starter items (Medpacs, Security Spikes). A network player's inventory is kept by the host
+    // and sent to them; only characters controlled on this machine use the local inventory.
+    const starterItems: GMLootItem[] = [{ resRef: 'g_i_medeqpmnt02', stack: 1 }, { resRef: 'g_i_secspike01', stack: 1 }];
+    if (!config.ownerPeerId) {
+      for (const entry of starterItems) {
+        GameState.InventoryManager.addItem(await this.createItemFromResRefAsync(entry.resRef));
+      }
+    } else if (GMNetworkManager.role === 'host') {
+      this.addToPlayerInventory(player, starterItems);
+    }
 
     const model = await player.loadModel();
     if (model) {
@@ -3494,6 +3534,11 @@ export class GMManager {
 
     if (GMNetworkManager.role === 'host') {
       this.updateHostDrivenActors();
+      this.sheetSyncTimer += delta;
+      if (this.sheetSyncTimer >= this.SHEET_SYNC_INTERVAL) {
+        this.sheetSyncTimer = 0;
+        this.updatePlayerSheets();
+      }
     }
     GMNetworkManager.update(delta);
   }
@@ -3715,6 +3760,10 @@ export class GMManager {
         if (cre.factionId !== actor.factionId) {
           this.assignFaction(cre, actor.factionId);
         }
+        // Our own character's equipment comes from our character sheet instead
+        if (actor.netId !== GMNetworkManager.assignedActorNetId) {
+          this.syncReplicaEquipment(cre, actor);
+        }
       }
       return existing;
     }
@@ -3730,6 +3779,14 @@ export class GMManager {
   }
 
   static async spawnFromSerialized(actor: GMSerializedActor): Promise<ModuleObject | null> {
+    const spawned = await this.spawnFromSerializedInner(actor);
+    if (spawned && this.pendingPlayerSheet?.netId === actor.netId) {
+      await this.applyPlayerSheetOnClient(this.pendingPlayerSheet);
+    }
+    return spawned;
+  }
+
+  static async spawnFromSerializedInner(actor: GMSerializedActor): Promise<ModuleObject | null> {
     const pos = new THREE.Vector3(actor.x, actor.y, actor.z);
     if (actor.kind === 'placeable') {
       return await this.spawnPlaceable(
@@ -3865,6 +3922,393 @@ export class GMManager {
     }
   }
 
+  // =========================================================================
+  // Host visuals mirrored to clients (combat animations, combat text, visual effects)
+  // =========================================================================
+
+  /** Host only, and only for objects clients know about */
+  static getHostFxNetId(obj: ModuleObject | undefined): string | null {
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !obj) return null;
+    return (obj as any).gmNetId || null;
+  }
+
+  /**
+   * Host: a creature started a 2DA animation. Callers set the animation state index right after
+   * (ATTACK, DAMAGE, DODGE...), so read it once the current call stack has finished.
+   */
+  static onHostTwoDAAnimation(cre: ModuleCreature, animation: ITwoDAAnimation) {
+    const netId = this.getHostFxNetId(cre);
+    if (!netId || !animation?.name) return;
+    queueMicrotask(() => {
+      if (cre.animationState?.animation !== animation) return;
+      GMNetworkManager.broadcastFx({ kind: 'anim', netId, anim: animation.name, index: cre.animationState.index });
+    });
+  }
+
+  static onHostTextSprite(obj: ModuleObject, text: string, style: number, timer: number) {
+    const netId = this.getHostFxNetId(obj);
+    if (!netId) return;
+    GMNetworkManager.broadcastFx({ kind: 'text', netId, text, style, timer });
+  }
+
+  static onHostVisualEffectApplied(effect: GameEffect) {
+    const netId = this.getHostFxNetId(effect.object);
+    if (!netId) return;
+    const fxId = this.getNextNetId('fx');
+    (effect as any).gmFxId = fxId;
+    GMNetworkManager.broadcastFx({
+      kind: 'vfx.add',
+      netId,
+      fxId,
+      vfx: effect.getInt(0),
+      miss: effect.getInt(2),
+      durationType: effect.getDurationType(),
+      duration: effect.getDuration(),
+    });
+  }
+
+  static onHostVisualEffectRemoved(effect: GameEffect) {
+    const fxId = (effect as any).gmFxId;
+    const netId = this.getHostFxNetId(effect.object);
+    // Instant effects finish on their own on every machine
+    if (!fxId || !netId || effect.getDurationType() === GameEffectDurationType.INSTANT) return;
+    GMNetworkManager.broadcastFx({ kind: 'vfx.remove', netId, fxId });
+  }
+
+  /**
+   * Client: replay a host visual on our copy of the object
+   */
+  static applyFxEventOnClient(event: GMFxEvent) {
+    const obj = this.netIdMap.get(event?.netId);
+    if (!obj) return;
+    switch (event.kind) {
+      case 'anim': {
+        if (!BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return;
+        const cre = obj as ModuleCreature;
+        const animation = OdysseyModelAnimation.GetAnimation2DA(event.anim);
+        if (!animation || cre.isDead()) return;
+        cre.playTwoDAAnimation(animation);
+        cre.animationState.index = event.index;
+        (cre as any).gmFxAnimation = cre.animationState.animation;
+        break;
+      }
+      case 'text':
+        TextSprite3D.CreateOnObject(obj, event.text, event.style, event.timer);
+        break;
+      case 'vfx.add': {
+        const effect = new GameState.GameEffectFactory.EffectVisualEffect();
+        effect.setInt(0, event.vfx);
+        effect.setInt(2, event.miss);
+        effect.setDurationType(event.durationType);
+        effect.setDuration(event.duration);
+        effect.initialize();
+        (effect as any).gmFxId = event.fxId;
+        obj.addEffect(effect);
+        break;
+      }
+      case 'vfx.remove': {
+        const effect = obj.effects.find((e) => (e as any).gmFxId === event.fxId);
+        if (effect) obj.removeEffect(effect);
+        break;
+      }
+    }
+  }
+
+  // =========================================================================
+  // Host-granted looting
+  // =========================================================================
+
+  static toLootItems(items: ModuleItem[]): GMLootItem[] {
+    return (items || [])
+      .map((item) => ({ resRef: item.getEquippedRes() || item.getInventoryRes() || item.getTemplateResRef(), stack: item.getStackSize() || 1 }))
+      .filter((item) => !!item.resRef);
+  }
+
+  static async createLootItems(items: GMLootItem[]): Promise<ModuleItem[]> {
+    const created = await Promise.all(items.map(async (entry) => {
+      const item = await this.createItemFromResRefAsync(entry.resRef);
+      item.setStackSize(Math.max(1, entry.stack || 1));
+      return item;
+    }));
+    return created.filter(Boolean);
+  }
+
+  /**
+   * Host: a container was opened. When the user is another player, show them its contents
+   * instead of opening the loot window on the GM's screen. Returns true when handled.
+   */
+  static routeContainerOpen(container: ModuleObject, user: ModuleObject | undefined): boolean {
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host') return false;
+    const peerId = (user as any)?.gmOwnerPeerId;
+    const containerNetId = (container as any)?.gmNetId;
+    if (!peerId || !containerNetId) return false;
+    GMNetworkManager.sendPacket({
+      type: 'container.open',
+      senderId: GMNetworkManager.peerId,
+      targetPeerId: peerId,
+      timestamp: Date.now(),
+      payload: { containerNetId, items: this.toLootItems((container as any).inventory) }
+    });
+    return true;
+  }
+
+  /**
+   * Host: move a container's items to the requesting player, so two players can't both take them
+   */
+  static grantLootOnHost(peerId: string, actor: ModuleCreature, containerNetId?: string) {
+    const container = containerNetId ? this.netIdMap.get(containerNetId) : null;
+    const inventory: ModuleItem[] | undefined = (container as any)?.inventory;
+    if (!container || !Array.isArray(inventory)) return;
+    if (actor.position.distanceTo(container.position) > this.LOOT_RANGE) return;
+    const taken = inventory.splice(0, inventory.length);
+    this.addToPlayerInventory(actor, this.toLootItems(taken));
+    GMNetworkManager.sendPacket({
+      type: 'container.loot',
+      senderId: GMNetworkManager.peerId,
+      targetPeerId: peerId,
+      timestamp: Date.now(),
+      payload: { containerNetId, items: this.toLootItems(taken) }
+    });
+    this.notifyChange();
+  }
+
+  /**
+   * Client: show the host's container contents in the normal loot window
+   */
+  static async openNetworkContainer(containerNetId: string, items: GMLootItem[]) {
+    const container = this.netIdMap.get(containerNetId);
+    if (!container) return;
+    (container as any).inventory = await this.createLootItems(items);
+    const menu = GameState.MenuManager.MenuContainer;
+    menu.AttachContainer(container);
+    menu.open();
+  }
+
+  /**
+   * Client: the loot window's "take items" asks the host instead of taking locally. Returns true when handled.
+   */
+  static requestNetworkLoot(container: ModuleObject): boolean {
+    if (!this.isNetworkContainer(container)) return false;
+    (container as any).inventory = [];
+    GMNetworkManager.sendIntent('loot', (container as any).gmNetId);
+    return true;
+  }
+
+  /** Client: a container whose contents the host owns */
+  static isNetworkContainer(container: ModuleObject): boolean {
+    return GameState.gmMode && GMNetworkManager.role === 'client' && !!(container as any)?.gmNetId;
+  }
+
+  /** Client: the items themselves arrive with our next character sheet; this just tells the player */
+  static async receiveNetworkLoot(items: GMLootItem[]) {
+    if (items.length) {
+      GMNetworkManager.appendChat('System', `Received ${items.length} item${items.length === 1 ? '' : 's'}.`);
+    }
+  }
+
+  // =========================================================================
+  // Host-owned player character sheets and inventories
+  // =========================================================================
+
+  /** Host: a network player's inventory, kept as resrefs so it can't drift from what the host grants */
+  static getPlayerInventory(actor: ModuleObject): GMLootItem[] {
+    if (!Array.isArray((actor as any).gmInventory)) (actor as any).gmInventory = [];
+    return (actor as any).gmInventory;
+  }
+
+  static addToPlayerInventory(actor: ModuleObject, items: GMLootItem[]) {
+    const inventory = this.getPlayerInventory(actor);
+    for (const item of items) {
+      const existing = inventory.find((e) => e.resRef === item.resRef);
+      if (existing) existing.stack += item.stack;
+      else inventory.push({ resRef: item.resRef, stack: item.stack });
+    }
+  }
+
+  static removeFromPlayerInventory(actor: ModuleObject, resRef: string): boolean {
+    const inventory = this.getPlayerInventory(actor);
+    const entry = inventory.find((e) => e.resRef === resRef);
+    if (!entry) return false;
+    entry.stack--;
+    if (entry.stack <= 0) inventory.splice(inventory.indexOf(entry), 1);
+    return true;
+  }
+
+  static buildPlayerSheet(cre: ModuleCreature): GMPlayerSheet {
+    const equipment: Record<string, string> = {};
+    for (const slot of this.PLAYER_EQUIP_SLOTS) {
+      const item: ModuleItem | undefined = (cre.equipment as any)[slot];
+      const resRef = item?.getEquippedRes() || item?.getInventoryRes();
+      if (resRef) equipment[slot] = resRef;
+    }
+    return {
+      netId: (cre as any).gmNetId,
+      classes: (cre.classes || []).map((c) => ({ id: c.id, level: c.level, spells: (c.spells || []).map((s) => s.id) })),
+      attributes: { str: cre.str, dex: cre.dex, con: cre.con, int: cre.int, wis: cre.wis, cha: cre.cha },
+      feats: (cre.feats || []).map((f) => f.id),
+      skills: (cre.skills || []).map((s) => s?.rank ?? 0),
+      hp: cre.getHP(),
+      maxHp: cre.getMaxHP(),
+      forcePoints: cre.forcePoints || 0,
+      maxForcePoints: cre.maxForcePoints || 0,
+      currentForce: cre.currentForce || 0,
+      xp: cre.experience || 0,
+      equipment,
+      inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
+    };
+  }
+
+  /** Host: send each connected player their sheet whenever anything on it changed */
+  static updatePlayerSheets() {
+    for (const peer of GMNetworkManager.peers.values()) {
+      const actor = peer.controlledNetId ? this.netIdMap.get(peer.controlledNetId) : null;
+      if (!actor || !BitWise.InstanceOf(actor.objectType, ModuleObjectType.ModuleCreature)) continue;
+      const sheet = this.buildPlayerSheet(actor as ModuleCreature);
+      const json = JSON.stringify(sheet);
+      // A rejoining player keeps their id but starts with an empty sheet, so track each join separately
+      const session = `${peer.peerId}:${peer.joinedAt}`;
+      if ((actor as any).gmLastSheetJson === json && (actor as any).gmLastSheetSession === session) continue;
+      (actor as any).gmLastSheetJson = json;
+      (actor as any).gmLastSheetSession = session;
+      GMNetworkManager.sendPacket({
+        type: 'player.sheet',
+        senderId: GMNetworkManager.peerId,
+        targetPeerId: peer.peerId,
+        timestamp: Date.now(),
+        payload: sheet
+      });
+    }
+  }
+
+  /** Host: put an item from the player's inventory into an equipment slot */
+  static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string) {
+    const slotName = ModuleCreatureArmorSlot[slot];
+    if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName) || !resRef) return;
+    if (!this.removeFromPlayerInventory(actor, resRef)) return;
+    const current: ModuleItem | undefined = (actor.equipment as any)[slotName];
+    const currentResRef = current?.getEquippedRes() || current?.getInventoryRes();
+    if (currentResRef) this.addToPlayerInventory(actor, [{ resRef: currentResRef, stack: 1 }]);
+    const item = await this.createItemFromResRefAsync(resRef);
+    await actor.equipItem(slot, item);
+  }
+
+  /** Host: move an equipped item back into the player's inventory */
+  static unequipOnHost(actor: ModuleCreature, slot: number) {
+    const slotName = ModuleCreatureArmorSlot[slot];
+    if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName)) return;
+    const current: ModuleItem | undefined = (actor.equipment as any)[slotName];
+    const currentResRef = current?.getEquippedRes() || current?.getInventoryRes();
+    if (!currentResRef) return;
+    this.addToPlayerInventory(actor, [{ resRef: currentResRef, stack: 1 }]);
+    actor.unequipSlot(slot);
+  }
+
+  /** Client: equipping our own character becomes a request to the host. Returns true when handled. */
+  static requestNetworkEquip(cre: ModuleObject, slot: number, item: ModuleItem): boolean {
+    if (!this.isOwnNetworkCharacter(cre)) return false;
+    const resRef = item?.getEquippedRes() || item?.getInventoryRes();
+    if (!resRef) return true;
+    GMNetworkManager.sendIntent('equip', undefined, { slot, resRef });
+    return true;
+  }
+
+  /** Client: unequipping our own character becomes a request to the host. Returns true when handled. */
+  static requestNetworkUnequip(cre: ModuleObject, slot: number): boolean {
+    if (!this.isOwnNetworkCharacter(cre)) return false;
+    GMNetworkManager.sendIntent('unequip', undefined, { slot });
+    return true;
+  }
+
+  static isOwnNetworkCharacter(cre: ModuleObject): boolean {
+    return GameState.gmMode &&
+      GMNetworkManager.role === 'client' &&
+      !this.applyingHostSheet &&
+      !!(cre as any)?.gmNetId &&
+      (cre as any).gmNetId === GMNetworkManager.assignedActorNetId;
+  }
+
+  /**
+   * Client: make our character match the host's: stats, classes, feats, skills, equipment and inventory
+   */
+  static async applyPlayerSheetOnClient(sheet: GMPlayerSheet) {
+    if (!sheet || sheet.netId !== GMNetworkManager.assignedActorNetId) return;
+    const cre = this.netIdMap.get(sheet.netId) as ModuleCreature;
+    if (!cre) {
+      this.pendingPlayerSheet = sheet;
+      return;
+    }
+    this.pendingPlayerSheet = null;
+    this.applyingHostSheet = true;
+    try {
+      Object.assign(cre, sheet.attributes);
+      cre.classes = sheet.classes.map((c) => {
+        const cls = new CreatureClass(c.id);
+        cls.setLevel(c.level);
+        for (const spellId of c.spells) cls.addSpell(new TalentSpell(spellId));
+        return cls;
+      });
+      const featRows = GameState.TwoDAManager.datatables.get('feat')?.rows || {};
+      cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
+      sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
+      cre.experience = sheet.xp;
+      cre.forcePoints = sheet.forcePoints;
+      cre.maxForcePoints = sheet.maxForcePoints;
+      cre.currentForce = sheet.currentForce;
+      this.setCreatureHP(cre, sheet.hp, sheet.maxHp);
+
+      for (const slotName of this.PLAYER_EQUIP_SLOTS) {
+        const want = sheet.equipment[slotName] || '';
+        const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
+        const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
+        if (want === have) continue;
+        const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
+        if (want) {
+          await cre.equipItem(slot, await this.createItemFromResRefAsync(want));
+        } else {
+          cre.unequipSlot(slot);
+        }
+      }
+
+      const inventoryJson = JSON.stringify(sheet.inventory);
+      if (inventoryJson !== this.lastAppliedInventoryJson) {
+        this.lastAppliedInventoryJson = inventoryJson;
+        // Assigned directly: InventoryManager.addItem would re-credit gold on every resync
+        GameState.InventoryManager.inventory = await this.createLootItems(sheet.inventory);
+      }
+    } finally {
+      this.applyingHostSheet = false;
+    }
+    this.notifyChange();
+  }
+
+  /**
+   * Client: keep another player's or NPC's visible weapons and armor matching the host
+   */
+  static syncReplicaEquipment(cre: ModuleCreature, actor: GMSerializedActor) {
+    const wanted: [string, string | undefined][] = [
+      ['RIGHTHAND', actor.rightHandResRef],
+      ['LEFTHAND', actor.leftHandResRef],
+      ['ARMOR', actor.armorResRef],
+    ];
+    const loading: Record<string, boolean> = (cre as any).gmEquipLoading || ((cre as any).gmEquipLoading = {});
+    for (const [slotName, resRef] of wanted) {
+      if (resRef === undefined || loading[slotName]) continue;
+      const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
+      const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
+      if (have === resRef) continue;
+      const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
+      if (!resRef) {
+        cre.unequipSlot(slot);
+        continue;
+      }
+      loading[slotName] = true;
+      this.createItemFromResRefAsync(resRef)
+        .then((item) => cre.equipItem(slot, item))
+        .catch((e) => console.warn('[GMManager] replica equip failed', resRef, e))
+        .finally(() => { loading[slotName] = false; });
+    }
+  }
+
   /**
    * Execute a client's interaction request on the host using the engine's normal actions,
    * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
@@ -3874,6 +4318,20 @@ export class GMManager {
     const actor = this.getOwnedActor(peerId, intent.netId);
     if (!actor) return;
     (actor as any).gmIntentSeq = intent.seq;
+
+    // Taking items and changing equipment don't interrupt anything the actor is doing
+    if (intent.kind === 'loot') {
+      this.grantLootOnHost(peerId, actor, intent.targetNetId);
+      return;
+    }
+    if (intent.kind === 'equip') {
+      this.equipOnHost(actor, intent.slot, intent.resRef).catch((e) => console.warn('[GMManager] equip failed', e));
+      return;
+    }
+    if (intent.kind === 'unequip') {
+      this.unequipOnHost(actor, intent.slot);
+      return;
+    }
 
     actor.clearAllActions();
     if (intent.kind === 'cancel') {
@@ -3977,7 +4435,10 @@ export class GMManager {
     } else {
       const hostAnim = (cre as any).gmNetAnim as number | undefined;
       const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
-      if (hostAnim && !hostIsLocomotion && hostAnim !== anim) {
+      const hostIsFxDriven = this.FX_DRIVEN_ANIM_STATES.includes(hostAnim);
+      // Let a replayed attack/reaction animation finish before applying the tick's state
+      const fxPlaying = !!(cre as any).gmFxAnimation && cre.animationState.animation === (cre as any).gmFxAnimation;
+      if (hostAnim && !hostIsLocomotion && !hostIsFxDriven && !fxPlaying && hostAnim !== anim) {
         cre.setAnimationState(hostAnim);
       } else if (isLocomotion) {
         cre.setAnimationState(cre.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);

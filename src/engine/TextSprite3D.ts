@@ -27,6 +27,9 @@ export class TextSprite3D {
 
   static HEIGHT: number = 0.1;
 
+  /** Optional observer for text created on objects (the GM host mirrors combat text to players) */
+  static onCreateOnObject?: (object: ModuleObject, text: string, type: TextSprite3DType, timer: number) => void;
+
   container: THREE.Object3D = new THREE.Object3D();
   area: ModuleArea;
   owner: ModuleObject;
@@ -274,6 +277,7 @@ export class TextSprite3D {
 
   static CreateOnObject(object: ModuleObject, text: string = '', type: TextSprite3DType = TextSprite3DType.NEUTRAL, timer: number = 3000){
     if(!object) return;
+    TextSprite3D.onCreateOnObject?.(object, text, type, timer);
 
     if(object.area){
       const textSprite = new TextSprite3D(text, type);

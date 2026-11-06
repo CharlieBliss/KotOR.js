@@ -20,6 +20,10 @@ const HOST_ONLY_TYPES = new Set([
   'actor.remove',
   'actor.assign',
   'door.state',
+  'fx.event',
+  'container.open',
+  'container.loot',
+  'player.sheet',
 ]);
 
 // Player packets that only the host needs to see

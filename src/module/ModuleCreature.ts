@@ -1497,6 +1497,7 @@ export class ModuleCreature extends ModuleObject {
         started: false,
         speed: 1,
       }
+      if(GameState.gmMode) GameState.GMManager.onHostTwoDAAnimation(this, animation);
     }
   }
 
@@ -2309,6 +2310,7 @@ export class ModuleCreature extends ModuleObject {
 
   use(object: ModuleObject){
     if(this.hasInventory()){
+      if(GameState.gmMode && GameState.GMManager.routeContainerOpen(this, object)) return;
       GameState.MenuManager.MenuContainer.AttachContainer(this);
       GameState.MenuManager.MenuContainer.open();
     }
@@ -2319,6 +2321,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   retrieveInventory(){
+    if(GameState.gmMode && GameState.GMManager.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       GameState.InventoryManager.addItem(this.inventory.pop())
     }
@@ -3481,6 +3484,8 @@ export class ModuleCreature extends ModuleObject {
     if(!item){
       return;
     }
+    // GM multiplayer: a player's own equipment is changed by the host
+    if(GameState.gmMode && GameState.GMManager.requestNetworkEquip(this, slot, item)) return;
 
     this.unequipSlot(slot);
     item.onEquip(this);
@@ -3521,6 +3526,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   unequipSlot(slot = 0x1){
+    if(GameState.gmMode && GameState.GMManager.requestNetworkUnequip(this, slot)) return;
     try{
       switch(slot){
         case ModuleCreatureArmorSlot.IMPLANT:
