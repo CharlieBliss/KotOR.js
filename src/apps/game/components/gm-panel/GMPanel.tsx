@@ -20,7 +20,7 @@ type DrawerTab = 'scenes' | 'builder' | 'actors' | 'players' | 'inspector' | 'mu
 
 export const GMPanel: React.FC = () => {
   const [, setTick] = useState(0);
-  const [drawerTab, setDrawerTab] = useState<DrawerTab>('builder');
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>(null);
   const [showQuickJoinOnMenu, setShowQuickJoinOnMenu] = useState(false);
 
   // Scene tab states
@@ -88,7 +88,8 @@ export const GMPanel: React.FC = () => {
     }, 350);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!KotOR.GameState.gmMode) return;
+      if (!KotOR.GameState.gmMode || KotOR.IngameControls.isTypingInPageField(e)) return;
+      if (!GMManager.isGMUser()) return;
       if (e.key === 'F2') {
         e.preventDefault();
         if (GMManager.controlMode === 'POSSESS') {
@@ -102,14 +103,10 @@ export const GMPanel: React.FC = () => {
             GMManager.spawnedPlayers[0];
           if (target) GMManager.possessCharacter(target);
         }
-      } else if (e.key === 'Escape' && GMManager.activeTool !== 'select') {
+      } else if (e.code === 'KeyR' && GMManager.isPlacementTool(GMManager.activeTool)) {
+        GMManager.rotatePlacement(e.shiftKey ? -GMManager.PLACEMENT_KEY_STEP : GMManager.PLACEMENT_KEY_STEP);
+      } else if (e.key === 'Escape' && GMManager.activeTool !== 'select' && GMManager.controlMode === 'POSSESS') {
         GMManager.setToolMode('select');
-      } else if (GMManager.activeTool !== 'select' && (e.key === 'q' || e.key === 'Q')) {
-        GMManager.placementYawOffset = (GMManager.placementYawOffset - 45 + 360) % 360;
-        forceUpdate();
-      } else if (GMManager.activeTool !== 'select' && (e.key === 'e' || e.key === 'E')) {
-        GMManager.placementYawOffset = (GMManager.placementYawOffset + 45) % 360;
-        forceUpdate();
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -234,6 +231,59 @@ export const GMPanel: React.FC = () => {
   const currentArea = KotOR.GameState.module?.area;
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
+  const isPlayerView = !GMManager.isGMUser();
+  if (isPlayerView && drawerTab && drawerTab !== 'multiplayer') {
+    queueMicrotask(() => setDrawerTab(null));
+  }
+
+  // Who "Play as" (and F2) would take control of
+  const selectedCreature = selectedObj && BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModuleCreature)
+    ? (selectedObj as KotOR.ModuleCreature)
+    : null;
+  const possessCandidate = selectedCreature || currentLeader || GMManager.spawnedPlayers[0] || null;
+  const possessCandidateName = possessCandidate?.getName() || 'new character';
+
+  const drawerTabs: { id: Exclude<DrawerTab, null>; label: string; title: string }[] = isPlayerView
+    ? [{ id: 'multiplayer', label: 'Session', title: 'Connection status and chat' }]
+    : [
+      { id: 'scenes', label: 'Scenes', title: 'Load a module as the scene' },
+      { id: 'builder', label: 'Build', title: 'Build whole scenes from blueprints (office, temple, ...)' },
+      { id: 'actors', label: 'Place', title: 'Choose the creature or prop that Place Actor / Place Object puts down' },
+      { id: 'players', label: `Players (${GMManager.spawnedPlayers.length})`, title: 'Player characters and party' },
+      { id: 'inspector', label: selectedObj ? `Inspect: ${selectedObj.getName() || 'Selected'}` : 'Inspect', title: 'Edit the selected object, or browse everything in the scene' },
+      { id: 'multiplayer', label: 'Session', title: 'Host a session, connected players and chat' },
+    ];
+
+  // Context-sensitive status chip and control hints shown at the bottom of the screen
+  const tool = GMManager.activeTool;
+  const placingName =
+    tool === 'place_creature' ? GMManager.pendingCreatureConfig?.name :
+    tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
+    tool === 'place_player' ? GMManager.pendingPlayerConfig?.name : '';
+  const teleportTarget = GMManager.getTeleportTarget();
+  let statusChip: string | null = null;
+  let controlHints: [string, string][] = [];
+  if (isPlayerView) {
+    controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
+  } else if (GMManager.isPlacementTool(tool)) {
+    statusChip = `Placing: ${placingName || 'object'} · ${GMManager.placementYawOffset}°`;
+    controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc', 'done']];
+  } else if (tool === 'teleport') {
+    statusChip = teleportTarget ? `Teleport: ${teleportTarget.getName() || 'selected object'}` : 'Teleport: select something first';
+    controlHints = [['Click ground', 'move it there'], ['Esc', 'done']];
+  } else if (GMManager.controlMode === 'POSSESS') {
+    controlHints = [['WASD', 'move'], ['Click', 'interact'], ['F2', 'back to GM camera']];
+  } else {
+    controlHints = [
+      ['WASD', 'fly'], ['Q / E or Space', 'down / up'], ['Shift', 'faster'], ['Drag', 'look'],
+      ['Click', 'select'], ['Double-click creature', 'play as it'], ['F2', `play as ${possessCandidateName}`],
+    ];
+  }
+
+  const possessCandidateOrSpawn = async () => {
+    const target = possessCandidate || await GMManager.spawnPlayerCharacter(playerCfg);
+    if (target) GMManager.possessCharacter(target);
+  };
 
   const planets = ['All', ...Array.from(new Set(GMManager.CURATED_MODULES.map(m => m.planet)))];
   const filteredCuratedModules = GMManager.CURATED_MODULES.filter(m => {
@@ -297,131 +347,107 @@ export const GMPanel: React.FC = () => {
 
   return (
     <div className="gm-panel-root">
-      {/* Top NWN-Style Dungeon Master / GM Toolbar */}
+      {/* GM toolbar: status, drawer tabs, then viewport tools and mode controls */}
       <div className="gm-topbar">
         <div className="gm-topbar-group">
-          <span className="gm-badge">GM Mode</span>
-          <span className="gm-badge" title="Active Scene Module">
-            Scene: {currentModuleName}
+          <span className="gm-badge" title="Active scene module">
+            {isPlayerView ? 'Player' : 'GM'} · {currentModuleName}
           </span>
           {GMNetworkManager.role !== 'offline' && (
             <span className={`gm-badge ${GMNetworkManager.role}`}>
               {GMNetworkManager.role === 'host'
-                ? `Hosting (${GMNetworkManager.peers.size} Players)`
-                : `Client (${GMNetworkManager.connected ? 'Connected' : 'Connecting'})`}
+                ? `Hosting · ${GMNetworkManager.peers.size} player${GMNetworkManager.peers.size === 1 ? '' : 's'}`
+                : (GMNetworkManager.connected ? 'Connected' : 'Connecting…')}
             </span>
           )}
 
-          {/* Drawer Tab Buttons */}
-          <button
-            className={`gm-btn ${drawerTab === 'builder' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'builder' ? null : 'builder')}
-          >
-            Scene Builder (Office / Temple)
-          </button>
-          <button
-            className={`gm-btn ${drawerTab === 'scenes' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'scenes' ? null : 'scenes')}
-          >
-            Scenes
-          </button>
-          <button
-            className={`gm-btn ${drawerTab === 'actors' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'actors' ? null : 'actors')}
-          >
-            Place Actors & Props
-          </button>
-          <button
-            className={`gm-btn ${drawerTab === 'players' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'players' ? null : 'players')}
-          >
-            Players & Party ({GMManager.spawnedPlayers.length})
-          </button>
-          <button
-            className={`gm-btn ${drawerTab === 'inspector' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'inspector' ? null : 'inspector')}
-          >
-            World Inspector {selectedObj ? `[${selectedObj.getName() || 'Selected'}]` : ''}
-          </button>
-          <button
-            className={`gm-btn ${drawerTab === 'multiplayer' ? 'active' : ''}`}
-            onClick={() => setDrawerTab(drawerTab === 'multiplayer' ? null : 'multiplayer')}
-          >
-            Multiplayer (NWN)
-          </button>
+          {drawerTabs.map(tab => (
+            <button
+              key={tab.id}
+              className={`gm-btn ${drawerTab === tab.id ? 'active' : ''}`}
+              onClick={() => setDrawerTab(drawerTab === tab.id ? null : tab.id)}
+              title={tab.title}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* Viewport Tool & Camera/Possess Mode Controls */}
-        <div className="gm-topbar-group">
-          <button
-            className={`gm-btn small ${GMManager.activeTool === 'select' ? 'active' : ''}`}
-            onClick={() => GMManager.setToolMode('select')}
-            title="Click objects in 3D scene to inspect; double-click creatures to possess"
-          >
-            Cursor: Select
-          </button>
-          <button
-            className={`gm-btn small ${GMManager.activeTool === 'place_creature' ? 'warning active' : ''}`}
-            onClick={() => GMManager.setToolMode(GMManager.activeTool === 'place_creature' ? 'select' : 'place_creature')}
-            title="Click anywhere on the 3D ground to place the current Creature"
-          >
-            + Click-Place Actor
-          </button>
-          <button
-            className={`gm-btn small ${GMManager.activeTool === 'place_placeable' ? 'warning active' : ''}`}
-            onClick={() => GMManager.setToolMode(GMManager.activeTool === 'place_placeable' ? 'select' : 'place_placeable')}
-            title="Click anywhere on the 3D ground to place the current Placeable/Container"
-          >
-            + Click-Place Object
-          </button>
-          <button
-            className={`gm-btn small ${GMManager.activeTool === 'teleport' ? 'warning active' : ''}`}
-            onClick={() => GMManager.setToolMode(GMManager.activeTool === 'teleport' ? 'select' : 'teleport')}
-            title="Click anywhere on the 3D ground to teleport the selected object or player"
-          >
-            Click-Teleport
-          </button>
+        {!isPlayerView && (
+          <div className="gm-topbar-group">
+            <div className="gm-segmented" role="group" aria-label="Viewport tool">
+              <button
+                className={`gm-btn small ${tool === 'select' ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode('select')}
+                title="Click objects to select them"
+              >
+                Select
+              </button>
+              <button
+                className={`gm-btn small ${tool === 'place_creature' ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode(tool === 'place_creature' ? 'select' : 'place_creature')}
+                title={`Click the ground to place: ${GMManager.pendingCreatureConfig?.name || 'creature'} (change it in Place)`}
+              >
+                Place Actor
+              </button>
+              <button
+                className={`gm-btn small ${tool === 'place_placeable' ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode(tool === 'place_placeable' ? 'select' : 'place_placeable')}
+                title={`Click the ground to place: ${GMManager.pendingPlaceableConfig?.name || 'object'} (change it in Place)`}
+              >
+                Place Object
+              </button>
+              <button
+                className={`gm-btn small ${tool === 'teleport' ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode(tool === 'teleport' ? 'select' : 'teleport')}
+                disabled={!teleportTarget && tool !== 'teleport'}
+                title={teleportTarget ? `Click the ground to move ${teleportTarget.getName() || 'the selection'}` : 'Select something to teleport first'}
+              >
+                Teleport
+              </button>
+            </div>
 
-          {/* Toggle Free Camera vs Possess Character */}
-          {GMManager.controlMode === 'FREECAM' ? (
+            <div className="gm-segmented" role="group" aria-label="Control mode (F2)">
+              <button
+                className={`gm-btn small ${GMManager.controlMode === 'FREECAM' ? 'active' : ''}`}
+                onClick={() => { if (GMManager.controlMode !== 'FREECAM') GMManager.enterFreeCamera(true); }}
+                title="Fly the GM camera (F2)"
+              >
+                GM Camera
+              </button>
+              <button
+                className={`gm-btn small ${GMManager.controlMode === 'POSSESS' ? 'active' : ''}`}
+                onClick={() => { if (GMManager.controlMode !== 'POSSESS') possessCandidateOrSpawn(); }}
+                title="Play as a character: walk, fight, open doors and loot (F2)"
+              >
+                {GMManager.controlMode === 'POSSESS'
+                  ? `Playing: ${currentLeader?.getName() || 'character'}`
+                  : `Play as ${possessCandidateName}`}
+              </button>
+            </div>
+
             <button
-              className="gm-btn success"
-              onClick={async () => {
-                let target =
-                  (selectedObj && BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModuleCreature)
-                    ? (selectedObj as KotOR.ModuleCreature)
-                    : null) ||
-                  currentLeader ||
-                  GMManager.spawnedPlayers[0];
-                if (!target) {
-                  target = await GMManager.spawnPlayerCharacter(playerCfg);
-                }
-                if (target) GMManager.possessCharacter(target);
+              className={`gm-btn small ${GMManager.worldPaused ? 'danger' : ''}`}
+              onClick={() => {
+                GMManager.worldPaused = !GMManager.worldPaused;
+                forceUpdate();
               }}
-              title="Possess active Player Character (or selected Creature) to walk, fight, open doors, and loot containers (Hotkey: F2)"
+              title="Freeze movement, combat and effects for everyone"
             >
-              Possess Character (Play Mode)
+              {GMManager.worldPaused ? 'World Paused' : 'Pause World'}
             </button>
-          ) : (
-            <button
-              className="gm-btn warning"
-              onClick={() => GMManager.enterFreeCamera(true)}
-              title="Unpossess character and return to GM Free-Roam Camera (Hotkey: F2)"
-            >
-              GM Free Camera (Controlling: {currentLeader?.getName() || 'Player'})
-            </button>
-          )}
+          </div>
+        )}
+      </div>
 
-          <button
-            className={`gm-btn small ${GMManager.worldPaused ? 'danger' : ''}`}
-            onClick={() => {
-              GMManager.worldPaused = !GMManager.worldPaused;
-              forceUpdate();
-            }}
-          >
-            {GMManager.worldPaused ? 'AI Paused' : 'AI Running'}
-          </button>
-        </div>
+      {/* Bottom controls strip: what the current mode/tool does and its keys */}
+      <div className="gm-controls-strip">
+        {statusChip && <span className="gm-chip">{statusChip}</span>}
+        {controlHints.map(([keys, label]) => (
+          <span key={keys} className="gm-control-hint">
+            <kbd>{keys}</kbd> {label}
+          </span>
+        ))}
       </div>
 
       {/* Collapsible Drawer Content */}

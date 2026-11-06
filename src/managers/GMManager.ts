@@ -184,6 +184,10 @@ export class GMManager {
     ModuleCreatureAnimState.PARRY,
   ];
 
+  // Degrees per placement rotation step: R / Shift+R, and per mouse-wheel notch
+  static PLACEMENT_KEY_STEP: number = 45;
+  static PLACEMENT_WHEEL_STEP: number = 15;
+
   // How close a player must be to a container for the host to hand over its items
   static LOOT_RANGE: number = 4;
 
@@ -1641,8 +1645,16 @@ export class GMManager {
       this.updateMouseRaycast(e.clientX, e.clientY);
     });
 
+    // While placing, the mouse wheel turns what's being placed
+    window.addEventListener('wheel', (e: WheelEvent) => {
+      if (!GameState.gmMode || !this.isPlacementTool(this.activeTool) || !this.isGMUser()) return;
+      const target = e.target as HTMLElement;
+      if (target && target.closest('.gm-panel-root')) return;
+      this.rotatePlacement(e.deltaY > 0 ? this.PLACEMENT_WHEEL_STEP : -this.PLACEMENT_WHEEL_STEP);
+    }, { passive: true });
+
     window.addEventListener('pointerup', (e: PointerEvent) => {
-      if (!GameState.gmMode || e.button !== 0) return;
+      if (!GameState.gmMode || e.button !== 0 || !this.isGMUser()) return;
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
 
@@ -1801,11 +1813,35 @@ export class GMManager {
       if (player) this.selectObject(player);
       this.setToolMode('select');
     } else if (this.activeTool === 'teleport') {
-      const target = this.selectedObject || GameState.getCurrentPlayer();
+      const target = this.getTeleportTarget();
       if (target) {
         this.teleportObject(target, spawnPos);
       }
     }
+  }
+
+  /** Players joined to someone else's session don't get GM tools */
+  static isGMUser(): boolean {
+    return GMNetworkManager.role !== 'client';
+  }
+
+  static isPlacementTool(tool: GMToolMode): boolean {
+    return tool === 'place_creature' || tool === 'place_placeable' || tool === 'place_player';
+  }
+
+  static rotatePlacement(degrees: number) {
+    this.placementYawOffset = ((this.placementYawOffset + degrees) % 360 + 360) % 360;
+    this.notifyChange();
+  }
+
+  /**
+   * What Teleport will move: the selected object, or while playing as a character, that character.
+   * Nothing otherwise, so a stray click can't silently move someone.
+   */
+  static getTeleportTarget(): ModuleObject | null {
+    if (this.selectedObject) return this.selectedObject;
+    if (this.controlMode === 'POSSESS') return GameState.getCurrentPlayer() || null;
+    return null;
   }
 
   static pickObjectAtCursor(): ModuleObject | null {

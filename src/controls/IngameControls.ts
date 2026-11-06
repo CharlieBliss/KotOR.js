@@ -57,6 +57,8 @@ export class IngameControls {
     this.element.requestPointerLock = this.element.requestPointerLock;
 
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+      // Typing into a page text field (e.g. the GM panel) must not also move the camera or character
+      if(IngameControls.isTypingInPageField(e)) return;
       this.keyboard.onKeyDown(e);
 
       if(GameState.MenuManager.activeGUIElement){
@@ -421,6 +423,20 @@ export class IngameControls {
       e.preventDefault();
     });
 
+  }
+
+  /**
+   * True when a key event is text entry in a page form field (not the game's own GUI text boxes)
+   */
+  static isTypingInPageField(event: KeyboardEvent): boolean {
+    const target = event.target as HTMLElement | null;
+    if(!target || typeof target.tagName !== 'string') return false;
+    if(target.isContentEditable) return true;
+    const tag = target.tagName.toUpperCase();
+    if(tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if(tag !== 'INPUT') return false;
+    const type = ((target as HTMLInputElement).type || 'text').toLowerCase();
+    return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'color'].includes(type);
   }
 
   /**
@@ -946,7 +962,14 @@ export class IngameControls {
     
     if(GameState.Mode == EngineMode.FREELOOK){
       if(this.keyboard.action.Escape?.pressed){
-        GameState.MenuManager.MenuOptions.open();
+        // In GM mode Esc first cancels an active placement/teleport tool, and is consumed so the
+        // GUI key mapping processed below doesn't also open the Options menu this frame
+        if(GameState.gmMode && GameState.GMManager.activeTool !== 'select'){
+          GameState.GMManager.setToolMode('select');
+          this.keyboard.action.Escape.pressed = false;
+        }else{
+          GameState.MenuManager.MenuOptions.open();
+        }
       }
       const dx = Mouse.MouseX - Mouse.OldMouseX;
       const dy = Mouse.MouseY - Mouse.OldMouseY;

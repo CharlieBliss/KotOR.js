@@ -646,6 +646,44 @@ describe("GM multiplayer host authority", () => {
     });
   });
 
+  describe("GM tool rules", () => {
+    afterEach(() => {
+      GMManager.selectedObject = null;
+      GMManager.controlMode = "FREECAM";
+      GMManager.placementYawOffset = 0;
+    });
+
+    test("teleport only targets the selection, or the character being played", () => {
+      (GameState as any).getCurrentPlayer = () => ({ name: "played" });
+      GMManager.selectedObject = null;
+      GMManager.controlMode = "FREECAM";
+      expect(GMManager.getTeleportTarget()).toBeNull();
+
+      GMManager.controlMode = "POSSESS";
+      expect(GMManager.getTeleportTarget()).toEqual({ name: "played" });
+
+      const selected: any = { name: "selected" };
+      GMManager.selectedObject = selected;
+      expect(GMManager.getTeleportTarget()).toBe(selected);
+    });
+
+    test("placement rotation wraps around in both directions", () => {
+      GMManager.rotatePlacement(-45);
+      expect(GMManager.placementYawOffset).toBe(315);
+      GMManager.rotatePlacement(90);
+      expect(GMManager.placementYawOffset).toBe(45);
+    });
+
+    test("GM tools are for the GM, not for players joined to a session", () => {
+      GMNetworkManager.role = "offline";
+      expect(GMManager.isGMUser()).toBe(true);
+      GMNetworkManager.role = "host";
+      expect(GMManager.isGMUser()).toBe(true);
+      GMNetworkManager.role = "client";
+      expect(GMManager.isGMUser()).toBe(false);
+    });
+  });
+
   describe("replica motion", () => {
     test("snaps on first sync or teleport, otherwise glides toward the target with a run animation", () => {
       const cre = mockCreature("cre_0");
