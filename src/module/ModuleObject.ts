@@ -452,7 +452,7 @@ export class ModuleObject {
 
     for(let i = 0, len = this.effects.length; i < len; i++){
       const effect = this.effects[i];
-      let rate = 0;
+      if(!effect) continue; let rate = 0;
       if(effect.type == GameEffectType.EffectMovementSpeedIncrease){
         rate = (effect.getInt(0) / 100);
       }else if(effect.type == GameEffectType.EffectMovementSpeedDecrease){
@@ -491,7 +491,7 @@ export class ModuleObject {
     //Loop through and update the effects
     if(!this.deferEventUpdate){
       for(let i = 0, len = this.effects.length; i < len; i++){
-        this.effects[i].update(delta);
+        const lenBefore = this.effects.length; this.effects[i]?.update(delta); if(this.effects.length < lenBefore){ i -= (lenBefore - this.effects.length); len = this.effects.length; }
       }
     }
 
@@ -1560,7 +1560,7 @@ export class ModuleObject {
     }
     
     if(!onUserDefined){ return; }
-    onUserDefined.run(this, parseInt(event.getInt(0)));
+    onUserDefined.lastPerceived = (this as any).lastPerceived; onUserDefined.run(this, parseInt(event.getInt(0)));
   }
 
   /**
@@ -1952,6 +1952,16 @@ export class ModuleObject {
    * @returns 
    */
   isDebilitated() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && eff.getInt(0) >= 1 && eff.getInt(0) <= 10){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  _oldIsDebilitated() {
     return false;
   }
 
@@ -1960,6 +1970,16 @@ export class ModuleObject {
    * @returns 
    */
   isStunned() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && (eff.getInt(0) === 3 || eff.getInt(0) === 4)){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  _oldIsStunned() {
     return false;
   }
 
@@ -1968,6 +1988,16 @@ export class ModuleObject {
    * @returns 
    */
   isParalyzed() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && eff.getInt(0) === 5){
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+  _oldIsParalyzed() {
     return false;
   }
 
@@ -1976,6 +2006,9 @@ export class ModuleObject {
    * @returns 
    */
   isPoisoned() {
+    return this.hasEffect(GameEffectType.EffectPoison);
+  }
+  _oldIsPoisoned() {
     return false;
   }
 
@@ -1984,6 +2017,9 @@ export class ModuleObject {
    * @returns 
    */
   isDiseased(): any {
+    return this.hasEffect(GameEffectType.EffectDisease);
+  }
+  _oldIsDiseased(): any {
     return false;
   }
 
@@ -2470,7 +2506,9 @@ export class ModuleObject {
     let roll = Dice.roll(1, DiceType.d20);
     let bonus = CombatRound.GetMod(this.getCON());
     
-    if((roll + this.getFortitudeSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getFortitudeSave() + bonus) >= nDC){
       return 1
     }
 
@@ -2496,7 +2534,9 @@ export class ModuleObject {
     let roll = Dice.roll(1, DiceType.d20);
     let bonus = CombatRound.GetMod(this.getDEX());
     
-    if((roll + this.getReflexSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getReflexSave() + bonus) >= nDC){
       return 1
     }
 
@@ -2530,7 +2570,9 @@ export class ModuleObject {
     let roll = Dice.roll(1, DiceType.d20);
     let bonus = CombatRound.GetMod(this.getWIS());
 
-    if((roll + this.getWillSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getWillSave() + bonus) >= nDC){
       return 1
     }
 
@@ -3187,7 +3229,7 @@ export class ModuleObject {
 
     if(triggerOnNotice && onNotice){
       const instance = onNotice.nwscript.newInstance();
-      instance.lastPerceived = perceptionObject;
+      (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
       return true;
     }
@@ -3236,7 +3278,7 @@ export class ModuleObject {
 
     if(triggerOnNotice && onNotice){
       const instance = onNotice.nwscript.newInstance();
-      instance.lastPerceived = perceptionObject;
+      (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
       return true;
     }

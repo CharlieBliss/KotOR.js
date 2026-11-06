@@ -100,6 +100,7 @@ export class ModuleItem extends ModuleObject {
     this.modelVariation = 0;
     this.textureVariation = 1;
     this.palleteID = 0;
+    this.stackSize = 1;
     this.loaded = false;
     this.properties = [];
     this.upgradeItems = {};
@@ -223,7 +224,7 @@ export class ModuleItem extends ModuleObject {
   }
 
   getStackSize(){
-    return this.stackSize;
+    return this.stackSize || 1;
   }
 
   setStackSize(value: number){
@@ -231,7 +232,7 @@ export class ModuleItem extends ModuleObject {
   }
 
   getLocalizedName(){
-    return this.localizedName.getValue().replace(/\0[\s\S]*$/g,'');
+    return this.localizedName?.getValue ? (this.localizedName.getValue() || '').replace(/\0[\s\S]*$/g,'') : (this.tag || this.equippedRes || this.inventoryRes || 'Item');
   }
 
   getPalleteID(){
@@ -250,7 +251,7 @@ export class ModuleItem extends ModuleObject {
         bonus += property.getValue();
       }
     }
-    return this.baseItem.baseAC + bonus;
+    return (this.baseItem?.baseAC || 0) + bonus;
   }
 
   getDexBonus(){
@@ -577,7 +578,7 @@ export class ModuleItem extends ModuleObject {
    * @param powered - Whether the weapon should be powered
    */
   setPowered(powered: boolean){
-    const currentAnimL = this.model.animationManager.currentAnimation || this.model.odysseyAnimationMap.get('off');
+    const currentAnimL = this.model?.animationManager?.currentAnimation || this.model?.odysseyAnimationMap?.get('off');
     if(!currentAnimL){ return; }
 
     //power up

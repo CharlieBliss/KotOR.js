@@ -105,7 +105,7 @@ export class ResourceLoader {
             buffer
           );
         }
-      }else if(isERFArchive(archive) || archive instanceof ERFObject){
+      }else if(isERFArchive(archive) || (archive as unknown) instanceof ERFObject){
         const keyList = archive.keyList;
         for(let i = 0; i < keyList.length; i++){
           const key = keyList[i];
@@ -285,7 +285,7 @@ export class ResourceLoader {
         if(data){
           return data;
         }
-      }else if(isERFArchive(archive) || archive instanceof ERFObject){
+      }else if(isERFArchive(archive) || (archive as unknown) instanceof ERFObject){
         if(!archive.hasResource(resRef, resId)){ continue; }
         const data = await archive.getResourceBufferByResRef(resRef, resId);
         if(data){

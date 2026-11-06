@@ -38,6 +38,7 @@ export class EffectForceShield extends GameEffect {
       return;
 
     super.onApply();
+    if(!this.forceShield || !this.object) return;
     
     let eVisualEffect = new GameState.GameEffectFactory.EffectVisualEffect();
     eVisualEffect.setCreator(this.getCreator());
@@ -46,7 +47,7 @@ export class EffectForceShield extends GameEffect {
     eVisualEffect.setDuration(this.duration);
     eVisualEffect.setExpireDay(this.expireDay);
     eVisualEffect.setExpireTime(this.expireTime);
-    eVisualEffect.setInt(0, this.forceShield.visualeffectdef);
+    eVisualEffect.setInt(0, parseInt(this.forceShield.visualeffectdef) || 0);
     eVisualEffect.initialize();
     this.object.addEffect(eVisualEffect);
     eVisualEffect.setSkipOnLoad(true);
@@ -62,12 +63,13 @@ export class EffectForceShield extends GameEffect {
     this.object.addEffect(eDamageResistEffect);
     eDamageResistEffect.setSkipOnLoad(true);
 
-    eDamageResistEffect.setInt(0, this.forceShield.damageflags);
-    eDamageResistEffect.setInt(1, this.forceShield.resistance);
-    eDamageResistEffect.setInt(2, this.forceShield.amount);
-    eDamageResistEffect.setInt(3, this.forceShield.vulnerflags);
+    const amount = parseInt(this.forceShield.amount) || 0;
+    const resistance = parseInt(this.forceShield.resistance) || amount;
+    eDamageResistEffect.setInt(0, parseInt(this.forceShield.damageflags) || 0);
+    eDamageResistEffect.setInt(1, resistance);
+    eDamageResistEffect.setInt(2, amount);
+    eDamageResistEffect.setInt(3, parseInt(this.forceShield.vulnerflags) || 0);
 
   }
 
 }
-

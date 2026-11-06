@@ -8,7 +8,7 @@ import type { EventTimedEvent } from "@/events";
 import { GameState } from "@/GameState";
 import type { IPerceptionInfo } from "@/interface/engine/IPerceptionInfo";
 import type { INWScriptStoreState } from "@/interface/nwscript/INWScriptStoreState";
-import type { ModuleObject } from "@/module";
+import type { ModuleObject, ModuleItem } from "@/module";
 import type { DLGObject } from "@/resource/DLGObject";
 import { GFFField } from "@/resource/GFFField";
 import { GFFStruct } from "@/resource/GFFStruct";
@@ -80,6 +80,8 @@ export class NWScriptInstance {
   lastSpellAttacker: ModuleObject;
   lastSpell: TalentSpell;
   lastSpellHarmful: boolean;
+  spellTarget: ModuleObject;
+  spellItem: ModuleItem;
   healTarget: ModuleObject;
 
   lastDisturbed: ModuleObject;

@@ -58,6 +58,8 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import { UIIconTimerType } from "@/enums/engine/UIIconTimerType";
 import { ExperienceType } from "@/enums/engine/ExperienceType";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
+import { TalentObjectType } from "@/enums/engine/TalentObjectType";
+import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 
 /**
 * ModuleCreature class.
@@ -779,7 +781,7 @@ export class ModuleCreature extends ModuleObject {
       //Loop through and update the effects
       if(this.deferEventUpdate){
         for(let i = 0, len = this.effects.length; i < len; i++){
-          this.effects[i].update(delta);
+          const lenBefore = this.effects.length; this.effects[i]?.update(delta); if(this.effects.length < lenBefore){ i -= (lenBefore - this.effects.length); len = this.effects.length; }
         }
       }
 
@@ -1016,7 +1018,7 @@ export class ModuleCreature extends ModuleObject {
   updateCasting(delta = 0){
     //Update active spells
     for(let i = 0, len = this.casting.length; i < len; i++){
-      this.casting[i].spell.update(this.casting[i].target, this, this.casting[i], delta);
+      this.casting[i]?.spell?.update?.(this.casting[i].target, this, this.casting[i], delta);
     }
 
     //Remove completed spells
@@ -1392,7 +1394,39 @@ export class ModuleCreature extends ModuleObject {
   useTalent(talent: TalentObject, oTarget: ModuleObject): Action {
     let action: Action;
     if(talent instanceof TalentObject){
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat) || talent.objectType === 1){
+        (talent as TalentFeat).useTalentOnObject(oTarget, this);
+        return action;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell) || talent.objectType === 0){
+        (talent as TalentSpell).useTalentOnObject(oTarget, this);
+        return action;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill) || talent.objectType === 2){
+        if(talent.id == 6){
+          action = new GameState.ActionFactory.ActionUnlockObject();
+          action.setParameter(0, ActionParameterType.DWORD, oTarget?.id || ModuleObjectConstant.OBJECT_INVALID);
+          this.actionQueue.add(action);
+        }
+        return action;
+      }
+    }
+    return action;
+  }
+
+  _oldUseTalent(talent: TalentObject, oTarget: ModuleObject): any {
+    let action: Action;
+    if(talent instanceof TalentObject){
       const combatAction = new CombatRoundAction();
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)){
+        return this.getHasSpell(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)){
+        return this.getHasFeat(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)){
+        return this.getHasSkill(talent.id) ? true : false;
+      }
       switch(talent.objectType){
         case 1: //FEAT
           combatAction.actionType = CombatActionType.ATTACK_USE_FEAT;
@@ -2623,6 +2657,23 @@ export class ModuleCreature extends ModuleObject {
     let armorAC = (this.equipment.ARMOR?.getACBonus() || 0);
 
     let dexBonus = Math.floor((this.getDEX() - 10) / 2);
+    const maxDexBonus = this.equipment.ARMOR?.getDexBonus() || 0;
+    if(maxDexBonus > 0 && dexBonus > maxDexBonus){
+      dexBonus = maxDexBonus;
+    }
+    let featBonus = this.combatRound ? this.combatRound.calculateDuelingBonus(this) : 0;
+    let effectBonus = 0;
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectACIncrease){
+          effectBonus += (eff.getInt(1) || eff.getInt(0) || 0);
+        }else if(eff.type === GameEffectType.EffectACDecrease){
+          effectBonus -= (eff.getInt(1) || eff.getInt(0) || 0);
+        }
+      }
+    }
+    return baseac + (this.naturalAC || 0) + classBonus + armorAC + dexBonus + featBonus + effectBonus;
 
     return baseac + classBonus + armorAC + dexBonus;
   }
@@ -2748,6 +2799,61 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getSpellSaveDC(){
+    const wisMod = Math.floor((this.getWIS() - 10) / 2);
+    const chaMod = Math.floor((this.getCHA() - 10) / 2);
+    let focusBonus = 0;
+    if(this.getHasFeat(CombatFeatType.FORCE_FOCUS_MASTERY)){
+      focusBonus = 4;
+    }else if(this.getHasFeat(CombatFeatType.FORCE_FOCUS_ADVANCED)){
+      focusBonus = 2;
+    }else if(this.getHasFeat(CombatFeatType.FORCE_FOCUS)){
+      focusBonus = 1;
+    }
+    const level = this.getTotalClassLevel() || this.getSpellCasterLevel();
+    return 5 + level + wisMod + chaMod + focusBonus;
+  }
+
+  getFortitudeSave(){
+    return (this.fortitudeSaveThrow || 0) + (this.fortbonus || 0) + this.getSaveBonus(1);
+  }
+
+  getReflexSave(){
+    return (this.reflexSaveThrow || 0) + (this.refbonus || 0) + this.getSaveBonus(2);
+  }
+
+  getWillSave(){
+    return (this.willSaveThrow || 0) + (this.willbonus || 0) + this.getSaveBonus(3);
+  }
+
+  getSaveBonus(saveType: number = 0): number {
+    let bonus = 0;
+    if(this.getHasFeat(CombatFeatType.MASTER_CONDITIONING)){
+      bonus += 3;
+    }else if(this.getHasFeat(CombatFeatType.IMPROVED_CONDITIONING)){
+      bonus += 2;
+    }else if(this.getHasFeat(CombatFeatType.CONDITIONING)){
+      bonus += 1;
+    }
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectSavingThrowIncrease){
+          const effSave = eff.getInt(1) || 0;
+          if(effSave === 0 || effSave === saveType){
+            bonus += (eff.getInt(0) || 0);
+          }
+        }else if(eff.type === GameEffectType.EffectSavingThrowDecrease){
+          const effSave = eff.getInt(1) || 0;
+          if(effSave === 0 || effSave === saveType){
+            bonus -= (eff.getInt(0) || 0);
+          }
+        }
+      }
+    }
+    return bonus;
+  }
+
+  _oldGetSpellSaveDC(){
     return 10 + this.getSpellCasterLevel();
   }
 
@@ -2928,7 +3034,7 @@ export class ModuleCreature extends ModuleObject {
     let strMod = Math.floor(( this.getSTR() - 10) / 2);
     let dexMod = Math.floor(( this.getDEX() - 10) / 2);
 
-    if(strMod > dexMod){
+    if(strMod >= dexMod){
       bab += strMod;
     }else if(dexMod > strMod){
       bab += dexMod;
@@ -3020,6 +3126,15 @@ export class ModuleCreature extends ModuleObject {
   hasTalent(talent: TalentObject){
     //console.log('hasTalent', talent);
     if(typeof talent != 'undefined'){
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)){
+        return this.getHasSpell(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)){
+        return this.getHasFeat(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)){
+        return this.getHasSkill(talent.id) ? true : false;
+      }
       switch(talent.objectType){
         case 0: //Force / Spell
           return this.getHasSpell(talent.id) ? true : false;
@@ -3351,13 +3466,13 @@ export class ModuleCreature extends ModuleObject {
         this.equipment.RIGHTHAND = item;
         await item.loadModel();
         if(item.model instanceof OdysseyModel3D)
-          this.model.rhand.add(item.model);
+          this.model?.rhand?.add(item.model);
       break;
       case ModuleCreatureArmorSlot.LEFTHAND:
         this.equipment.LEFTHAND = item;
         await item.loadModel();
         if(item.model instanceof OdysseyModel3D)
-          this.model.lhand.add(item.model);
+          this.model?.lhand?.add(item.model);
       break;
       case ModuleCreatureArmorSlot.RIGHTHAND2:
         this.equipment.RIGHTHAND2 = item;
@@ -3462,7 +3577,7 @@ export class ModuleCreature extends ModuleObject {
           try{
             if(this.equipment.RIGHTHAND){
               this.equipment.RIGHTHAND.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.RIGHTHAND.model);
+              this.model?.rhand?.remove(this.equipment.RIGHTHAND.model);
               this.equipment.RIGHTHAND.destroy();
               this.equipment.RIGHTHAND = undefined;
             }
@@ -3498,7 +3613,7 @@ export class ModuleCreature extends ModuleObject {
           try{
             if(this.equipment.LEFTHAND){
               this.equipment.LEFTHAND.onUnEquip(this);
-              this.model.lhand.remove(this.equipment.LEFTHAND.model);
+              this.model?.lhand?.remove(this.equipment.LEFTHAND.model);
               this.equipment.LEFTHAND.destroy();
               this.equipment.LEFTHAND = null;
             }

@@ -2,7 +2,7 @@ import { GFFDataType } from "@/enums/resource/GFFDataType";
 import { GFFField } from "@/resource/GFFField";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { TalentObject } from "@/talents/TalentObject";
-import type { ModuleObject } from "@/module";
+import type { ModuleCreature, ModuleObject } from "@/module";
 import { OdysseyModel3D } from "@/three/odyssey";
 import { TwoDAManager } from "@/managers/TwoDAManager";
 import { ActionType } from "@/enums/actions/ActionType";
@@ -12,6 +12,8 @@ import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState"
 import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { TalentObjectType } from "@/enums/engine/TalentObjectType";
 import { TwoDAObject } from "@/resource/TwoDAObject";
+import { BitWise } from "@/utility/BitWise";
+import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 
 const underscoreParser = (value: string = ''): number[] => {
   return value.split('_').map((val) => {
@@ -105,9 +107,9 @@ export class TalentSpell extends TalentObject {
     super(id);
     this.objectType = TalentObjectType.TalentObject | TalentObjectType.TalentSpell;
 
-    const spells = TwoDAManager.datatables.get('spells');
+    const spells = TwoDAManager.datatables?.get('spells');
     //Merge the spell properties from the spells.2da row with this spell
-    if(spells && spells.rows[this.id]){
+    if(spells && spells.rows && spells.rows[this.id]){
       this.parseTwoDARow(spells.rows[this.id]);
     }
 
@@ -116,9 +118,32 @@ export class TalentSpell extends TalentObject {
   setId( value = 0 ){
     this.id = value;
     //Merge the spell properties from the spells.2da row with this spell
-    if(TwoDAManager.datatables.get('spells').rows[this.id]){
-      Object.assign(this, TwoDAManager.datatables.get('spells').rows[this.id]);
+    const spells = TwoDAManager.datatables?.get('spells');
+    if(spells && spells.rows && spells.rows[this.id]){
+      this.parseTwoDARow(spells.rows[this.id]);
     }
+  }
+
+  /**
+   * Calculate the Force Point cost for casting this power, adjusted by caster CHA and Alignment
+   */
+  getForcePointCost(oCaster?: ModuleObject): number {
+    if(this.forcepoints <= 0 || this.userType !== 1){
+      return 0;
+    }
+    let cost = this.forcepoints;
+    if(oCaster && BitWise.InstanceOfObject(oCaster, ModuleObjectType.ModuleCreature)){
+      const creature = oCaster as ModuleCreature;
+      const chaMod = Math.floor((creature.getCHA() - 10) / 2);
+      const alignment = creature.getGoodEvil(); // 0 = Dark, 50 = Neutral, 100 = Light
+      if(this.goodEvil === 'G' || this.goodEvil === '+'){
+        cost = Math.round(cost * (1 + (50 - alignment) * 0.01));
+      }else if(this.goodEvil === 'E'){
+        cost = Math.round(cost * (1 + (alignment - 50) * 0.01));
+      }
+      cost -= chaMod;
+    }
+    return Math.max(1, cost);
   }
 
   getConjureTime(){
@@ -183,7 +208,9 @@ export class TalentSpell extends TalentObject {
     console.log('Talent.useTalentOnObject', this);
     
     oCaster.combatData.lastSpellTarget = oTarget;
-    oTarget.combatData.lastSpellAttacker = oCaster;
+    if(oTarget){
+      oTarget.combatData.lastSpellAttacker = oCaster;
+    }
     if(this.hostilesetting == 1){
       oCaster.resetExcitedDuration();
     }
@@ -196,11 +223,11 @@ export class TalentSpell extends TalentObject {
     combatAction.animationName = this.getConjureAnimation();
     combatAction.animationTime = 1500;
 
-    combatAction.addSpellInstance(
-      new SpellCastInstance(combatAction.owner, combatAction.target, this)
-    );
-
     oCaster.combatRound.addAction(combatAction);
+
+    combatAction.addSpellInstance(
+      new SpellCastInstance(oCaster, combatAction.target, this)
+    );
 
     if(!oCaster.actionQueue.actionTypeExists(ActionType.ActionCombat)){
       const action = new ActionCombat(0xFFFF);

@@ -200,7 +200,7 @@ export class EffectVisualEffect extends GameEffect {
     if(this.visualEffect.imp_impact_node != '****'){
       MDLLoader.loader.load(this.visualEffect.imp_impact_node)
       .then(
-        (mdl: OdysseyModel) => {
+        (mdl: OdysseyModel) => { if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context
           }).then(
@@ -236,7 +236,7 @@ export class EffectVisualEffect extends GameEffect {
   impactRoot(){
     if(this.getImpactRootModel() != '****'){
       MDLLoader.loader.load(this.getImpactRootModel())
-      .then((mdl: OdysseyModel) => {
+      .then((mdl: OdysseyModel) => { if(!mdl) return;
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
         }).then((model: OdysseyModel3D) => {
@@ -255,7 +255,7 @@ export class EffectVisualEffect extends GameEffect {
   impactHead(){
     if(this.visualEffect.imp_headcon_node != '****'){
       MDLLoader.loader.load(this.visualEffect.imp_headcon_node).then(
-        (mdl: OdysseyModel) => {
+        (mdl: OdysseyModel) => { if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context,
           }).then((model: OdysseyModel3D) => {
@@ -302,7 +302,7 @@ export class EffectVisualEffect extends GameEffect {
         const creature = this.object as ModuleCreature;
         MDLLoader.loader.load(creature.bodyModel)
         .then(
-          (mdl: OdysseyModel) => {
+          (mdl: OdysseyModel) => { if(!mdl) return;
             OdysseyModel3D.FromMDL(mdl, {
               textureVar: fx_tex,
               isForceShield: true,
@@ -317,7 +317,7 @@ export class EffectVisualEffect extends GameEffect {
               
               if(creature.headModel){
                 MDLLoader.loader.load(creature.headModel).then(
-                  (mdl: OdysseyModel) => {
+                  (mdl: OdysseyModel) => { if(!mdl) return;
                   OdysseyModel3D.FromMDL(mdl, {
                     textureVar: fx_tex,
                     context: this.object.context,
@@ -364,7 +364,7 @@ export class EffectVisualEffect extends GameEffect {
               //model.disableMatrixUpdate();
               if(creature.headModel){
                 MDLLoader.loader.load(creature.headModel)
-                .then((mdl: OdysseyModel) => {
+                .then((mdl: OdysseyModel) => { if(!mdl) return;
                   OdysseyModel3D.FromMDL(mdl, {
                     textureVar: fx_tex,
                     context: this.object.context,

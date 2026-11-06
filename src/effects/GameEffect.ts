@@ -212,7 +212,7 @@ export class GameEffect {
   }
 
   update(delta: number = 0){
-    if(this.getDurationType() == GameEffectDurationType.TEMPORARY && (this.expireDay || this.expireTime)){
+    if(this.getDurationType() == GameEffectDurationType.TEMPORARY){
       if(this.duration <= 0){
         this.onDurationEnd();
         return;
@@ -245,7 +245,7 @@ export class GameEffect {
   //When the effect duration has expired
   onDurationEnd(){
     this.durationEnded = true;
-    if(this.object){
+    if(this.object && typeof this.object.removeEffect === 'function'){
       this.object.removeEffect(this);
     }else{
       this.onRemove();

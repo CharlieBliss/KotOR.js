@@ -84,24 +84,38 @@ export class ActionCombat extends Action {
         spellAction.setParameter(3, ActionParameterType.INT, 0);
         spellAction.setParameter(4, ActionParameterType.INT, 0);
         spellAction.setParameter(5, ActionParameterType.DWORD, combatAction.target?.id || ModuleObjectConstant.OBJECT_INVALID); //Target Object
-        spellAction.setParameter(6, ActionParameterType.FLOAT, combatAction.target.position.x); //Target X
-        spellAction.setParameter(7, ActionParameterType.FLOAT, combatAction.target.position.y); //Target Y
-        spellAction.setParameter(8, ActionParameterType.FLOAT, combatAction.target.position.z); //Target Z
+        spellAction.setParameter(6, ActionParameterType.FLOAT, combatAction.target?.position?.x || 0); //Target X
+        spellAction.setParameter(7, ActionParameterType.FLOAT, combatAction.target?.position?.y || 0); //Target Y
+        spellAction.setParameter(8, ActionParameterType.FLOAT, combatAction.target?.position?.z || 0); //Target Z
         spellAction.setParameter(9, ActionParameterType.INT, combatAction.projectilePath); //ProjectilePath
         spellAction.setParameter(10, ActionParameterType.INT, -1);
         spellAction.setParameter(11, ActionParameterType.INT, combatAction.overrideSpell ? combatAction.overrideSpell.id : -1);
-        attackAction.isUserAction = combatAction.isUserAction;
+        spellAction.isUserAction = combatAction.isUserAction;
         this.owner.actionQueue.unshift(spellAction);
       break;
       case CombatActionType.ITEM_CAST_SPELL:
-        //TODO
+        const itemSpellAction = new GameState.ActionFactory.ActionItemCastSpell();
+        itemSpellAction.setParameter(0, ActionParameterType.DWORD, combatAction.target?.id || ModuleObjectConstant.OBJECT_INVALID);
+        itemSpellAction.setParameter(1, ActionParameterType.DWORD, GameState.module?.area?.id || ModuleObjectConstant.OBJECT_INVALID);
+        itemSpellAction.setParameter(2, ActionParameterType.FLOAT, combatAction.target?.position?.x || 0);
+        itemSpellAction.setParameter(3, ActionParameterType.FLOAT, combatAction.target?.position?.y || 0);
+        itemSpellAction.setParameter(4, ActionParameterType.FLOAT, combatAction.target?.position?.z || 0);
+        itemSpellAction.setParameter(5, ActionParameterType.INT, combatAction.spell ? combatAction.spell.id : 0);
+        itemSpellAction.setParameter(6, ActionParameterType.INT, combatAction.domainLevel || 1);
+        itemSpellAction.setParameter(7, ActionParameterType.FLOAT, 0);
+        itemSpellAction.setParameter(8, ActionParameterType.INT, combatAction.projectilePath || 0);
+        itemSpellAction.setParameter(9, ActionParameterType.INT, combatAction.overrideSpell ? combatAction.overrideSpell.id : -1);
+        itemSpellAction.setParameter(10, ActionParameterType.DWORD, combatAction.item?.id || ModuleObjectConstant.OBJECT_INVALID);
+        itemSpellAction.setParameter(11, ActionParameterType.STRING, combatAction.spell?.impactscript || '');
+        itemSpellAction.isUserAction = combatAction.isUserAction;
+        this.owner.actionQueue.unshift(itemSpellAction);
       break;
       case CombatActionType.ITEM_EQUIP:
         const equipAction = new GameState.ActionFactory.ActionEquipItem();
         equipAction.setParameter(0, ActionParameterType.DWORD, combatAction.item?.id || ModuleObjectConstant.OBJECT_INVALID);
         equipAction.setParameter(1, ActionParameterType.DWORD, ModuleObjectConstant.OBJECT_INVALID);
         equipAction.setParameter(2, ActionParameterType.INT, combatAction.equipInstant ? 1 : 0);
-        attackAction.isUserAction = combatAction.isUserAction;
+        equipAction.isUserAction = combatAction.isUserAction;
         this.owner.actionQueue.unshift(equipAction);
       break;
       case CombatActionType.ITEM_UNEQUIP:
@@ -109,7 +123,7 @@ export class ActionCombat extends Action {
         unequipAction.setParameter(0, ActionParameterType.DWORD, combatAction.item?.id || ModuleObjectConstant.OBJECT_INVALID);
         unequipAction.setParameter(1, ActionParameterType.DWORD, ModuleObjectConstant.OBJECT_INVALID);
         unequipAction.setParameter(2, ActionParameterType.INT, combatAction.equipInstant ? 1 : 0);
-        attackAction.isUserAction = combatAction.isUserAction;
+        unequipAction.isUserAction = combatAction.isUserAction;
         this.owner.actionQueue.unshift(unequipAction);
       break;
     }

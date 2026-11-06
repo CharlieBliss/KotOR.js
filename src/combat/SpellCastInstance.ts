@@ -1,4 +1,4 @@
-import type { ModuleObject } from "@/module";
+import type { ModuleItem, ModuleObject } from "@/module";
 import type { TalentSpell } from "@/talents";
 import * as THREE from "three";
 import { OdysseyModel3D } from "@/three/odyssey";
@@ -22,6 +22,7 @@ export class SpellCastInstance {
   spell: TalentSpell;
   owner: ModuleObject;
   target: ModuleObject;
+  item: ModuleItem;
   targetLocation: THREE.Vector3 = new THREE.Vector3(0, 0, 0);
   container: THREE.Object3D = new THREE.Object3D();
 
@@ -40,8 +41,8 @@ export class SpellCastInstance {
   castTimeProgress: number = 0;
   projectileDistance: THREE.Vector3;
   casthandmodel: OdysseyModel3D;
-  impactscript: string;
-  casthandvisual: string;
+  impactscript: string = '';
+  casthandvisual: string = '';
   flags: number;
 
   impacted: boolean = false;
@@ -51,13 +52,38 @@ export class SpellCastInstance {
   castTime: number = 0;
 
   constructor(caster: ModuleObject, target: ModuleObject, spell: TalentSpell){
-    this.context = caster.context;
+    this.context = caster?.context;
     this.owner = caster;
     this.target = target;
     this.spell = spell;
+    this.impactscript = spell?.impactscript || '';
+    this.casthandvisual = spell?.casthandvisual || '';
+    if(spell){
+      const conjTime = Number(spell.getConjureTime());
+      if(!isNaN(conjTime) && conjTime > 0){
+        this.conjureTime = conjTime;
+      }
+      const castTime = Number(spell.getCastTime());
+      if(!isNaN(castTime) && castTime >= 0){
+        this.castTime = castTime;
+      }
+    }
   }
 
   init(){
+    this.impactscript = this.spell?.impactscript || this.impactscript || '';
+    this.casthandvisual = this.spell?.casthandvisual || this.casthandvisual || '';
+    if(this.spell){
+      const conjTime = Number(this.spell.getConjureTime());
+      if(!isNaN(conjTime) && conjTime > 0){
+        this.conjureTime = conjTime;
+      }
+      const castTime = Number(this.spell.getCastTime());
+      if(!isNaN(castTime) && castTime >= 0){
+        this.castTime = castTime;
+      }
+    }
+
     this.projectileHook = undefined;
     this.projectileOrigin = new THREE.Vector3();
     this.projectileTarget = new THREE.Vector3();
@@ -67,23 +93,23 @@ export class SpellCastInstance {
       new THREE.Vector3( 0, 0, 0 )
     );
 
-    if(this.target){
+    if(this.target && this.target.position){
       this.projectileTarget.copy(this.target.position);
       this.projectileTarget.x += Math.random() * (0.25 - -0.25) + -0.25;
       this.projectileTarget.y += Math.random() * (0.25 - -0.25) + -0.25;
       this.projectileCurve.v2.copy(this.projectileTarget);
     }
 
-    if(this.spell.projmodel != ''){
+    if(this.spell && this.spell.projmodel != '' && this.spell.projmodel != '****'){
       console.log('projectile', this.spell.projmodel);
       MDLLoader.loader.load(this.spell.projmodel.toLowerCase())
-      .then((mdl: OdysseyModel) => {
+      .then((mdl: OdysseyModel) => { if(!mdl) return;
         OdysseyModel3D.FromMDL(mdl, {
-          context: this.owner.context
+          context: this.owner?.context
         }).then((model: OdysseyModel3D) => {
           this.projectile = model;
           console.log('projectile', model);
-          if(this.owner.model){
+          if(this.owner?.model){
             if(this.owner.model.rhand){
               this.owner.context.group.effects.add(model);
               this.projectileHook = this.owner.model.rhand;
@@ -114,7 +140,7 @@ export class SpellCastInstance {
     }else if(this.castTime > 0){
       this.conjuring = false;
 
-      this.castTimeProgress = this.castTime / (this.spell.getCastTime() * 0.5);
+      this.castTimeProgress = this.castTime / ((this.spell?.getCastTime() || 1) * 0.5);
       if(this.castTimeProgress > 1){
         this.castTimeProgress = 1;
       }
@@ -125,7 +151,7 @@ export class SpellCastInstance {
         this.projectileCurve.v1.z += 2
       }
 
-      if(this.spell.range != 'L'){
+      if(this.spell?.range != 'L'){
         this.impact();
       }
 
@@ -138,7 +164,9 @@ export class SpellCastInstance {
     }else{
       this.conjuring = false;
 
-      if(this.spell.range == 'L'){
+      if(this.spell?.range == 'L'){
+        this.impact();
+      }else{
         this.impact();
       }
 
@@ -159,6 +187,31 @@ export class SpellCastInstance {
     //We only want to run the impact script once
     if(this.impacted) return;
     this.impacted = true;
+
+    if(this.spell){
+      this.spell.oCaster = this.owner;
+      this.spell.oTarget = this.target;
+      if(this.item){
+        this.spell.setItem(this.item);
+      }
+    }
+
+    if(this.owner?.combatData){
+      this.owner.combatData.lastSpellTarget = this.target;
+      this.owner.combatData.lastAttemptedSpellTarget = this.target;
+      this.owner.combatData.lastForcePowerUsed = this.spell;
+    }
+    if(this.target?.combatData){
+      this.target.combatData.lastSpellAttacker = this.owner;
+    }
+
+    // Deduct Force Points if cast as a Force Power (not from an item)
+    if(!this.item && this.spell && typeof (this.owner as any)?.subtractFP === 'function'){
+      const fpCost = this.spell.getForcePointCost(this.owner);
+      if(fpCost > 0){
+        (this.owner as any).subtractFP(fpCost);
+      }
+    }
     
     if(this.impactscript != ''){
       console.log('Casting spell', this.impactscript, this);
@@ -166,20 +219,25 @@ export class SpellCastInstance {
       if(instance) {
         //pass the talent to the script instance and run it
         instance.talent = this.spell;
-        //instance.spellTarget = oTarget;
+        instance.spellTarget = this.target;
+        instance.spellItem = this.item;
+        instance.lastSpellCaster = this.owner;
+        instance.lastSpellAttacker = this.owner;
+        instance.lastSpell = this.spell;
+        instance.lastSpellHarmful = this.spell?.hostilesetting == 1;
         instance.run(this.owner, 0);
-      };
+      }
     }
 
     if(this.casthandvisual != ''){
       MDLLoader.loader.load(this.casthandvisual)
-      .then((mdl: OdysseyModel) => {
+      .then((mdl: OdysseyModel) => { if(!mdl) return;
         OdysseyModel3D.FromMDL(mdl, {
-          context: this.owner.context
+          context: this.owner?.context
         }).then((model: OdysseyModel3D) => {
           this.casthandmodel = model;
 
-          if(this.owner.model){
+          if(this.owner?.model){
             if(this.owner.model.lhand){
               this.owner.model.lhand.add(this.casthandmodel);
               //TextureLoader.LoadQueue();
