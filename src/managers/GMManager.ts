@@ -64,6 +64,8 @@ export interface GMCreatureSpawnConfig {
   armorResRef?: string;
   barkText?: string;
   aiDisabled?: boolean;
+  /** Items the creature carries, lootable from its body once it dies */
+  lootResRefs?: string[];
 }
 
 export type GMPlaceablePropCategory =
@@ -171,6 +173,11 @@ export class GMManager {
 
   // Network actors whose spawn is still loading, so repeated ticks don't spawn duplicates
   static pendingNetSpawns: Set<string> = new Set();
+
+  // True from the start of a scene change until the new scene's objects are registered.
+  // World ticks are neither sent nor applied meanwhile, so nothing from the old scene is
+  // re-registered against objects that are about to be destroyed.
+  static sceneLoading: boolean = false;
 
   // Replica motion smoothing (higher = snappier) and the distance beyond which we teleport instead
   static NET_SMOOTHING: number = 12;
@@ -2077,12 +2084,27 @@ export class GMManager {
     const wasPossessing = this.controlMode === 'POSSESS';
     if (this.preservePartyOnWarp && this.spawnedPlayers.length > 0) {
       for (const p of this.spawnedPlayers) {
-        if ((p as any).gmPlayerConfig) {
+        if ((p as any).gmPlayerConfig && !(p as any).gmOwnerPeerId) {
           savedPlayerConfigs.push({ ...(p as any).gmPlayerConfig, possessImmediately: false });
         }
       }
     }
 
+    // Players connected to this session always come along, keeping the same character:
+    // net id (so their game keeps controlling it), inventory, equipment and HP
+    const savedNetworkPlayers: { netId: string; config: GMPlayerSpawnConfig; sheet: GMPlayerSheet }[] = [];
+    if (GMNetworkManager.role === 'host') {
+      for (const [netId, obj] of this.netIdMap.entries()) {
+        if (!(obj as any).gmOwnerPeerId || obj.destroyed || !(obj as any).gmPlayerConfig) continue;
+        savedNetworkPlayers.push({
+          netId,
+          config: { ...(obj as any).gmPlayerConfig, ownerPeerId: (obj as any).gmOwnerPeerId, possessImmediately: false },
+          sheet: this.buildPlayerSheet(obj as ModuleCreature),
+        });
+      }
+    }
+
+    this.sceneLoading = true;
     this.selectedObject = null;
     this.spawnedPlayers = [];
     this.netIdMap.clear();
@@ -2099,10 +2121,28 @@ export class GMManager {
     GameState.LoadModule(moduleResRef);
 
     // Wait until module finishes loading and then restore preserved players if any
-    if (savedPlayerConfigs.length > 0) {
+    if (savedPlayerConfigs.length > 0 || savedNetworkPlayers.length > 0) {
       const checkInterval = setInterval(async () => {
-        if (GameState.module?.readyToProcessEvents && !GameState.loadingTextures) {
+        // The old module still reports ready until the new one replaces it, so wait for this scene by name
+        const newSceneReady = !this.sceneLoading &&
+          String(GameState.module?.filename || '').toLowerCase() === moduleResRef.toLowerCase() &&
+          GameState.module?.readyToProcessEvents && !GameState.loadingTextures;
+        if (newSceneReady) {
           clearInterval(checkInterval);
+          for (let i = 0; i < savedNetworkPlayers.length; i++) {
+            const saved = savedNetworkPlayers[i];
+            const offset = (savedPlayerConfigs.length + i) * 1.5;
+            const pc = await this.spawnPlayerCharacter(
+              saved.config,
+              new THREE.Vector3((GameState.module.entryX || 0) + offset, GameState.module.entryY || 0, GameState.module.entryZ || 0),
+              0,
+              saved.netId
+            );
+            if (!pc) continue;
+            (pc as any).gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
+            await this.syncEquipmentTo(pc, saved.sheet.equipment);
+            this.setCreatureHP(pc, saved.sheet.hp, saved.sheet.maxHp);
+          }
           for (let i = 0; i < savedPlayerConfigs.length; i++) {
             const cfg = savedPlayerConfigs[i];
             const entryX = (GameState.module.entryX || 0) + (i * 1.5);
@@ -2128,6 +2168,7 @@ export class GMManager {
    */
   static onSceneLoaded() {
     this.active = true;
+    this.sceneLoading = false;
     this.init3DIndicators();
     const mod = GameState.module;
     if (!mod || !mod.area) return;
@@ -2305,6 +2346,11 @@ export class GMManager {
     creature.firstName = config.name || creature.firstName;
     this.setCreatureHP(creature, targetHp, targetHp);
     this.assignFaction(creature, config.factionId ?? 1);
+    if (Array.isArray(config.lootResRefs)) {
+      for (const resRef of config.lootResRefs) {
+        if (resRef) creature.inventory.push(await this.createItemFromResRefAsync(resRef));
+      }
+    }
 
     const model = await creature.loadModel();
     if (model) {
@@ -3637,7 +3683,7 @@ export class GMManager {
 
   static serializeActorsForTick(): GMSerializedActor[] {
     const area = GameState.module?.area;
-    if (!area) return [];
+    if (!area || this.sceneLoading || !GameState.module.readyToProcessEvents) return [];
     const list: GMSerializedActor[] = [];
     for (const p of GameState.PartyManager.party) {
       if (p) list.push(this.serializeSingleActor(p));
@@ -3728,7 +3774,7 @@ export class GMManager {
   }
 
   static applyWorldTickOnClient(actors: GMSerializedActor[]) {
-    if (!Array.isArray(actors)) return;
+    if (!Array.isArray(actors) || this.sceneLoading || !GameState.module?.readyToProcessEvents) return;
     for (const actor of actors) {
       if (actor.netId === GMNetworkManager.assignedActorNetId && this.controlMode === 'POSSESS') {
         // Once the host has seen our latest intent and finished it, position authority returns to us
@@ -4292,18 +4338,7 @@ export class GMManager {
       cre.currentForce = sheet.currentForce;
       this.setCreatureHP(cre, sheet.hp, sheet.maxHp);
 
-      for (const slotName of this.PLAYER_EQUIP_SLOTS) {
-        const want = sheet.equipment[slotName] || '';
-        const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
-        const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
-        if (want === have) continue;
-        const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
-        if (want) {
-          await cre.equipItem(slot, await this.createItemFromResRefAsync(want));
-        } else {
-          cre.unequipSlot(slot);
-        }
-      }
+      await this.syncEquipmentTo(cre, sheet.equipment);
 
       const inventoryJson = JSON.stringify(sheet.inventory);
       if (inventoryJson !== this.lastAppliedInventoryJson) {
@@ -4315,6 +4350,22 @@ export class GMManager {
       this.applyingHostSheet = false;
     }
     this.notifyChange();
+  }
+
+  /** Make a character's equipped items match a slot name -> resref map */
+  static async syncEquipmentTo(cre: ModuleCreature, equipment: Record<string, string>) {
+    for (const slotName of this.PLAYER_EQUIP_SLOTS) {
+      const want = equipment[slotName] || '';
+      const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
+      const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
+      if (want === have) continue;
+      const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
+      if (want) {
+        await cre.equipItem(slot, await this.createItemFromResRefAsync(want));
+      } else {
+        cre.unequipSlot(slot);
+      }
+    }
   }
 
   /**

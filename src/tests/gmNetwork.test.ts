@@ -202,6 +202,7 @@ describe("GM multiplayer host authority", () => {
       jest.spyOn(GMManager, "spawnOrUpdateFromSerialized").mockImplementation(async () => mine);
       jest.spyOn(GMManager, "setCreatureHP").mockImplementation(() => {});
       GMManager.controlMode = "POSSESS";
+      (GameState as any).module = { readyToProcessEvents: true };
 
       GMNetworkManager.sendIntent("open", "door_0");
       const tick = (intentSeq: number, hostDriven: boolean): any => ({ netId: "pc_1", intentSeq, hostDriven, hp: 10, maxHp: 10 });
@@ -643,6 +644,24 @@ describe("GM multiplayer host authority", () => {
       expect((GameState as any).InventoryManager.inventory.map((i: any) => i.getEquippedRes())).toEqual(["g_i_medeqpmnt02"]);
       // Applying the host's equipment must not be sent back to the host as requests
       expect(sent.filter((p) => p.type === "client.intent")).toHaveLength(0);
+    });
+  });
+
+  describe("scene changes", () => {
+    test("no world updates are sent or applied while a scene is loading", () => {
+      (GameState as any).module = { readyToProcessEvents: true, area: { creatures: [], placeables: [] } };
+      (GameState as any).PartyManager = { party: [] };
+      const spawn = jest.spyOn(GMManager, "spawnOrUpdateFromSerialized").mockImplementation(async () => null);
+      const tick: any = [{ netId: "cre_old", kind: "creature" }];
+
+      GMManager.sceneLoading = true;
+      GMManager.applyWorldTickOnClient(tick);
+      expect(GMManager.serializeActorsForTick()).toEqual([]);
+      expect(spawn).not.toHaveBeenCalled();
+
+      GMManager.sceneLoading = false;
+      GMManager.applyWorldTickOnClient(tick);
+      expect(spawn).toHaveBeenCalledTimes(1);
     });
   });
 
