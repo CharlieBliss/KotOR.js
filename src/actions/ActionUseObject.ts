@@ -5,6 +5,8 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { GameState } from "@/GameState";
 import type { ModuleObject } from "@/module/ModuleObject";
+import type { ModuleCreature } from "@/module/ModuleCreature";
+import { MOVE_FLAG_RUN, MOVE_FLAG_TARGET_MAY_BE_DEAD } from "@/actions/ActionMoveToPoint";
 import { BitWise } from "@/utility/BitWise";
 import { Utility } from "@/utility/Utility";
 import { Action } from "@/actions/Action";
@@ -47,7 +49,10 @@ export class ActionUseObject extends Action {
       actionMoveToTarget.setParameter(2, ActionParameterType.FLOAT, this.target.position.z);
       actionMoveToTarget.setParameter(3, ActionParameterType.DWORD, GameState.module.area.id);
       actionMoveToTarget.setParameter(4, ActionParameterType.DWORD, this.target.id);
-      actionMoveToTarget.setParameter(5, ActionParameterType.INT, 1);
+      // Moving to a dead creature normally fails at once (so combat doesn't chase the dead);
+      // using a body (looting it) has to be able to walk over to it
+      const targetIsBody = BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) && (this.target as ModuleCreature).isDead();
+      actionMoveToTarget.setParameter(5, ActionParameterType.INT, MOVE_FLAG_RUN | (targetIsBody ? MOVE_FLAG_TARGET_MAY_BE_DEAD : 0));
       actionMoveToTarget.setParameter(6, ActionParameterType.FLOAT, 1.5 );
       actionMoveToTarget.setParameter(7, ActionParameterType.INT, 0);
       actionMoveToTarget.setParameter(8, ActionParameterType.FLOAT, 30.0);
