@@ -19,15 +19,20 @@ const HOST_ONLY_TYPES = new Set([
   'actor.update',
   'actor.remove',
   'actor.assign',
+  'actor.teleport',
   'door.state',
   'fx.event',
   'container.open',
   'container.loot',
   'player.sheet',
+  'dm.prompt',
+  'talk.line',
+  'session.rules',
+  'talk.end',
 ]);
 
 // Player packets that only the host needs to see
-const HOST_BOUND_TYPES = new Set(['peer.join', 'client.input', 'client.intent']);
+const HOST_BOUND_TYPES = new Set(['peer.join', 'client.input', 'client.intent', 'dm.reply', 'talk.request', 'talk.reply', 'talk.leave', 'player.respawn']);
 
 function createRelayState() {
   return {
@@ -84,10 +89,18 @@ function attachSocketHandlers(wss, state) {
         state.hostWs = ws;
         meta.role = 'host';
         meta.name = pkt.payload?.sessionName || 'GM Host';
-        // Registration is between the host and the relay; players have no use for it
+        // Players who connected before the GM are waiting: tell them to send their join again
+        const ready = JSON.stringify({ type: 'relay.host-ready', senderId: 'relay', timestamp: Date.now(), payload: {} });
+        for (const [clientWs, clientMeta] of state.clients.entries()) {
+          if (clientWs !== ws && clientMeta.peerId && clientWs.readyState === WebSocket.OPEN) clientWs.send(ready);
+        }
         return;
       } else if (pkt.type === 'peer.join') {
         meta.name = pkt.payload?.name || 'Player';
+        if (!state.hostWs || state.hostWs.readyState !== WebSocket.OPEN) {
+          sendRelayError(ws, 'no-host', 'No GM is hosting on this server yet.');
+          return;
+        }
       }
 
       const fromHost = state.hostWs === ws;
@@ -105,13 +118,14 @@ function attachSocketHandlers(wss, state) {
     ws.on('close', () => {
       const meta = state.clients.get(ws);
       state.clients.delete(ws);
-      if (state.hostWs === ws) state.hostWs = null;
+      const wasHost = state.hostWs === ws;
+      if (wasHost) state.hostWs = null;
       if (meta && meta.peerId) {
         const leavePkt = JSON.stringify({
           type: 'peer.leave',
           senderId: meta.peerId,
           timestamp: Date.now(),
-          payload: { peerId: meta.peerId, name: meta.name }
+          payload: { peerId: meta.peerId, name: meta.name, wasHost }
         });
         for (const [clientWs] of state.clients.entries()) {
           if (clientWs.readyState === WebSocket.OPEN) {

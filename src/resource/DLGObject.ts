@@ -22,6 +22,15 @@ export interface DLGObjectScripts {
 }
 
 /**
+ * A conversation written as it happens (e.g. a GM speaking for an NPC) instead of read from a .dlg file.
+ * Picking a reply hands it to the handler, and the conversation waits for the next entry to be shown.
+ */
+export interface IDLGLiveHandler {
+  onReply(reply: DLGNode, index: number): void;
+  onEnd(aborted: boolean): void;
+}
+
+/**
  * DLGObject class.
  * 
  * Class representing a DLG file in memory.
@@ -42,6 +51,8 @@ export class DLGObject {
   stuntActors: Map<string, IDLGStuntActor> = new Map();
   owner: ModuleObject;
   listener: ModuleObject;
+  /** Set for a live conversation; see IDLGLiveHandler */
+  live?: IDLGLiveHandler;
 
   vo_id: string; //folder where the vo files reside
 

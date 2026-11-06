@@ -6,6 +6,7 @@ import { BitWise } from "@/utility/BitWise";
 // otherwise webpack bundles a second copy of the whole engine into game.js
 import type {
   GMCreatureSpawnConfig,
+  GMCreatureTemplateInfo,
   GMPlaceableSpawnConfig,
   GMPlaceablePropCategory,
   GMPlayerSpawnConfig,
@@ -13,7 +14,7 @@ import type {
   GMToolMode
 } from "@/managers/GMManager";
 
-const { GMManager, GMNetworkManager } = KotOR;
+const { GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders } = KotOR;
 import "@/apps/game/components/gm-panel/gm-panel.scss";
 
 type DrawerTab = 'scenes' | 'builder' | 'actors' | 'players' | 'inspector' | 'multiplayer' | null;
@@ -45,8 +46,17 @@ export const GMPanel: React.FC = () => {
   // Actors & Placeables tab states
   const [spawnSubTab, setSpawnSubTab] = useState<'creatures' | 'placeables'>('placeables');
   const [propCategoryFilter, setPropCategoryFilter] = useState<'All' | GMPlaceablePropCategory>('All');
+  // The creature preset or template the GM picked; creatureCfg is what gets placed (customized only on request)
+  const [creaturePick, setCreaturePick] = useState<GMCreatureSpawnConfig>({ ...GMManager.pendingCreatureConfig });
   const [creatureCfg, setCreatureCfg] = useState<GMCreatureSpawnConfig>({ ...GMManager.pendingCreatureConfig });
-  const [placeableCfg, setPlaceableCfg] = useState<GMPlaceableSpawnConfig>({ ...GMManager.pendingPlaceableConfig, scale: 1.0, zOffset: 0 });
+  // What the picked template really holds (look, HP, class, gear), read from the game files
+  const [creatureTemplateInfo, setCreatureTemplateInfo] = useState<GMCreatureTemplateInfo | null>(null);
+  const [creatureSource, setCreatureSource] = useState<'presets' | 'templates'>('presets');
+  const [templateQuery, setTemplateQuery] = useState<string>('');
+  const [templateIndex, setTemplateIndex] = useState<GMCreatureTemplateInfo[] | null>(null);
+  // The preset the GM picked; placeableCfg is what gets placed (a copy of it, customized only on request)
+  const [placeablePreset, setPlaceablePreset] = useState<GMPlaceableSpawnConfig>(GMManager.pendingPlaceableConfig);
+  const [placeableCfg, setPlaceableCfg] = useState<GMPlaceableSpawnConfig>(() => GMManager.copyPlaceablePreset(GMManager.pendingPlaceableConfig));
   const [customLootResRef, setCustomLootResRef] = useState<string>('g_i_medeqpmnt01');
 
   // Players tab states
@@ -67,6 +77,25 @@ export const GMPanel: React.FC = () => {
   const [joinPresetIdx, setJoinPresetIdx] = useState<number>(0);
   const [chatInput, setChatInput] = useState<string>('');
 
+  // DM tools
+  const [rewardXp, setRewardXp] = useState<number>(250);
+  const [rewardItem, setRewardItem] = useState<string>('g_i_medeqpmnt01');
+  const [askText, setAskText] = useState<string>('');
+  const [askOptions, setAskOptions] = useState<string>('Yes\nNo');
+  const [askTarget, setAskTarget] = useState<string>('');
+  // When our own character fell (player view), for the respawn countdown
+  const downedSince = useRef<number>(0);
+  // GM conversation drafts, per conversation: what the NPC says next and the replies offered
+  const [talkDrafts, setTalkDrafts] = useState<Record<string, { text: string; replies: string }>>({});
+  const [encounterPreset, setEncounterPreset] = useState<number>(0);
+  const [encounterCount, setEncounterCount] = useState<number>(3);
+  const [encounterSpread, setEncounterSpread] = useState<number>(2.5);
+  const [encounterFaction, setEncounterFaction] = useState<number>(1);
+
+  // Session save & load
+  const [sessionName, setSessionName] = useState<string>('');
+  const sessionFileRef = useRef<HTMLInputElement | null>(null);
+
   const forceUpdate = () => setTick(t => t + 1);
 
   useEffect(() => {
@@ -77,8 +106,12 @@ export const GMPanel: React.FC = () => {
       forceUpdate();
     };
     const onNetChange = () => forceUpdate();
+    const onInspect = () => setDrawerTab('inspector');
+    const onOpenJoin = () => setShowQuickJoinOnMenu(true);
 
     GMManager.events.addEventListener('change', onGMChange);
+    GMManager.events.addEventListener('inspect', onInspect);
+    GMNetworkManager.events.addEventListener('open-join', onOpenJoin);
     GMNetworkManager.events.addEventListener('change', onNetChange);
 
     const interval = setInterval(() => {
@@ -88,8 +121,16 @@ export const GMPanel: React.FC = () => {
     }, 350);
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (!KotOR.GameState.gmMode || KotOR.IngameControls.isTypingInPageField(e)) return;
-      if (!GMManager.isGMUser()) return;
+      if (!KotOR.GameState.gmMode || !GMManager.isGMUser()) return;
+      // Esc puts down a placement or teleport tool, wherever focus is, and does nothing else
+      // (this listener runs in the capture phase, before the game's own Esc handling opens Options)
+      if (e.key === 'Escape' && GMManager.activeTool !== 'select') {
+        GMManager.setToolMode('select');
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (KotOR.IngameControls.isTypingInPageField(e)) return;
       if (e.key === 'F2') {
         e.preventDefault();
         if (GMManager.controlMode === 'POSSESS') {
@@ -105,17 +146,17 @@ export const GMPanel: React.FC = () => {
         }
       } else if (e.code === 'KeyR' && GMManager.isPlacementTool(GMManager.activeTool)) {
         GMManager.rotatePlacement(e.shiftKey ? -GMManager.PLACEMENT_KEY_STEP : GMManager.PLACEMENT_KEY_STEP);
-      } else if (e.key === 'Escape' && GMManager.activeTool !== 'select' && GMManager.controlMode === 'POSSESS') {
-        GMManager.setToolMode('select');
       }
     };
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
 
     return () => {
       GMManager.events.removeEventListener('change', onGMChange);
+      GMManager.events.removeEventListener('inspect', onInspect);
+      GMNetworkManager.events.removeEventListener('open-join', onOpenJoin);
       GMNetworkManager.events.removeEventListener('change', onNetChange);
       clearInterval(interval);
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
     };
   }, [showQuickJoinOnMenu]);
 
@@ -126,10 +167,80 @@ export const GMPanel: React.FC = () => {
     GMManager.pendingCreatureConfig = next;
   };
 
+  // Read the picked creature's template, for the summary and as the starting point for customizing
+  useEffect(() => {
+    let live = true;
+    setCreatureTemplateInfo(null);
+    if (creaturePick.templateResRef) {
+      GMManager.describeCreatureTemplate(creaturePick.templateResRef).then((info) => { if (live) setCreatureTemplateInfo(info); });
+    }
+    return () => { live = false; };
+  }, [creaturePick]);
+
+  // The template browser reads every template the first time it opens
+  useEffect(() => {
+    if (spawnSubTab !== 'creatures' || creatureSource !== 'templates' || templateIndex) return;
+    let live = true;
+    GMManager.loadCreatureTemplateIndex().then((list) => { if (live) setTemplateIndex(list); });
+    return () => { live = false; };
+  }, [spawnSubTab, creatureSource, templateIndex]);
+
+  /** Pick a creature preset or template: place exactly it, nothing carried over from the previous pick */
+  const selectCreature = (config: GMCreatureSpawnConfig) => {
+    const next = { ...config, customized: false };
+    setCreaturePick(next);
+    setCreatureCfg(next);
+    GMManager.pendingCreatureConfig = next;
+  };
+
+  /** Customize: every change marks the creature customized (its look, HP and gear then win over the template's) */
+  const customizeCreature = (patch: Partial<GMCreatureSpawnConfig>) => updateCreatureCfg({ ...patch, customized: true });
+
+  const setCreatureCustomized = (on: boolean) => {
+    if (!on) {
+      selectCreature(creaturePick);
+      return;
+    }
+    // Start from what the template really has, so the fields show the creature as it would appear
+    const t = creatureTemplateInfo;
+    customizeCreature(t ? {
+      appearanceId: t.appearanceId,
+      appearanceLabel: undefined,
+      hp: t.hp,
+      rightHandResRef: creatureCfg.rightHandResRef || t.rightHandResRef,
+      leftHandResRef: t.leftHandResRef,
+      armorResRef: t.armorResRef,
+    } : { appearanceId: GMManager.resolveCreatureAppearance(creatureCfg), appearanceLabel: undefined });
+  };
+
+  const factionName = (id: number) => id === 1 ? 'Hostile' : id === 2 ? 'Friendly' : id === 0 ? 'Party' : 'Neutral';
+
+  // Only the Customize section edits the object; everything it changes marks it customized
   const updatePlaceableCfg = (patch: Partial<GMPlaceableSpawnConfig>) => {
-    const next = { ...placeableCfg, ...patch };
+    const next = { ...placeableCfg, ...patch, customized: true };
     setPlaceableCfg(next);
     GMManager.pendingPlaceableConfig = next;
+  };
+
+  /** Pick a preset: place exactly it, with nothing carried over from the previous pick */
+  const selectPlaceablePreset = (preset: GMPlaceableSpawnConfig) => {
+    const next = GMManager.copyPlaceablePreset(preset);
+    setPlaceablePreset(preset);
+    setPlaceableCfg(next);
+    GMManager.pendingPlaceableConfig = next;
+  };
+
+  const setPlaceableCustomized = (on: boolean) => {
+    if (!on) {
+      selectPlaceablePreset(placeablePreset);
+      return;
+    }
+    // Start customizing from the model the preset really uses, so the Model list shows it
+    updatePlaceableCfg({
+      appearanceId: GMManager.resolvePlaceableAppearance(placeableCfg),
+      appearanceLabel: undefined,
+      modelKeywords: undefined,
+    });
   };
 
   const updatePlayerCfg = (patch: Partial<GMPlayerSpawnConfig>) => {
@@ -140,89 +251,111 @@ export const GMPanel: React.FC = () => {
 
   const isGMMode = !!KotOR.GameState.gmMode;
 
-  // Quick launcher shown on Main Menu before GM Mode is entered
-  if (!isGMMode) {
-    return (
-      <div className="gm-panel-root">
-        <div className="gm-Menu-Launcher">
-          <button
-            className="gm-btn active"
-            onClick={() => {
-              GMManager.loadScene('danm14aa', { keepCreatures: false, keepTriggers: false });
-            }}
-          >
-            Enter GM Mode
-          </button>
-          <button
-            className="gm-btn warning"
-            onClick={() => setShowQuickJoinOnMenu(!showQuickJoinOnMenu)}
-          >
-            Join Multiplayer Server
-          </button>
-        </div>
+  const startJoin = () => {
+    const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
+    KotOR.GameState.gmMode = true;
+    GMManager.active = true;
+    GMNetworkManager.joinSession(joinUrl, joinPlayerName, {
+      name: joinPlayerName,
+      appearanceId: p.appearanceId,
+      classId: p.classId,
+      rightHandResRef: p.rightHandResRef,
+      armorResRef: p.armorResRef
+    });
+    setShowQuickJoinOnMenu(false);
+  };
 
-        {showQuickJoinOnMenu && (
-          <div className="gm-drawer" style={{ position: 'fixed', top: 44, right: 12, margin: 0 }}>
-            <div className="gm-drawer-header">
-              <span>Join GM Multiplayer Server (NWN Client)</span>
-              <button className="gm-btn small" onClick={() => setShowQuickJoinOnMenu(false)}>✕</button>
-            </div>
-            <div className="gm-drawer-body">
-              <div className="gm-hint">
-                Connect to a Game Master hosting on your LAN or a port-forwarded machine (default port <code>7878</code>).
-                Your client will automatically load the GM&apos;s active scene and spawn your chosen Player Character!
-              </div>
-              <div className="gm-field">
-                <label>GM Server WebSocket URL (or IP:Port)</label>
-                <input
-                  className="gm-input"
-                  value={joinUrl}
-                  onChange={e => setJoinUrl(e.target.value)}
-                  placeholder="ws://192.168.1.50:7878"
-                />
-              </div>
-              <div className="gm-field">
-                <label>Your Player Character Name</label>
-                <input
-                  className="gm-input"
-                  value={joinPlayerName}
-                  onChange={e => setJoinPlayerName(e.target.value)}
-                />
-              </div>
-              <div className="gm-field">
-                <label>Character Archetype & Loadout</label>
-                <select
-                  className="gm-select"
-                  value={joinPresetIdx}
-                  onChange={e => setJoinPresetIdx(Number(e.target.value))}
-                >
-                  {GMManager.PLAYER_PRESETS.map((p, i) => (
-                    <option key={i} value={i}>{p.name} (Lv.{p.level}, HP {p.hp})</option>
-                  ))}
-                </select>
-              </div>
-              <button
-                className="gm-btn success"
-                onClick={() => {
-                  const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
-                  KotOR.GameState.gmMode = true;
-                  GMManager.active = true;
-                  GMNetworkManager.joinSession(joinUrl, joinPlayerName, {
-                    name: joinPlayerName,
-                    appearanceId: p.appearanceId,
-                    classId: p.classId,
-                    rightHandResRef: p.rightHandResRef,
-                    armorResRef: p.armorResRef
-                  });
-                  setShowQuickJoinOnMenu(false);
-                  setDrawerTab('multiplayer');
-                }}
-              >
-                Connect & Enter World
-              </button>
+  /** Stop joining (or give up after a failed join) and go back to the main menu */
+  const leaveJoin = () => {
+    GMNetworkManager.disconnect();
+    setShowQuickJoinOnMenu(false);
+    if (KotOR.GameState.module) {
+      KotOR.GameState.ReturnToMainMenu();
+    } else {
+      KotOR.GameState.gmMode = false;
+      GMManager.active = false;
+    }
+    forceUpdate();
+  };
+
+  const joinState = GMNetworkManager.joinState;
+  const joinInProgress = GMNetworkManager.role === 'client' && joinState !== 'playing' && joinState !== 'idle';
+  const joinStatusText: Record<string, [string, string]> = {
+    connecting: ['Connecting…', `Reaching ${GMNetworkManager.serverUrl}`],
+    'waiting-for-host': ['Waiting for the GM', 'You are connected, but no GM is hosting yet. You will join as soon as they click Host.'],
+    joining: ['Joining…', 'The GM is sending you the scene and your character.'],
+  };
+
+  const joinCard = (
+    <div className="gm-join" role="dialog" aria-label="Join a GM's game">
+      <div className="gm-join-title">Join a GM&apos;s game</div>
+      {joinInProgress ? (
+        <>
+          <div className="gm-join-status">
+            <span className="gm-join-spinner" aria-hidden="true" />
+            <div>
+              <div className="gm-join-status-title">{joinStatusText[joinState]?.[0]}</div>
+              <div className="gm-join-status-text">{joinStatusText[joinState]?.[1]}</div>
             </div>
           </div>
+          <div className="gm-row" style={{ justifyContent: 'flex-end' }}>
+            <button className="gm-btn" onClick={leaveJoin}>Cancel</button>
+          </div>
+        </>
+      ) : (
+        <>
+          {joinState === 'failed' && <div className="gm-join-error">{GMNetworkManager.joinError}</div>}
+          <ol className="gm-join-steps">
+            <li>Your GM starts <b>GM Mode</b> and clicks <b>Session → Start Hosting</b>.</li>
+            <li>Enter their address below. Playing on this computer? Leave it as it is.</li>
+            <li>Name your character, pick a build, and join. You will appear in the GM&apos;s scene.</li>
+          </ol>
+          <div className="gm-field">
+            <label htmlFor="gm-join-url">GM&apos;s address</label>
+            <input id="gm-join-url" className="gm-input" value={joinUrl} onChange={e => setJoinUrl(e.target.value)} placeholder="ws://192.168.1.50:7878" />
+          </div>
+          <div className="gm-grid-2">
+            <div className="gm-field">
+              <label htmlFor="gm-join-name">Character name</label>
+              <input id="gm-join-name" className="gm-input" value={joinPlayerName} onChange={e => setJoinPlayerName(e.target.value)} />
+            </div>
+            <div className="gm-field">
+              <label htmlFor="gm-join-build">Build</label>
+              <select id="gm-join-build" className="gm-select" value={joinPresetIdx} onChange={e => setJoinPresetIdx(Number(e.target.value))}>
+                {GMManager.PLAYER_PRESETS.map((p, i) => (
+                  <option key={i} value={i}>{p.name} (Lv.{p.level})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="gm-row" style={{ justifyContent: 'flex-end' }}>
+            <button className="gm-btn" onClick={leaveJoin}>{joinState === 'failed' ? 'Back to menu' : 'Cancel'}</button>
+            <button className="gm-btn success" onClick={startJoin} disabled={!joinUrl.trim() || !joinPlayerName.trim()}>
+              {joinState === 'failed' ? 'Try again' : 'Join game'}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // Joining (or a join that failed) takes the whole screen until the player has their character
+  if (joinInProgress || joinState === 'failed') {
+    return <div className="gm-panel-root"><div className="gm-join-backdrop">{joinCard}</div></div>;
+  }
+
+  // On the main menu: the join form, opened from the menu's Join GM Game entry
+  if (!isGMMode) {
+    const isTSL = KotOR.GameState.GameKey === KotOR.GameEngineType.TSL;
+    return (
+      <div className="gm-panel-root">
+        {/* TSL's main menu has no Join GM Game entry yet */}
+        {isTSL && !showQuickJoinOnMenu && (
+          <div className="gm-Menu-Launcher">
+            <button className="gm-btn warning" onClick={() => setShowQuickJoinOnMenu(true)}>Join GM Game</button>
+          </div>
         )}
+        {showQuickJoinOnMenu && <div className="gm-join-backdrop">{joinCard}</div>}
       </div>
     );
   }
@@ -267,18 +400,67 @@ export const GMPanel: React.FC = () => {
     controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
   } else if (GMManager.isPlacementTool(tool)) {
     statusChip = `Placing: ${placingName || 'object'} · ${GMManager.placementYawOffset}°`;
-    controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc', 'done']];
+    controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc / Right-click', 'done']];
+  } else if (GMManager.isOrderTool(tool)) {
+    const who = GMManager.orderSubject?.getName() || 'NPC';
+    if (tool === 'order_move') {
+      statusChip = `Order ${who}: move here`;
+      controlHints = [['Click ground', 'go there, then guard it'], ['Esc / Right-click', 'cancel']];
+    } else if (tool === 'order_attack') {
+      statusChip = `Order ${who}: attack`;
+      controlHints = [['Click a creature', 'attack it'], ['Esc / Right-click', 'cancel']];
+    } else if (tool === 'order_follow') {
+      statusChip = `Order ${who}: follow`;
+      controlHints = [['Click a creature or player', 'follow them'], ['Esc / Right-click', 'cancel']];
+    } else {
+      const points = Math.max(0, GMManager.patrolDraft.length - 1);
+      statusChip = `Order ${who}: patrol · ${points} point${points === 1 ? '' : 's'}`;
+      controlHints = [['Click ground', 'add a point'], ['Esc / Right-click', points ? 'start patrolling' : 'cancel']];
+    }
   } else if (tool === 'teleport') {
     statusChip = teleportTarget ? `Teleport: ${teleportTarget.getName() || 'selected object'}` : 'Teleport: select something first';
-    controlHints = [['Click ground', 'move it there'], ['Esc', 'done']];
+    controlHints = [['Click ground', 'move it there'], ['Esc / Right-click', 'done']];
   } else if (GMManager.controlMode === 'POSSESS') {
     controlHints = [['WASD', 'move'], ['Click', 'interact'], ['F2', 'back to GM camera']];
   } else {
     controlHints = [
       ['WASD', 'fly'], ['Q / E or Space', 'down / up'], ['Shift', 'faster'], ['Drag', 'look'],
-      ['Click', 'select'], ['Double-click creature', 'play as it'], ['F2', `play as ${possessCandidateName}`],
+      ['Click', 'select'], ['Double-click', 'inspect'], ['F2', `play as ${possessCandidateName}`],
     ];
   }
+
+  const connectedPeers = [...GMNetworkManager.peers.values()];
+
+  const downloadSession = (save: KotOR.GMSessionSave) => {
+    const blob = new Blob([JSON.stringify(save, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${save.name.replace(/[^a-z0-9_-]+/gi, '_') || 'session'}.gmsession.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportSession = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const save = GMManager.importSessionJSON(await file.text());
+    GMNetworkManager.appendChat('System', save ? `Imported session "${save.name}".` : `${file.name} isn't a GM session save.`);
+    forceUpdate();
+  };
+
+  const conversations = [...GMConversationManager.conversations.values()];
+  // Player death: fallen player characters (GM), and whether our own character is down (player)
+  const fallenPlayers = isPlayerView ? [] : GMManager.getPlayerCharacters().filter((pc) => pc.isDead());
+  const myCharacter = isPlayerView ? KotOR.GameState.getCurrentPlayer() : null;
+  const iAmDown = !!myCharacter && myCharacter.isDead();
+  if (iAmDown && !downedSince.current) downedSince.current = Date.now();
+  if (!iAmDown) downedSince.current = 0;
+  const deathRule = isPlayerView ? GMNetworkManager.sessionRules.deathRule : GMManager.deathRule;
+  const respawnIn = iAmDown ? Math.max(0, Math.ceil(GMManager.RESPAWN_DELAY_SECONDS - (Date.now() - downedSince.current) / 1000)) : 0;
+
+  const recentPrompts = [...GMManager.dmPrompts.values()].slice(-3).reverse();
 
   const possessCandidateOrSpawn = async () => {
     const target = possessCandidate || await GMManager.spawnPlayerCharacter(playerCfg);
@@ -345,8 +527,11 @@ export const GMPanel: React.FC = () => {
     e.target.value = '';
   };
 
+  // KotOR's conversation screen uses the top and bottom of the screen; keep the GM bars out of its way
+  const inConversation = KotOR.GameState.Mode === KotOR.EngineMode.DIALOG;
+
   return (
-    <div className="gm-panel-root">
+    <div className={`gm-panel-root ${inConversation ? 'in-conversation' : ''}`}>
       {/* GM toolbar: status, drawer tabs, then viewport tools and mode controls */}
       <div className="gm-topbar">
         <div className="gm-topbar-group">
@@ -436,9 +621,111 @@ export const GMPanel: React.FC = () => {
             >
               {GMManager.worldPaused ? 'World Paused' : 'Pause World'}
             </button>
+            <button
+              className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
+              onClick={() => {
+                GMManager.npcAiEnabled = !GMManager.npcAiEnabled;
+                forceUpdate();
+              }}
+              title="Whether hostile NPCs pick fights on their own. Off: they only act when you tell them to."
+            >
+              {GMManager.npcAiEnabled ? 'NPC AI: On' : 'NPC AI: Off'}
+            </button>
           </div>
         )}
       </div>
+
+      {/* Conversations: the GM speaks for NPCs players are talking to */}
+      {!isPlayerView && GMNetworkManager.role === 'host' && conversations.length > 0 && (
+        <div className="gm-conversations">
+          {conversations.map(conv => {
+            const draft = talkDrafts[conv.id] || { text: '', replies: '' };
+            const setDraft = (patch: Partial<{ text: string; replies: string }>) =>
+              setTalkDrafts(d => ({ ...d, [conv.id]: { ...draft, ...patch } }));
+            const send = () => {
+              const replies = draft.replies.split('\n').map(r => r.trim()).filter(Boolean);
+              if (GMConversationManager.say(conv.id, draft.text, replies)) setDraft({ text: '' });
+            };
+            const players = [...conv.peers].map(id => GMNetworkManager.peers.get(id)?.name || 'Player').join(', ');
+            return (
+              <div key={conv.id} className="gm-conversation" role="region" aria-label={`Conversation as ${conv.npcName}`}>
+                <div className="gm-conversation-header">
+                  <span>Speaking as <b>{conv.npcName}</b> · {players}</span>
+                  <button className="gm-btn small danger" onClick={() => GMConversationManager.end(conv.id)}>End</button>
+                </div>
+                <div className="gm-conversation-log">
+                  {conv.transcript.slice(-8).map((t, i) => (
+                    <div key={i} className={t.npc ? 'npc' : 'player'}>
+                      <span className="who">{t.speaker}:</span> {t.text}
+                    </div>
+                  ))}
+                  {conv.lastLine && conv.transcript.length > 0 && conv.transcript[conv.transcript.length - 1].npc && (
+                    <div className="waiting">Waiting for a reply: {conv.lastLine.replies.join(' / ')}</div>
+                  )}
+                </div>
+                <textarea
+                  className="gm-input"
+                  rows={2}
+                  value={draft.text}
+                  onChange={e => setDraft({ text: e.target.value })}
+                  onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); send(); } }}
+                  placeholder={`What ${conv.npcName} says`}
+                />
+                <textarea
+                  className="gm-input"
+                  rows={2}
+                  value={draft.replies}
+                  onChange={e => setDraft({ replies: e.target.value })}
+                  placeholder="Replies players can pick, one per line (none: [Continue])"
+                />
+                <div className="gm-row" style={{ justifyContent: 'space-between' }}>
+                  <span className="gm-conversation-hint">Ctrl+Enter sends · players can always end it</span>
+                  <button className="gm-btn small success" disabled={!draft.text.trim()} onClick={send}>Say</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Our character is down: what happens next, by the session's rule */}
+      {isPlayerView && iAmDown && (
+        <div className="gm-prompt gm-downed" role="status">
+          <div className="gm-prompt-speaker">You're down</div>
+          <div className="gm-prompt-text">
+            {deathRule === 'kotor' && 'You will get back up once no enemies are near, or when the GM revives you.'}
+            {deathRule === 'gm' && 'The GM will decide what happens to you.'}
+            {deathRule === 'respawn' && (respawnIn > 0
+              ? `You can respawn at the entrance in ${respawnIn}s, or the GM may revive you.`
+              : 'Respawn at the entrance, or wait for the GM to revive you.')}
+          </div>
+          {deathRule === 'respawn' && (
+            <div className="gm-prompt-options">
+              <button className="gm-btn success" disabled={respawnIn > 0} onClick={() => GMNetworkManager.requestRespawn()}>
+                Respawn at the entrance
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* A question from the GM, waiting for this player's reply */}
+      {isPlayerView && GMNetworkManager.pendingPrompts.length > 0 && (() => {
+        const prompt = GMNetworkManager.pendingPrompts[0];
+        return (
+          <div className="gm-prompt" role="dialog" aria-label={`${prompt.speaker} asks`}>
+            <div className="gm-prompt-speaker">{prompt.speaker}</div>
+            <div className="gm-prompt-text">{prompt.text}</div>
+            <div className="gm-prompt-options">
+              {prompt.options.map((option, i) => (
+                <button key={i} className="gm-btn" onClick={() => GMNetworkManager.answerPrompt(prompt.promptId, i)}>
+                  {i + 1}. {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Bottom controls strip: what the current mode/tool does and its keys */}
       <div className="gm-controls-strip">
@@ -895,134 +1182,273 @@ export const GMPanel: React.FC = () => {
                 {spawnSubTab === 'creatures' ? (
                   <>
                     <div className="gm-section">
-                      <div className="gm-section-title">Quick Creature / NPC Presets</div>
-                      <div className="gm-list" style={{ maxHeight: 165 }}>
-                        {GMManager.CREATURE_PRESETS.map((preset, idx) => (
-                          <div
-                            key={idx}
-                            className={`gm-card ${creatureCfg.name === preset.name ? 'selected' : ''}`}
-                            onClick={() => updateCreatureCfg({ ...preset })}
-                          >
-                            <div className="gm-card-info">
-                              <div className="gm-card-title">{preset.name}</div>
-                              <div className="gm-card-sub">
-                                {preset.factionId === 1 ? 'Hostile' : preset.factionId === 2 ? 'Friendly' : 'Neutral'} • HP {preset.hp} • App #{preset.appearanceId}
+                      <div className="gm-section-title">Encounter</div>
+                      <div className="gm-grid-2">
+                        <div className="gm-field">
+                          <label>Creature</label>
+                          <select className="gm-select" value={encounterPreset} onChange={e => setEncounterPreset(Number(e.target.value))}>
+                            {GMManager.CREATURE_PRESETS.map((preset, idx) => <option key={idx} value={idx}>{preset.name}</option>)}
+                          </select>
+                        </div>
+                        <div className="gm-field">
+                          <label>Faction</label>
+                          <select className="gm-select" value={encounterFaction} onChange={e => setEncounterFaction(Number(e.target.value))}>
+                            <option value={1}>Hostile</option>
+                            <option value={2}>Friendly</option>
+                            <option value={5}>Neutral</option>
+                          </select>
+                        </div>
+                        <div className="gm-field">
+                          <label>How many</label>
+                          <input className="gm-input" type="number" min={1} max={12} value={encounterCount} onChange={e => setEncounterCount(Number(e.target.value))} />
+                        </div>
+                        <div className="gm-field">
+                          <label>Spread (m)</label>
+                          <input className="gm-input" type="number" min={0.5} step={0.5} value={encounterSpread} onChange={e => setEncounterSpread(Number(e.target.value))} />
+                        </div>
+                      </div>
+                      <button
+                        className="gm-btn success"
+                        onClick={() => GMManager.spawnEncounter({ presetIndex: encounterPreset, count: encounterCount, spread: encounterSpread, factionId: encounterFaction })}
+                        title="Spawns the group in a ring around where the camera is looking"
+                      >
+                        Spawn encounter where the camera looks
+                      </button>
+                    </div>
+                    <div className="gm-section">
+                      <div className="gm-section-title">
+                        <span>Creatures</span>
+                        <div className="gm-row">
+                          <button className={`gm-btn small ${creatureSource === 'presets' ? 'active' : ''}`} onClick={() => setCreatureSource('presets')}>Presets</button>
+                          <button className={`gm-btn small ${creatureSource === 'templates' ? 'active' : ''}`} onClick={() => setCreatureSource('templates')} title="Every creature template (.utc) in the game, with its real stats">All game templates</button>
+                        </div>
+                      </div>
+
+                      {creatureSource === 'presets' ? (
+                        <div className="gm-list" style={{ maxHeight: 200 }}>
+                          {GMManager.CREATURE_PRESETS.map((preset, idx) => (
+                            <div
+                              key={idx}
+                              className={`gm-card ${creaturePick.name === preset.name && creaturePick.templateResRef === preset.templateResRef ? 'selected' : ''}`}
+                              onClick={() => selectCreature(preset)}
+                            >
+                              <div className="gm-card-info">
+                                <div className="gm-card-title">{preset.name}</div>
+                                <div className="gm-card-sub">
+                                  {factionName(preset.factionId)} • Level {preset.level} • HP {preset.hp}
+                                </div>
                               </div>
-                            </div>
-                            <div className="gm-row">
                               <button
-                                className="gm-btn small success"
-                                onClick={async e => {
+                                className="gm-btn small warning"
+                                onClick={e => {
                                   e.stopPropagation();
-                                  updateCreatureCfg({ ...preset });
-                                  const c = await GMManager.spawnCreature(preset);
-                                  if (c) GMManager.selectObject(c);
+                                  selectCreature(preset);
+                                  GMManager.setToolMode('place_creature');
                                 }}
+                                title="Click the ground to place it"
                               >
-                                Spawn
+                                Place
                               </button>
                             </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <>
+                          <input
+                            className="gm-input"
+                            placeholder="Search templates by name or resref (e.g. trooper, g_darkjedi)"
+                            value={templateQuery}
+                            onChange={e => setTemplateQuery(e.target.value)}
+                          />
+                          <div className="gm-list" style={{ maxHeight: 220 }}>
+                            {!templateIndex && <div className="gm-hint">Reading the game's creature templates…</div>}
+                            {templateIndex && (() => {
+                              const q = templateQuery.trim().toLowerCase();
+                              const matches = templateIndex.filter(t => !q || t.name.toLowerCase().includes(q) || t.resRef.includes(q));
+                              if (!matches.length) return <div className="gm-hint">No templates match.</div>;
+                              return (
+                                <>
+                                  {matches.slice(0, 80).map(t => (
+                                    <div
+                                      key={t.resRef}
+                                      className={`gm-card ${creaturePick.templateResRef === t.resRef ? 'selected' : ''}`}
+                                      onClick={() => selectCreature(GMManager.creatureConfigFromTemplate(t))}
+                                    >
+                                      <div className="gm-card-info">
+                                        <div className="gm-card-title">{t.name} <span className="gm-badge" style={{ marginLeft: 4 }}>{t.resRef}</span></div>
+                                        <div className="gm-card-sub">{factionName(t.factionId)} • {t.classes || 'No class'} • HP {t.hp}{t.fp ? ` • FP ${t.fp}` : ''}</div>
+                                      </div>
+                                      <button
+                                        className="gm-btn small warning"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          selectCreature(GMManager.creatureConfigFromTemplate(t));
+                                          GMManager.setToolMode('place_creature');
+                                        }}
+                                        title="Click the ground to place it"
+                                      >
+                                        Place
+                                      </button>
+                                    </div>
+                                  ))}
+                                  {matches.length > 80 && <div className="gm-hint">{matches.length - 80} more: narrow the search.</div>}
+                                </>
+                              );
+                            })()}
                           </div>
-                        ))}
-                      </div>
+                        </>
+                      )}
                     </div>
 
                     <div className="gm-section">
-                      <div className="gm-section-title">Customize Creature Before Spawning</div>
+                      <div className="gm-section-title">
+                        <span>{creatureCfg.customized ? 'Placing (customized)' : 'Placing'}: {creatureCfg.name}</span>
+                      </div>
+                      <div className="gm-hint">
+                        {creatureCfg.templateResRef ? (
+                          creatureTemplateInfo ? (
+                            creatureCfg.customized
+                              ? <>From template {creatureTemplateInfo.resRef}, with your changes • {creatureTemplateInfo.classes}</>
+                              : <>
+                                  Template {creatureTemplateInfo.resRef}: {creatureTemplateInfo.appearanceLabel || `appearance ${creatureTemplateInfo.appearanceId}`}
+                                  {' '}• {creatureTemplateInfo.classes} • HP {creatureTemplateInfo.hp}{creatureTemplateInfo.fp ? ` • FP ${creatureTemplateInfo.fp}` : ''}
+                                  {' '}• {[creatureTemplateInfo.rightHandResRef || creatureCfg.rightHandResRef, creatureTemplateInfo.leftHandResRef].filter(Boolean).join(', ') || 'no weapon'}
+                                </>
+                          ) : 'Reading the template…'
+                        ) : (
+                          <>Built by class: {GMManager.getAvailableAppearanceOptions().find(o => o.id === GMManager.resolveCreatureAppearance(creatureCfg))?.label || `appearance ${creatureCfg.appearanceId}`} • Level {creatureCfg.level} • HP {creatureCfg.hp}</>
+                        )}
+                      </div>
+
                       <div className="gm-grid-2">
                         <div className="gm-field">
                           <label>Name</label>
-                          <input
-                            className="gm-input"
-                            value={creatureCfg.name}
-                            onChange={e => updateCreatureCfg({ name: e.target.value })}
-                          />
+                          <input className="gm-input" value={creatureCfg.name} onChange={e => updateCreatureCfg({ name: e.target.value })} />
                         </div>
                         <div className="gm-field">
-                          <label>Faction (AI Attitude)</label>
+                          <label>Faction (AI attitude)</label>
                           <select
                             className="gm-select"
                             value={creatureCfg.factionId}
                             onChange={e => updateCreatureCfg({ factionId: Number(e.target.value) })}
                           >
-                            <option value={1}>Hostile (Attacks Players)</option>
-                            <option value={2}>Friendly (Ally / Talkable)</option>
-                            <option value={5}>Neutral (Bystander / Talkable)</option>
-                            <option value={0}>Party Faction</option>
+                            <option value={1}>Hostile (attacks players)</option>
+                            <option value={2}>Friendly (ally / talkable)</option>
+                            <option value={5}>Neutral (bystander / talkable)</option>
+                            <option value={0}>Party faction</option>
                           </select>
                         </div>
                       </div>
 
-                      <div className="gm-grid-3">
-                        <div className="gm-field">
-                          <label>Appearance ID</label>
-                          <input
-                            type="number"
-                            className="gm-input"
-                            value={creatureCfg.appearanceId}
-                            onChange={e => updateCreatureCfg({ appearanceId: Number(e.target.value), templateResRef: '' })}
-                          />
-                        </div>
-                        <div className="gm-field">
-                          <label>Hit Points (HP)</label>
-                          <input
-                            type="number"
-                            className="gm-input"
-                            value={creatureCfg.hp}
-                            onChange={e => updateCreatureCfg({ hp: Number(e.target.value) })}
-                          />
-                        </div>
-                        <div className="gm-field">
-                          <label>Level</label>
-                          <input
-                            type="number"
-                            className="gm-input"
-                            value={creatureCfg.level}
-                            onChange={e => updateCreatureCfg({ level: Number(e.target.value) })}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="gm-field">
-                        <label>Browse Appearance (appearance.2da)</label>
-                        <select
-                          className="gm-select"
-                          value={creatureCfg.appearanceId}
-                          onChange={e => updateCreatureCfg({ appearanceId: Number(e.target.value), templateResRef: '' })}
+                      <div className="gm-row">
+                        <button
+                          className={`gm-btn warning ${GMManager.activeTool === 'place_creature' ? 'active' : ''}`}
+                          style={{ flex: 1 }}
+                          onClick={() => GMManager.setToolMode(GMManager.activeTool === 'place_creature' ? 'select' : 'place_creature')}
                         >
-                          {GMManager.getAvailableAppearanceOptions().map(opt => (
-                            <option key={opt.id} value={opt.id}>{opt.label}</option>
-                          ))}
-                        </select>
+                          {GMManager.activeTool === 'place_creature' ? 'Click the ground to place (Esc to stop)' : 'Click to place'}
+                        </button>
+                        <button
+                          className="gm-btn success"
+                          style={{ flex: 1 }}
+                          onClick={async () => {
+                            const c = await GMManager.spawnCreature(creatureCfg);
+                            if (c) GMManager.selectObject(c);
+                          }}
+                        >
+                          Place where the camera looks
+                        </button>
                       </div>
 
-                      <div className="gm-grid-2">
+                      <label className="gm-checkbox">
+                        <input type="checkbox" checked={!!creatureCfg.customized} onChange={e => setCreatureCustomized(e.target.checked)} />
+                        Customize this creature (look, HP, weapons, armour)
+                      </label>
+                    </div>
+
+                    {creatureCfg.customized && (
+                      <div className="gm-section">
+                        <div className="gm-section-title">
+                          <span>Customize</span>
+                          <button className="gm-btn small" onClick={() => setCreatureCustomized(false)} title="Back to the preset or template as it is">
+                            Reset
+                          </button>
+                        </div>
+                        <div className="gm-grid-3">
+                          <div className="gm-field">
+                            <label>Appearance ID</label>
+                            <input
+                              type="number"
+                              className="gm-input"
+                              value={creatureCfg.appearanceId}
+                              onChange={e => customizeCreature({ appearanceId: Number(e.target.value), appearanceLabel: undefined })}
+                            />
+                          </div>
+                          <div className="gm-field">
+                            <label>Hit points</label>
+                            <input type="number" className="gm-input" value={creatureCfg.hp} onChange={e => customizeCreature({ hp: Number(e.target.value) })} />
+                          </div>
+                          <div className="gm-field">
+                            <label title={creatureCfg.templateResRef ? 'A template keeps its own classes and level' : ''}>Level</label>
+                            <input
+                              type="number"
+                              className="gm-input"
+                              value={creatureCfg.level}
+                              disabled={!!creatureCfg.templateResRef}
+                              onChange={e => customizeCreature({ level: Number(e.target.value) })}
+                            />
+                          </div>
+                        </div>
+
                         <div className="gm-field">
-                          <label>Right-Hand Weapon</label>
+                          <label>Browse appearance (appearance.2da)</label>
                           <select
                             className="gm-select"
-                            value={creatureCfg.rightHandResRef || ''}
-                            onChange={e => updateCreatureCfg({ rightHandResRef: e.target.value })}
+                            value={creatureCfg.appearanceId}
+                            onChange={e => customizeCreature({ appearanceId: Number(e.target.value), appearanceLabel: undefined })}
                           >
-                            {GMManager.WEAPON_OPTIONS.map(w => (
-                              <option key={w.resRef} value={w.resRef}>{w.label}</option>
+                            {GMManager.getAvailableAppearanceOptions().map(opt => (
+                              <option key={opt.id} value={opt.id}>{opt.label}</option>
                             ))}
                           </select>
                         </div>
-                        <div className="gm-field">
-                          <label>Armor / Clothing</label>
-                          <select
-                            className="gm-select"
-                            value={creatureCfg.armorResRef || ''}
-                            onChange={e => updateCreatureCfg({ armorResRef: e.target.value })}
-                          >
-                            {GMManager.ARMOR_OPTIONS.map(a => (
-                              <option key={a.resRef} value={a.resRef}>{a.label}</option>
-                            ))}
-                          </select>
+
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>Right-hand weapon</label>
+                            <select
+                              className="gm-select"
+                              value={creatureCfg.rightHandResRef || ''}
+                              onChange={e => customizeCreature({ rightHandResRef: e.target.value })}
+                            >
+                              {!GMManager.WEAPON_OPTIONS.some(w => w.resRef === (creatureCfg.rightHandResRef || '')) && (
+                                <option value={creatureCfg.rightHandResRef}>{creatureCfg.rightHandResRef} (template)</option>
+                              )}
+                              {GMManager.WEAPON_OPTIONS.map(w => (
+                                <option key={w.resRef} value={w.resRef}>{w.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="gm-field">
+                            <label>Armour / clothing</label>
+                            <select
+                              className="gm-select"
+                              value={creatureCfg.armorResRef || ''}
+                              onChange={e => customizeCreature({ armorResRef: e.target.value })}
+                            >
+                              {!GMManager.ARMOR_OPTIONS.some(a => a.resRef === (creatureCfg.armorResRef || '')) && (
+                                <option value={creatureCfg.armorResRef}>{creatureCfg.armorResRef} (template)</option>
+                              )}
+                              {GMManager.ARMOR_OPTIONS.map(a => (
+                                <option key={a.resRef} value={a.resRef}>{a.label}</option>
+                              ))}
+                            </select>
+                          </div>
                         </div>
                       </div>
+                    )}
 
+                    <div className="gm-section">
                       <div className="gm-field">
                         <label>Custom Dialogue / Bark Line (spoken when clicked by player)</label>
                         <input
@@ -1032,39 +1458,14 @@ export const GMPanel: React.FC = () => {
                           placeholder="e.g. Halt! None shall pass!"
                         />
                       </div>
-
-                      <div className="gm-row">
-                        <button
-                          className="gm-btn success"
-                          style={{ flex: 1 }}
-                          onClick={async () => {
-                            const c = await GMManager.spawnCreature(creatureCfg);
-                            if (c) GMManager.selectObject(c);
-                          }}
-                        >
-                          Spawn at Camera Target
-                        </button>
-                        <button
-                          className={`gm-btn warning ${GMManager.activeTool === 'place_creature' ? 'active' : ''}`}
-                          style={{ flex: 1 }}
-                          onClick={() =>
-                            GMManager.setToolMode(GMManager.activeTool === 'place_creature' ? 'select' : 'place_creature')
-                          }
-                        >
-                          {GMManager.activeTool === 'place_creature' ? 'Click 3D Ground to Place (Active)' : 'Arm 3D Click-to-Place'}
-                        </button>
-                      </div>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="gm-section">
                       <div className="gm-section-title">
-                        <span>Categorized Architectural &amp; Prop Palette</span>
-                        <button
-                          className="gm-btn small"
-                          onClick={() => setDrawerTab('builder')}
-                        >
+                        <span>Objects</span>
+                        <button className="gm-btn small" onClick={() => setDrawerTab('builder')}>
                           Scene Blueprints (Office/Temple) →
                         </button>
                       </div>
@@ -1096,68 +1497,68 @@ export const GMPanel: React.FC = () => {
                         ).map((preset, idx) => (
                           <div
                             key={idx}
-                            className={`gm-card ${placeableCfg.name === preset.name ? 'selected' : ''}`}
-                            onClick={() =>
-                              updatePlaceableCfg({
-                                ...preset,
-                                scale: preset.scale ?? 1.0,
-                                zOffset: preset.zOffset ?? 0,
-                                lootResRefs: [...(preset.lootResRefs || [])]
-                              })
-                            }
+                            className={`gm-card ${placeablePreset === preset ? 'selected' : ''}`}
+                            onClick={() => selectPlaceablePreset(preset)}
                           >
                             <div className="gm-card-info">
                               <div className="gm-card-title">
                                 {preset.name} <span className="gm-badge" style={{ marginLeft: 4 }}>{preset.category}</span>
                               </div>
                               <div className="gm-card-sub">
-                                {preset.hasInventory ? `Container (${preset.lootResRefs.length} items)` : 'Prop / Interactive'} • Scale {(preset.scale ?? 1.0).toFixed(2)}x • {preset.locked ? `Locked (DC ${preset.openLockDC})` : 'Unlocked'}
+                                {preset.hasInventory ? `Container (${preset.lootResRefs.length} items)` : 'Prop / Interactive'} • {preset.locked ? `Locked (DC ${preset.openLockDC})` : 'Unlocked'}
                               </div>
                             </div>
-                            <div className="gm-row">
-                              <button
-                                className="gm-btn small success"
-                                onClick={async e => {
-                                  e.stopPropagation();
-                                  const next = {
-                                    ...preset,
-                                    scale: preset.scale ?? 1.0,
-                                    zOffset: preset.zOffset ?? 0,
-                                    lootResRefs: [...(preset.lootResRefs || [])]
-                                  };
-                                  updatePlaceableCfg(next);
-                                  const plc = await GMManager.spawnPlaceable(next);
-                                  if (plc) GMManager.selectObject(plc);
-                                }}
-                              >
-                                Spawn
-                              </button>
-                              <button
-                                className="gm-btn small warning"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  updatePlaceableCfg({
-                                    ...preset,
-                                    scale: preset.scale ?? 1.0,
-                                    zOffset: preset.zOffset ?? 0,
-                                    lootResRefs: [...(preset.lootResRefs || [])]
-                                  });
-                                  GMManager.setToolMode('place_placeable');
-                                }}
-                              >
-                                Click-Place
-                              </button>
-                            </div>
+                            <button
+                              className="gm-btn small warning"
+                              onClick={e => {
+                                e.stopPropagation();
+                                selectPlaceablePreset(preset);
+                                GMManager.setToolMode('place_placeable');
+                              }}
+                              title="Click the ground to place it"
+                            >
+                              Place
+                            </button>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     <div className="gm-section">
-                      <div className="gm-section-title">Architectural Placement Controls (Grid Snap, Rotation, Scale &amp; Elevation)</div>
-                      <div className="gm-grid-3">
+                      <div className="gm-section-title">
+                        <span>{placeableCfg.customized ? 'Placing (customized)' : 'Placing'}: {placeableCfg.name}</span>
+                      </div>
+                      <div className="gm-hint">
+                        Model: {GMManager.getPlaceableAppearanceLabel(GMManager.resolvePlaceableAppearance(placeableCfg))}
+                        {placeableCfg.hasInventory ? ` • Container with ${placeableCfg.lootResRefs.length} item${placeableCfg.lootResRefs.length === 1 ? '' : 's'}` : ''}
+                        {placeableCfg.locked ? ` • Locked (DC ${placeableCfg.openLockDC})` : ''}
+                      </div>
+
+                      <div className="gm-row">
+                        <button
+                          className={`gm-btn warning ${GMManager.activeTool === 'place_placeable' ? 'active' : ''}`}
+                          style={{ flex: 1 }}
+                          onClick={() =>
+                            GMManager.setToolMode(GMManager.activeTool === 'place_placeable' ? 'select' : 'place_placeable')
+                          }
+                        >
+                          {GMManager.activeTool === 'place_placeable' ? 'Click the ground to place (Esc to stop)' : 'Click to place'}
+                        </button>
+                        <button
+                          className="gm-btn success"
+                          style={{ flex: 1 }}
+                          onClick={async () => {
+                            const plc = await GMManager.spawnPlaceable(placeableCfg);
+                            if (plc) GMManager.selectObject(plc);
+                          }}
+                        >
+                          Place where the camera looks
+                        </button>
+                      </div>
+
+                      <div className="gm-grid-2">
                         <div className="gm-field">
-                          <label>Grid Snap</label>
+                          <label>Grid snap</label>
                           <select
                             className="gm-select"
                             value={GMManager.gridSnapSize}
@@ -1173,174 +1574,169 @@ export const GMPanel: React.FC = () => {
                           </select>
                         </div>
                         <div className="gm-field">
-                          <label>Scale ({(placeableCfg.scale ?? 1.0).toFixed(2)}x)</label>
+                          <label>Rotation (R / Shift+R or wheel while placing)</label>
                           <select
                             className="gm-select"
-                            value={placeableCfg.scale ?? 1.0}
-                            onChange={e => updatePlaceableCfg({ scale: Number(e.target.value) })}
+                            value={GMManager.placementYawOffset}
+                            onChange={e => {
+                              GMManager.placementYawOffset = Number(e.target.value);
+                              forceUpdate();
+                            }}
                           >
-                            <option value={0.65}>0.65x (Compact / Desktop)</option>
-                            <option value={0.85}>0.85x (Small)</option>
-                            <option value={1}>1.00x (Standard)</option>
-                            <option value={1.2}>1.20x (Large)</option>
-                            <option value={1.4}>1.40x (Grand)</option>
-                            <option value={1.75}>1.75x (Monumental Pillar/Statue)</option>
-                            <option value={2.25}>2.25x (Colossal)</option>
-                          </select>
-                        </div>
-                        <div className="gm-field">
-                          <label>Vertical Z-Offset ({(placeableCfg.zOffset ?? 0).toFixed(2)}m)</label>
-                          <select
-                            className="gm-select"
-                            value={placeableCfg.zOffset ?? 0}
-                            onChange={e => updatePlaceableCfg({ zOffset: Number(e.target.value) })}
-                          >
-                            <option value={0}>0.00m (Floor Level)</option>
-                            <option value={0.65}>+0.65m (On Desk / Table)</option>
-                            <option value={0.9}>+0.90m (On Counter / Altar)</option>
-                            <option value={1.15}>+1.15m (Stacked Crate Tier 2)</option>
-                            <option value={2.2}>+2.20m (Elevated Wall / Upper Tier)</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="gm-field">
-                        <label>Placement Yaw Rotation Offset: {GMManager.placementYawOffset}° (Hotkeys: Q / E while placing)</label>
-                        <div className="gm-row">
-                          {([0, 45, 90, 135, 180, 225, 270, 315] as const).map(deg => (
-                            <button
-                              key={deg}
-                              className={`gm-btn small ${GMManager.placementYawOffset === deg ? 'active' : ''}`}
-                              onClick={() => {
-                                GMManager.placementYawOffset = deg;
-                                forceUpdate();
-                              }}
-                            >
-                              {deg}°
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="gm-section">
-                      <div className="gm-section-title">Customize Placeable / Container Properties</div>
-                      <div className="gm-grid-2">
-                        <div className="gm-field">
-                          <label>Object Name</label>
-                          <input
-                            className="gm-input"
-                            value={placeableCfg.name}
-                            onChange={e => updatePlaceableCfg({ name: e.target.value })}
-                          />
-                        </div>
-                        <div className="gm-field">
-                          <label>Placeable Appearance (placeables.2da)</label>
-                          <select
-                            className="gm-select"
-                            value={placeableCfg.appearanceId}
-                            onChange={e => updatePlaceableCfg({ appearanceId: Number(e.target.value), modelKeywords: undefined })}
-                          >
-                            {GMManager.getAvailablePlaceableAppearances().map(opt => (
-                              <option key={opt.id} value={opt.id}>{opt.label}</option>
+                            {Array.from(new Set([0, 45, 90, 135, 180, 225, 270, 315, GMManager.placementYawOffset])).sort((a, b) => a - b).map(deg => (
+                              <option key={deg} value={deg}>{deg}°</option>
                             ))}
                           </select>
                         </div>
                       </div>
 
-                      <div className="gm-row">
-                        <label className="gm-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={placeableCfg.useable}
-                            onChange={e => updatePlaceableCfg({ useable: e.target.checked })}
-                          />
-                          Interactive (Useable)
-                        </label>
-                        <label className="gm-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={placeableCfg.hasInventory}
-                            onChange={e => updatePlaceableCfg({ hasInventory: e.target.checked })}
-                          />
-                          Lootable Container
-                        </label>
-                        <label className="gm-checkbox">
-                          <input
-                            type="checkbox"
-                            checked={placeableCfg.locked}
-                            onChange={e => updatePlaceableCfg({ locked: e.target.checked })}
-                          />
-                          Locked
-                        </label>
-                      </div>
+                      <label className="gm-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={!!placeableCfg.customized}
+                          onChange={e => setPlaceableCustomized(e.target.checked)}
+                        />
+                        Customize this object (model, name, loot, lock, size)
+                      </label>
+                    </div>
 
-                      {placeableCfg.hasInventory && (
-                        <div className="gm-field">
-                          <label>Starter Loot Items ({placeableCfg.lootResRefs.join(', ') || 'Empty'})</label>
-                          <div className="gm-row">
+                    {placeableCfg.customized && (
+                      <div className="gm-section">
+                        <div className="gm-section-title">
+                          <span>Customize</span>
+                          <button className="gm-btn small" onClick={() => setPlaceableCustomized(false)} title="Back to the preset as it is">
+                            Reset to preset
+                          </button>
+                        </div>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>Name</label>
+                            <input
+                              className="gm-input"
+                              value={placeableCfg.name}
+                              onChange={e => updatePlaceableCfg({ name: e.target.value })}
+                            />
+                          </div>
+                          <div className="gm-field">
+                            <label>Model (placeables.2da)</label>
                             <select
                               className="gm-select"
-                              style={{ flex: 1 }}
-                              value={customLootResRef}
-                              onChange={e => setCustomLootResRef(e.target.value)}
+                              value={placeableCfg.appearanceId}
+                              onChange={e => updatePlaceableCfg({ appearanceId: Number(e.target.value), appearanceLabel: undefined, modelKeywords: undefined })}
                             >
-                              {GMManager.LOOT_ITEM_OPTIONS.map(it => (
-                                <option key={it.resRef} value={it.resRef}>{it.label}</option>
+                              {GMManager.getAvailablePlaceableAppearances().map(opt => (
+                                <option key={opt.id} value={opt.id}>{opt.label}</option>
                               ))}
                             </select>
-                            <button
-                              className="gm-btn small"
-                              onClick={() =>
-                                updatePlaceableCfg({
-                                  lootResRefs: [...placeableCfg.lootResRefs, customLootResRef]
-                                })
-                              }
-                            >
-                              + Add Item
-                            </button>
-                            <button
-                              className="gm-btn small danger"
-                              onClick={() => updatePlaceableCfg({ lootResRefs: [] })}
-                            >
-                              Clear
-                            </button>
                           </div>
                         </div>
-                      )}
 
-                      <div className="gm-field">
-                        <label>On-Use Message / Terminal Readout</label>
-                        <input
-                          className="gm-input"
-                          value={placeableCfg.barkText || ''}
-                          onChange={e => updatePlaceableCfg({ barkText: e.target.value })}
-                          placeholder="Optional message shown when player uses object"
-                        />
-                      </div>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>Size</label>
+                            <select
+                              className="gm-select"
+                              value={placeableCfg.scale ?? 1.0}
+                              onChange={e => updatePlaceableCfg({ scale: Number(e.target.value) })}
+                            >
+                              {Array.from(new Set([0.65, 0.85, 1, 1.2, 1.4, 1.75, 2.25, placeableCfg.scale ?? 1])).sort((a, b) => a - b).map(v => (
+                                <option key={v} value={v}>{v.toFixed(2)}x</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="gm-field">
+                            <label>Height above ground</label>
+                            <select
+                              className="gm-select"
+                              value={placeableCfg.zOffset ?? 0}
+                              onChange={e => updatePlaceableCfg({ zOffset: Number(e.target.value) })}
+                            >
+                              {Array.from(new Set([0, 0.65, 0.9, 1.15, 2.2, placeableCfg.zOffset ?? 0])).sort((a, b) => a - b).map(v => (
+                                <option key={v} value={v}>+{v.toFixed(2)}m</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
 
-                      <div className="gm-row">
-                        <button
-                          className="gm-btn success"
-                          style={{ flex: 1 }}
-                          onClick={async () => {
-                            const plc = await GMManager.spawnPlaceable(placeableCfg);
-                            if (plc) GMManager.selectObject(plc);
-                          }}
-                        >
-                          Spawn at Camera Target
-                        </button>
-                        <button
-                          className={`gm-btn warning ${GMManager.activeTool === 'place_placeable' ? 'active' : ''}`}
-                          style={{ flex: 1 }}
-                          onClick={() =>
-                            GMManager.setToolMode(GMManager.activeTool === 'place_placeable' ? 'select' : 'place_placeable')
-                          }
-                        >
-                          {GMManager.activeTool === 'place_placeable' ? 'Click 3D Ground to Place (Active)' : 'Arm 3D Click-to-Place'}
-                        </button>
+                        <div className="gm-row">
+                          <label className="gm-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={placeableCfg.useable}
+                              onChange={e => updatePlaceableCfg({ useable: e.target.checked })}
+                            />
+                            Usable
+                          </label>
+                          <label className="gm-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={placeableCfg.hasInventory}
+                              onChange={e => updatePlaceableCfg({ hasInventory: e.target.checked })}
+                            />
+                            Container
+                          </label>
+                          <label className="gm-checkbox">
+                            <input
+                              type="checkbox"
+                              checked={placeableCfg.locked}
+                              onChange={e => updatePlaceableCfg({ locked: e.target.checked })}
+                            />
+                            Locked
+                          </label>
+                          {placeableCfg.locked && (
+                            <label className="gm-checkbox">
+                              DC
+                              <input
+                                className="gm-input"
+                                style={{ width: 56 }}
+                                type="number"
+                                min={1}
+                                max={60}
+                                value={placeableCfg.openLockDC}
+                                onChange={e => updatePlaceableCfg({ openLockDC: Number(e.target.value) || 15 })}
+                              />
+                            </label>
+                          )}
+                        </div>
+
+                        {placeableCfg.hasInventory && (
+                          <div className="gm-field">
+                            <label>Loot ({placeableCfg.lootResRefs.join(', ') || 'empty'})</label>
+                            <div className="gm-row">
+                              <select
+                                className="gm-select"
+                                style={{ flex: 1 }}
+                                value={customLootResRef}
+                                onChange={e => setCustomLootResRef(e.target.value)}
+                              >
+                                {GMManager.LOOT_ITEM_OPTIONS.map(it => (
+                                  <option key={it.resRef} value={it.resRef}>{it.label}</option>
+                                ))}
+                              </select>
+                              <button
+                                className="gm-btn small"
+                                onClick={() => updatePlaceableCfg({ lootResRefs: [...placeableCfg.lootResRefs, customLootResRef] })}
+                              >
+                                + Add
+                              </button>
+                              <button className="gm-btn small danger" onClick={() => updatePlaceableCfg({ lootResRefs: [] })}>
+                                Clear
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="gm-field">
+                          <label>Message when used</label>
+                          <input
+                            className="gm-input"
+                            value={placeableCfg.barkText || ''}
+                            onChange={e => updatePlaceableCfg({ barkText: e.target.value })}
+                            placeholder="Optional"
+                          />
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
               </>
@@ -1349,6 +1745,78 @@ export const GMPanel: React.FC = () => {
             {/* ==================== TAB 3: PLAYERS & PARTY ==================== */}
             {drawerTab === 'players' && (
               <>
+                {fallenPlayers.length > 0 && (
+                  <div className="gm-section">
+                    <div className="gm-section-title">
+                      <span>Fallen players ({fallenPlayers.length})</span>
+                      {fallenPlayers.length > 1 && (
+                        <button className="gm-btn small success" onClick={() => GMManager.reviveAllPlayers()}>Revive everyone</button>
+                      )}
+                    </div>
+                    <div className="gm-list">
+                      {fallenPlayers.map((pc) => (
+                        <div key={(pc as any).gmNetId || pc.id} className="gm-card">
+                          <div className="gm-card-info">
+                            <div className="gm-card-title">{pc.getName()}</div>
+                            <div className="gm-card-sub">Down for {Math.round((Date.now() - ((pc as any).gmDowned?.since || Date.now())) / 1000)}s</div>
+                          </div>
+                          <div className="gm-row">
+                            <button className="gm-btn small success" onClick={() => GMManager.revivePlayer(pc)} title="Back on their feet with full vitality">Revive</button>
+                            <button className="gm-btn small" onClick={() => GMManager.respawnPlayer(pc)} title="Back at the scene's entry with half their vitality">Send to entry</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {GMNetworkManager.role === 'host' && (
+                  <div className="gm-section">
+                    <div className="gm-section-title">Connected Players ({connectedPeers.length})</div>
+                    {connectedPeers.length === 0 ? (
+                      <div className="gm-hint">No players have joined yet. Host from the Session tab and share the address.</div>
+                    ) : (
+                      <>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>XP to give</label>
+                            <input className="gm-input" type="number" min={1} value={rewardXp} onChange={e => setRewardXp(Number(e.target.value))} />
+                          </div>
+                          <div className="gm-field">
+                            <label>Item to give (resref)</label>
+                            <input className="gm-input" value={rewardItem} onChange={e => setRewardItem(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="gm-list">
+                          {connectedPeers.map(peer => {
+                            const pc = GMManager.getPeerActor(peer.peerId);
+                            return (
+                              <div key={peer.peerId} className="gm-card">
+                                <div className="gm-card-info">
+                                  <div className="gm-card-title">{peer.name}</div>
+                                  <div className="gm-card-sub">
+                                    {pc ? `${pc.getName()} • Level ${pc.classes?.[0]?.level ?? '?'} • HP ${pc.getHP()}/${pc.getMaxHP()} • XP ${pc.experience || 0}` : 'No character yet'}
+                                  </div>
+                                </div>
+                                <div className="gm-row">
+                                  <button className="gm-btn small" disabled={!pc} onClick={() => GMManager.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
+                                    + XP
+                                  </button>
+                                  <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMManager.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
+                                    + Item
+                                  </button>
+                                  <button className="gm-btn small" disabled={!pc} onClick={() => pc && GMManager.selectObject(pc)} title="Select their character">
+                                    Select
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="gm-section">
                   <div className="gm-section-title">
                     <span>Loaded Player Characters & Party ({KotOR.GameState.PartyManager.party.length})</span>
@@ -1483,7 +1951,10 @@ export const GMPanel: React.FC = () => {
                         <div className="gm-card-info">
                           <div className="gm-card-title">{preset.name}</div>
                           <div className="gm-card-sub">
-                            Lv.{preset.level} • HP {preset.hp} • FP {preset.fp} • STR {preset.str} DEX {preset.dex} WIS {preset.wis}
+                            {(() => {
+                              const built = GMManager.buildPlayerAbilities(preset);
+                              return `Lv.${preset.level} • HP ${built.maxHp} • FP ${built.maxFp} • ${built.feats.length} feats, ${built.powers.length} powers`;
+                            })()}
                           </div>
                         </div>
                         <button
@@ -1540,21 +2011,23 @@ export const GMPanel: React.FC = () => {
                       />
                     </div>
                     <div className="gm-field">
-                      <label>HP</label>
+                      <label>HP (blank: from class)</label>
                       <input
                         type="number"
                         className="gm-input"
-                        value={playerCfg.hp}
-                        onChange={e => updatePlayerCfg({ hp: Number(e.target.value) })}
+                        value={playerCfg.hp ?? ''}
+                        placeholder={String(GMManager.buildPlayerAbilities({ ...playerCfg, hp: undefined }).maxHp)}
+                        onChange={e => updatePlayerCfg({ hp: e.target.value === '' ? undefined : Number(e.target.value) })}
                       />
                     </div>
                     <div className="gm-field">
-                      <label>Force Points</label>
+                      <label>Force Points (blank: from class)</label>
                       <input
                         type="number"
                         className="gm-input"
-                        value={playerCfg.fp}
-                        onChange={e => updatePlayerCfg({ fp: Number(e.target.value) })}
+                        value={playerCfg.fp ?? ''}
+                        placeholder={String(GMManager.buildPlayerAbilities({ ...playerCfg, fp: undefined }).maxFp)}
+                        onChange={e => updatePlayerCfg({ fp: e.target.value === '' ? undefined : Number(e.target.value) })}
                       />
                     </div>
                   </div>
@@ -1855,6 +2328,101 @@ export const GMPanel: React.FC = () => {
                           </button>
                         </div>
                       </div>
+
+                      {!(selectedObj as any).gmOwnerPeerId && (
+                        <label className="gm-checkbox" title="Hidden objects stay visible to you but are removed from players' games until revealed">
+                          <input
+                            type="checkbox"
+                            checked={GMManager.isHiddenFromPlayers(selectedObj)}
+                            onChange={e => GMManager.setObjectHidden(selectedObj, e.target.checked)}
+                          />
+                          Hidden from players
+                        </label>
+                      )}
+
+                      {GMManager.canOrder(selectedObj) && (() => {
+                        const npc = selectedObj as KotOR.ModuleCreature;
+                        const order = GMNpcOrders.getOrder(npc);
+                        const players = GMManager.getPlayerCharacters().filter((pc) => !pc.isDead());
+                        return (
+                          <div className="gm-field">
+                            <label>Orders: {GMNpcOrders.describe(order)}</label>
+                            <div className="gm-row">
+                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_move', npc)} title="Click the ground: it walks there, then guards the spot">Move here…</button>
+                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_attack', npc)} title="Click a creature: it attacks until that one is dead">Attack…</button>
+                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_follow', npc)} title="Click a creature or player: it stays close and fights back if attacked">Follow…</button>
+                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_patrol', npc)} title="Click points on the ground, then Esc: it walks the loop and fights what it meets">Patrol…</button>
+                            </div>
+                            <div className="gm-row">
+                              <button className="gm-btn small" onClick={() => GMManager.giveOrder(npc, { kind: 'guard', point: GMManager.pointOf(npc), radius: GMNpcOrders.GUARD_RADIUS })} title={`Holds this spot and fights enemies within ${GMNpcOrders.GUARD_RADIUS}m`}>Guard here</button>
+                              <button className="gm-btn small warning" onClick={() => GMManager.giveOrder(npc, { kind: 'flee' })} title="Runs from the nearest enemy and doesn't fight">Flee</button>
+                              <button className="gm-btn small warning" onClick={() => GMManager.giveOrder(npc, { kind: 'standDown' })} title="Stops fighting, even if attacked">Stand down</button>
+                              <button className="gm-btn small" disabled={!order} onClick={() => GMManager.giveOrder(npc, undefined)} title="Back to its own judgement: fights the nearest enemy">Clear order</button>
+                            </div>
+                            {players.length > 0 && (
+                              <select
+                                className="gm-select"
+                                value=""
+                                onChange={(e) => { if (e.target.value) GMManager.giveOrder(npc, { kind: 'follow', targetNetId: e.target.value }); }}
+                              >
+                                <option value="">Follow a player…</option>
+                                {players.map((pc) => (
+                                  <option key={(pc as any).gmNetId} value={(pc as any).gmNetId}>{pc.getName()}</option>
+                                ))}
+                              </select>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {GMNetworkManager.role === 'host' && GMConversationManager.canTalkTo(selectedObj) && (() => {
+                        const nearby = GMConversationManager.getNearbyPeers(selectedObj);
+                        return (
+                          <button
+                            className="gm-btn small"
+                            disabled={!nearby.length}
+                            onClick={() => GMConversationManager.join(selectedObj as KotOR.ModuleCreature, nearby)}
+                            title={nearby.length ? 'Open a conversation with the players standing near it' : `No players within ${GMConversationManager.NEARBY_RANGE}m`}
+                          >
+                            Talk as {selectedObj.getName() || 'this NPC'} to nearby players ({nearby.length})
+                          </button>
+                        );
+                      })()}
+
+                      {GMNetworkManager.role === 'host' && (
+                        <div className="gm-field">
+                          <label>Ask players, as {selectedObj.getName() || 'this object'}</label>
+                          <input className="gm-input" value={askText} onChange={e => setAskText(e.target.value)} placeholder="What do you want, stranger?" />
+                          <textarea
+                            className="gm-input"
+                            rows={3}
+                            value={askOptions}
+                            onChange={e => setAskOptions(e.target.value)}
+                            placeholder="One reply per line"
+                          />
+                          <div className="gm-row">
+                            <select className="gm-select" style={{ flex: 1 }} value={askTarget} onChange={e => setAskTarget(e.target.value)}>
+                              <option value="">Everyone</option>
+                              {connectedPeers.map(peer => <option key={peer.peerId} value={peer.peerId}>{peer.name}</option>)}
+                            </select>
+                            <button
+                              className="gm-btn small active"
+                              disabled={!askText.trim() || !askOptions.trim()}
+                              onClick={() => {
+                                const id = GMManager.askPlayers(selectedObj, askText, askOptions.split('\n'), askTarget || undefined);
+                                if (id) setAskText('');
+                              }}
+                            >
+                              Ask
+                            </button>
+                          </div>
+                          {recentPrompts.map(({ prompt, replies }) => (
+                            <div key={prompt.promptId} className="gm-card-sub">
+                              "{prompt.text}": {replies.length ? replies.map(r => `${r.name} → ${prompt.options[r.choice]}`).join(', ') : 'waiting for replies'}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -1924,6 +2492,58 @@ export const GMPanel: React.FC = () => {
             {/* ==================== TAB 5: MULTIPLAYER (NWN HOST / JOIN) ==================== */}
             {drawerTab === 'multiplayer' && (
               <>
+                {!isPlayerView && (
+                  <>
+                  <div className="gm-section">
+                    <div className="gm-section-title">When a player falls</div>
+                    <select className="gm-select" value={GMManager.deathRule} onChange={(e) => GMManager.setDeathRule(e.target.value as KotOR.GMDeathRule)}>
+                      <option value="kotor">KotOR rules: they get up with 1 HP once no enemy is near</option>
+                      <option value="gm">GM decides: they stay down until you revive them</option>
+                      <option value="respawn">Respawn: after {GMManager.RESPAWN_DELAY_SECONDS}s they can respawn at the entrance</option>
+                    </select>
+                    <div className="gm-hint">You can always revive fallen players from the Players tab. Saved with the session.</div>
+                  </div>
+                  <div className="gm-section">
+                    <div className="gm-section-title">Save & Load Session</div>
+                    <div className="gm-row">
+                      <input
+                        className="gm-input"
+                        style={{ flex: 1 }}
+                        value={sessionName}
+                        onChange={e => setSessionName(e.target.value)}
+                        placeholder={`${currentModuleName} session`}
+                      />
+                      <button className="gm-btn small success" onClick={() => { if (GMManager.saveSession(sessionName)) setSessionName(''); }}>
+                        Save
+                      </button>
+                      <button className="gm-btn small" onClick={() => sessionFileRef.current?.click()} title="Add a session exported from another browser">
+                        Import…
+                      </button>
+                      <input ref={sessionFileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={onImportSession} />
+                    </div>
+                    <div className="gm-hint">
+                      Saves the scene, everything you placed, door states and every player character. Players get their saved character back when they join under the same name.
+                    </div>
+                    <div className="gm-list">
+                      {GMManager.getSavedSessions().map(save => (
+                        <div key={save.id} className="gm-card">
+                          <div className="gm-card-info">
+                            <div className="gm-card-title">{save.name}</div>
+                            <div className="gm-card-sub">
+                              {save.scene.module} • {save.objects.length} objects • {save.players.length} characters • {new Date(save.savedAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="gm-row">
+                            <button className="gm-btn small active" onClick={() => GMManager.loadSession(save)}>Load</button>
+                            <button className="gm-btn small" onClick={() => downloadSession(save)}>Export</button>
+                            <button className="gm-btn small danger" onClick={() => GMManager.deleteSavedSession(save.id)}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  </>
+                )}
                 <div className="gm-hint">
                   <b>Neverwinter Nights-Style GM Hosting:</b> A Game Master can host a live server on port <code>7878</code> (started automatically with <code>npm run dev</code> or standalone via <code>npm run gm:server</code>). Forward TCP port <code>7878</code> (and <code>8080</code> if hosting the web client) on your router so remote players can connect, spawn their Player Characters, and interact with your world in real time!
                 </div>
@@ -1989,19 +2609,7 @@ export const GMPanel: React.FC = () => {
                           </select>
                         </div>
                       </div>
-                      <button
-                        className="gm-btn active"
-                        onClick={() => {
-                          const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
-                          GMNetworkManager.joinSession(joinUrl, joinPlayerName, {
-                            name: joinPlayerName,
-                            appearanceId: p.appearanceId,
-                            classId: p.classId,
-                            rightHandResRef: p.rightHandResRef,
-                            armorResRef: p.armorResRef
-                          });
-                        }}
-                      >
+                      <button className="gm-btn active" onClick={startJoin}>
                         Connect to GM Host & Spawn Player
                       </button>
                     </div>
@@ -2010,9 +2618,16 @@ export const GMPanel: React.FC = () => {
                   <div className="gm-section">
                     <div className="gm-section-title">
                       <span>Active Session: {GMNetworkManager.role.toUpperCase()}</span>
-                      <button className="gm-btn small danger" onClick={() => GMNetworkManager.disconnect()}>
-                        Disconnect
-                      </button>
+                      {isPlayerView ? (
+                        // A player who leaves goes back to the main menu; staying in the scene offline would hand them the GM tools
+                        <button className="gm-btn small danger" onClick={() => KotOR.GameState.ReturnToMainMenu()}>
+                          Leave game
+                        </button>
+                      ) : (
+                        <button className="gm-btn small danger" onClick={() => GMNetworkManager.disconnect()}>
+                          Stop hosting
+                        </button>
+                      )}
                     </div>
                     <div style={{ fontSize: 11.5, color: '#9ed2ff' }}>
                       Status: <b>{GMNetworkManager.statusMessage}</b>

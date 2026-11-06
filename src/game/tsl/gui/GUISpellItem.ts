@@ -6,6 +6,10 @@ import { OdysseyTexture } from "@/three/odyssey/OdysseyTexture";
 import type { GFFStruct } from "@/resource/GFFStruct";
 import { GameState } from "@/GameState";
 import { TextureLoader } from "@/loaders";
+import { GameEngineType } from "@/enums/engine";
+
+/** The slot and arrow art: TSL's own, or KotOR's (which has no uibit_abi_* textures) */
+const isTSL = () => GameState.GameKey === GameEngineType.TSL;
 
 /**
  * GUISpellItem class.
@@ -93,7 +97,7 @@ export class GUISpellItem extends GUIProtoItem {
 
         this.widget.add(_buttonIconWidget);
 
-        TextureLoader.enQueue('uibit_abi_back', this.border.fill.material, TextureType.TEXTURE, (texture: OdysseyTexture) => {
+        TextureLoader.enQueue(isTSL() ? 'uibit_abi_back' : 'lbl_indent', this.border.fill.material, TextureType.TEXTURE, (texture: OdysseyTexture) => {
           buttonIcon.setMaterialTexture( buttonIcon.border.fill.material, texture);
           buttonIcon.border.fill.material.transparent = true;
           buttonIcon.setMaterialTexture( buttonIcon.highlight.fill.material, texture);
@@ -103,8 +107,13 @@ export class GUISpellItem extends GUIProtoItem {
           }
         });
 
+        // Tell the menu which power this is (the Abilities screen shows its name and description)
         buttonIcon.addEventListener('click', (e) => {
           e.stopPropagation();
+          (this.menu as any).onAbilityPicked?.(spell);
+        });
+        buttonIcon.addEventListener('hover', () => {
+          (this.menu as any).onAbilityPicked?.(spell);
         });
 
         /**
@@ -164,7 +173,7 @@ export class GUISpellItem extends GUIProtoItem {
 
           this.widget.add(_arrowIconWidget);
 
-          TextureLoader.enQueue('uibit_abi_arrow', this.border.fill.material, TextureType.TEXTURE, (texture: OdysseyTexture) => {
+          TextureLoader.enQueue(isTSL() ? 'uibit_abi_arrow' : 'lbl_skarr', this.border.fill.material, TextureType.TEXTURE, (texture: OdysseyTexture) => {
             arrowIcon.setMaterialTexture( arrowIcon.border.fill.material, texture);
             arrowIcon.border.fill.material.transparent = true;
             arrowIcon.setMaterialTexture( arrowIcon.highlight.fill.material, texture);

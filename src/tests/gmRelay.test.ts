@@ -63,11 +63,15 @@ describe("GM relay server", () => {
     alice.send({ type: "world.tick", senderId: "alice", payload: { actors: [] } });
     alice.send({ type: "fx.event", senderId: "alice", payload: { kind: "text", netId: "cre_1", text: "999" } });
     alice.send({ type: "container.loot", senderId: "alice", targetPeerId: "bob", payload: { items: [] } });
+    alice.send({ type: "dm.prompt", senderId: "alice", payload: { promptId: "fake", options: ["Give me your loot"] } });
+    alice.send({ type: "actor.teleport", senderId: "alice", targetPeerId: "bob", payload: { netId: "pc_2", x: 0, y: 0, z: -100 } });
     host.send({ type: "actor.remove", senderId: "gm", payload: { netId: "cre_1" } });
     await settle();
 
     expect(types(bob)).not.toContain("fx.event");
     expect(types(bob)).not.toContain("container.loot");
+    expect(types(bob)).not.toContain("dm.prompt");
+    expect(types(bob)).not.toContain("actor.teleport");
 
     expect(types(bob).filter((t) => t === "actor.remove")).toHaveLength(1);
     expect(bob.received.find((p) => p.type === "actor.remove")?.senderId).toBe("gm");
@@ -87,9 +91,10 @@ describe("GM relay server", () => {
     alice.send({ type: "client.intent", senderId: "alice", payload: { kind: "attack" } });
     alice.send({ type: "client.input", senderId: "alice", payload: { x: 1 } });
     alice.send({ type: "chat.message", senderId: "alice", payload: { text: "hi" } });
+    alice.send({ type: "dm.reply", senderId: "alice", payload: { promptId: "ask_1", choice: 0 } });
     await settle();
 
-    expect(types(host)).toEqual(expect.arrayContaining(["peer.join", "client.intent", "client.input", "chat.message"]));
+    expect(types(host)).toEqual(expect.arrayContaining(["peer.join", "client.intent", "client.input", "chat.message", "dm.reply"]));
     expect(types(bob)).toEqual(["chat.message"]);
   });
 
@@ -149,6 +154,37 @@ describe("GM relay server", () => {
     duplicate.send({ type: "peer.join", senderId: "alice_2" });
     await settle();
     expect(host.received.filter((p) => p.type === "peer.join").map((p) => p.senderId)).toEqual(["alice", "alice_2"]);
+  });
+
+  test("tells a player when no GM is hosting, and tells them again when one starts", async () => {
+    const alice = await connect();
+    alice.send({ type: "peer.join", senderId: "alice" });
+    await settle();
+    expect(alice.received).toEqual([
+      expect.objectContaining({ type: "relay.error", payload: expect.objectContaining({ code: "no-host" }) }),
+    ]);
+
+    const host = await connect();
+    host.send({ type: "host.register", senderId: "gm" });
+    await settle();
+    expect(types(alice)).toContain("relay.host-ready");
+    expect(types(host)).not.toContain("relay.host-ready");
+
+    alice.send({ type: "peer.join", senderId: "alice" });
+    await settle();
+    expect(types(host)).toContain("peer.join");
+  });
+
+  test("says when the connection that left was the GM", async () => {
+    const host = await connect();
+    const alice = await connect();
+    host.send({ type: "host.register", senderId: "gm" });
+    alice.send({ type: "peer.join", senderId: "alice" });
+    await settle();
+
+    host.ws.close();
+    await settle();
+    expect(alice.received).toContainEqual(expect.objectContaining({ type: "peer.leave", senderId: "gm", payload: expect.objectContaining({ wasHost: true }) }));
   });
 
   test("announces a disconnect to the remaining connections", async () => {

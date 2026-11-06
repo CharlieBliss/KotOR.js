@@ -17,6 +17,10 @@ import { ResourceLoader } from "@/loaders";
 import { FollowerCamera } from "@/engine/FollowerCamera";
 import type { SaveGame } from "@/engine/SaveGame";
 import { CreatureClass } from "@/combat/CreatureClass";
+import { CharacterBuilder } from "@/engine/rules/CharacterBuilder";
+import { GMNpcOrders } from "@/managers/GMNpcOrders";
+import type { GMNpcOrder, GMPoint } from "@/managers/GMNpcOrders";
+import type { ICharacterBuild } from "@/engine/rules/CharacterBuilder";
 import { TalentFeat, TalentSpell } from "@/talents";
 import { ModuleObject, ModuleCreature, ModulePlayer, ModulePlaceable, ModuleDoor, ModuleItem } from "@/module";
 import { OdysseyModel3D } from "@/three/odyssey";
@@ -30,6 +34,8 @@ import { Utility } from "@/utility/Utility";
 import { GameFileSystem } from "@/utility/GameFileSystem";
 import {
   GMEventEmitter,
+  GMDeathRule,
+  GMSessionRules,
   GMNetworkManager,
   GMSerializedActor,
   GMSerializedDoorState,
@@ -38,11 +44,14 @@ import {
   GMClientIntent,
   GMFxEvent,
   GMLootItem,
-  GMPlayerSheet
+  GMPlayerSheet,
+  GMDmPrompt
 } from "@/managers/GMNetworkManager";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
-export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport';
+export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport'
+  // Ordering an NPC (GMNpcOrders): click the ground to move it, a creature to attack or follow, points to patrol
+  | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol';
 
 export interface GMModuleEntry {
   resRef: string;
@@ -53,8 +62,16 @@ export interface GMModuleEntry {
 
 export interface GMCreatureSpawnConfig {
   name: string;
+  /** A game template (.utc). Without customized, the creature keeps the template's own look, stats and gear */
   templateResRef?: string;
   appearanceId: number;
+  /** Exact appearance.2da label; wins over appearanceId when the creature is built without a template */
+  appearanceLabel?: string;
+  /**
+   * The GM changed this creature from its preset or template: its appearance, HP and gear are used instead of
+   * the template's. Name, faction, bark and loot always apply.
+   */
+  customized?: boolean;
   factionId: number; // 0 = Party/Player, 1 = Hostile, 2 = Friendly, 5 = Neutral
   hp: number;
   level: number;
@@ -66,6 +83,24 @@ export interface GMCreatureSpawnConfig {
   aiDisabled?: boolean;
   /** Items the creature carries, lootable from its body once it dies */
   lootResRefs?: string[];
+}
+
+/** What a creature template (.utc) holds, for choosing one in the GM panel */
+export interface GMCreatureTemplateInfo {
+  resRef: string;
+  name: string;
+  appearanceId: number;
+  appearanceLabel: string;
+  factionId: number;
+  hp: number;
+  fp: number;
+  level: number;
+  classId: number;
+  /** e.g. "Soldier 5" or "Soldier 10 / Scoundrel 3" */
+  classes: string;
+  rightHandResRef: string;
+  leftHandResRef: string;
+  armorResRef: string;
 }
 
 export type GMPlaceablePropCategory =
@@ -80,7 +115,14 @@ export interface GMPlaceableSpawnConfig {
   category?: GMPlaceablePropCategory;
   templateResRef?: string;
   appearanceId: number;
+  /** Exact placeables.2da label for the model; wins over appearanceId and modelKeywords */
+  appearanceLabel?: string;
   modelKeywords?: string[];
+  /**
+   * The GM changed this object from its preset or template. Without it, an object built from a .utp
+   * template keeps the template's own model, name and settings.
+   */
+  customized?: boolean;
   scale?: number;
   zOffset?: number;
   useable: boolean;
@@ -125,8 +167,12 @@ export interface GMPlayerSpawnConfig {
   gender: number;
   classId: number; // 0=Soldier, 1=Scout, 2=Scoundrel, 3=Jedi Guardian, 4=Jedi Consular, 5=Jedi Sentinel
   level: number;
-  hp: number;
-  fp: number;
+  /** Override the class's vitality (CharacterBuilder) */
+  hp?: number;
+  /** Override the class's Force points (CharacterBuilder) */
+  fp?: number;
+  /** Which side's recommended Force powers the class takes (light by default) */
+  alignment?: 'light' | 'dark';
   str: number;
   dex: number;
   con: number;
@@ -136,10 +182,57 @@ export interface GMPlayerSpawnConfig {
   rightHandResRef?: string;
   leftHandResRef?: string;
   armorResRef?: string;
-  featIds: number[];
-  spellIds: number[];
+  /** Override the class's feats (CharacterBuilder): feat.2da rows */
+  featIds?: number[];
+  /** Override the class's Force powers (CharacterBuilder): spells.2da rows */
+  spellIds?: number[];
   possessImmediately?: boolean;
   ownerPeerId?: string;
+}
+
+/** A GM-placed creature or placeable as saved in a session */
+export interface GMSavedObject {
+  kind: 'creature' | 'placeable';
+  config: GMCreatureSpawnConfig | GMPlaceableSpawnConfig;
+  x: number;
+  y: number;
+  z: number;
+  facing: number;
+  factionId?: number;
+  hp?: number;
+  maxHp?: number;
+  locked?: boolean;
+  hidden?: boolean;
+  loot: string[];
+  barkText: string;
+}
+
+/** A player character as saved in a session; network players are matched back by name */
+export interface GMSavedPlayer {
+  name: string;
+  /** Controlled on the GM's machine rather than by a connected player */
+  local: boolean;
+  config: GMPlayerSpawnConfig;
+  sheet: GMPlayerSheet;
+  x: number;
+  y: number;
+  z: number;
+  facing: number;
+  hidden?: boolean;
+}
+
+/** Everything needed to pick a GM session back up later */
+export interface GMSessionSave {
+  version: 1;
+  id: string;
+  name: string;
+  savedAt: number;
+  scene: { module: string; keepCreatures: boolean; keepTriggers: boolean; keepPlaceables: boolean };
+  objects: GMSavedObject[];
+  doors: { netId: string; openState: number; locked: boolean }[];
+  players: GMSavedPlayer[];
+  /** Added later; older saves use the default rules */
+  rules?: GMSessionRules;
 }
 
 export class GMManager {
@@ -204,9 +297,44 @@ export class GMManager {
   // Host: how often player sheets are checked for changes and resent
   static SHEET_SYNC_INTERVAL: number = 1.0;
   static sheetSyncTimer: number = 0;
+  /** How often (seconds) idle NPCs look for someone to fight */
+  static NPC_AI_INTERVAL: number = 0.75;
+  /** How far (metres) an NPC with no perception range of its own sees enemies */
+  static NPC_AI_SIGHT_RANGE: number = 20;
+  /** NPCs fight back against an attacker up to this far away (metres) even if they can't see them */
+  static NPC_AI_RETALIATE_RANGE: number = 30;
+  static npcAiTimer: number = 0;
+  /** What happens when a player's character falls; see GMDeathRule */
+  static deathRule: GMDeathRule = 'kotor';
+  /** KotOR rule: a fallen player gets up once no living enemy is this close (metres)... */
+  static RECOVER_ENEMY_RANGE = 20;
+  /** ...for this long (seconds) */
+  static RECOVER_AFTER_SECONDS = 3;
+  /** Respawn rule: how long (seconds) a fallen player waits before they can respawn */
+  static RESPAWN_DELAY_SECONDS = 10;
+  static DOWNED_CHECK_INTERVAL = 0.5;
+  static downedTimer = 0;
+  /** Everyone was down at the last check (so the GM is told once) */
+  static everyoneDown = false;
+
+  /** The NPC an order tool (order_move, order_attack...) is giving its order to */
+  static orderSubject: ModuleCreature | null = null;
+  /** Patrol points clicked so far with the order_patrol tool */
+  static patrolDraft: GMPoint[] = [];
+
+  /** The GM can switch the NPC combat AI off (NPCs then only act when told to) */
+  static npcAiEnabled: boolean = true;
 
   // Client: set while applying the host's sheet, so our own equip calls aren't sent back as requests
   static applyingHostSheet: boolean = false;
+  // Host: questions asked of players, and their replies
+  static dmPrompts: Map<string, { prompt: GMDmPrompt; targetPeerId?: string; replies: { peerId: string; name: string; choice: number }[] }> = new Map();
+
+  // Host: characters from a loaded session waiting for their player to (re)join, by lower-case player name
+  static reservedPlayers: Map<string, GMSavedPlayer> = new Map();
+  static SESSIONS_STORAGE_KEY: string = 'kotor_gm_sessions_v1';
+  static MAX_SAVED_SESSIONS: number = 20;
+
   // Client: a sheet that arrived before our character finished spawning
   static pendingPlayerSheet: GMPlayerSheet | null = null;
   static lastAppliedInventoryJson: string = '';
@@ -214,22 +342,21 @@ export class GMManager {
   // Pending spawn configurations for 3D viewport click-to-place
   static pendingCreatureConfig: GMCreatureSpawnConfig = {
     name: 'Sith Trooper',
-    templateResRef: 'n_sithtrooper',
+    templateResRef: 'g_sithtroop01',
     appearanceId: 28,
+    appearanceLabel: 'Sith_Soldier_01',
     factionId: 1, // Hostile
-    hp: 45,
-    level: 4,
-    classId: 0,
-    rightHandResRef: 'w_blaste_01',
-    leftHandResRef: '',
-    armorResRef: '',
-    barkText: 'Halt! By order of the Sith Empire!'
+    hp: 25,
+    level: 3,
+    classId: 8,
+    barkText: 'Halt! By order of the Sith!'
   };
 
   static pendingPlaceableConfig: GMPlaceableSpawnConfig = {
     name: 'Supply Footlocker',
     templateResRef: '',
-    appearanceId: 52, // Footlocker
+    appearanceId: 39,
+    appearanceLabel: 'Footlocker',
     useable: true,
     hasInventory: true,
     locked: false,
@@ -245,8 +372,6 @@ export class GMManager {
     gender: 0,
     classId: 3, // Jedi Guardian
     level: 8,
-    hp: 120,
-    fp: 100,
     str: 16,
     dex: 14,
     con: 14,
@@ -256,8 +381,6 @@ export class GMManager {
     rightHandResRef: 'g_w_lghtsbr01',
     leftHandResRef: '',
     armorResRef: 'g_a_jedirobe01',
-    featIds: [1, 3, 8, 11, 28, 29, 30, 53], // Flurry, Power Attack, Critical Strike, Weapon Proficiency Lightsaber
-    spellIds: [9, 14, 15, 21, 29, 43], // Cure/Heal, Force Push/Wave, Force Lightning, Knight Speed, Throw Lightsaber
     possessImmediately: true
   };
 
@@ -273,6 +396,9 @@ export class GMManager {
   static mouseNDC: THREE.Vector2 = new THREE.Vector2();
   static domListenersAttached: boolean = false;
   static pointerDownPos: { x: number; y: number } = { x: 0, y: 0 };
+  /** The last viewport click, to recognise a double-click (pointer events don't count clicks) */
+  static lastViewportClick: { x: number; y: number; at: number } = { x: 0, y: 0, at: 0 };
+  static DOUBLE_CLICK_MS = 400;
 
   // Curated Module Catalog (KotOR 1 & 2)
   static CURATED_MODULES: GMModuleEntry[] = [
@@ -338,34 +464,62 @@ export class GMManager {
   ];
 
   // Curated Creature Presets
+  /**
+   * Creature presets: KotOR's own templates (.utc), so each keeps the game's look, stats, class, powers and gear.
+   * The appearance, HP, level and class here are the template's (shown in the panel), and the fallback when a
+   * template is missing (another game's data). A preset's weapon only fills a hand the template leaves empty.
+   */
   static CREATURE_PRESETS: GMCreatureSpawnConfig[] = [
-    { name: 'Sith Trooper', templateResRef: 'n_sithtrooper', appearanceId: 28, factionId: 1, hp: 45, level: 4, classId: 0, rightHandResRef: 'w_blaste_01', barkText: 'Halt! By order of the Sith!' },
-    { name: 'Sith Commando (Elite)', templateResRef: 'n_sithcommando', appearanceId: 27, factionId: 1, hp: 75, level: 7, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'For the Sith Empire!' },
-    { name: 'Dark Jedi Knight', templateResRef: 'n_darkjedi01', appearanceId: 58, factionId: 1, hp: 95, level: 8, classId: 3, rightHandResRef: 'g_w_lghtsbr02', barkText: 'Your feeble skills are no match for the Dark Side!' },
-    { name: 'Darth Malak', templateResRef: 'n_darthmalak', appearanceId: 21, factionId: 1, hp: 250, level: 15, classId: 3, rightHandResRef: 'g_w_lghtsbr02', barkText: 'Wipe this pathetic planet from the face of the galaxy!' },
-    { name: 'Darth Bandon', templateResRef: 'n_darthbandon', appearanceId: 185, factionId: 1, hp: 160, level: 12, classId: 3, rightHandResRef: 'g_w_dblsbr002', barkText: 'You will bow before the Sith!' },
-    { name: 'Calo Nord', templateResRef: 'n_calonord', appearanceId: 25, factionId: 1, hp: 130, level: 10, classId: 0, rightHandResRef: 'g_w_hvyrptbltr01', barkText: 'One... Two... Three.' },
-    { name: 'Mandalorian Raider', templateResRef: '', appearanceId: 30, factionId: 1, hp: 85, level: 7, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'For Mandalore!' },
-    { name: 'Tusken Raider (Sand Person)', templateResRef: '', appearanceId: 17, factionId: 1, hp: 65, level: 6, classId: 0, rightHandResRef: 'g_w_gaffi001', barkText: '*Aggressive Tusken war cry!*' },
-    { name: 'Kath Hound', templateResRef: '', appearanceId: 6, factionId: 1, hp: 40, level: 4, classId: 0, barkText: '*Snarls menacingly*' },
-    { name: 'Rakghoul', templateResRef: '', appearanceId: 13, factionId: 1, hp: 50, level: 5, classId: 0, barkText: '*Ferocious screech!*' },
-    { name: 'Terentatek', templateResRef: '', appearanceId: 19, factionId: 1, hp: 220, level: 14, classId: 0, barkText: '*Earth-shaking roar!*' },
-    { name: 'Rancor', templateResRef: '', appearanceId: 15, factionId: 1, hp: 300, level: 16, classId: 0, barkText: '*Deafening Rancor roar!*' },
-    { name: 'War Droid', templateResRef: '', appearanceId: 37, factionId: 1, hp: 70, level: 6, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'Target acquired. Eliminating threat.' },
-    { name: 'Republic Soldier', templateResRef: '', appearanceId: 29, factionId: 2, hp: 60, level: 5, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'Reporting for duty! For the Republic!' },
-    { name: 'Jedi Guardian Ally', templateResRef: '', appearanceId: 136, factionId: 2, hp: 110, level: 8, classId: 3, rightHandResRef: 'g_w_lghtsbr01', armorResRef: 'g_a_jedirobe01', barkText: 'May the Force be with you.' },
-    { name: 'Bastila Shan', templateResRef: 'p_bastila', appearanceId: 4, factionId: 2, hp: 110, level: 8, classId: 5, rightHandResRef: 'g_w_dblsbr001', armorResRef: 'g_a_jedirobe01', barkText: 'Keep your guard up. The Force is with us.' },
-    { name: 'Carth Onasi', templateResRef: 'p_carth', appearanceId: 6, factionId: 2, hp: 105, level: 8, classId: 0, rightHandResRef: 'g_w_blstrpstl001', leftHandResRef: 'g_w_blstrpstl001', barkText: 'Down you go!' },
-    { name: 'Canderous Ordo', templateResRef: 'p_cand', appearanceId: 0, factionId: 2, hp: 130, level: 8, classId: 0, rightHandResRef: 'g_w_hvyrptbltr01', barkText: 'Yeah, this is what I live for!' },
-    { name: 'HK-47', templateResRef: 'p_hk47', appearanceId: 11, factionId: 2, hp: 115, level: 8, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'Statement: Ready to terminate any hostile meatbags, Master.' },
-    { name: 'Jolee Bindo', templateResRef: 'p_jolee', appearanceId: 9, factionId: 2, hp: 100, level: 8, classId: 4, rightHandResRef: 'g_w_lghtsbr01', barkText: 'Get off my lawn, you kids!' },
-    { name: 'Juhani', templateResRef: 'p_juhani', appearanceId: 10, factionId: 2, hp: 120, level: 8, classId: 3, rightHandResRef: 'g_w_lghtsbr01', barkText: 'I will be your doom!' },
-    { name: 'Mission Vao', templateResRef: 'p_mission', appearanceId: 7, factionId: 2, hp: 85, level: 7, classId: 2, rightHandResRef: 'g_w_blstrpstl001', barkText: 'Need something unlocked? I\'m on it!' },
-    { name: 'Zaalbar', templateResRef: 'p_zaalbar', appearanceId: 8, factionId: 2, hp: 145, level: 8, classId: 1, rightHandResRef: 'g_w_bowcaster001', barkText: '*Loyal Wookiee growl*' },
-    { name: 'T3-M4', templateResRef: 'p_t3m4', appearanceId: 12, factionId: 2, hp: 80, level: 7, classId: 1, barkText: '*Cheerful astromech binary whistle*' },
-    { name: 'Protocol Droid', templateResRef: '', appearanceId: 36, factionId: 5, hp: 40, level: 2, classId: 1, barkText: 'Greetings! How may I be of assistance today?' },
-    { name: 'Selkath Officer', templateResRef: '', appearanceId: 16, factionId: 5, hp: 65, level: 5, classId: 0, barkText: 'Obey the neutrality laws of Ahto City.' },
-    { name: 'Twi\'lek Merchant', templateResRef: '', appearanceId: 50, factionId: 5, hp: 45, level: 3, classId: 2, barkText: 'Welcome, traveler! Looking for rare goods from across the Outer Rim?' },
+    // Hostile
+    { name: 'Sith Trooper', templateResRef: 'g_sithtroop01', appearanceId: 28, appearanceLabel: 'Sith_Soldier_01', factionId: 1, hp: 25, level: 3, classId: 8, barkText: 'Halt! By order of the Sith!' },
+    { name: 'Sith Elite Trooper', templateResRef: 'g_sithtroop02', appearanceId: 44, appearanceLabel: 'Sith_Soldier_02', factionId: 1, hp: 35, level: 5, classId: 0, barkText: 'For the Sith Empire!' },
+    { name: 'Sith Heavy Trooper', templateResRef: 'g_sithtroop03', appearanceId: 44, appearanceLabel: 'Sith_Soldier_02', factionId: 1, hp: 48, level: 8, classId: 0, barkText: 'Open fire!' },
+    { name: 'Sith Grenadier', templateResRef: 'g_sithtroop04', appearanceId: 28, appearanceLabel: 'Sith_Soldier_01', factionId: 1, hp: 30, level: 6, classId: 0, barkText: 'Grenade out!' },
+    { name: 'Sith Assault Trooper', templateResRef: 'g_sithtroop07', appearanceId: 44, appearanceLabel: 'Sith_Soldier_02', factionId: 1, hp: 96, level: 12, classId: 0, barkText: 'Leave no survivors!' },
+    { name: 'Sith Lieutenant', templateResRef: 'g_sithcomm01', appearanceId: 42, appearanceLabel: 'Sith_Female_Albino', factionId: 1, hp: 42, level: 5, classId: 1, barkText: 'Take them down!' },
+    { name: 'Sith Captain', templateResRef: 'g_sithcomm02', appearanceId: 43, appearanceLabel: 'Sith_Male_Albino', factionId: 1, hp: 64, level: 8, classId: 1, barkText: 'You will answer to the Sith!' },
+    { name: 'Dark Jedi Apprentice', templateResRef: 'g_darkjedi01', appearanceId: 20, appearanceLabel: 'Dark_Jedi_Male_01', factionId: 1, hp: 31, level: 4, classId: 3, barkText: 'The dark side will consume you!' },
+    { name: 'Dark Jedi', templateResRef: 'g_darkjedi02', appearanceId: 19, appearanceLabel: 'Dark_Jedi_Female_01', factionId: 1, hp: 80, level: 8, classId: 3, barkText: 'Your feeble skills are no match for the dark side!' },
+    { name: 'Dark Jedi Master', templateResRef: 'g_darkjedi03', appearanceId: 20, appearanceLabel: 'Dark_Jedi_Male_01', factionId: 1, hp: 110, level: 12, classId: 3, barkText: 'You know nothing of true power.' },
+    { name: 'Darth Malak', templateResRef: 'n_darthmalak', appearanceId: 21, appearanceLabel: 'Unique_Darth_Malak', factionId: 1, hp: 114, level: 20, classId: 3, barkText: 'Wipe this pathetic planet from the face of the galaxy!' },
+    { name: 'Darth Bandon', templateResRef: 'g_bandon', appearanceId: 184, appearanceLabel: 'Unique_Darth_Bandon', factionId: 1, hp: 40, level: 15, classId: 3, barkText: 'You will bow before the Sith!' },
+    { name: 'Calo Nord', templateResRef: 'n_calonord', appearanceId: 13, appearanceLabel: 'Unique_Calo_Nord', factionId: 1, hp: 219, level: 13, classId: 0, barkText: 'One... Two... Three.' },
+    { name: 'Mandalorian Warrior', templateResRef: 'g_mandalor01', appearanceId: 35, appearanceLabel: 'Alien_Mandalorian_01', factionId: 1, hp: 34, level: 4, classId: 8, barkText: 'For Mandalore!' },
+    { name: 'Mandalorian Elite', templateResRef: 'g_mandalor02', appearanceId: 351, appearanceLabel: 'Alien_Mandalorian_02', factionId: 1, hp: 56, level: 8, classId: 0, barkText: 'This is the way of the warrior!' },
+    { name: 'Sand People Warrior', templateResRef: 'g_tuskenmale01', appearanceId: 46, appearanceLabel: 'Alien_Sand_People_01', factionId: 1, hp: 16, level: 3, classId: 8, barkText: '*Aggressive Tusken war cry!*' },
+    { name: 'Rodian Thug', templateResRef: 'g_thug01', appearanceId: 257, appearanceLabel: 'Alien_Rodian_03', factionId: 1, hp: 20, level: 3, classId: 8, barkText: 'Hand over your credits!' },
+    { name: 'Gamorrean', templateResRef: 'g_gammorean01', appearanceId: 240, appearanceLabel: 'Alien_Gammorean_02', factionId: 1, hp: 6, level: 1, classId: 8, barkText: '*Gamorrean grunting*' },
+    { name: 'War Droid Mark I', templateResRef: 'g_wardroid01', appearanceId: 66, appearanceLabel: 'Droid_War_01', factionId: 1, hp: 8, level: 1, classId: 8, barkText: 'Target acquired. Eliminating threat.' },
+    { name: 'War Droid Mark II', templateResRef: 'c_drdwar', appearanceId: 236, appearanceLabel: 'Droid_War_02', factionId: 1, hp: 14, level: 3, classId: 8, barkText: 'Target acquired. Eliminating threat.' },
+    { name: 'Assassin Droid', templateResRef: 'g_assassindrd01', appearanceId: 56, appearanceLabel: 'Droid_Assassin', factionId: 1, hp: 59, level: 6, classId: 6, barkText: 'Termination protocol engaged.' },
+    { name: 'Kath Hound', templateResRef: 'c_khounda', appearanceId: 75, appearanceLabel: 'Creature_Kath_Hound_A01', factionId: 1, hp: 25, level: 3, classId: 8, barkText: '*Snarls menacingly*' },
+    { name: 'Rakghoul', templateResRef: 'g_rakghoul01', appearanceId: 79, appearanceLabel: 'Creature_Rakghoul', factionId: 1, hp: 6, level: 1, classId: 8, barkText: '*Ferocious screech!*' },
+    { name: 'Kinrath', templateResRef: 'c_kinrath', appearanceId: 88, appearanceLabel: 'Creature_Kinrath', factionId: 1, hp: 35, level: 4, classId: 8, barkText: '*Clicking mandibles*' },
+    { name: 'Tuk\'ata', templateResRef: 'c_tukata', appearanceId: 89, appearanceLabel: 'Creature_Tukata', factionId: 1, hp: 56, level: 8, classId: 8, barkText: '*Low growl*' },
+    { name: 'Terentatek', templateResRef: 'g_terantanak', appearanceId: 353, appearanceLabel: 'Creature_Terantanak', factionId: 1, hp: 150, level: 10, classId: 0, barkText: '*Earth-shaking roar!*' },
+    { name: 'Rancor', templateResRef: 'g_rancor01', appearanceId: 80, appearanceLabel: 'Creature_Rancor', factionId: 1, hp: 350, level: 20, classId: 0, barkText: '*Deafening Rancor roar!*' },
+    // Friendly: armed with what they carry, plus a weapon where the template has none
+    { name: 'Republic Soldier', templateResRef: 'n_repsold', appearanceId: 38, appearanceLabel: 'Republic_Soldier_Mal_White', factionId: 2, hp: 8, level: 1, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'Reporting for duty! For the Republic!' },
+    { name: 'Republic Officer', templateResRef: 'n_repoff', appearanceId: 37, appearanceLabel: 'Republic_Officer_Mal_White', factionId: 2, hp: 8, level: 1, classId: 0, rightHandResRef: 'g_w_blstrpstl001', barkText: 'Hold the line!' },
+    { name: 'Jedi', templateResRef: 'n_jedicounm', appearanceId: 214, appearanceLabel: 'Jedi_White_Male_02', factionId: 2, hp: 8, level: 1, classId: 3, barkText: 'May the Force be with you.' },
+    { name: 'Wookiee Warrior', templateResRef: 'g_wookiemale01', appearanceId: 272, appearanceLabel: 'Alien_Wookie_Male_03', factionId: 2, hp: 30, level: 4, classId: 0, barkText: '*Fierce Wookiee roar*' },
+    { name: 'Bastila Shan', templateResRef: 'p_bastilla', appearanceId: 4, appearanceLabel: 'Party_NPC_Bastila', factionId: 2, hp: 27, level: 3, classId: 5, rightHandResRef: 'g_w_dblsbr001', barkText: 'Keep your guard up. The Force is with us.' },
+    { name: 'Carth Onasi', templateResRef: 'p_carth', appearanceId: 6, appearanceLabel: 'Party_NPC_Carth', factionId: 2, hp: 44, level: 4, classId: 0, barkText: 'Down you go!' },
+    { name: 'Canderous Ordo', templateResRef: 'p_cand', appearanceId: 5, appearanceLabel: 'Party_NPC_Cand', factionId: 2, hp: 65, level: 5, classId: 0, barkText: 'Yeah, this is what I live for!' },
+    { name: 'HK-47', templateResRef: 'p_hk47', appearanceId: 3, appearanceLabel: 'Party_NPC_HK47', factionId: 2, hp: 66, level: 6, classId: 6, barkText: 'Statement: Ready to terminate any hostile meatbags, Master.' },
+    { name: 'Jolee Bindo', templateResRef: 'p_jolee', appearanceId: 7, appearanceLabel: 'Party_NPC_Jolee', factionId: 2, hp: 42, level: 6, classId: 4, barkText: 'Get off my lawn, you kids!' },
+    { name: 'Juhani', templateResRef: 'p_juhani', appearanceId: 8, appearanceLabel: 'Party_NPC_Juhani', factionId: 2, hp: 78, level: 6, classId: 3, barkText: 'I will be your doom!' },
+    { name: 'Mission Vao', templateResRef: 'p_mission', appearanceId: 10, appearanceLabel: 'Party_NPC_Mission', factionId: 2, hp: 21, level: 3, classId: 2, barkText: 'Need something unlocked? I\'m on it!' },
+    { name: 'Zaalbar', templateResRef: 'p_zaalbar', appearanceId: 9, appearanceLabel: 'Party_NPC_Zaalbar', factionId: 2, hp: 52, level: 4, classId: 1, rightHandResRef: 'g_w_bowcstr001', barkText: '*Loyal Wookiee growl*' },
+    { name: 'T3-M4', templateResRef: 'p_t3m4', appearanceId: 2, appearanceLabel: 'Party_NPC_T3M3', factionId: 2, hp: 30, level: 3, classId: 7, barkText: '*Cheerful astromech binary whistle*' },
+    // Neutral
+    { name: 'Protocol Droid', templateResRef: 'c_drdprot', appearanceId: 63, appearanceLabel: 'Droid_Protocol_01', factionId: 5, hp: 9, level: 1, classId: 7, barkText: 'Greetings! How may I be of assistance today?' },
+    { name: 'Selkath', templateResRef: 'n_selkath', appearanceId: 40, appearanceLabel: 'Alien_Selkath_01', factionId: 5, hp: 9, level: 1, classId: 8, barkText: 'Obey the neutrality laws of Ahto City.' },
+    { name: 'Twi\'lek', templateResRef: 'n_twilekf', appearanceId: 47, appearanceLabel: 'Alien_Twilek_Female_01', factionId: 5, hp: 8, level: 1, classId: 0, barkText: 'Welcome, traveler! Looking for rare goods?' },
+    { name: 'Rodian', templateResRef: 'n_rodian', appearanceId: 39, appearanceLabel: 'Alien_Rodian_01', factionId: 5, hp: 8, level: 1, classId: 2, barkText: 'Keep moving, outsider.' },
+    { name: 'Commoner', templateResRef: 'n_commm', appearanceId: 17, appearanceLabel: 'Commoner_01_Mal_Asian', factionId: 5, hp: 8, level: 1, classId: 0, barkText: 'Can I help you?' },
+    { name: 'Jawa', templateResRef: 'c_jawa', appearanceId: 73, appearanceLabel: 'Alien_Jawa', factionId: 5, hp: 8, level: 1, classId: 2, barkText: 'Utinni!' },
+    { name: 'Dewback', templateResRef: 'g_dewback01', appearanceId: 55, appearanceLabel: 'Creature_Dewback', factionId: 5, hp: 42, level: 5, classId: 0, barkText: '*Placid snort*' },
   ];
 
   // Curated Placeable Presets
@@ -375,7 +529,7 @@ export class GMManager {
     { name: 'Locked Sith Vault (DC 18)', category: 'Storage & Cargo', appearanceId: 54, modelKeywords: ['metal', 'vault', 'safe', 'box'], useable: true, hasInventory: true, locked: true, openLockDC: 18, lootResRefs: ['g_w_lghtsbr02', 'g_a_mstrrobe02', 'g_i_medeqpmnt03'], barkText: '' },
     { name: 'Sith Sarcophagus', category: 'Temple & Sacred', appearanceId: 64, modelKeywords: ['sarcoph', 'tomb', 'altar'], useable: true, hasInventory: true, locked: false, openLockDC: 20, lootResRefs: ['g_w_dblsbr002', 'g_a_mstrrobe02'], barkText: '' },
     { name: 'Computer Terminal', category: 'Tech & Consoles', appearanceId: 57, modelKeywords: ['comp', 'terminal', 'console', 'panel'], useable: true, hasInventory: false, locked: false, openLockDC: 15, lootResRefs: [], barkText: '[Terminal Active]: Security grid online. All sector doors operational.' },
-    { name: 'Workbench', category: 'Storage & Cargo', appearanceId: 68, modelKeywords: ['workbench', 'bench'], useable: true, hasInventory: true, locked: false, openLockDC: 10, lootResRefs: ['g_w_blstrrfl001', 'g_w_vbrswrd01'], barkText: '[Workbench]: Ready for weapon & armor modifications.' },
+    { name: 'Workbench', category: 'Storage & Cargo', appearanceId: 68, modelKeywords: ['workbench', 'bench'], useable: true, hasInventory: true, locked: false, openLockDC: 10, lootResRefs: ['g_w_blstrrfl001', 'g_w_vbroswrd01'], barkText: '[Workbench]: Ready for weapon & armor modifications.' },
     { name: 'Kolto Healing Tank', category: 'Medical & Lab', appearanceId: 39, modelKeywords: ['kolto', 'bacta', 'tank'], useable: true, hasInventory: false, locked: false, openLockDC: 10, lootResRefs: [], barkText: '[Kolto Dispenser]: Dispensing emergency Bacta/Kolto mist.' },
     { name: 'Skeletal Remains', category: 'Temple & Sacred', appearanceId: 62, modelKeywords: ['skeleton', 'corpse', 'remains', 'bones'], useable: true, hasInventory: true, locked: false, openLockDC: 10, lootResRefs: ['g_i_medeqpmnt01', 'g_w_blstrpstl001'], barkText: '' },
   ];
@@ -493,6 +647,7 @@ export class GMManager {
       name: 'Sacred Temple Pillar / Obelisk',
       category: 'Temple & Sacred',
       appearanceId: 65,
+      appearanceLabel: 'RuneObelisk',
       modelKeywords: ['pillar', 'obelisk', 'column', 'statue'],
       scale: 1.75,
       useable: true,
@@ -700,7 +855,7 @@ export class GMManager {
       hasInventory: true,
       locked: false,
       openLockDC: 14,
-      lootResRefs: ['g_i_secspike01', 'g_i_progspike01', 'g_w_vbrswrd01'],
+      lootResRefs: ['g_i_secspike01', 'g_i_progspike01', 'g_w_vbroswrd01'],
       barkText: '[Plasteel Cylinder]: Sealed cylindrical storage container.'
     },
     {
@@ -713,7 +868,7 @@ export class GMManager {
       hasInventory: true,
       locked: false,
       openLockDC: 16,
-      lootResRefs: ['g_w_blstrrfl001', 'g_w_hvyrptbltr01', 'g_w_blstrpstl001', 'g_w_vbrswrd01'],
+      lootResRefs: ['g_w_blstrrfl001', 'g_w_hvrptbltr01', 'g_w_blstrpstl001', 'g_w_vbroswrd01'],
       barkText: '[Weapons Locker]: Military ordnance and heavy blasters.'
     },
     {
@@ -923,14 +1078,14 @@ export class GMManager {
         {
           dx: 0, dy: 5.1, dz: 0, yawDeg: 180,
           config: {
-            name: 'Receptionist Protocol Droid', appearanceId: 36, factionId: 5, hp: 45, level: 3, classId: 1,
+            name: 'Receptionist Protocol Droid', templateResRef: 'c_drdprot', appearanceId: 63, factionId: 5, hp: 45, level: 3, classId: 1,
             barkText: 'Welcome to the Executive Office Complex! Do you have an appointment with the Director?'
           }
         },
         {
           dx: 0, dy: 17.4, dz: 0, yawDeg: 180,
           config: {
-            name: 'Sector Director', appearanceId: 50, factionId: 5, hp: 75, level: 6, classId: 2, rightHandResRef: 'g_w_blstrpstl001',
+            name: 'Sector Director', templateResRef: 'n_czerkaoff', appearanceId: 18, factionId: 5, hp: 75, level: 6, classId: 2, rightHandResRef: 'g_w_blstrpstl001',
             barkText: 'Who authorized you to enter my private office? Security!'
           }
         }
@@ -1067,7 +1222,7 @@ export class GMManager {
         {
           dx: 0, dy: 14.8, dz: 0, yawDeg: 180,
           config: {
-            name: 'Ancient Temple Guardian', appearanceId: 136, factionId: 5, hp: 160, level: 12, classId: 3,
+            name: 'Ancient Temple Guardian', templateResRef: 'n_jedicounm', appearanceId: 214, factionId: 5, hp: 160, level: 12, classId: 3,
             rightHandResRef: 'g_w_dblsbr001', armorResRef: 'g_a_mstrrobe01',
             barkText: 'State your purpose, seeker. This sanctuary has stood for a thousand generations.'
           }
@@ -1118,7 +1273,7 @@ export class GMManager {
           config: {
             name: 'Armory Heavy Weapons Locker', category: 'Storage & Cargo', appearanceId: 54, modelKeywords: ['rack', 'weapon', 'metal', 'locker'], scale: 1.15,
             useable: true, hasInventory: true, locked: false, openLockDC: 16,
-            lootResRefs: ['g_w_hvyrptbltr01', 'g_w_blstrrfl001', 'g_w_blstrpstl001', 'g_a_class8001'],
+            lootResRefs: ['g_w_hvrptbltr01', 'g_w_blstrrfl001', 'g_w_blstrpstl001', 'g_a_class8001'],
             barkText: '[Armory Locker]: Heavy repeating blasters and battle armor.'
           }
         },
@@ -1144,14 +1299,14 @@ export class GMManager {
         {
           dx: 0, dy: 10.6, dz: 0, yawDeg: 180,
           config: {
-            name: 'Tactical Commander', appearanceId: 29, factionId: 2, hp: 95, level: 8, classId: 0, rightHandResRef: 'g_w_blstrpstl001',
+            name: 'Tactical Commander', templateResRef: 'n_repoff', appearanceId: 37, factionId: 2, hp: 95, level: 8, classId: 0, rightHandResRef: 'g_w_blstrpstl001',
             barkText: 'Gather around the holo-table. Our strike team deploys on your mark!'
           }
         },
         {
           dx: -3.5, dy: 5.5, dz: 0, yawDeg: 0,
           config: {
-            name: 'Command Security Droid', appearanceId: 37, factionId: 2, hp: 80, level: 6, classId: 0, rightHandResRef: 'g_w_blstrrfl001',
+            name: 'Command Security Droid', templateResRef: 'c_drdwar', appearanceId: 236, factionId: 2, hp: 80, level: 6, classId: 0, rightHandResRef: 'g_w_blstrrfl001',
             barkText: 'Command deck perimeter secure.'
           }
         }
@@ -1235,7 +1390,7 @@ export class GMManager {
         {
           dx: 0, dy: 8.5, dz: 0, yawDeg: 180,
           config: {
-            name: 'Chief Medical Officer Droid', appearanceId: 36, factionId: 2, hp: 60, level: 5, classId: 1,
+            name: 'Chief Medical Officer Droid', templateResRef: 'c_drdprot', appearanceId: 63, factionId: 2, hp: 60, level: 5, classId: 1,
             barkText: 'Please state the nature of your medical emergency. Step into a Kolto tank if you require immediate healing.'
           }
         }
@@ -1324,7 +1479,7 @@ export class GMManager {
         {
           dx: 0, dy: 14.3, dz: 0, yawDeg: 180,
           config: {
-            name: 'Twi\'lek Cantina Bartender', appearanceId: 50, factionId: 5, hp: 55, level: 4, classId: 2,
+            name: 'Twi\'lek Cantina Bartender', templateResRef: 'n_twilekf', appearanceId: 47, factionId: 5, hp: 55, level: 4, classId: 2,
             barkText: 'Welcome to the cantina! Keep your blasters holstered and pay your tab.'
           }
         }
@@ -1355,14 +1510,14 @@ export class GMManager {
           dx: 3.5, dy: 7.5, dz: 0, yawDeg: -20,
           config: {
             name: 'Heavy Cargo Crate 201', category: 'Storage & Cargo', appearanceId: 51, modelKeywords: ['crate', 'cargo', 'box'], scale: 1.25,
-            useable: true, hasInventory: true, locked: false, openLockDC: 12, lootResRefs: ['g_w_vbrswrd01']
+            useable: true, hasInventory: true, locked: false, openLockDC: 12, lootResRefs: ['g_w_vbroswrd01']
           }
         },
         {
           dx: 3.5, dy: 9.8, dz: 0, yawDeg: 0,
           config: {
             name: 'Plasteel Contraband Cylinder', category: 'Storage & Cargo', appearanceId: 53, modelKeywords: ['cylinder', 'plasteel', 'canister'], scale: 1.1,
-            useable: true, hasInventory: true, locked: false, openLockDC: 15, lootResRefs: ['g_w_hvyrptbltr01', 'g_a_class6001']
+            useable: true, hasInventory: true, locked: false, openLockDC: 15, lootResRefs: ['g_w_hvrptbltr01', 'g_a_class6001']
           }
         },
         {
@@ -1395,7 +1550,7 @@ export class GMManager {
         {
           dx: 0, dy: 13.7, dz: 0, yawDeg: 180,
           config: {
-            name: 'Warehouse Quartermaster', appearanceId: 25, factionId: 5, hp: 90, level: 7, classId: 2, rightHandResRef: 'g_w_blstrpstl001',
+            name: 'Warehouse Quartermaster', templateResRef: 'n_smuggler', appearanceId: 179, factionId: 5, hp: 90, level: 7, classId: 2, rightHandResRef: 'g_w_blstrpstl001',
             barkText: 'Don\'t touch the crates unless you\'ve got credits or clearance from the boss.'
           }
         }
@@ -1412,8 +1567,6 @@ export class GMManager {
       gender: 0,
       classId: 3, // Jedi Guardian
       level: 10,
-      hp: 150,
-      fp: 110,
       str: 18,
       dex: 14,
       con: 15,
@@ -1423,8 +1576,6 @@ export class GMManager {
       rightHandResRef: 'g_w_lghtsbr01',
       leftHandResRef: '',
       armorResRef: 'g_a_jedirobe01',
-      featIds: [1, 3, 8, 11, 28, 29, 30, 53],
-      spellIds: [9, 14, 15, 29, 43],
       possessImmediately: true
     },
     {
@@ -1434,8 +1585,6 @@ export class GMManager {
       gender: 1,
       classId: 4, // Jedi Consular
       level: 10,
-      hp: 115,
-      fp: 180,
       str: 12,
       dex: 14,
       con: 14,
@@ -1445,8 +1594,6 @@ export class GMManager {
       rightHandResRef: 'g_w_lghtsbr03',
       leftHandResRef: '',
       armorResRef: 'g_a_mstrrobe01',
-      featIds: [1, 3, 8, 11, 53],
-      spellIds: [9, 10, 14, 15, 21, 22, 29, 43],
       possessImmediately: true
     },
     {
@@ -1456,8 +1603,6 @@ export class GMManager {
       gender: 0,
       classId: 5, // Jedi Sentinel
       level: 10,
-      hp: 130,
-      fp: 140,
       str: 14,
       dex: 17,
       con: 14,
@@ -1467,19 +1612,16 @@ export class GMManager {
       rightHandResRef: 'g_w_dblsbr001',
       leftHandResRef: '',
       armorResRef: 'g_a_kghtrobe01',
-      featIds: [1, 2, 3, 8, 9, 11, 28, 53],
-      spellIds: [9, 14, 15, 29, 43],
       possessImmediately: true
     },
     {
       name: 'Sith Marauder (Dark Side)',
+      alignment: 'dark',
       appearanceId: 138,
       portraitId: 16,
       gender: 0,
       classId: 3, // Jedi Guardian
       level: 12,
-      hp: 175,
-      fp: 150,
       str: 18,
       dex: 15,
       con: 16,
@@ -1489,8 +1631,6 @@ export class GMManager {
       rightHandResRef: 'g_w_lghtsbr02',
       leftHandResRef: 'g_w_lghtsbr02',
       armorResRef: 'g_a_mstrrobe02',
-      featIds: [1, 2, 3, 8, 9, 11, 28, 29, 30, 53],
-      spellIds: [9, 14, 15, 21, 22, 29, 43],
       possessImmediately: true
     },
     {
@@ -1500,19 +1640,15 @@ export class GMManager {
       gender: 0,
       classId: 0, // Soldier
       level: 8,
-      hp: 140,
-      fp: 0,
       str: 16,
       dex: 16,
       con: 16,
       int: 12,
       wis: 12,
       cha: 10,
-      rightHandResRef: 'g_w_hvyrptbltr01',
+      rightHandResRef: 'g_w_hvrptbltr01',
       leftHandResRef: '',
       armorResRef: 'g_a_class8001',
-      featIds: [1, 3, 8, 11, 20, 29],
-      spellIds: [],
       possessImmediately: true
     },
     {
@@ -1522,8 +1658,6 @@ export class GMManager {
       gender: 1,
       classId: 2, // Scoundrel
       level: 8,
-      hp: 105,
-      fp: 0,
       str: 12,
       dex: 18,
       con: 13,
@@ -1533,8 +1667,6 @@ export class GMManager {
       rightHandResRef: 'g_w_blstrpstl001',
       leftHandResRef: 'g_w_blstrpstl001',
       armorResRef: 'g_a_class4001',
-      featIds: [1, 2, 3, 8, 9, 11, 19],
-      spellIds: [],
       possessImmediately: true
     }
   ];
@@ -1548,14 +1680,13 @@ export class GMManager {
     { resRef: 'g_w_lghtsbr05', label: 'Violet Lightsaber (g_w_lghtsbr05)' },
     { resRef: 'g_w_dblsbr001', label: 'Double-Bladed Lightsaber Blue (g_w_dblsbr001)' },
     { resRef: 'g_w_dblsbr002', label: 'Double-Bladed Lightsaber Red (g_w_dblsbr002)' },
-    { resRef: 'g_w_vbrswrd01', label: 'Vibrosword (g_w_vbrswrd01)' },
+    { resRef: 'g_w_vbroswrd01', label: 'Vibrosword (g_w_vbroswrd01)' },
     { resRef: 'g_w_vbrdblswd01', label: 'Vibro Double-Blade (g_w_vbrdblswd01)' },
     { resRef: 'g_w_gaffi001', label: 'Gaffi Stick (g_w_gaffi001)' },
-    { resRef: 'w_blaste_01', label: 'Sith Blaster Rifle (w_blaste_01)' },
     { resRef: 'g_w_blstrrfl001', label: 'Blaster Rifle (g_w_blstrrfl001)' },
-    { resRef: 'g_w_hvyrptbltr01', label: 'Heavy Repeating Blaster (g_w_hvyrptbltr01)' },
+    { resRef: 'g_w_hvrptbltr01', label: 'Heavy Repeating Blaster (g_w_hvrptbltr01)' },
     { resRef: 'g_w_blstrpstl001', label: 'Blaster Pistol (g_w_blstrpstl001)' },
-    { resRef: 'g_w_bowcaster001', label: 'Wookiee Bowcaster (g_w_bowcaster001)' },
+    { resRef: 'g_w_bowcstr001', label: 'Wookiee Bowcaster (g_w_bowcstr001)' },
   ];
 
   static ARMOR_OPTIONS: { resRef: string; label: string }[] = [
@@ -1661,7 +1792,7 @@ export class GMManager {
     }, { passive: true });
 
     window.addEventListener('pointerup', (e: PointerEvent) => {
-      if (!GameState.gmMode || e.button !== 0 || !this.isGMUser()) return;
+      if (!GameState.gmMode || (e.button !== 0 && e.button !== 2) || !this.isGMUser()) return;
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
 
@@ -1670,12 +1801,23 @@ export class GMManager {
       const dy = e.clientY - this.pointerDownPos.y;
       if (Math.hypot(dx, dy) > 6) return;
 
+      // A right-click (not a right-drag, which looks around) puts down the placement or teleport tool
+      if (e.button === 2) {
+        if (this.activeTool !== 'select') this.setToolMode('select');
+        return;
+      }
+
       // In POSSESS mode, let standard KotOR IngameControls handle left-clicks unless a placement/teleport tool is explicitly active
       if (this.controlMode === 'POSSESS' && this.activeTool === 'select') {
         return;
       }
 
-      this.handleViewportClick(e.clientX, e.clientY, e.detail >= 2);
+      const last = this.lastViewportClick;
+      const now = performance.now();
+      const isDoubleClick = now - last.at < this.DOUBLE_CLICK_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= 6;
+      this.lastViewportClick = isDoubleClick ? { x: 0, y: 0, at: 0 } : { x: e.clientX, y: e.clientY, at: now };
+
+      this.handleViewportClick(e.clientX, e.clientY, isDoubleClick);
     });
   }
 
@@ -1710,6 +1852,84 @@ export class GMManager {
       return hits[0].point.z;
     }
     return fallbackZ;
+  }
+
+  /**
+   * The placeables.2da model each preset keyword means (by its first keyword). Checked against KotOR's
+   * table: the presets' numeric ids and a loose keyword search had picked unrelated models (a speeder for
+   * a desk, a fountain for a vault).
+   */
+  static PLACEABLE_KEYWORD_LABELS: Record<string, string> = {
+    comp: 'CompPanel',
+    panel: 'ButtonPanel_hightech',
+    chair: 'Chair1_military_style',
+    desk: 'Desk2_fancy',
+    counter: 'Desk1_office',
+    table: 'ManaanTable1',
+    pazaak: 'ManaanTable2',
+    pillar: 'Pillar',
+    statue: 'Statue2_heroic_Jedi',
+    starmap: 'StarMap',
+    holo: 'Hologram2_abstract',
+    sarcoph: 'Sith_Sarcophagus',
+    brazier: 'Firepit',
+    skeleton: 'HumanSkeleton',
+    ornate: 'RakataBin2_wicker_footlocker',
+    footlker: 'Footlocker',
+    locker: 'LargeLocker',
+    rack: 'LargeLocker',
+    med: 'Footlocker',
+    safe: 'MetalBox_octagonal',
+    metal: 'MetalBox_octagonal',
+    crate: 'Crate_wooden',
+    cylinder: 'PlasticCrate_cylinder',
+    workbench: 'RepairTable1',
+    bed: 'Bed1_military_cot',
+    kolto: 'KoltoTank_empty',
+    gen: 'PowerConductor',
+  };
+
+  /** A fresh, uncustomized copy of a placeable preset (lists copied, so edits never reach the preset) */
+  static copyPlaceablePreset(preset: GMPlaceableSpawnConfig): GMPlaceableSpawnConfig {
+    return {
+      ...preset,
+      scale: preset.scale ?? 1.0,
+      zOffset: preset.zOffset ?? 0,
+      modelKeywords: preset.modelKeywords ? [...preset.modelKeywords] : undefined,
+      lootResRefs: [...(preset.lootResRefs || [])],
+      customized: false,
+    };
+  }
+
+  static getPlaceableAppearanceLabel(id: number): string {
+    const app = GameState.AppearanceManager?.placeableAppearances?.get(id);
+    return app?.label && app.label !== '****' ? `${app.label} (#${id})` : `#${id}`;
+  }
+
+  static findPlaceableAppearanceByLabel(label?: string): number | null {
+    const wanted = (label || '').trim().toLowerCase();
+    const map = GameState.AppearanceManager?.placeableAppearances;
+    if (!wanted || !map) return null;
+    let found: number | null = null;
+    map.forEach((app, id) => {
+      if (found === null && app && (app.label || '').toLowerCase() === wanted && app.modelname && app.modelname !== '****') {
+        found = id;
+      }
+    });
+    return found;
+  }
+
+  /**
+   * The placeables.2da row a spawn config means: its exact label, else the checked model for its keywords,
+   * else a loose keyword search (other games' tables), else its numeric id
+   */
+  static resolvePlaceableAppearance(config: Pick<GMPlaceableSpawnConfig, 'appearanceId' | 'appearanceLabel' | 'modelKeywords'>): number {
+    const byLabel = this.findPlaceableAppearanceByLabel(config.appearanceLabel);
+    if (byLabel !== null) return byLabel;
+    const firstKeyword = (config.modelKeywords?.[0] || '').toLowerCase();
+    const byKeyword = this.findPlaceableAppearanceByLabel(this.PLACEABLE_KEYWORD_LABELS[firstKeyword]);
+    if (byKeyword !== null) return byKeyword;
+    return this.resolvePlaceableAppearanceId(config.modelKeywords, config.appearanceId ?? 52);
   }
 
   static resolvePlaceableAppearanceId(keywords?: string[], fallbackId: number = 52): number {
@@ -1796,9 +2016,15 @@ export class GMManager {
     if (this.activeTool === 'select') {
       const picked = this.pickObjectAtCursor();
       this.selectObject(picked);
-      if (isDoubleClick && picked && BitWise.InstanceOf(picked.objectType, ModuleObjectType.ModuleCreature)) {
-        this.possessCharacter(picked as ModuleCreature);
+      if (isDoubleClick && picked) {
+        // The GM panel opens its Inspect tab on this
+        this.events.dispatchEvent('inspect', picked);
       }
+      return;
+    }
+
+    if (this.isOrderTool(this.activeTool)) {
+      this.handleOrderClick();
       return;
     }
 
@@ -1899,7 +2125,14 @@ export class GMManager {
     return null;
   }
 
+  static isOrderTool(tool: GMToolMode): boolean {
+    return tool === 'order_move' || tool === 'order_attack' || tool === 'order_follow' || tool === 'order_patrol';
+  }
+
   static setToolMode(tool: GMToolMode) {
+    const previous = this.activeTool;
+    if (previous === 'order_patrol' && tool !== 'order_patrol') this.finishPatrolOrder();
+    if (this.isOrderTool(previous) && !this.isOrderTool(tool)) this.orderSubject = null;
     this.activeTool = tool;
     if (this.placementRing) {
       if (tool === 'select') {
@@ -1910,6 +2143,7 @@ export class GMManager {
         else if (tool === 'place_placeable') mat.color.setHex(0xffaa00);
         else if (tool === 'place_player') mat.color.setHex(0x00ff88);
         else if (tool === 'teleport') mat.color.setHex(0x00e5ff);
+        else if (this.isOrderTool(tool)) mat.color.setHex(0xffd740);
       }
     }
     this.notifyChange();
@@ -2066,6 +2300,13 @@ export class GMManager {
     GameState.gmMode = true;
     this.active = true;
 
+    // Conversations are with NPCs in this scene
+    if (GMNetworkManager.role === 'host') {
+      GameState.GMConversationManager?.clear();
+    } else {
+      GameState.GMConversationManager?.reset();
+    }
+
     if (typeof options?.keepCreatures === 'boolean') {
       this.keepDefaultCreatures = options.keepCreatures;
     }
@@ -2216,6 +2457,134 @@ export class GMManager {
   }
 
   /**
+   * Objects the area loads with the module are spawned by the area (ModuleArea.initAreaObjects); ones the GM
+   * adds later are not. Without it they can't perceive or see anything (hasLineOfSight needs it), so NPCs
+   * never notice enemies. Module scripts stay off in GM scenes, so their OnSpawn script doesn't run.
+   */
+  static markSpawned(obj: ModuleObject) {
+    if (obj && !obj.spawned) obj.onSpawn(false);
+  }
+
+  /** A creature's appearance.2da row: its exact label if it has one, else its id */
+  static resolveCreatureAppearance(config: Pick<GMCreatureSpawnConfig, 'appearanceId' | 'appearanceLabel'>): number {
+    if (config.appearanceLabel) {
+      const map = GameState.AppearanceManager?.appearances;
+      if (map) {
+        const wanted = config.appearanceLabel.toLowerCase();
+        for (const [id, app] of map) {
+          if (app?.label && app.label.toLowerCase() === wanted) return id;
+        }
+      }
+    }
+    return config.appearanceId ?? 28;
+  }
+
+  /** Set a creature template's hands and armour (see spawnCreature) */
+  static applyCreatureGear(root: GFFStruct, config: GMCreatureSpawnConfig, replace: boolean) {
+    let list = root.getFieldByLabel('Equip_ItemList');
+    if (!list) list = root.addField(new GFFField(GFFDataType.LIST, 'Equip_ItemList'));
+    const slots: [number, string | undefined][] = [
+      [ModuleCreatureArmorSlot.ARMOR, config.armorResRef],
+      [ModuleCreatureArmorSlot.RIGHTHAND, config.rightHandResRef],
+      [ModuleCreatureArmorSlot.LEFTHAND, config.leftHandResRef],
+    ];
+    for (const [slot, resRef] of slots) {
+      if (resRef === undefined) continue;
+      const structs = list.getChildStructs();
+      const existing = structs.find((st) => st.type === slot);
+      if (!replace) {
+        if (existing || !resRef) continue;
+      } else if (existing) {
+        list.removeChildStruct(existing);
+      }
+      if (!resRef) continue;
+      const st = new GFFStruct(slot);
+      st.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(resRef);
+      list.addChildStruct(st);
+    }
+  }
+
+  static creatureTemplateIndex: GMCreatureTemplateInfo[] | null = null;
+  static creatureTemplateIndexLoading: Promise<GMCreatureTemplateInfo[]> | null = null;
+
+  /** Read a creature template (.utc): its name, look, faction, stats, class and gear */
+  static async describeCreatureTemplate(resRef: string): Promise<GMCreatureTemplateInfo | null> {
+    const key = (resRef || '').toLowerCase();
+    if (!key) return null;
+    let buffer = ResourceLoader.loadCachedResource(ResourceTypes.utc, key);
+    if (!buffer) {
+      try { buffer = await ResourceLoader.loadResource(ResourceTypes.utc, key); } catch (e) { buffer = undefined; }
+    }
+    if (!buffer) return null;
+    try {
+      const root = new GFFObject(buffer).RootNode;
+      const value = (label: string, fallback: any = 0) => root.hasField(label) ? root.getFieldByLabel(label).getValue() : fallback;
+      const first = root.hasField('FirstName') ? root.getFieldByLabel('FirstName').getCExoLocString().getValue() : '';
+      const last = root.hasField('LastName') ? root.getFieldByLabel('LastName').getCExoLocString().getValue() : '';
+      const appearanceId = Number(value('Appearance_Type', 0));
+      const classRows = GameState.TwoDAManager?.datatables.get('classes')?.rows || {};
+      const classStructs = root.hasField('ClassList') ? root.getFieldByLabel('ClassList').getChildStructs() : [];
+      const classes = classStructs.map((st) => {
+        const id = st.getFieldByLabel('Class')?.getValue() ?? 0;
+        const row = classRows[id];
+        const name = row ? (GameState.TLKManager?.GetStringById(Number(row.name))?.Value || row.label) : 'Class ' + id;
+        return { id, level: Number(st.getFieldByLabel('ClassLevel')?.getValue() ?? 1), name };
+      });
+      const gear = root.hasField('Equip_ItemList') ? root.getFieldByLabel('Equip_ItemList').getChildStructs() : [];
+      const slot = (s: number) => gear.find((st) => st.type === s)?.getFieldByLabel('EquippedRes')?.getValue() || '';
+      return {
+        resRef: key,
+        name: [first, last].filter(Boolean).join(' ') || key,
+        appearanceId,
+        appearanceLabel: GameState.AppearanceManager?.appearances.get(appearanceId)?.label || '',
+        factionId: Number(value('FactionID', 5)),
+        hp: Number(value('MaxHitPoints', 0)) || Number(value('HitPoints', 0)),
+        fp: Number(value('ForcePoints', 0)),
+        level: classes.reduce((sum, c) => sum + c.level, 0) || 1,
+        classId: classes[0]?.id ?? 0,
+        classes: classes.map((c) => `${c.name} ${c.level}`).join(' / '),
+        rightHandResRef: slot(ModuleCreatureArmorSlot.RIGHTHAND),
+        leftHandResRef: slot(ModuleCreatureArmorSlot.LEFTHAND),
+        armorResRef: slot(ModuleCreatureArmorSlot.ARMOR),
+      };
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Every creature template the game has (read once, then cached), for the template browser */
+  static async loadCreatureTemplateIndex(): Promise<GMCreatureTemplateInfo[]> {
+    if (this.creatureTemplateIndex) return this.creatureTemplateIndex;
+    if (!this.creatureTemplateIndexLoading) {
+      this.creatureTemplateIndexLoading = (async () => {
+        const out: GMCreatureTemplateInfo[] = [];
+        for (const resRef of this.getAvailableUTCTemplates()) {
+          const info = await this.describeCreatureTemplate(resRef);
+          if (info) out.push(info);
+        }
+        out.sort((a, b) => a.name.localeCompare(b.name) || a.resRef.localeCompare(b.resRef));
+        this.creatureTemplateIndex = out;
+        return out;
+      })().finally(() => { this.creatureTemplateIndexLoading = null; });
+    }
+    return this.creatureTemplateIndexLoading;
+  }
+
+  /** Place a template exactly as the game has it (its own faction too) */
+  static creatureConfigFromTemplate(info: GMCreatureTemplateInfo): GMCreatureSpawnConfig {
+    return {
+      name: info.name,
+      templateResRef: info.resRef,
+      appearanceId: info.appearanceId,
+      appearanceLabel: info.appearanceLabel || undefined,
+      factionId: info.factionId,
+      hp: info.hp,
+      level: info.level,
+      classId: info.classId,
+    };
+  }
+
+  /**
    * Spawn a Creature / NPC in the current area
    */
   static async spawnCreature(
@@ -2260,14 +2629,18 @@ export class GMManager {
       }
     };
 
-    if (!loadedFromUTC || config.appearanceId >= 0) {
-      setOrAdd(GFFDataType.WORD, 'Appearance_Type', config.appearanceId ?? 28);
+    // A template keeps its own look, stats and gear unless the GM customized them
+    const useConfig = !loadedFromUTC || !!config.customized;
+    if (useConfig) {
+      setOrAdd(GFFDataType.WORD, 'Appearance_Type', this.resolveCreatureAppearance(config));
     }
     const targetHp = config.hp || 50;
     setOrAdd(GFFDataType.WORD, 'FactionID', config.factionId ?? 1);
-    setOrAdd(GFFDataType.WORD, 'HitPoints', targetHp);
-    setOrAdd(GFFDataType.WORD, 'CurrentHitPoints', targetHp);
-    setOrAdd(GFFDataType.WORD, 'MaxHitPoints', targetHp);
+    if (useConfig) {
+      setOrAdd(GFFDataType.WORD, 'HitPoints', targetHp);
+      setOrAdd(GFFDataType.WORD, 'CurrentHitPoints', targetHp);
+      setOrAdd(GFFDataType.WORD, 'MaxHitPoints', targetHp);
+    }
 
     if (config.name) {
       const locName = new CExoLocString();
@@ -2302,33 +2675,48 @@ export class GMManager {
       setOrAdd(GFFDataType.RESREF, 'ScriptOnNotice', 'k_def_percept01');
       setOrAdd(GFFDataType.RESREF, 'ScriptSpawn', 'k_def_spawn01');
 
+      // What its class gives it at this level: feats, Force powers, skills and Force points
+      const abilities = CharacterBuilder.build({
+        classId: config.classId ?? 0,
+        level: config.level || 4,
+        attributes: { str: 14, dex: 14, con: 14, int: 12, wis: 14, cha: 12 },
+        alignment: config.factionId === 1 ? 'dark' : 'light',
+      });
       const classList = root.addField(new GFFField(GFFDataType.LIST, 'ClassList'));
       const classStruct = new GFFStruct();
       classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(config.classId ?? 0);
       classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(config.level || 4);
+      const knownList = classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
+      for (const spellId of abilities.powers) {
+        const sp = new GFFStruct();
+        sp.addField(new GFFField(GFFDataType.WORD, 'Spell')).setValue(spellId);
+        knownList.addChildStruct(sp);
+      }
       classList.addChildStruct(classStruct);
+
+      root.removeFieldByLabel('FeatList');
+      const featList = root.addField(new GFFField(GFFDataType.LIST, 'FeatList'));
+      for (const featId of abilities.feats) {
+        const ft = new GFFStruct();
+        ft.addField(new GFFField(GFFDataType.WORD, 'Feat')).setValue(featId);
+        featList.addChildStruct(ft);
+      }
+      root.removeFieldByLabel('SkillList');
+      const skillList = root.addField(new GFFField(GFFDataType.LIST, 'SkillList'));
+      for (let i = 0; i < Math.max(8, abilities.skillRanks.length); i++) {
+        const sk = new GFFStruct();
+        sk.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(abilities.skillRanks[i] || 0);
+        skillList.addChildStruct(sk);
+      }
+      setOrAdd(GFFDataType.WORD, 'ForcePoints', abilities.maxFp);
+      setOrAdd(GFFDataType.WORD, 'CurrentForce', abilities.maxFp);
+      setOrAdd(GFFDataType.WORD, 'MaxForcePoints', abilities.maxFp);
     }
 
-    // Configure Equipped Items if specified
-    if (config.rightHandResRef || config.leftHandResRef || config.armorResRef) {
-      root.removeFieldByLabel('Equip_ItemList');
-      const equipField = root.addField(new GFFField(GFFDataType.LIST, 'Equip_ItemList'));
-      if (config.armorResRef) {
-        const s = new GFFStruct(ModuleCreatureArmorSlot.ARMOR);
-        s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.armorResRef);
-        equipField.addChildStruct(s);
-      }
-      if (config.rightHandResRef) {
-        const s = new GFFStruct(ModuleCreatureArmorSlot.RIGHTHAND);
-        s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.rightHandResRef);
-        equipField.addChildStruct(s);
-      }
-      if (config.leftHandResRef) {
-        const s = new GFFStruct(ModuleCreatureArmorSlot.LEFTHAND);
-        s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.leftHandResRef);
-        equipField.addChildStruct(s);
-      }
-    }
+    // Gear. Customized (or built without a template): the hands and armour are what the config says, '' for
+    // empty. From a template: its own gear, with the config only filling an empty hand. Either way the template's
+    // other slots (creature claws and hides, belts, implants) stay.
+    this.applyCreatureGear(root, config, useConfig);
 
     setOrAdd(GFFDataType.FLOAT, 'XPosition', targetLoc.position.x);
     setOrAdd(GFFDataType.FLOAT, 'YPosition', targetLoc.position.y);
@@ -2337,6 +2725,12 @@ export class GMManager {
     setOrAdd(GFFDataType.FLOAT, 'YOrientation', Math.cos(targetLoc.facing));
 
     const creature = new ModuleCreature(gff);
+    // Its network id is fixed before it joins the area: world updates sent while its model loads must not
+    // give it a second id (players would get a frozen duplicate)
+    const netId = existingNetId || this.getNextNetId('cre');
+    this.registerNetObject(netId, creature);
+    (creature as any).gmSpawning = true;
+    (creature as any).gmSpawnConfig = { ...config };
     if (config.barkText) {
       (creature as any).gmBarkText = config.barkText;
     }
@@ -2344,7 +2738,13 @@ export class GMManager {
     area.attachObject(creature);
     creature.load();
     creature.firstName = config.name || creature.firstName;
-    this.setCreatureHP(creature, targetHp, targetHp);
+    if (useConfig) {
+      this.setCreatureHP(creature, targetHp, targetHp);
+    } else {
+      // Some templates' current HP is above their maximum (it includes their Constitution bonus): start at full
+      const full = Math.max(creature.getHP() || 0, creature.getMaxHP() || 0);
+      if (full > 0) this.setCreatureHP(creature, full, full);
+    }
     this.assignFaction(creature, config.factionId ?? 1);
     if (Array.isArray(config.lootResRefs)) {
       for (const resRef of config.lootResRefs) {
@@ -2363,9 +2763,8 @@ export class GMManager {
 
     creature.getCurrentRoom();
     creature.computeBoundingBox(true);
-
-    const netId = existingNetId || this.getNextNetId('cre');
-    this.registerNetObject(netId, creature);
+    this.markSpawned(creature);
+    delete (creature as any).gmSpawning;
 
     if (!existingNetId && GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(creature));
@@ -2395,12 +2794,8 @@ export class GMManager {
       targetLoc.position.z += config.zOffset;
     }
 
-    const resolvedAppearanceId = this.resolvePlaceableAppearanceId(
-      config.modelKeywords,
-      config.appearanceId ?? 52
-    );
-
     let gff = new GFFObject();
+    let fromTemplate = false;
     if (config.templateResRef) {
       const resKey = config.templateResRef.toLowerCase();
       let buffer = ResourceLoader.loadCachedResource(ResourceTypes.utp, resKey);
@@ -2413,8 +2808,14 @@ export class GMManager {
       }
       if (buffer) {
         gff = new GFFObject(buffer);
+        fromTemplate = true;
       }
     }
+    // A template keeps its own model, name and settings unless the GM customized them
+    const useConfig = !fromTemplate || !!config.customized;
+    const resolvedAppearanceId = useConfig
+      ? this.resolvePlaceableAppearance(config)
+      : (gff.RootNode.getFieldByLabel('Appearance')?.getValue() ?? this.resolvePlaceableAppearance(config));
 
     const root = gff.RootNode;
     root.removeFieldByLabel('TemplateResRef');
@@ -2426,28 +2827,34 @@ export class GMManager {
       }
     };
 
-    const locName = new CExoLocString();
-    locName.addSubString(config.name || 'Interactive Object', 0);
-    if (root.hasField('LocName')) {
-      root.getFieldByLabel('LocName').setCExoLocString(locName);
-    } else {
-      root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName', locName));
-    }
+    if (useConfig) {
+      const locName = new CExoLocString();
+      locName.addSubString(config.name || 'Interactive Object', 0);
+      if (root.hasField('LocName')) {
+        root.getFieldByLabel('LocName').setCExoLocString(locName);
+      } else {
+        root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName', locName));
+      }
 
-    setOrAdd(GFFDataType.DWORD, 'Appearance', resolvedAppearanceId);
-    setOrAdd(GFFDataType.BYTE, 'Useable', config.useable ? 1 : 0);
-    setOrAdd(GFFDataType.BYTE, 'HasInventory', config.hasInventory ? 1 : 0);
-    setOrAdd(GFFDataType.BYTE, 'Locked', config.locked ? 1 : 0);
-    setOrAdd(GFFDataType.BYTE, 'OpenLockDC', config.openLockDC || 15);
+      setOrAdd(GFFDataType.DWORD, 'Appearance', resolvedAppearanceId);
+      setOrAdd(GFFDataType.BYTE, 'Useable', config.useable ? 1 : 0);
+      setOrAdd(GFFDataType.BYTE, 'HasInventory', config.hasInventory ? 1 : 0);
+      setOrAdd(GFFDataType.BYTE, 'Locked', config.locked ? 1 : 0);
+      setOrAdd(GFFDataType.BYTE, 'OpenLockDC', config.openLockDC || 15);
+      setOrAdd(GFFDataType.SHORT, 'HP', 50);
+      setOrAdd(GFFDataType.SHORT, 'CurrentHP', 50);
+    }
+    // Placed objects can always be moved and interacted with
     setOrAdd(GFFDataType.BYTE, 'Static', 0);
-    setOrAdd(GFFDataType.SHORT, 'HP', 50);
-    setOrAdd(GFFDataType.SHORT, 'CurrentHP', 50);
     setOrAdd(GFFDataType.FLOAT, 'X', targetLoc.position.x);
     setOrAdd(GFFDataType.FLOAT, 'Y', targetLoc.position.y);
     setOrAdd(GFFDataType.FLOAT, 'Z', targetLoc.position.z);
     setOrAdd(GFFDataType.FLOAT, 'Bearing', targetLoc.facing);
 
     const plc = new ModulePlaceable(gff);
+    const netId = existingNetId || this.getNextNetId('plc');
+    this.registerNetObject(netId, plc);
+    (plc as any).gmSpawning = true;
     if (config.barkText) {
       (plc as any).gmBarkText = config.barkText;
     }
@@ -2462,17 +2869,19 @@ export class GMManager {
 
     area.attachObject(plc);
     plc.load();
-    plc.appearance = resolvedAppearanceId;
-    plc.useable = config.useable;
-    plc.hasInventory = config.hasInventory;
-    plc.locked = config.locked;
-    plc.openLockDC = config.openLockDC || 15;
+    if (useConfig) {
+      plc.appearance = resolvedAppearanceId;
+      plc.useable = config.useable;
+      plc.hasInventory = config.hasInventory;
+      plc.locked = config.locked;
+      plc.openLockDC = config.openLockDC || 15;
+    }
     plc.position.copy(targetLoc.position);
     plc.bearing = targetLoc.facing;
     plc.rotation.set(0, 0, targetLoc.facing);
 
-    // Populate container inventory items
-    if (config.hasInventory && Array.isArray(config.lootResRefs)) {
+    // Populate container inventory items (on top of any the template carries)
+    if ((useConfig ? config.hasInventory : plc.hasInventory) && Array.isArray(config.lootResRefs)) {
       for (const itemRes of config.lootResRefs) {
         if (!itemRes) continue;
         await this.addItemToObjectAsync(plc, itemRes);
@@ -2500,9 +2909,8 @@ export class GMManager {
 
     plc.getCurrentRoom();
     plc.computeBoundingBox(true);
-
-    const netId = existingNetId || this.getNextNetId('plc');
-    this.registerNetObject(netId, plc);
+    this.markSpawned(plc);
+    delete (plc as any).gmSpawning;
 
     if (!existingNetId && GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(plc));
@@ -2515,6 +2923,31 @@ export class GMManager {
   /**
    * Spawn a playable Player Character in the current area
    */
+  /**
+   * A player character's feats, Force powers, skill ranks, vitality and Force points: what its class and level
+   * give it by the game's rules (CharacterBuilder), unless the config sets them explicitly
+   */
+  static buildPlayerAbilities(config: Partial<GMPlayerSpawnConfig>): ICharacterBuild {
+    const build = CharacterBuilder.build({
+      classId: config.classId ?? 3,
+      level: config.level || 1,
+      attributes: {
+        str: config.str || 14,
+        dex: config.dex || 14,
+        con: config.con || 14,
+        int: config.int || 12,
+        wis: config.wis || 14,
+        cha: config.cha || 14,
+      },
+      alignment: config.alignment,
+    });
+    if (Array.isArray(config.featIds) && config.featIds.length) build.feats = [...config.featIds];
+    if (Array.isArray(config.spellIds) && config.spellIds.length) build.powers = [...config.spellIds];
+    if (typeof config.hp === 'number' && config.hp > 0) build.maxHp = config.hp;
+    if (typeof config.fp === 'number' && config.fp >= 0) build.maxFp = config.fp;
+    return build;
+  }
+
   static async spawnPlayerCharacter(
     config: GMPlayerSpawnConfig,
     position?: THREE.Vector3,
@@ -2528,6 +2961,7 @@ export class GMManager {
       ? { position: position.clone(), facing: facing ?? 0 }
       : this.getCameraTargetSpawnPoint(3.0);
 
+    const abilities = this.buildPlayerAbilities(config);
     const template = new GFFObject();
     const root = template.RootNode;
     const locName = new CExoLocString();
@@ -2540,11 +2974,12 @@ export class GMManager {
     root.addField(new GFFField(GFFDataType.WORD, 'FactionID')).setValue(0); // Party/Player Faction
     root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName', locName));
     root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName', new CExoLocString()));
-    root.addField(new GFFField(GFFDataType.WORD, 'HitPoints')).setValue(config.hp || 120);
-    root.addField(new GFFField(GFFDataType.WORD, 'CurrentHitPoints')).setValue(config.hp || 120);
-    root.addField(new GFFField(GFFDataType.WORD, 'MaxHitPoints')).setValue(config.hp || 120);
-    root.addField(new GFFField(GFFDataType.WORD, 'ForcePoints')).setValue(config.fp ?? 100);
-    root.addField(new GFFField(GFFDataType.WORD, 'CurrentForce')).setValue(config.fp ?? 100);
+    root.addField(new GFFField(GFFDataType.WORD, 'HitPoints')).setValue(abilities.maxHp);
+    root.addField(new GFFField(GFFDataType.WORD, 'CurrentHitPoints')).setValue(abilities.maxHp);
+    root.addField(new GFFField(GFFDataType.WORD, 'MaxHitPoints')).setValue(abilities.maxHp);
+    root.addField(new GFFField(GFFDataType.WORD, 'ForcePoints')).setValue(abilities.maxFp);
+    root.addField(new GFFField(GFFDataType.WORD, 'CurrentForce')).setValue(abilities.maxFp);
+    root.addField(new GFFField(GFFDataType.WORD, 'MaxForcePoints')).setValue(abilities.maxFp);
     root.addField(new GFFField(GFFDataType.BYTE, 'Str')).setValue(config.str || 14);
     root.addField(new GFFField(GFFDataType.BYTE, 'Dex')).setValue(config.dex || 14);
     root.addField(new GFFField(GFFDataType.BYTE, 'Con')).setValue(config.con || 14);
@@ -2567,11 +3002,11 @@ export class GMManager {
     root.addField(new GFFField(GFFDataType.RESREF, 'ScriptOnNotice')).setValue('k_hen_percept01');
     root.addField(new GFFField(GFFDataType.RESREF, 'ScriptSpawn')).setValue('k_hen_spawn01');
 
-    // Skills (give high Security, Computer Use, Persuade, Repair, Treat Injury so player can unlock doors and use objects)
+    // Skills, as the class spends its skill points
     const skillList = root.addField(new GFFField(GFFDataType.LIST, 'SkillList'));
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < Math.max(8, abilities.skillRanks.length); i++) {
       const s = new GFFStruct();
-      s.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(12);
+      s.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(abilities.skillRanks[i] || 0);
       skillList.addChildStruct(s);
     }
 
@@ -2581,8 +3016,8 @@ export class GMManager {
     classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(config.classId ?? 3);
     classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(config.level || 8);
     const knownList = classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
-    if (Array.isArray(config.spellIds)) {
-      for (const spellId of config.spellIds) {
+    {
+      for (const spellId of abilities.powers) {
         const sp = new GFFStruct();
         sp.addField(new GFFField(GFFDataType.WORD, 'Spell')).setValue(spellId);
         knownList.addChildStruct(sp);
@@ -2592,8 +3027,8 @@ export class GMManager {
 
     // Feats
     const featList = root.addField(new GFFField(GFFDataType.LIST, 'FeatList'));
-    if (Array.isArray(config.featIds)) {
-      for (const featId of config.featIds) {
+    {
+      for (const featId of abilities.feats) {
         const ft = new GFFStruct();
         ft.addField(new GFFField(GFFDataType.WORD, 'Feat')).setValue(featId);
         featList.addChildStruct(ft);
@@ -2625,18 +3060,18 @@ export class GMManager {
     }
     player.npcId = -1;
     player.load();
-    this.setCreatureHP(player, config.hp || 120, config.hp || 120);
+    this.setCreatureHP(player, abilities.maxHp, abilities.maxHp);
 
     // Ensure runtime feats & spells are populated if not already
-    if (Array.isArray(config.featIds)) {
-      for (const fId of config.featIds) {
+    {
+      for (const fId of abilities.feats) {
         if (!player.getHasFeat(fId)) {
           player.addFeat(TalentFeat.From2DA({ __index: fId, ...(GameState.TwoDAManager.datatables.get('feat')?.rows?.[fId] || {}) }));
         }
       }
     }
-    if (Array.isArray(config.spellIds) && player.classes[0]) {
-      for (const sId of config.spellIds) {
+    if (player.classes[0]) {
+      for (const sId of abilities.powers) {
         if (!player.classes[0].spells.some(s => s.id === sId)) {
           player.classes[0].addSpell(new TalentSpell(sId));
         }
@@ -2685,6 +3120,7 @@ export class GMManager {
 
     player.getCurrentRoom();
     player.computeBoundingBox(true);
+    this.markSpawned(player);
 
     const netId = existingNetId || this.getNextNetId('pc');
     this.registerNetObject(netId, player);
@@ -2748,6 +3184,7 @@ export class GMManager {
 
       player.getCurrentRoom();
       player.computeBoundingBox(true);
+      this.markSpawned(player);
 
       const netId = this.getNextNetId('pc_save');
       this.registerNetObject(netId, player);
@@ -2806,6 +3243,7 @@ export class GMManager {
 
       player.getCurrentRoom();
       player.computeBoundingBox(true);
+      this.markSpawned(player);
 
       const netId = this.getNextNetId('pc_utc');
       this.registerNetObject(netId, player);
@@ -2979,14 +3417,63 @@ export class GMManager {
 
   static teleportObject(obj: ModuleObject, pos: THREE.Vector3) {
     if (!obj || !pos) return;
+    this.placeAt(obj, pos);
+
+    // A player's character goes where its player says: move it on their machine too, and ignore their
+    // position reports from before the teleport (some are already on their way)
+    const ownerPeerId = (obj as any).gmOwnerPeerId;
+    if (GMNetworkManager.role === 'host' && ownerPeerId && (obj as any).gmNetId) {
+      const seq = ((obj as any).gmTeleportSeq || 0) + 1;
+      (obj as any).gmTeleportSeq = seq;
+      (obj as any).gmHostDriven = false;
+      GMNetworkManager.sendPacket({
+        type: 'actor.teleport',
+        senderId: GMNetworkManager.peerId,
+        targetPeerId: ownerPeerId,
+        timestamp: Date.now(),
+        payload: { netId: (obj as any).gmNetId, x: pos.x, y: pos.y, z: pos.z, seq }
+      });
+    }
+
+    if (GMNetworkManager.role !== 'offline') {
+      GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(obj));
+    }
+    this.notifyChange();
+  }
+
+  /**
+   * Put an object somewhere outright. A creature drops whatever it was doing (a walk would carry on from
+   * the new spot back to where it was heading) and stops following any older synced position.
+   */
+  static placeAt(obj: ModuleObject, pos: THREE.Vector3) {
+    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+      const cre = obj as ModuleCreature;
+      cre.clearAllActions();
+      cre.force = 0;
+      cre.speed = 0;
+      cre.setAnimationState(ModuleCreatureAnimState.PAUSE);
+    }
     obj.position.copy(pos);
     if (obj.container) {
       obj.container.position.copy(pos);
     }
+    const netTarget = (obj as any).gmNetTarget as THREE.Vector3 | undefined;
+    if (netTarget) netTarget.copy(pos);
     obj.getCurrentRoom();
     obj.computeBoundingBox(true);
-    if (GMNetworkManager.role !== 'offline') {
-      GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(obj));
+  }
+
+  /**
+   * Client: the GM teleported a character. Our own character is moved here, since we normally ignore the
+   * host's position for it; anyone else's just snaps.
+   */
+  static applyTeleportOnClient(payload: { netId: string; x: number; y: number; z: number; seq?: number }) {
+    const obj = this.netIdMap.get(payload.netId);
+    if (!obj) return;
+    this.placeAt(obj, new THREE.Vector3(payload.x, payload.y, payload.z));
+    if (payload.netId === GMNetworkManager.assignedActorNetId) {
+      GMNetworkManager.teleportSeq = Math.max(GMNetworkManager.teleportSeq, payload.seq || 0);
+      GMNetworkManager.awaitingHost = false;
     }
     this.notifyChange();
   }
@@ -3586,6 +4073,252 @@ export class GMManager {
   }
 
   /**
+   * GM scenes don't run the module's creature scripts, which is where KotOR decides who an NPC fights.
+   * Stand in for them: an NPC that isn't already mid-attack goes after its current target, else whoever
+   * last attacked it, else the nearest creature it is hostile to and can see.
+   */
+  // =========================================================================
+  // Player death
+  // =========================================================================
+
+  /** A character a player plays: a connected player's, or one the GM spawned as a player character */
+  static isPlayerCharacter(obj: ModuleObject | undefined): boolean {
+    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
+    return !!((obj as any).gmOwnerPeerId || (obj as any).gmPlayerConfig);
+  }
+
+  static getPlayerCharacters(): ModuleCreature[] {
+    const area = GameState.module?.area;
+    if (!area) return [];
+    const all = [...GameState.PartyManager.party, ...area.creatures] as ModuleCreature[];
+    return [...new Set(all)].filter((c) => this.isPlayerCharacter(c));
+  }
+
+  static setDeathRule(rule: GMDeathRule) {
+    if (!['kotor', 'gm', 'respawn'].includes(rule)) return;
+    this.deathRule = rule;
+    GMNetworkManager.broadcastSessionRules({ deathRule: rule });
+    this.notifyChange();
+  }
+
+  /** Host: notice players falling, stand them back up under the KotOR rule, tell the GM if everyone is down */
+  static updateDownedPlayers(elapsed: number) {
+    const pcs = this.getPlayerCharacters();
+    const now = Date.now();
+    for (const pc of pcs) {
+      const state = (pc as any).gmDowned as { since: number; clearFor: number } | undefined;
+      if (!pc.isDead()) {
+        if (state) delete (pc as any).gmDowned;
+        continue;
+      }
+      if (!state) {
+        (pc as any).gmDowned = { since: now, clearFor: 0 };
+        GMNetworkManager.appendChat('System', `${pc.getName() || 'A player'} is down.`);
+        this.notifyChange();
+        continue;
+      }
+      if (this.deathRule !== 'kotor') continue;
+      // KotOR: party members get back up once the fight is over
+      if (this.isEnemyNear(pc)) {
+        state.clearFor = 0;
+      } else {
+        state.clearFor += elapsed;
+        if (state.clearFor >= this.RECOVER_AFTER_SECONDS) {
+          this.revivePlayer(pc, 1);
+          GMNetworkManager.appendChat('System', `${pc.getName() || 'A player'} gets back up.`);
+        }
+      }
+    }
+
+    const everyoneDown = pcs.length > 0 && pcs.every((pc) => pc.isDead());
+    if (everyoneDown && !this.everyoneDown) {
+      GMNetworkManager.appendChat('System', 'Every player is down. Revive them, or send them back to the scene\'s entry, from the Players tab.');
+    }
+    this.everyoneDown = everyoneDown;
+  }
+
+  /** A living creature hostile to this character within RECOVER_ENEMY_RANGE */
+  static isEnemyNear(pc: ModuleCreature): boolean {
+    const area = GameState.module?.area;
+    if (!area) return false;
+    return area.creatures.some((c) =>
+      c !== pc && !c.isDead() && !this.isPlayerCharacter(c) &&
+      c.position.distanceTo(pc.position) <= this.RECOVER_ENEMY_RANGE && c.isHostile(pc)
+    );
+  }
+
+  /** Host: bring a fallen character back, with hp hit points (default: full) */
+  static revivePlayer(pc: ModuleCreature, hp?: number) {
+    if (!pc) return;
+    const max = pc.getMaxHP() || 1;
+    this.setCreatureHP(pc, Math.max(1, Math.min(max, hp ?? max)), max);
+    delete (pc as any).gmDowned;
+    pc.clearAllActions();
+    pc.combatRound?.clearActions?.();
+    if (pc.combatData) pc.combatData.combatState = false;
+    if (GMNetworkManager.role === 'host' && (pc as any).gmNetId) {
+      GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(pc));
+    }
+    this.notifyChange();
+  }
+
+  static reviveAllPlayers() {
+    for (const pc of this.getPlayerCharacters()) {
+      if (pc.isDead()) this.revivePlayer(pc);
+    }
+  }
+
+  /** Where a respawned character appears: the scene's entry point */
+  static getRespawnPoint(): THREE.Vector3 | null {
+    const mod = GameState.module;
+    if (!mod?.area) return null;
+    const entry = new THREE.Vector3(mod.entryX, mod.entryY, mod.entryZ);
+    return mod.area.getNearestWalkablePoint ? mod.area.getNearestWalkablePoint(entry, 0.5).clone() : entry;
+  }
+
+  /** Host: back to the scene's entry, on half their vitality */
+  static respawnPlayer(pc: ModuleCreature) {
+    const point = this.getRespawnPoint();
+    if (!pc || !point) return;
+    this.revivePlayer(pc, Math.ceil((pc.getMaxHP() || 2) / 2));
+    this.teleportObject(pc, point);
+    GMNetworkManager.appendChat('System', `${pc.getName() || 'A player'} respawned at the entrance.`);
+  }
+
+  /** Host: a player asked to respawn; allowed under the respawn rule once they've waited */
+  static onRespawnRequest(peerId: string) {
+    if (this.deathRule !== 'respawn') return;
+    const pc = this.getPeerActor(peerId);
+    const state = (pc as any)?.gmDowned as { since: number } | undefined;
+    if (!pc || !pc.isDead() || !state) return;
+    if (Date.now() - state.since < this.RESPAWN_DELAY_SECONDS * 1000) return;
+    this.respawnPlayer(pc);
+  }
+
+  /**
+   * One step of the NPCs' behaviour. NPCs with a GM order follow it (GMNpcOrders); the rest, when ownJudgement
+   * is on (the GM's NPC AI switch), fight the nearest enemy.
+   */
+  // =========================================================================
+  // Ordering NPCs (GMNpcOrders)
+  // =========================================================================
+
+  /** An NPC the GM can order: a creature no player plays and the GM isn't playing */
+  static canOrder(obj: ModuleObject | null | undefined): obj is ModuleCreature {
+    return !!obj && BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature) &&
+      !this.isPlayerCharacter(obj) && !GameState.PartyManager.party.includes(obj as ModuleCreature) && !(obj as ModuleCreature).isDead();
+  }
+
+  /** Give an NPC an order, or undefined to hand it back to its own judgement */
+  static giveOrder(cre: ModuleCreature, order: GMNpcOrder | undefined) {
+    if (!this.canOrder(cre)) return;
+    GMNpcOrders.setOrder(cre, order);
+    this.notifyChange();
+  }
+
+  static pointOf(obj: { position: THREE.Vector3 }): GMPoint {
+    return { x: obj.position.x, y: obj.position.y, z: obj.position.z };
+  }
+
+  /** Start an order that needs a click in the world (where to go, whom to attack or follow, patrol points) */
+  static startOrderTool(tool: GMToolMode, cre: ModuleCreature) {
+    if (!this.isOrderTool(tool) || !this.canOrder(cre)) return;
+    this.setToolMode(tool);
+    this.orderSubject = cre;
+    this.patrolDraft = tool === 'order_patrol' ? [this.pointOf(cre)] : [];
+    this.notifyChange();
+  }
+
+  /** A click in the world with an order tool */
+  static handleOrderClick() {
+    const cre = this.orderSubject;
+    if (!cre || !this.canOrder(cre)) {
+      this.setToolMode('select');
+      return;
+    }
+    const tool = this.activeTool;
+    if (tool === 'order_move' || tool === 'order_patrol') {
+      if (!this.hasValidRaycastPoint) return;
+      const p = this.lastRaycastPoint;
+      if (tool === 'order_move') {
+        this.giveOrder(cre, { kind: 'move', point: { x: p.x, y: p.y, z: p.z } });
+        this.setToolMode('select');
+      } else {
+        this.patrolDraft.push({ x: p.x, y: p.y, z: p.z });
+        this.notifyChange();
+      }
+      return;
+    }
+    const picked = this.pickObjectAtCursor();
+    if (!picked || picked === cre || !BitWise.InstanceOf(picked.objectType, ModuleObjectType.ModuleCreature)) return;
+    const netId = (picked as any).gmNetId as string | undefined;
+    if (!netId) return;
+    this.giveOrder(cre, tool === 'order_attack' ? { kind: 'attack', targetNetId: netId } : { kind: 'follow', targetNetId: netId });
+    this.setToolMode('select');
+  }
+
+  /** Putting down the patrol tool: patrol the points clicked (with where it started), if any were */
+  static finishPatrolOrder() {
+    const cre = this.orderSubject;
+    const points = this.patrolDraft;
+    this.patrolDraft = [];
+    if (cre && points.length >= 2) this.giveOrder(cre, { kind: 'patrol', points, index: 1 });
+  }
+
+  static updateNpcCombat(ownJudgement: boolean = true) {
+    const area = GameState.module?.area;
+    if (!area || !GameState.module.readyToProcessEvents) return;
+
+    const everyone: ModuleCreature[] = [...area.creatures, ...GameState.PartyManager.party];
+    for (const cre of area.creatures) {
+      if (!this.isAutonomousNpc(cre)) continue;
+      if (GMNpcOrders.getOrder(cre)) {
+        GMNpcOrders.think(cre, everyone);
+        continue;
+      }
+      if (!ownJudgement) continue;
+      // Already swinging, or with attacks queued: let the combat round play out
+      if (cre.combatRound.action || cre.combatRound.scheduledActionList.length) continue;
+
+      const target = this.chooseNpcTarget(cre, everyone);
+      if (target) cre.attackCreature(target, undefined);
+    }
+  }
+
+  /** NPCs the GM isn't controlling and no player owns */
+  static isAutonomousNpc(cre: ModuleCreature): boolean {
+    if (!cre || !cre.isReady || cre.isDead() || cre.destroyed) return false;
+    if (GameState.PartyManager.party.includes(cre)) return false;
+    if ((cre as any).gmOwnerPeerId || (cre as any).gmPlayerConfig || (cre as any).gmHostDriven) return false;
+    return true;
+  }
+
+  static chooseNpcTarget(cre: ModuleCreature, everyone: ModuleCreature[]): ModuleCreature | null {
+    const usable = (c: ModuleObject | undefined, range: number): c is ModuleCreature =>
+      !!c && c !== cre && BitWise.InstanceOf(c.objectType, ModuleObjectType.ModuleCreature) &&
+      !c.isDead() && everyone.includes(c as ModuleCreature) &&
+      cre.position.distanceTo(c.position) <= range && cre.isHostile(c);
+
+    const sight = cre.perceptionRange ? Math.max(cre.getPerceptionRangePrimary(), 1) : this.NPC_AI_SIGHT_RANGE;
+    const current = cre.combatData.lastAttackTarget;
+    if (usable(current, this.NPC_AI_RETALIATE_RANGE)) return current;
+    const attacker = cre.combatData.lastAttacker;
+    if (usable(attacker, this.NPC_AI_RETALIATE_RANGE)) return attacker;
+
+    let nearest: ModuleCreature | null = null;
+    let nearestDistance = Infinity;
+    for (const other of everyone) {
+      if (!usable(other, sight)) continue;
+      const d = cre.position.distanceTo(other.position);
+      if (d < nearestDistance && cre.hasLineOfSight(other, sight)) {
+        nearest = other;
+        nearestDistance = d;
+      }
+    }
+    return nearest;
+  }
+
+  /**
    * Frame Update (updates 3D selection ring & multiplayer network sync)
    */
   static update(delta: number) {
@@ -3611,6 +4344,26 @@ export class GMManager {
         }
       } else {
         this.selectionRing.visible = false;
+      }
+    }
+
+    if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
+
+    // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
+    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+      this.downedTimer += delta;
+      if (this.downedTimer >= this.DOWNED_CHECK_INTERVAL) {
+        this.updateDownedPlayers(this.downedTimer);
+        this.downedTimer = 0;
+      }
+    }
+
+    // NPCs run on the GM's machine only; players see the result through the world updates
+    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+      this.npcAiTimer += delta;
+      if (this.npcAiTimer >= this.NPC_AI_INTERVAL) {
+        this.npcAiTimer = 0;
+        this.updateNpcCombat(this.npcAiEnabled);
       }
     }
 
@@ -3653,7 +4406,7 @@ export class GMManager {
       netId,
       kind,
       ownerPeerId: (obj as any).gmOwnerPeerId,
-      templateResRef: obj.getTemplateResRef() || '',
+      templateResRef: (obj as any).gmSpawnConfig?.templateResRef || obj.getTemplateResRef() || '',
       appearanceId: obj.appearance || 0,
       name: obj.getName() || (obj as ModuleCreature).firstName || 'Actor',
       tag: obj.getTag() || '',
@@ -3666,6 +4419,7 @@ export class GMManager {
       facing: isPlaceable ? (obj.bearing || 0) : (obj as ModuleCreature).getFacing(),
       scale: (obj as any).gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
+      hidden: !!(obj as any).gmHidden,
       hostDriven: !!(obj as any).gmHostDriven,
       intentSeq: (obj as any).gmIntentSeq || 0,
       rightHandResRef,
@@ -3682,19 +4436,24 @@ export class GMManager {
   }
 
   static serializeActorsForTick(): GMSerializedActor[] {
+    return this.serializeAllActors().filter((actor) => !actor.hidden);
+  }
+
+  static serializeAllActors(): GMSerializedActor[] {
     const area = GameState.module?.area;
     if (!area || this.sceneLoading || !GameState.module.readyToProcessEvents) return [];
     const list: GMSerializedActor[] = [];
     for (const p of GameState.PartyManager.party) {
       if (p) list.push(this.serializeSingleActor(p));
     }
+    // Objects still loading are sent once, complete, when their spawn finishes
     for (const c of area.creatures) {
-      if (c && !GameState.PartyManager.party.includes(c)) {
+      if (c && !GameState.PartyManager.party.includes(c) && !(c as any).gmSpawning) {
         list.push(this.serializeSingleActor(c));
       }
     }
     for (const plc of area.placeables) {
-      if (plc && (plc as any).gmNetId && !String((plc as any).gmNetId).startsWith('plc_area_')) {
+      if (plc && (plc as any).gmNetId && !(plc as any).gmSpawning && !String((plc as any).gmNetId).startsWith('plc_area_')) {
         list.push(this.serializeSingleActor(plc));
       }
     }
@@ -3717,6 +4476,7 @@ export class GMManager {
       keepDefaultCreatures: this.keepDefaultCreatures,
       keepDefaultTriggers: this.keepDefaultTriggers,
       keepDefaultPlaceables: this.keepDefaultPlaceables,
+      rules: { deathRule: this.deathRule },
       actors: this.serializeActorsForTick(),
       doors
     };
@@ -3761,6 +4521,9 @@ export class GMManager {
   }
 
   static async syncSnapshotEntitiesOnClient(snapshot: GMWorldSnapshot) {
+    if (snapshot.rules?.deathRule) {
+      GMNetworkManager.sessionRules = { ...GMNetworkManager.sessionRules, ...snapshot.rules };
+    }
     if (Array.isArray(snapshot.doors)) {
       for (const ds of snapshot.doors) {
         this.applyDoorStateOnClient(ds);
@@ -3807,7 +4570,7 @@ export class GMManager {
   }
 
   static async spawnOrUpdateFromSerialized(actor: GMSerializedActor): Promise<ModuleObject | null> {
-    if (!actor || !GameState.module?.area) return null;
+    if (!actor || actor.hidden || !GameState.module?.area) return null;
     const existing = this.netIdMap.get(actor.netId);
     if (existing) {
       if (actor.kind === 'placeable') {
@@ -3876,6 +4639,8 @@ export class GMManager {
           name: actor.name,
           templateResRef: actor.templateResRef,
           appearanceId: actor.appearanceId,
+          // Mirror what the host built (its model, name and lock), not the template's defaults
+          customized: true,
           scale: actor.scale || 1.0,
           useable: true,
           hasInventory: !!actor.hasInventory,
@@ -3912,6 +4677,8 @@ export class GMManager {
           name: actor.name,
           templateResRef: actor.templateResRef,
           appearanceId: actor.appearanceId,
+          // Mirror what the host built (look, HP, gear), on top of the template's other slots
+          customized: true,
           factionId: actor.factionId,
           hp: actor.maxHp || 50,
           level: 4,
@@ -3996,6 +4763,8 @@ export class GMManager {
     if (!payload) return;
     const actor = this.getOwnedActor(peerId, payload.netId);
     if (!actor || (actor as any).gmHostDriven) return;
+    // Sent before the player's game had moved their character to where the GM teleported it
+    if ((payload.teleportSeq ?? 0) < ((actor as any).gmTeleportSeq || 0)) return;
     if (typeof payload.x === 'number' && typeof payload.y === 'number') {
       this.setNetTarget(actor, payload.x, payload.y, payload.z);
       if (typeof payload.facing === 'number') {
@@ -4010,7 +4779,7 @@ export class GMManager {
 
   /** Host only, and only for objects clients know about */
   static getHostFxNetId(obj: ModuleObject | undefined): string | null {
-    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !obj) return null;
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !obj || (obj as any).gmHidden) return null;
     return (obj as any).gmNetId || null;
   }
 
@@ -4031,6 +4800,14 @@ export class GMManager {
     const netId = this.getHostFxNetId(obj);
     if (!netId) return;
     GMNetworkManager.broadcastFx({ kind: 'text', netId, text, style, timer });
+  }
+
+  /** Host: a ranged attack fired a bolt; players draw it too */
+  static onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number) {
+    const netId = this.getHostFxNetId(caster);
+    const targetNetId = this.getHostFxNetId(target);
+    if (!netId || !targetNetId) return;
+    GMNetworkManager.broadcastFx({ kind: 'projectile', netId, targetNetId, ammunition, hit, delay });
   }
 
   static onHostVisualEffectApplied(effect: GameEffect) {
@@ -4091,6 +4868,11 @@ export class GMManager {
       case 'vfx.remove': {
         const effect = obj.effects.find((e) => (e as any).gmFxId === event.fxId);
         if (effect) obj.removeEffect(effect);
+        break;
+      }
+      case 'projectile': {
+        const target = this.netIdMap.get(event.targetNetId);
+        if (target) GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay);
         break;
       }
     }
@@ -4186,6 +4968,363 @@ export class GMManager {
     if (items.length) {
       GMNetworkManager.appendChat('System', `Received ${items.length} item${items.length === 1 ? '' : 's'}.`);
     }
+  }
+
+  // =========================================================================
+  // DM tools: questions, rewards, hiding, encounters
+  // =========================================================================
+
+  /** Host: the character a connected player controls */
+  static getPeerActor(peerId: string): ModuleCreature | null {
+    const netId = GMNetworkManager.peers.get(peerId)?.controlledNetId;
+    const actor = netId ? this.netIdMap.get(netId) : null;
+    return actor && BitWise.InstanceOf(actor.objectType, ModuleObjectType.ModuleCreature) ? actor as ModuleCreature : null;
+  }
+
+  /**
+   * Host: ask players a question, as an NPC (speaker) or as the GM, with replies for them to pick.
+   * Goes to every player, or only targetPeerId. Returns the prompt id.
+   */
+  static askPlayers(speaker: ModuleObject | null, text: string, options: string[], targetPeerId?: string): string | null {
+    if (GMNetworkManager.role !== 'host') return null;
+    const replies = (options || []).map((o) => String(o).trim()).filter(Boolean).slice(0, 6);
+    if (!String(text || '').trim() || !replies.length) return null;
+    const prompt: GMDmPrompt = {
+      promptId: this.getNextNetId('ask'),
+      speaker: speaker?.getName() || 'GM',
+      text: text.trim(),
+      options: replies,
+    };
+    this.dmPrompts.set(prompt.promptId, { prompt, targetPeerId, replies: [] });
+    GMNetworkManager.sendDmPrompt(prompt, targetPeerId);
+    const to = targetPeerId ? GMNetworkManager.peers.get(targetPeerId)?.name || 'a player' : 'everyone';
+    GMNetworkManager.appendChat(prompt.speaker, `${prompt.text} (asked ${to}: ${replies.join(' / ')})`);
+    this.notifyChange();
+    return prompt.promptId;
+  }
+
+  /** Host: a player answered one of our questions */
+  static onDmReply(peerId: string, reply: { promptId: string; choice: number }) {
+    const record = this.dmPrompts.get(reply?.promptId);
+    if (!record || !record.prompt.options[reply.choice]) return;
+    if (record.targetPeerId && record.targetPeerId !== peerId) return;
+    if (record.replies.some((r) => r.peerId === peerId)) return;
+    const name = GMNetworkManager.peers.get(peerId)?.name || 'A player';
+    record.replies.push({ peerId, name, choice: reply.choice });
+    GMNetworkManager.appendChat('Reply', `${name} answered "${record.prompt.options[reply.choice]}"`);
+    this.notifyChange();
+  }
+
+  /** Host: award XP to one connected player; it reaches them with their next character sheet */
+  static giveXP(peerId: string, amount: number): boolean {
+    const actor = this.getPeerActor(peerId);
+    const xp = Math.round(Number(amount));
+    if (!actor || !(xp > 0)) return false;
+    actor.experience = (actor.experience || 0) + xp;
+    GMNetworkManager.sendChatTo(peerId, 'GM', `You gained ${xp} XP.`);
+    this.notifyChange();
+    return true;
+  }
+
+  /** Host: put an item straight into one connected player's inventory */
+  static giveItem(peerId: string, resRef: string, stack: number = 1): boolean {
+    const actor = this.getPeerActor(peerId);
+    const ref = String(resRef || '').trim().toLowerCase();
+    const count = Math.max(1, Math.round(Number(stack) || 1));
+    if (!actor || !ref) return false;
+    this.addToPlayerInventory(actor, [{ resRef: ref, stack: count }]);
+    GMNetworkManager.sendChatTo(peerId, 'GM', `You received ${ref}${count > 1 ? ` x${count}` : ''}.`);
+    this.notifyChange();
+    return true;
+  }
+
+  /**
+   * Hide an object from players (it stays visible to the GM), or reveal it. Hidden objects are removed
+   * from players' games and never synced, which also gives the GM an invisible character to play.
+   */
+  static setObjectHidden(obj: ModuleObject, hidden: boolean): boolean {
+    // A connected player's character can't be hidden: it would vanish from their own game
+    if (!obj || (obj as any).gmOwnerPeerId) return false;
+    (obj as any).gmHidden = !!hidden;
+    const netId = (obj as any).gmNetId;
+    if (netId && GMNetworkManager.role === 'host') {
+      if (hidden) {
+        GMNetworkManager.broadcastActorRemove(netId);
+      } else {
+        GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(obj));
+      }
+    }
+    this.notifyChange();
+    return true;
+  }
+
+  static isHiddenFromPlayers(obj: ModuleObject | null | undefined): boolean {
+    return !!(obj as any)?.gmHidden;
+  }
+
+  /**
+   * Spawn a group of one creature preset in a ring around a point (the camera target by default)
+   */
+  static async spawnEncounter(options: { presetIndex: number; count: number; spread?: number; factionId?: number; center?: THREE.Vector3 }): Promise<string[]> {
+    const preset = this.CREATURE_PRESETS[options.presetIndex] || this.CREATURE_PRESETS[0];
+    const count = Math.min(12, Math.max(1, Math.round(options.count || 1)));
+    const spread = Math.max(0.5, options.spread ?? 2.5);
+    const center = options.center || this.getCameraTargetSpawnPoint().position;
+    const netIds: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const radius = count === 1 ? 0 : spread;
+      const x = center.x + Math.cos(angle) * radius;
+      const y = center.y + Math.sin(angle) * radius;
+      const pos = new THREE.Vector3(x, y, this.getGroundZAt(x, y, center.z));
+      const facing = Math.atan2(center.x - x, center.y - y);
+      const cre = await this.spawnCreature(
+        { ...preset, name: count > 1 ? `${preset.name} ${i + 1}` : preset.name, factionId: options.factionId ?? preset.factionId },
+        pos,
+        facing
+      );
+      if (cre) netIds.push((cre as any).gmNetId);
+    }
+    this.notifyChange();
+    return netIds;
+  }
+
+  // =========================================================================
+  // Session save & load
+  // =========================================================================
+
+  /** Snapshot the running session: scene, GM-placed objects, doors and every player character */
+  static buildSessionSave(name: string): GMSessionSave | null {
+    const mod = GameState.module;
+    const area = mod?.area;
+    if (!mod || !area) return null;
+    const objects: GMSavedObject[] = [];
+    const players: GMSavedPlayer[] = [];
+    const seen = new Set<ModuleObject>();
+
+    for (const obj of [...area.creatures, ...GameState.PartyManager.party, ...this.spawnedPlayers]) {
+      if (!obj || seen.has(obj) || obj.destroyed) continue;
+      seen.add(obj);
+      const cre = obj as ModuleCreature;
+      const playerConfig: GMPlayerSpawnConfig | undefined = (cre as any).gmPlayerConfig;
+      if (playerConfig) {
+        players.push({
+          name: playerConfig.name || cre.getName() || 'Player',
+          local: !(cre as any).gmOwnerPeerId,
+          config: { ...playerConfig, ownerPeerId: undefined, possessImmediately: false },
+          sheet: this.buildPlayerSheet(cre),
+          x: cre.position.x, y: cre.position.y, z: cre.position.z,
+          facing: cre.getFacing(),
+          hidden: !!(cre as any).gmHidden,
+        });
+        continue;
+      }
+      const config: GMCreatureSpawnConfig | undefined = (cre as any).gmSpawnConfig;
+      if (!config) continue; // part of the module itself; reloaded with the scene
+      objects.push({
+        kind: 'creature',
+        config: { ...config, lootResRefs: undefined },
+        x: cre.position.x, y: cre.position.y, z: cre.position.z,
+        facing: cre.getFacing(),
+        factionId: cre.factionId,
+        hp: cre.getHP(),
+        maxHp: cre.getMaxHP(),
+        hidden: !!(cre as any).gmHidden,
+        loot: this.toLootItems(cre.inventory).map((e) => e.resRef),
+        barkText: (cre as any).gmBarkText || '',
+      });
+    }
+
+    for (const plc of area.placeables) {
+      const config: GMPlaceableSpawnConfig | undefined = (plc as any)?.gmSpawnConfig;
+      if (!plc || !config || plc.destroyed) continue;
+      objects.push({
+        kind: 'placeable',
+        config: { ...config, lootResRefs: [] },
+        x: plc.position.x, y: plc.position.y, z: plc.position.z,
+        facing: plc.bearing || 0,
+        locked: plc.isLocked(),
+        hidden: !!(plc as any).gmHidden,
+        loot: this.toLootItems(plc.inventory).map((e) => e.resRef),
+        barkText: (plc as any).gmBarkText || '',
+      });
+    }
+
+    const doors = area.doors
+      .filter((d) => (d as any).gmNetId)
+      .map((d) => ({ netId: (d as any).gmNetId, openState: d.openState, locked: !!d.isLocked() }));
+
+    return {
+      version: 1,
+      id: `session_${Date.now()}`,
+      name: String(name || '').trim() || `${mod.filename} session`,
+      savedAt: Date.now(),
+      scene: {
+        module: String(mod.filename).toLowerCase(),
+        keepCreatures: this.keepDefaultCreatures,
+        keepTriggers: this.keepDefaultTriggers,
+        keepPlaceables: this.keepDefaultPlaceables,
+      },
+      objects,
+      doors,
+      players,
+      rules: { deathRule: this.deathRule },
+    };
+  }
+
+  static getSavedSessions(): GMSessionSave[] {
+    try {
+      const raw = localStorage.getItem(this.SESSIONS_STORAGE_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list.filter((s) => s && s.version === 1 && s.scene?.module) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  static writeSavedSessions(list: GMSessionSave[]) {
+    try {
+      localStorage.setItem(this.SESSIONS_STORAGE_KEY, JSON.stringify(list.slice(0, this.MAX_SAVED_SESSIONS)));
+    } catch (e) {
+      console.warn('[GMManager] Could not store GM sessions', e);
+    }
+    this.notifyChange();
+  }
+
+  /** Save the running session to this browser's GM session list */
+  static saveSession(name: string): GMSessionSave | null {
+    const save = this.buildSessionSave(name);
+    if (!save) return null;
+    this.writeSavedSessions([save, ...this.getSavedSessions()]);
+    GMNetworkManager.appendChat('System', `Saved session "${save.name}".`);
+    return save;
+  }
+
+  static deleteSavedSession(id: string) {
+    this.writeSavedSessions(this.getSavedSessions().filter((s) => s.id !== id));
+  }
+
+  /** Add a session exported as JSON to the saved list; returns it, or null when it isn't a GM session */
+  static importSessionJSON(json: string): GMSessionSave | null {
+    try {
+      const save = JSON.parse(json) as GMSessionSave;
+      if (!save || save.version !== 1 || !save.scene?.module || !Array.isArray(save.objects) || !Array.isArray(save.players)) return null;
+      const imported = { ...save, id: `session_${Date.now()}` };
+      this.writeSavedSessions([imported, ...this.getSavedSessions()]);
+      return imported;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Resolves once the given scene has finished loading, or false after timeoutMs */
+  static waitForScene(moduleResRef: string, timeoutMs: number = 120000): Promise<boolean> {
+    const want = moduleResRef.toLowerCase();
+    const start = Date.now();
+    return new Promise((resolve) => {
+      const check = setInterval(() => {
+        const ready = !this.sceneLoading &&
+          String(GameState.module?.filename || '').toLowerCase() === want &&
+          GameState.module?.readyToProcessEvents && !GameState.loadingTextures;
+        if (ready || Date.now() - start > timeoutMs) {
+          clearInterval(check);
+          resolve(!!ready);
+        }
+      }, 250);
+    });
+  }
+
+  /** Spawn a saved player character; owned by peerId when a connected player takes it */
+  static async spawnSavedPlayer(saved: GMSavedPlayer, ownerPeerId?: string): Promise<ModulePlayer | null> {
+    const pc = await this.spawnPlayerCharacter(
+      { ...saved.config, name: saved.name, ownerPeerId, possessImmediately: false },
+      new THREE.Vector3(saved.x, saved.y, saved.z),
+      saved.facing
+    );
+    if (!pc) return null;
+    await this.applySheetToCharacter(pc, saved.sheet);
+    if (ownerPeerId) (pc as any).gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
+    if (saved.hidden) this.setObjectHidden(pc, true);
+    return pc;
+  }
+
+  /**
+   * Load a saved session: its scene, placed objects, doors and characters. Connected players are given
+   * their saved character by name now; the rest get theirs when they (re)join under the same name.
+   */
+  static async loadSession(save: GMSessionSave): Promise<boolean> {
+    if (!save?.scene?.module) return false;
+    if (save.rules?.deathRule) this.setDeathRule(save.rules.deathRule);
+    const networkPlayers = save.players.filter((p) => !p.local);
+    this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
+
+    await this.loadScene(save.scene.module, {
+      keepCreatures: save.scene.keepCreatures,
+      keepTriggers: save.scene.keepTriggers,
+      keepPlaceables: save.scene.keepPlaceables,
+      preserveParty: false,
+    });
+    if (!await this.waitForScene(save.scene.module)) return false;
+
+    // Connected players' characters are carried into the new scene; wait for them before restoring
+    const connected = [...GMNetworkManager.peers.values()];
+    const deadline = Date.now() + 15000;
+    while (Date.now() < deadline && connected.some((p) => p.controlledNetId && !this.netIdMap.has(p.controlledNetId))) {
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    for (const door of save.doors || []) {
+      const obj = this.netIdMap.get(door.netId) as ModuleDoor;
+      if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleDoor)) continue;
+      obj.setLocked(door.locked);
+      const shouldBeOpen = door.openState === ModuleDoorOpenState.OPEN1 || door.openState === ModuleDoorOpenState.OPEN2;
+      if (shouldBeOpen && !obj.isOpen()) obj.openDoor(obj);
+      else if (!shouldBeOpen && obj.isOpen()) obj.closeDoor(obj);
+    }
+
+    for (const saved of save.objects || []) {
+      const pos = new THREE.Vector3(saved.x, saved.y, saved.z);
+      let obj: ModuleObject | null = null;
+      if (saved.kind === 'creature') {
+        const cfg = saved.config as GMCreatureSpawnConfig;
+        const cre = await this.spawnCreature(
+          { ...cfg, factionId: saved.factionId ?? cfg.factionId, hp: saved.maxHp ?? cfg.hp, barkText: saved.barkText, lootResRefs: saved.loot },
+          pos,
+          saved.facing
+        );
+        if (cre && typeof saved.hp === 'number') this.setCreatureHP(cre, saved.hp, saved.maxHp);
+        obj = cre;
+      } else {
+        const cfg = saved.config as GMPlaceableSpawnConfig;
+        obj = await this.spawnPlaceable(
+          { ...cfg, locked: !!saved.locked, barkText: saved.barkText, lootResRefs: saved.loot, hasInventory: cfg.hasInventory || saved.loot.length > 0 },
+          pos,
+          saved.facing
+        );
+      }
+      if (obj && saved.hidden) this.setObjectHidden(obj, true);
+    }
+
+    for (const saved of save.players.filter((p) => p.local)) {
+      await this.spawnSavedPlayer(saved);
+    }
+
+    // Players already here take over their saved character now
+    for (const peer of connected) {
+      const reserved = this.reservedPlayers.get(String(peer.name || '').trim().toLowerCase());
+      const actor = this.getPeerActor(peer.peerId);
+      if (!reserved || !actor) continue;
+      this.reservedPlayers.delete(reserved.name.trim().toLowerCase());
+      await this.applySheetToCharacter(actor, reserved.sheet);
+      (actor as any).gmInventory = reserved.sheet.inventory.map((e) => ({ ...e }));
+      this.teleportObject(actor, new THREE.Vector3(reserved.x, reserved.y, reserved.z));
+      actor.setFacing(reserved.facing, true);
+      if (reserved.hidden) this.setObjectHidden(actor, true);
+    }
+
+    GMNetworkManager.appendChat('System', `Loaded session "${save.name}".${this.reservedPlayers.size ? ` Waiting for: ${[...this.reservedPlayers.values()].map((p) => p.name).join(', ')}.` : ''}`);
+    this.notifyChange();
+    return true;
   }
 
   // =========================================================================
@@ -4322,23 +5461,7 @@ export class GMManager {
     this.pendingPlayerSheet = null;
     this.applyingHostSheet = true;
     try {
-      Object.assign(cre, sheet.attributes);
-      cre.classes = sheet.classes.map((c) => {
-        const cls = new CreatureClass(c.id);
-        cls.setLevel(c.level);
-        for (const spellId of c.spells) cls.addSpell(new TalentSpell(spellId));
-        return cls;
-      });
-      const featRows = GameState.TwoDAManager.datatables.get('feat')?.rows || {};
-      cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
-      sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
-      cre.experience = sheet.xp;
-      cre.forcePoints = sheet.forcePoints;
-      cre.maxForcePoints = sheet.maxForcePoints;
-      cre.currentForce = sheet.currentForce;
-      this.setCreatureHP(cre, sheet.hp, sheet.maxHp);
-
-      await this.syncEquipmentTo(cre, sheet.equipment);
+      await this.applySheetToCharacter(cre, sheet);
 
       const inventoryJson = JSON.stringify(sheet.inventory);
       if (inventoryJson !== this.lastAppliedInventoryJson) {
@@ -4350,6 +5473,26 @@ export class GMManager {
       this.applyingHostSheet = false;
     }
     this.notifyChange();
+  }
+
+  /** Make a character's stats, classes, feats, skills, XP, HP/FP and equipment match a sheet */
+  static async applySheetToCharacter(cre: ModuleCreature, sheet: GMPlayerSheet) {
+    Object.assign(cre, sheet.attributes);
+    cre.classes = sheet.classes.map((c) => {
+      const cls = new CreatureClass(c.id);
+      cls.setLevel(c.level);
+      for (const spellId of c.spells) cls.addSpell(new TalentSpell(spellId));
+      return cls;
+    });
+    const featRows = GameState.TwoDAManager.datatables.get('feat')?.rows || {};
+    cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
+    sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
+    cre.experience = sheet.xp;
+    cre.forcePoints = sheet.forcePoints;
+    cre.maxForcePoints = sheet.maxForcePoints;
+    cre.currentForce = sheet.currentForce;
+    this.setCreatureHP(cre, sheet.hp, sheet.maxHp);
+    await this.syncEquipmentTo(cre, sheet.equipment);
   }
 
   /** Make a character's equipped items match a slot name -> resref map */
@@ -4562,11 +5705,20 @@ export class GMManager {
         return true;
       }
     }
-    // Friendly creatures (barks/greetings) stay local and cosmetic for now
+    // Anyone else: walk over and talk; the GM speaks for them
+    if (GameState.GMConversationManager?.requestTalk(target)) return true;
     return false;
   }
 
   static async spawnPlayerFromNetworkPreset(peerId: string, playerName: string, preset: GMPlayerJoinPreset): Promise<string | null> {
+    // A player rejoining a loaded session gets the character saved under their name
+    const reserved = this.reservedPlayers.get(String(playerName || '').trim().toLowerCase());
+    if (reserved) {
+      this.reservedPlayers.delete(reserved.name.trim().toLowerCase());
+      const pc = await this.spawnSavedPlayer(reserved, peerId);
+      if (pc) GMNetworkManager.appendChat('System', `${reserved.name} picked up their saved character.`);
+      return pc ? ((pc as any).gmNetId || null) : null;
+    }
     const basePreset = this.PLAYER_PRESETS.find(p => p.classId === preset?.classId) || this.PLAYER_PRESETS[0];
     const spawned = await this.spawnPlayerCharacter(
       {

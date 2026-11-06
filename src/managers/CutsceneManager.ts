@@ -315,6 +315,15 @@ export class CutsceneManager {
       this.endConversation();
       return;
     }
+    // A live conversation's next entry comes from whoever is writing it: hand over the reply and wait
+    if (this.dialog?.live) {
+      this.state = ConversationState.LISTENING_TO_SPEAKER;
+      this.currentEntry = undefined;
+      this.lastSpokenString = '...';
+      GameState.MenuManager.InGameDialog.setDialogMode(ConversationState.LISTENING_TO_SPEAKER);
+      this.dialog.live.onReply(reply, this.dialog.replyList.indexOf(reply));
+      return;
+    }
     if(this.dialog.getConversationType() == DLGConversationType.COMPUTER){
       GameState.MenuManager.InGameComputer.setDialogMode(ConversationState.LISTENING_TO_SPEAKER);
     }else{
@@ -414,6 +423,8 @@ export class CutsceneManager {
    */
   static endConversation(aborted = false) {
     const wasBark = this.cutsceneMode == CutsceneMode.BARK;
+    const live = this.dialog?.live;
+    if (live && this.dialog) this.dialog.live = undefined;
     this.active = false;
     if (this.paused) {
       this.ended = true;
@@ -459,6 +470,7 @@ export class CutsceneManager {
     if(wasBark){
       GameState.RestoreEnginePlayMode();
     }
+    live?.onEnd(aborted);
   }
 
   /**

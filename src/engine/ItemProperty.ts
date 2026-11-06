@@ -113,9 +113,14 @@ export class ItemProperty {
 
   //Determine if the property requires an upgrade to use, or if it is always useable
   isUseable(){
-    const upgrade_flag = (1 << this.upgradeType);
-    //If no upgrade is required or the upgrade is present on the item
-    if(this.upgradeType == -1 || ((this.item.upgrades & upgrade_flag) == upgrade_flag)){
+    // No upgrade required: -1 here, 255 in the GFF, or no UpgradeType field at all
+    const upgradeType = Number(this.upgradeType);
+    if(!Number.isFinite(upgradeType) || upgradeType < 0 || upgradeType >= 255){
+      return true;
+    }
+    const upgrade_flag = (1 << upgradeType);
+    //If the upgrade is present on the item
+    if(((this.item.upgrades & upgrade_flag) == upgrade_flag)){
       return true;
     }
     return false;

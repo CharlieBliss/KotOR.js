@@ -434,6 +434,20 @@ export class CombatRound {
           }
         }
       }else if(creature && creature.isSimpleCreature()){
+        /**
+         * Simple-model creatures that hold a weapon and have no claws (war and assassin droids, Gamorreans)
+         * fight with what they hold
+         */
+        const hasClaws = !!(creature.equipment.CLAW1 || creature.equipment.CLAW2 || creature.equipment.CLAW3);
+        if(!hasClaws){
+          if(creature.equipment.RIGHTHAND){
+            this.calculateWeaponAttack(creature, creature.equipment.RIGHTHAND, ModuleCreatureArmorSlot.RIGHTHAND, combatAction);
+          }
+          if(creature.equipment.LEFTHAND){
+            this.calculateWeaponAttack(creature, creature.equipment.LEFTHAND, ModuleCreatureArmorSlot.LEFTHAND, combatAction);
+          }
+        }
+
         if(creature.equipment.CLAW1){
           this.calculateWeaponAttack(creature, creature.equipment.CLAW1, ModuleCreatureArmorSlot.CLAW1, combatAction);
         }
@@ -484,11 +498,17 @@ export class CombatRound {
         if(!attack)
           continue;
 
-        if(
+        const landed =
           attack.attackResult == AttackResult.HIT_SUCCESSFUL ||
           attack.attackResult == AttackResult.CRITICAL_HIT ||
-          attack.attackResult == AttackResult.AUTOMATIC_HIT
-        ){
+          attack.attackResult == AttackResult.AUTOMATIC_HIT;
+
+        // Ranged weapons show their shot: a blaster bolt that reaches the target, or flies past on a miss
+        if(targetCreature){
+          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || attack.attackResult == AttackResult.DEFLECTED, attackDamageDelay);
+        }
+
+        if(landed){
           attack.applyDamageEffectToCreature(creature, targetCreature);
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, attack.getTotalDamage().toString(), TextSprite3DType.HOSTILE, 1500);

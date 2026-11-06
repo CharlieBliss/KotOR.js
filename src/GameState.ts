@@ -3,7 +3,8 @@ import {
   AppearanceManager, AutoPauseManager, TLKManager, CharGenManager, CheatConsoleManager, CameraShakeManager, ConfigManager, CursorManager, DialogMessageManager,
   FadeOverlayManager, FeedbackMessageManager, GlobalVariableManager, InventoryManager, JournalManager, LightManager, WindManager, MenuManager, ModuleObjectManager, PartyManager,
   ResolutionManager, ShaderManager, TwoDAManager, FactionManager,
-  VideoEffectManager, VideoManager, PazaakManager, UINotificationManager, CutsceneManager, LegalScreenManager, EventManager, GMManager, GMNetworkManager
+  VideoEffectManager, VideoManager, PazaakManager, UINotificationManager, CutsceneManager, LegalScreenManager, EventManager, GMManager, GMNetworkManager,
+  ProjectileManager, GMConversationManager
 } from "@/managers";
 
 import type { SWRuleSet } from "@/engine/rules/SWRuleSet";
@@ -120,6 +121,8 @@ export class GameState implements EngineContext {
   static LegalScreenManager: typeof LegalScreenManager;
   static GMManager: typeof GMManager = GMManager;
   static GMNetworkManager: typeof GMNetworkManager = GMNetworkManager;
+  static ProjectileManager: typeof ProjectileManager = ProjectileManager;
+  static GMConversationManager: typeof GMConversationManager = GMConversationManager;
   static lastGameplayThumb?: OffscreenCanvas;
   static lastGameplayThumbCtx?: OffscreenCanvasRenderingContext2D;
   static lastGameplayThumbRT?: THREE.WebGLRenderTarget;
@@ -985,6 +988,22 @@ export class GameState implements EngineContext {
    * @param sMovie5 - The fifth movie to play
    * @param sMovie6 - The sixth movie to play
    */
+  /**
+   * Leave the current game for the main menu (as Options > Quit does), dropping any GM session connection
+   */
+  static ReturnToMainMenu(){
+    if(GameState.GMNetworkManager?.role !== 'offline') GameState.GMNetworkManager.disconnect();
+    if(GameState.module){
+      GameState.UnloadModule();
+      GameState.State = EngineState.RUNNING;
+      GameState.module.dispose();
+      GameState.module = undefined;
+      GameState.NWScript?.Reload();
+      GameState.controls?.initKeys();
+    }
+    GameState.MenuManager.MainMenu.Start();
+  }
+
   static EnterGMMode(moduleName = 'danm14aa'){
     GameState.gmMode = true;
     GameState.isLoadingSave = false;
@@ -1313,7 +1332,10 @@ export class GameState implements EngineContext {
   static RestoreEnginePlayMode(): void {
     if(GameState.module){
       if(GameState.gmMode){
-        GameState.SetEngineMode(EngineMode.FREELOOK);
+        // Closing a menu while playing a character (a possessing GM, or any player) goes back to playing it;
+        // only the GM's free camera is free look
+        const playing = GameState.GMManager?.controlMode === 'POSSESS' || !GameState.GMManager?.isGMUser();
+        GameState.SetEngineMode(playing ? EngineMode.INGAME : EngineMode.FREELOOK);
       }else if(GameState.module.area.miniGame){
         console.log('RestoreEnginePlayMode: MINIGAME');
         GameState.SetEngineMode(EngineMode.MINIGAME)
@@ -1362,6 +1384,7 @@ export class GameState implements EngineContext {
   }
 
   static UnloadModule(){
+    GameState.ProjectileManager.Clear();
     if(GameState.module){
       EventManager.FireEvent('module.unload', {
         name: GameState.module.name
@@ -1448,6 +1471,7 @@ export class GameState implements EngineContext {
 
     GameState.MenuManager.Update(delta);
     GameState.GMManager.update(delta);
+    if(GameState.State != EngineState.PAUSED && !GameState.GMManager?.worldPaused) GameState.ProjectileManager.Update(delta);
     if(GameState.MenuManager.InGameAreaTransition)
       GameState.MenuManager.InGameAreaTransition.hide();
 

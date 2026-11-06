@@ -213,6 +213,11 @@ export class SpellCastInstance {
       }
     }
     
+    // An item's spell: the item pays for the use now that it has gone off (a stack or charges)
+    if(this.item && this.spell && typeof (this.item as any).spendUse === 'function'){
+      (this.item as any).spendUse(this.spell.id, this.owner);
+    }
+
     if(this.impactscript != ''){
       console.log('Casting spell', this.impactscript, this);
       const instance = GameState.NWScript.Load(this.impactscript);

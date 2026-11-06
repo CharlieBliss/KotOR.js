@@ -29,6 +29,19 @@ export class GMEventEmitter {
 
 export type GMNetworkRole = 'offline' | 'host' | 'client';
 
+/**
+ * Where a player is in joining a GM's game, for the join screen
+ * - connecting: opening the connection to the address they gave
+ * - waiting-for-host: connected, but no GM is hosting there yet (the join goes through when one does)
+ * - joining: the GM has the join and is sending the scene and their character
+ * - playing: they control their character
+ * - failed: nothing answered; joinError says why
+ */
+export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining' | 'playing' | 'failed';
+
+/** How long a player waits for any answer from a GM before the join screen says it failed */
+const JOIN_ANSWER_TIMEOUT_MS = 12000;
+
 export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel';
 
 /** Intents where the host walks and acts for the player, so it takes over the actor's position */
@@ -39,12 +52,22 @@ const HOST_DRIVEN_INTENTS: GMIntentKind[] = ['open', 'use', 'attack'];
  * - anim: a 2DA animation (attack swings, hit/dodge/parry reactions, casting)
  * - text: floating combat text (damage numbers, miss, deflected)
  * - vfx.add / vfx.remove: a visualeffects.2da effect (Force power impacts, auras, shields)
+ * - projectile: a blaster bolt (ammunitiontypes.2da row) from netId to targetNetId
  */
 export type GMFxEvent =
   | { kind: 'anim'; netId: string; anim: string; index: number }
   | { kind: 'text'; netId: string; text: string; style: number; timer: number }
   | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number }
-  | { kind: 'vfx.remove'; netId: string; fxId: string };
+  | { kind: 'vfx.remove'; netId: string; fxId: string }
+  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number };
+
+/** A question the GM asks players, as an NPC or as the GM, with replies to pick from */
+export interface GMDmPrompt {
+  promptId: string;
+  speaker: string;
+  text: string;
+  options: string[];
+}
 
 export interface GMLootItem {
   resRef: string;
@@ -111,6 +134,8 @@ export interface GMSerializedActor {
   hostDriven?: boolean;
   /** Last client intent sequence number the host has applied to this actor */
   intentSeq?: number;
+  /** Hidden from players by the GM: never spawned or updated on their machines */
+  hidden?: boolean;
   rightHandResRef?: string;
   leftHandResRef?: string;
   armorResRef?: string;
@@ -131,8 +156,23 @@ export interface GMSerializedDoorState {
   openState: number;
 }
 
+/**
+ * What happens when a player's character falls (0 HP):
+ * - kotor: like KotOR's party, they get back up with 1 HP once no enemy is near
+ * - gm: they stay down until the GM revives them
+ * - respawn: after a short wait they can respawn at the scene's entry
+ * The GM can revive anyone under any rule.
+ */
+export type GMDeathRule = 'kotor' | 'gm' | 'respawn';
+
+/** Session-wide rules the GM sets, which players need to know */
+export interface GMSessionRules {
+  deathRule: GMDeathRule;
+}
+
 export interface GMWorldSnapshot {
   moduleResRef: string;
+  rules?: GMSessionRules;
   keepDefaultCreatures: boolean;
   keepDefaultTriggers: boolean;
   keepDefaultPlaceables?: boolean;
@@ -160,6 +200,7 @@ export interface GMPacket {
     | 'actor.update'
     | 'actor.remove'
     | 'actor.assign'
+    | 'actor.teleport'
     | 'door.state'
     | 'client.input'
     | 'client.intent'
@@ -168,7 +209,17 @@ export interface GMPacket {
     | 'container.open'
     | 'container.loot'
     | 'player.sheet'
-    | 'relay.error';
+    | 'dm.prompt'
+    | 'dm.reply'
+    | 'relay.error'
+    | 'relay.host-ready'
+    | 'talk.request'
+    | 'talk.reply'
+    | 'talk.leave'
+    | 'talk.line'
+    | 'talk.end'
+    | 'session.rules'
+    | 'player.respawn';
   senderId: string;
   targetPeerId?: string;
   timestamp: number;
@@ -219,10 +270,20 @@ export class GMNetworkManager {
 
   static peers: Map<string, GMPeerInfo> = new Map();
   static assignedActorNetId: string | null = null;
+  /** Client: the latest GM teleport of our character we've applied; our position reports carry it */
+  static teleportSeq: number = 0;
+  static joinState: GMJoinState = 'idle';
+  static joinError: string = '';
+  static joinTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Client-side intent tracking: while awaitingHost, the host drives our actor and we stop sending positions
   static localIntentSeq: number = 0;
   static awaitingHost: boolean = false;
+
+  // Client: questions from the GM still waiting for our reply
+  static pendingPrompts: GMDmPrompt[] = [];
+  /** Client: the session's rules, as the GM last sent them */
+  static sessionRules: GMSessionRules = { deathRule: 'kotor' };
 
   // Re-sends our host.register / peer.join, used when the relay asks us to retry under a new id
   static resendRegistration: (() => void) | null = null;
@@ -323,10 +384,19 @@ export class GMNetworkManager {
     this.playerName = playerName || 'Player';
     this.serverUrl = wsUrl || 'ws://localhost:7878';
     this.statusMessage = `Connecting to GM Host at ${this.serverUrl}...`;
-    this.notifyChange();
+    this.setJoinState('connecting');
 
     const sendJoin = () => {
       this.connected = true;
+      this.setJoinState('joining');
+      // Nothing comes back when nobody is listening at all (e.g. the BroadcastChannel fallback with no GM tab)
+      this.clearJoinTimer();
+      this.joinTimer = setTimeout(() => {
+        this.joinTimer = null;
+        if (this.role === 'client' && this.joinState === 'joining') {
+          this.failJoin(`No GM answered at ${this.serverUrl}. Check the address with your GM, and that they have clicked Host.`);
+        }
+      }, JOIN_ANSWER_TIMEOUT_MS);
       this.statusMessage = `Connected to ${this.serverUrl} as ${this.playerName}`;
       this.sendPacket({
         type: 'peer.join',
@@ -358,6 +428,27 @@ export class GMNetworkManager {
         sendJoin();
       }
     });
+  }
+
+  static setJoinState(state: GMJoinState) {
+    this.joinState = state;
+    if (state !== 'failed') this.joinError = '';
+    if (state === 'playing' || state === 'waiting-for-host' || state === 'idle') this.clearJoinTimer();
+    this.notifyChange();
+  }
+
+  static clearJoinTimer() {
+    if (this.joinTimer) clearTimeout(this.joinTimer);
+    this.joinTimer = null;
+  }
+
+  /** Give up joining: back to offline, with a reason for the join screen */
+  static failJoin(reason: string) {
+    this.disconnect();
+    this.joinState = 'failed';
+    this.joinError = reason;
+    this.statusMessage = reason;
+    this.notifyChange();
   }
 
   static connectWebSocket(url: string, onOpen: () => void, onErrorFallback: () => void) {
@@ -426,7 +517,13 @@ export class GMNetworkManager {
     this.role = 'offline';
     this.connected = false;
     this.assignedActorNetId = null;
+    this.teleportSeq = 0;
     this.awaitingHost = false;
+    this.pendingPrompts = [];
+    GameState.GMConversationManager?.reset();
+    this.clearJoinTimer();
+    this.joinState = 'idle';
+    this.joinError = '';
     this.peers.clear();
     this.statusMessage = 'Offline (Local GM Session)';
     this.notifyChange();
@@ -521,7 +618,13 @@ export class GMNetworkManager {
       }
 
       case 'peer.leave': {
+        if (this.role === 'client' && packet.payload?.wasHost) {
+          this.appendChat('System', 'The GM left the game. You will rejoin when they host again.');
+          this.setJoinState('waiting-for-host');
+          break;
+        }
         const peer = this.peers.get(packet.senderId);
+        if (peer && this.role === 'host') GameState.GMConversationManager?.onPeerLeft(packet.senderId);
         if (peer) {
           this.appendChat('System', `${peer.name} left the session. Their character stays until they rejoin.`);
           this.peers.delete(packet.senderId);
@@ -537,6 +640,7 @@ export class GMNetworkManager {
         if (this.role === 'client' && (!packet.targetPeerId || packet.targetPeerId === this.peerId)) {
           const { moduleResRef, keepDefaultCreatures, keepDefaultTriggers, keepDefaultPlaceables } = packet.payload || {};
           if (moduleResRef && this.gmManager) {
+            if (this.joinState !== 'playing') this.clearJoinTimer();
             this.appendChat('GM', `Loading scene: ${moduleResRef}...`);
             await this.gmManager.loadSceneFromNetwork(moduleResRef, !!keepDefaultCreatures, !!keepDefaultTriggers, keepDefaultPlaceables !== false);
           }
@@ -575,6 +679,13 @@ export class GMNetworkManager {
         break;
       }
 
+      case 'actor.teleport': {
+        if (this.role === 'client' && this.gmManager && packet.payload?.netId) {
+          this.gmManager.applyTeleportOnClient(packet.payload);
+        }
+        break;
+      }
+
       case 'actor.remove': {
         if (this.role === 'client' && this.gmManager && packet.payload?.netId) {
           this.gmManager.removeActorByNetId(packet.payload.netId);
@@ -587,6 +698,7 @@ export class GMNetworkManager {
           const { netId } = packet.payload || {};
           if (netId) {
             this.assignedActorNetId = netId;
+            this.setJoinState('playing');
             if (this.gmManager) {
               const obj = this.gmManager.netIdMap.get(netId);
               if (obj) {
@@ -628,12 +740,28 @@ export class GMNetworkManager {
           try { window.sessionStorage.setItem(PEER_ID_STORAGE_KEY, this.peerId); } catch (e) {}
           this.resendRegistration?.();
         } else {
+          if (code === 'no-host') {
+            // The relay keeps our connection; it tells us when a GM starts hosting
+            this.statusMessage = 'Connected. Waiting for the GM to start hosting...';
+            this.setJoinState('waiting-for-host');
+            break;
+          }
           this.appendChat('System', message || `Relay error: ${code}`);
           if (code === 'host-exists') {
             this.disconnect();
             this.statusMessage = message || 'A GM is already hosting on this server.';
           }
           this.notifyChange();
+        }
+        break;
+      }
+
+      case 'relay.host-ready': {
+        // A GM started hosting on the relay we're waiting on: send our join again
+        if (this.role === 'client' && this.joinState === 'waiting-for-host') {
+          this.appendChat('System', 'The GM is hosting. Joining...');
+          this.setJoinState('joining');
+          this.resendRegistration?.();
         }
         break;
       }
@@ -666,7 +794,56 @@ export class GMNetworkManager {
         break;
       }
 
+      case 'dm.prompt': {
+        if (this.role === 'client' && (!packet.targetPeerId || packet.targetPeerId === this.peerId) && packet.payload?.promptId) {
+          const prompt = packet.payload as GMDmPrompt;
+          this.pendingPrompts.push(prompt);
+          this.appendChat(prompt.speaker, prompt.text);
+          this.notifyChange();
+        }
+        break;
+      }
+
+      // Talking to NPCs the GM voices (GMConversationManager)
+      case 'talk.request':
+        if (this.role === 'host') GameState.GMConversationManager?.onTalkRequest(packet.senderId, packet.payload);
+        break;
+      case 'talk.reply':
+        if (this.role === 'host') GameState.GMConversationManager?.onTalkReply(packet.senderId, packet.payload);
+        break;
+      case 'talk.leave':
+        if (this.role === 'host') GameState.GMConversationManager?.onTalkLeave(packet.senderId, packet.payload);
+        break;
+      case 'talk.line':
+        if (this.role === 'client' && (!packet.targetPeerId || packet.targetPeerId === this.peerId)) {
+          GameState.GMConversationManager?.onLine(packet.payload);
+        }
+        break;
+      case 'talk.end':
+        if (this.role === 'client' && (!packet.targetPeerId || packet.targetPeerId === this.peerId)) {
+          GameState.GMConversationManager?.onEnd(packet.payload);
+        }
+        break;
+
+      case 'session.rules':
+        if (this.role === 'client' && packet.payload?.deathRule) {
+          this.sessionRules = { ...this.sessionRules, ...packet.payload };
+          this.notifyChange();
+        }
+        break;
+      case 'player.respawn':
+        if (this.role === 'host') this.gmManager?.onRespawnRequest(packet.senderId);
+        break;
+
+      case 'dm.reply': {
+        if (this.role === 'host' && this.gmManager && packet.payload) {
+          this.gmManager.onDmReply(packet.senderId, packet.payload);
+        }
+        break;
+      }
+
       case 'chat.message': {
+        if (packet.targetPeerId && packet.targetPeerId !== this.peerId) break;
         if (packet.payload?.text) {
           this.appendChat(packet.payload.sender || 'Player', packet.payload.text);
           GameState.MenuManager.InGameBark?.barkFromString(`${packet.payload.sender || 'Player'}: ${packet.payload.text}`);
@@ -735,8 +912,48 @@ export class GMNetworkManager {
     });
   }
 
+  /**
+   * Host: ask players a question with replies to choose from; everyone, or one player
+   */
+  /** Host: tell every player the session's rules */
+  static broadcastSessionRules(rules: GMSessionRules) {
+    if (this.role !== 'host') return;
+    this.sendPacket({ type: 'session.rules', senderId: this.peerId, timestamp: Date.now(), payload: rules });
+  }
+
+  /** Client: ask to respawn our fallen character (only under the respawn rule) */
+  static requestRespawn() {
+    if (this.role !== 'client') return;
+    this.sendPacket({ type: 'player.respawn', senderId: this.peerId, timestamp: Date.now(), payload: {} });
+  }
+
+  static sendDmPrompt(prompt: GMDmPrompt, targetPeerId?: string) {
+    if (this.role !== 'host') return;
+    this.sendPacket({ type: 'dm.prompt', senderId: this.peerId, targetPeerId, timestamp: Date.now(), payload: prompt });
+  }
+
+  /**
+   * Client: answer one of the GM's questions
+   */
+  static answerPrompt(promptId: string, choice: number) {
+    const prompt = this.pendingPrompts.find((p) => p.promptId === promptId);
+    if (!prompt || !prompt.options[choice]) return;
+    this.pendingPrompts = this.pendingPrompts.filter((p) => p !== prompt);
+    this.sendPacket({ type: 'dm.reply', senderId: this.peerId, timestamp: Date.now(), payload: { promptId, choice } });
+    this.appendChat(this.playerName, prompt.options[choice]);
+    this.notifyChange();
+  }
+
+  /**
+   * Host: a chat line only one player sees
+   */
+  static sendChatTo(targetPeerId: string, sender: string, text: string) {
+    if (this.role !== 'host') return;
+    this.sendPacket({ type: 'chat.message', senderId: this.peerId, targetPeerId, timestamp: Date.now(), payload: { sender, text } });
+  }
+
   static broadcastActorSpawn(actor: GMSerializedActor) {
-    if (this.role === 'offline') return;
+    if (this.role === 'offline' || actor?.hidden) return;
     this.sendPacket({
       type: 'actor.spawn',
       senderId: this.peerId,
@@ -746,7 +963,7 @@ export class GMNetworkManager {
   }
 
   static broadcastActorUpdate(actor: GMSerializedActor) {
-    if (this.role === 'offline') return;
+    if (this.role === 'offline' || actor?.hidden) return;
     this.sendPacket({
       type: 'actor.update',
       senderId: this.peerId,
@@ -804,7 +1021,8 @@ export class GMNetworkManager {
             y: controlled.position.y,
             z: controlled.position.z,
             facing: typeof controlled.getFacing === 'function' ? controlled.getFacing() : 0,
-            animState: controlled.animState || 0
+            animState: controlled.animState || 0,
+            teleportSeq: this.teleportSeq
           }
         });
       }

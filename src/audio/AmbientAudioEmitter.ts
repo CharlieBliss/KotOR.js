@@ -28,6 +28,8 @@ export class AmbientAudioEmitter extends EventListener {
   onendedFired: boolean = false;
 
   volume: number = 1;
+  /** Bumped by every play() and stop(): a play() still decoding when it changes was superseded */
+  playGeneration: number = 0;
 
   constructor(engine: AudioEngine){
     super();
@@ -79,8 +81,17 @@ export class AmbientAudioEmitter extends EventListener {
     }
 
     if(this.node || this.playing){
-      this.node.onended = undefined;
+      if(this.node) this.node.onended = undefined;
       this.stop();
+    }
+    const generation = ++this.playGeneration;
+
+    this.onendedFired = false;
+    this.loaded = false;
+    const buffer = await this.engine.audioCtx.decodeAudioData(this.data.slice(0));
+    // Another play() or a stop() happened while decoding: this one is out of date
+    if(generation !== this.playGeneration){
+      return this;
     }
 
     if(this.gainNode){
@@ -89,18 +100,18 @@ export class AmbientAudioEmitter extends EventListener {
       this.gainNode = this.engine.audioCtx.createGain();
     }
 
-    this.onendedFired = false;
-    this.loaded = false;
-    this.node = this.engine.audioCtx.createBufferSource();
-    this.node.buffer = await this.engine.audioCtx.decodeAudioData(this.data.slice(0));
-    this.node.loop = loop;
-    this.node.start(0, 0);
-    this.node.connect(this.gainNode);
+    const node = this.engine.audioCtx.createBufferSource();
+    this.node = node;
+    node.buffer = buffer;
+    node.loop = loop;
+    node.start(0, 0);
+    node.connect(this.gainNode);
     this.gainNode.connect(this.destination);
     this.gainNode.gain.value = this.volume;
     this.playing = true;
     this.loaded = true;
-    this.node.onended = () => {
+    node.onended = () => {
+      if(this.node !== node) return;
       this.onendedFired = true;
       this.playing = false;
       this.loaded = false;
@@ -115,6 +126,7 @@ export class AmbientAudioEmitter extends EventListener {
    * Stop the audio
    */
   stop(){
+    this.playGeneration++;
     const wasPlaying = this.playing;
     this.playing = false;
     if(this.node){

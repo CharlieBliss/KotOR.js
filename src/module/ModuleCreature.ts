@@ -2309,6 +2309,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   use(object: ModuleObject){
+    // A fallen player character in a GM session is knocked out, not a body to loot
+    if(GameState.gmMode && GameState.GMManager?.isPlayerCharacter(this)) return;
     if(this.hasInventory()){
       if(GameState.gmMode && GameState.GMManager.routeContainerOpen(this, object)) return;
       GameState.MenuManager.MenuContainer.AttachContainer(this);
@@ -2632,8 +2634,15 @@ export class ModuleCreature extends ModuleObject {
     this.min1HP = bMinOneHP ? true : false;
   }
 
+  /**
+   * Current Force points. Stored the way hit points are (see getHP): forcePoints is the base, maxForcePoints
+   * the maximum and currentForce what's left relative to them, so spending (subtractFP) shows here.
+   */
   getFP(){
-    return this.forcePoints;
+    const base = Number(this.forcePoints) || 0;
+    const max = Number.isFinite(Number(this.maxForcePoints)) ? Number(this.maxForcePoints) : base;
+    const current = Number(this.currentForce) || 0;
+    return max + current - base;
   }
 
   getMaxFP(){

@@ -457,19 +457,84 @@ export class ModuleItem extends ModuleObject {
     }
   }
 
+  /**
+   * The spells.2da row a Cast Spell property casts. Its subtype is a row of iprp_spells.2da, whose
+   * spellindex is the spell (e.g. a medpac's subtype 64 is its healing spell).
+   */
+  static GetCastSpellId(property: ItemProperty): number {
+    const row = GameState.TwoDAManager.datatables.get('iprp_spells')?.rows[property?.subType];
+    const spellId = parseInt(row?.spellindex);
+    return Number.isFinite(spellId) ? spellId : -1;
+  }
+
+  /**
+   * What one use of a Cast Spell property costs, from iprp_chargecost.2da (its cost table, 3):
+   * Single_Use takes one from the stack, N_Charges/Use takes N charges; anything else is free.
+   */
+  static GetCastSpellUseCost(property: ItemProperty): { single: boolean; charges: number } {
+    const IPRP_CHARGECOST = 3;
+    if(property?.costTable !== IPRP_CHARGECOST) return { single: false, charges: 0 };
+    const label = String(GameState.TwoDAManager.datatables.get('iprp_chargecost')?.rows[property.costValue]?.label || '');
+    if(label === 'Single_Use') return { single: true, charges: 0 };
+    const charges = label.match(/^(\d+)_Charges?\/Use$/);
+    return { single: false, charges: charges ? parseInt(charges[1]) : 0 };
+  }
+
+  /** The item's usable Cast Spell properties, with enough charges left for a use */
+  getUsableCastSpellProperties(): ItemProperty[] {
+    return (this.properties || []).filter((property) => {
+      if(!property.isUseable() || !property.is(ModuleItemProperty.CastSpell)) return false;
+      if(ModuleItem.GetCastSpellId(property) < 0) return false;
+      const cost = ModuleItem.GetCastSpellUseCost(property);
+      return !cost.charges || (Number(this.charges) || 0) >= cost.charges;
+    });
+  }
+
+  /**
+   * The item's spell went off: pay for the use. A single-use item (medpac, grenade, stim) loses one from
+   * its stack and is gone at none; a charged one (energy shield, armband) loses its charges per use.
+   */
+  spendUse(spellId: number, user?: ModuleObject){
+    const property = (this.properties || []).find((p) => p.is(ModuleItemProperty.CastSpell) && ModuleItem.GetCastSpellId(p) === spellId);
+    if(!property) return;
+    const cost = ModuleItem.GetCastSpellUseCost(property);
+    if(cost.charges){
+      this.charges = Math.max(0, (Number(this.charges) || 0) - cost.charges);
+      return;
+    }
+    if(!cost.single) return;
+    const stack = this.getStackSize() || 1;
+    if(stack > 1){
+      this.setStackSize(stack - 1);
+      return;
+    }
+    // Used up: take it out of whichever inventory holds it
+    const party = GameState.InventoryManager?.inventory;
+    if(party && party.includes(this)){
+      GameState.InventoryManager.removeItem(this);
+    }
+    for(const owner of [user, this.possessor] as any[]){
+      const list = owner?.inventory;
+      const i = Array.isArray(list) ? list.indexOf(this) : -1;
+      if(i >= 0) list.splice(i, 1);
+    }
+    this.setStackSize(0);
+  }
+
   useItemOnObject(oCaster: ModuleCreature, oTarget: ModuleObject){
     for(let i = 0, len = this.properties.length; i < len; i++){
       let property = this.properties[i];
       if(!property.isUseable()){ continue; }
 
       if(property.is(ModuleItemProperty.CastSpell)){
+        if(!this.getUsableCastSpellProperties().includes(property)){ continue; }
         const action = new GameState.ActionFactory.ActionItemCastSpell();
         action.setParameter(0, ActionParameterType.DWORD, oTarget);
         action.setParameter(1, ActionParameterType.DWORD, oTarget.area);
         action.setParameter(2, ActionParameterType.FLOAT, oTarget.position.x);
         action.setParameter(3, ActionParameterType.FLOAT, oTarget.position.y);
         action.setParameter(4, ActionParameterType.FLOAT, oTarget.position.z);
-        action.setParameter(5, ActionParameterType.INT, property.getValue());
+        action.setParameter(5, ActionParameterType.INT, ModuleItem.GetCastSpellId(property));
         action.setParameter(6, ActionParameterType.INT, 1);
         action.setParameter(7, ActionParameterType.FLOAT, 1.0);
         action.setParameter(8, ActionParameterType.INT, -1);
@@ -477,6 +542,8 @@ export class ModuleItem extends ModuleObject {
         action.setParameter(10, ActionParameterType.DWORD, this);
         action.setParameter(11, ActionParameterType.STRING, '');
         oCaster.actionQueue.add(action);
+        // One use casts one spell
+        return;
       }else if(property.is(ModuleItemProperty.ThievesTools)){
         const action = new GameState.ActionFactory.ActionUnlockObject();
         action.setParameter(0, ActionParameterType.DWORD, oTarget);

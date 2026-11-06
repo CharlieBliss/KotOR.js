@@ -173,6 +173,235 @@
     }
   }
 
+  // A question from the GM, shown to a player until they pick a reply
+  .gm-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: 72px;
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 32px));
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: rgba(8, 18, 30, 0.95);
+    border: 1px solid rgba(255, 215, 64, 0.55);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
+    pointer-events: auto;
+
+    .gm-prompt-speaker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #ffd740;
+    }
+
+    .gm-prompt-text {
+      margin: 6px 0 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #e4eef7;
+    }
+
+    .gm-prompt-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      .gm-btn {
+        justify-content: flex-start;
+        text-align: left;
+      }
+    }
+  }
+
+  // Joining a GM's game: the form, then live status until the player has their character
+  .gm-join-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(2, 6, 12, 0.55);
+    pointer-events: auto;
+  }
+
+  .gm-join {
+    width: min(460px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    border-radius: 8px;
+    background: rgba(9, 19, 32, 0.97);
+    border: 1px solid rgba(68, 162, 240, 0.55);
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85);
+    font-size: 12.5px;
+    user-select: text;
+
+    .gm-join-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #90d5ff;
+    }
+
+    .gm-join-steps {
+      margin: 0;
+      padding-left: 18px;
+      color: #b9d4ea;
+      line-height: 1.5;
+    }
+
+    .gm-join-error {
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: rgba(102, 24, 24, 0.75);
+      border: 1px solid rgba(255, 82, 82, 0.55);
+      color: #ffc4c4;
+      line-height: 1.4;
+    }
+
+    .gm-join-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 0;
+    }
+
+    .gm-join-status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e4eef7;
+    }
+
+    .gm-join-status-text {
+      margin-top: 2px;
+      color: #9ab8d4;
+      line-height: 1.4;
+    }
+
+    .gm-join-spinner {
+      flex: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 3px solid rgba(91, 192, 255, 0.25);
+      border-top-color: #5bc0ff;
+      animation: gm-join-spin 0.9s linear infinite;
+    }
+
+    .gm-btn {
+      padding: 7px 14px;
+      font-size: 12.5px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gm-join-spinner {
+        animation: none;
+      }
+    }
+  }
+
+  @keyframes gm-join-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  // In a conversation, KotOR's dialog screen owns the top and bottom of the screen
+  &.in-conversation {
+    .gm-topbar,
+    .gm-controls-strip,
+    .gm-drawer {
+      display: none;
+    }
+  }
+
+  // The GM speaking for NPCs players are talking to
+  .gm-conversations {
+    position: fixed;
+    right: 12px;
+    bottom: 64px;
+    width: min(380px, calc(100vw - 24px));
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+  }
+
+  .gm-conversation {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.95);
+    border: 1px solid rgba(255, 215, 64, 0.5);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    font-size: 12px;
+
+    .gm-conversation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #ffe082;
+    }
+
+    .gm-conversation-log {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: rgba(5, 11, 19, 0.9);
+      line-height: 1.35;
+      user-select: text;
+
+      .who {
+        font-weight: 600;
+      }
+
+      .npc .who {
+        color: #ffd740;
+      }
+
+      .player .who {
+        color: #6bc5ff;
+      }
+
+      .waiting {
+        color: #8cb0d0;
+        font-style: italic;
+      }
+    }
+
+    .gm-conversation-hint {
+      font-size: 10.5px;
+      color: #8cb0d0;
+    }
+  }
+
+  // Our own character is down
+  .gm-prompt.gm-downed {
+    border-color: rgba(255, 82, 82, 0.6);
+
+    .gm-prompt-speaker {
+      color: #ff8a80;
+    }
+  }
+
+  textarea.gm-input {
+    resize: vertical;
+    font-family: inherit;
+  }
+
   // What the current mode or tool does, and its keys
   .gm-controls-strip {
     position: fixed;

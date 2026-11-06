@@ -4,11 +4,18 @@
  * Runs a real GM session in three game windows (a GM host and two players) against the dev server and
  * the dev game folder, and verifies after every step that the host and both players agree:
  *
- *   1. GM enters GM mode            6. GM places friendly NPCs (one carrying loot)
- *   2. GM starts a session          7. GM turns them hostile
- *   3. GM switches scene            8. both players fight that NPC until it dies
- *   4. GM places items              9. Player 1 loots its body; only Player 1 gets the items
- *   5. two players join            10. GM moves everyone to a new scene, then everyone leaves
+ *   1. GM enters GM mode             9. Player 1 loots its body; only Player 1 gets the items
+ *   2. GM starts a session          10. GM gives Player 2 XP and an item
+ *   3. GM switches scene            11. GM asks Player 1 a question as an NPC; Player 1 answers
+ *   4. GM places items              12. GM hides an NPC from players, then reveals it
+ *   5. two players join; they can't 13. GM spawns an encounter
+ *      switch character            14. GM saves the session
+ *   6. GM places friendly NPCs
+ *      (one carrying loot)          15. GM moves everyone to a new scene
+ *   7. GM turns them hostile; one   16. GM loads the saved session; players get their saved characters
+ *      attacks a player by itself   17. everyone leaves
+ *   8. both players fight one NPC
+ *      until it dies
  *
  * Each step uses the same calls the GM panel and main-menu buttons make. Exits non-zero on any failure.
  *
@@ -37,6 +44,10 @@ const FACTION_FRIENDLY = 2;
 
 // Carried by the first NPC, taken from its body by Player 1. Neither player starts with these.
 const NPC_LOOT = ['g_w_vbroswrd01', 'g_w_blstrrfl001'];
+
+// What the GM gives Player 2
+const REWARD_XP = 500;
+const REWARD_ITEM = 'g_i_medeqpmnt03';
 
 const BOOT_TIMEOUT = 180000;
 const SCENE_TIMEOUT = 120000;
@@ -380,6 +391,22 @@ async function run() {
       }, SCENE_TIMEOUT, SECOND_SCENE)));
       expect(new Set(playerNetIds).size === 2, `players were given the same character: ${playerNetIds}`);
 
+      // The join screen has gone, and players can't switch to another character or fly the GM camera
+      for (let i = 0; i < players.length; i++) {
+        const state = await players[i].eval((KotOR) => {
+          const before = KotOR.GameState.getCurrentPlayer();
+          KotOR.GameState.PartyManager.ShiftLeader();
+          return {
+            joinState: KotOR.GMNetworkManager.joinState,
+            sameCharacter: KotOR.GameState.getCurrentPlayer() === before,
+            ingame: KotOR.GameState.Mode === KotOR.EngineMode.INGAME,
+          };
+        });
+        expect(state.joinState === 'playing', `Player ${i + 1}'s join state is ${state.joinState}`);
+        expect(state.sameCharacter, `Player ${i + 1} switched character with Tab`);
+        expect(state.ingame, `Player ${i + 1} isn't playing their character (engine mode isn't INGAME)`);
+      }
+
       const hostPeers = await gm.eval((KotOR) => [...KotOR.GMNetworkManager.peers.values()].map((p) => p.controlledNetId).sort());
       expect(JSON.stringify(hostPeers) === JSON.stringify([...playerNetIds].sort()), `host's players ${JSON.stringify(hostPeers)} don't match ${JSON.stringify(playerNetIds)}`);
 
@@ -410,7 +437,7 @@ async function run() {
           // The second NPC stands well away, so both players can reach the first one
           const p = i === 0 ? spot(KotOR, -3, -2) : spot(KotOR, 6, 6);
           // The looted NPC is tough enough that both players reach it and fight before it falls
-          const config = { ...G.CREATURE_PRESETS[0], name: `E2E Guard ${i + 1}`, factionId: faction, barkText: '', hp: i === 0 ? 200 : G.CREATURE_PRESETS[0].hp, lootResRefs: i === 0 ? loot : [] };
+          const config = { ...G.CREATURE_PRESETS[0], name: `E2E Guard ${i + 1}`, factionId: faction, barkText: '', customized: i === 0, hp: i === 0 ? 200 : G.CREATURE_PRESETS[0].hp, lootResRefs: i === 0 ? loot : [] };
           const cre = await G.spawnCreature(config, new window.THREE.Vector3(p.x, p.y, p.z), 0);
           if (cre) out.push(cre.gmNetId);
         }
@@ -446,6 +473,53 @@ async function run() {
             return cre && cre.factionId === faction && cre.isHostile(me);
           });
         }, SYNC_TIMEOUT, placed.npcs, FACTION_HOSTILE);
+      }
+    });
+
+    await must('A hostile NPC attacks a player by itself', async () => {
+      // The players start out of the NPCs' sight. The GM teleports the looted NPC up to Player 1 (as the
+      // Teleport tool does); nobody has attacked yet, so it has to pick a player to fight on its own.
+      await gm.eval((KotOR, npcId, pcId) => {
+        const G = KotOR.GMManager;
+        const npc = G.netIdMap.get(npcId);
+        const pc = G.netIdMap.get(pcId);
+        const toward = npc.position.clone().sub(pc.position).setZ(0).normalize().multiplyScalar(2);
+        const spot = pc.position.clone().add(toward);
+        spot.z = G.getGroundZAt(spot.x, spot.y, pc.position.z);
+        G.teleportObject(npc, spot);
+      }, placed.npcs[0], playerNetIds[0]);
+      try {
+        return await gm.waitFor('an NPC to attack a player', (KotOR, npcIds, pcIds) => {
+          const G = KotOR.GMManager;
+          for (const id of npcIds) {
+            const cre = G.netIdMap.get(id);
+            const target = cre && (cre.combatData.lastAttackTarget || (cre.combatRound.action && cre.combatRound.action.target));
+            if (target && pcIds.includes(target.gmNetId)) return `${cre.getName()} → ${target.getName()}`;
+          }
+          return false;
+        }, SYNC_TIMEOUT, placed.npcs, playerNetIds);
+      } catch (e) {
+        // Why each NPC didn't pick a player
+        const why = await gm.eval((KotOR, npcIds, pcIds) => {
+          const G = KotOR.GMManager;
+          const area = KotOR.GameState.module.area;
+          return npcIds.map((id) => {
+            const cre = G.netIdMap.get(id);
+            return {
+              id,
+              inArea: area.creatures.includes(cre),
+              autonomous: G.isAutonomousNpc(cre),
+              busy: !!cre.combatRound.action || cre.combatRound.scheduledActionList.length,
+              sight: cre.perceptionRange ? cre.getPerceptionRangePrimary() : 'none',
+              aiTimer: G.npcAiTimer,
+              players: pcIds.map((pid) => {
+                const pc = G.netIdMap.get(pid);
+                return { pid, d: +cre.position.distanceTo(pc.position).toFixed(1), hostile: cre.isHostile(pc), los: cre.hasLineOfSight(pc), inArea: area.creatures.includes(pc) };
+              }),
+            };
+          });
+        }, placed.npcs, playerNetIds);
+        throw new CheckFailed(`${e.message}: ${JSON.stringify(why)}`);
       }
     });
 
@@ -596,6 +670,94 @@ async function run() {
       return `Player 1 received ${NPC_LOOT.join(', ')}`;
     });
 
+    const peerOf = (netId) => gm.eval((KotOR, id) => {
+      const peer = [...KotOR.GMNetworkManager.peers.values()].find((p) => p.controlledNetId === id);
+      return peer ? peer.peerId : null;
+    }, netId);
+    const sheetOf = (p) => p.eval((KotOR) => {
+      const me = KotOR.GameState.getCurrentPlayer();
+      return { xp: me ? me.experience || 0 : -1, inventory: KotOR.GameState.InventoryManager.inventory.map((i) => i.getEquippedRes() || i.getInventoryRes()) };
+    });
+
+    await must('GM gives Player 2 XP and an item', async () => {
+      const p2Peer = await peerOf(playerNetIds[1]);
+      const before = await Promise.all(players.map(sheetOf));
+      const given = await gm.eval((KotOR, peerId, xp, item) => [KotOR.GMManager.giveXP(peerId, xp), KotOR.GMManager.giveItem(peerId, item)], p2Peer, REWARD_XP, REWARD_ITEM);
+      expect(given.every(Boolean), `giveXP / giveItem returned ${JSON.stringify(given)}`);
+      await players[1].waitFor('the reward on our sheet', (KotOR, xp, item) => {
+        const me = KotOR.GameState.getCurrentPlayer();
+        const inv = KotOR.GameState.InventoryManager.inventory.map((i) => i.getEquippedRes() || i.getInventoryRes());
+        return me && me.experience >= xp && inv.includes(item);
+      }, SYNC_TIMEOUT, before[1].xp + REWARD_XP, REWARD_ITEM);
+      await sleep(2000); // a sheet sync interval, in case anything leaked to Player 1
+      const p1 = await sheetOf(players[0]);
+      expect(p1.xp === before[0].xp && !p1.inventory.includes(REWARD_ITEM), `Player 1 also got the reward: ${JSON.stringify(p1)}`);
+    });
+
+    await must('GM asks Player 1 a question as an NPC', async () => {
+      const p1Peer = await peerOf(playerNetIds[0]);
+      const promptId = await gm.eval((KotOR, npcId, peerId) => KotOR.GMManager.askPlayers(KotOR.GMManager.netIdMap.get(npcId), 'Surrender, rebel?', ['Never!', 'Fine...'], peerId), placed.npcs[1], p1Peer);
+      expect(promptId, 'askPlayers returned nothing');
+      const shown = await players[0].waitFor('the question', (KotOR, id) => {
+        const prompt = KotOR.GMNetworkManager.pendingPrompts.find((p) => p.promptId === id);
+        return prompt ? `${prompt.speaker}: ${prompt.text}` : false;
+      }, SYNC_TIMEOUT, promptId);
+      expect(shown === 'E2E Guard 2: Surrender, rebel?', `Player 1 was shown "${shown}"`);
+      const p2Saw = await players[1].eval((KotOR) => KotOR.GMNetworkManager.pendingPrompts.length);
+      expect(p2Saw === 0, 'Player 2 was also asked');
+      await players[0].eval((KotOR, id) => KotOR.GMNetworkManager.answerPrompt(id, 0), promptId);
+      const replies = await gm.waitFor('Player 1\'s reply', (KotOR, id) => {
+        const record = KotOR.GMManager.dmPrompts.get(id);
+        return record && record.replies.length ? record.replies.map((r) => `${r.name}: ${record.prompt.options[r.choice]}`) : false;
+      }, SYNC_TIMEOUT, promptId);
+      return replies.join(', ');
+    });
+
+    await must('GM hides an NPC from players, then reveals it', async () => {
+      const npc = placed.npcs[1];
+      await gm.eval((KotOR, id) => KotOR.GMManager.setObjectHidden(KotOR.GMManager.netIdMap.get(id), true), npc);
+      for (const p of players) {
+        await p.waitFor('the NPC to disappear', (KotOR, id) => !KotOR.GMManager.netIdMap.has(id), SYNC_TIMEOUT, npc);
+      }
+      const hostStillHasIt = await gm.eval((KotOR, id) => KotOR.GMManager.netIdMap.has(id), npc);
+      expect(hostStillHasIt, 'the GM lost the hidden NPC');
+      await sleep(1500); // world ticks keep running; the NPC must stay gone
+      for (const p of players) {
+        const back = await p.eval((KotOR, id) => KotOR.GMManager.netIdMap.has(id), npc);
+        expect(!back, `${p.label} got the hidden NPC back from a world update`);
+      }
+      await gm.eval((KotOR, id) => KotOR.GMManager.setObjectHidden(KotOR.GMManager.netIdMap.get(id), false), npc);
+      for (const p of players) {
+        await p.waitFor('the NPC to reappear', (KotOR, id) => KotOR.GMManager.netIdMap.has(id), SYNC_TIMEOUT, npc);
+      }
+    });
+
+    await must('GM spawns an encounter', async () => {
+      placed.encounter = await gm.eval(async (KotOR, spotSrc) => {
+        const spot = eval(spotSrc);
+        const p = spot(KotOR, 6, -6);
+        return KotOR.GMManager.spawnEncounter({ presetIndex: 0, count: 3, spread: 2, factionId: 2, center: new window.THREE.Vector3(p.x, p.y, p.z) });
+      }, spotNearEntry.toString());
+      expect(placed.encounter.length === 3, `expected 3 creatures, got ${placed.encounter.length}`);
+      for (const p of players) {
+        await p.waitFor('the encounter', (KotOR, ids) => ids.every((id) => KotOR.GMManager.netIdMap.has(id)), SYNC_TIMEOUT, placed.encounter);
+      }
+      return placed.encounter.join(', ');
+    });
+
+    let savedSession = null;
+    await must('GM saves the session', async () => {
+      savedSession = await gm.eval((KotOR) => KotOR.GMManager.saveSession('GM e2e save'));
+      expect(savedSession, 'saveSession returned nothing');
+      const creatures = savedSession.objects.filter((o) => o.kind === 'creature').length;
+      const placeables = savedSession.objects.filter((o) => o.kind === 'placeable').length;
+      expect(creatures === 5 && placeables === 2, `saved ${creatures} creatures and ${placeables} placeables, expected 5 and 2`);
+      const byName = Object.fromEntries(savedSession.players.map((p) => [p.name, p]));
+      expect(NPC_LOOT.every((r) => byName['E2E Player 1'].sheet.inventory.some((e) => e.resRef === r)), 'Player 1\'s saved inventory lacks the loot');
+      expect(byName['E2E Player 2'].sheet.inventory.some((e) => e.resRef === REWARD_ITEM), 'Player 2\'s saved inventory lacks the reward item');
+      return `${savedSession.objects.length} objects, ${savedSession.players.length} characters`;
+    });
+
     await must(`GM moves everyone to ${FINAL_SCENE}`, async () => {
       // Count world ticks reaching each player from here on (shown in diagnostics if this step fails)
       for (const p of players) {
@@ -655,6 +817,45 @@ async function run() {
         await players[i].waitFor('the other player and no old objects', (KotOR, otherId, oldIds) =>
           KotOR.GMManager.netIdMap.has(otherId) && oldIds.every((id) => !KotOR.GMManager.netIdMap.has(id)),
         SYNC_TIMEOUT, playerNetIds[1 - i], [...placed.items, ...placed.npcs]);
+      }
+    });
+
+    await must('GM loads the saved session with players connected', async () => {
+      expect(savedSession, 'no saved session to load');
+      const expected = Object.fromEntries(savedSession.players.map((p) => [p.name, p.sheet]));
+      const loaded = await gm.eval((KotOR, save) => KotOR.GMManager.loadSession(save), savedSession);
+      expect(loaded, 'loadSession returned false');
+      await gm.waitFor(`${SECOND_SCENE} to load`, sceneReady, SCENE_TIMEOUT, SECOND_SCENE);
+
+      // Players follow, keep control of their characters, and get their saved sheets back
+      await Promise.all(players.map((p, i) => p.waitFor(`${SECOND_SCENE} with our saved character`, (KotOR, scene, myId, sheet) => {
+        const GS = KotOR.GameState;
+        const me = GS.getCurrentPlayer();
+        const inv = GS.InventoryManager.inventory.map((it) => it.getEquippedRes() || it.getInventoryRes());
+        return String(GS.module && GS.module.filename).toLowerCase() === scene && GS.module.readyToProcessEvents &&
+          me && me.gmNetId === myId && me.experience === sheet.xp && sheet.inventory.every((e) => inv.includes(e.resRef));
+      }, SCENE_TIMEOUT, SECOND_SCENE, playerNetIds[i], expected[`E2E Player ${i + 1}`])));
+
+      // The placed objects are back, with their loot and factions, on the host and for both players
+      const hostObjects = await gm.eval((KotOR) => {
+        const G = KotOR.GMManager;
+        const area = KotOR.GameState.module.area;
+        const placedCreatures = area.creatures.filter((c) => c.gmSpawnConfig && !c.gmPlayerConfig);
+        const placedProps = area.placeables.filter((p) => p.gmSpawnConfig);
+        return {
+          creatures: placedCreatures.map((c) => ({ id: c.gmNetId, name: c.getName(), faction: c.factionId, dead: c.isDead() })),
+          props: placedProps.map((p) => ({ id: p.gmNetId, items: p.inventory.length })),
+        };
+      });
+      expect(hostObjects.creatures.length === 5 && hostObjects.props.length === 2, `restored ${hostObjects.creatures.length} creatures and ${hostObjects.props.length} props, expected 5 and 2`);
+      const guard1 = hostObjects.creatures.find((c) => c.name === 'E2E Guard 1');
+      const guard2 = hostObjects.creatures.find((c) => c.name === 'E2E Guard 2');
+      expect(guard1 && guard1.dead, `the killed guard should be restored dead: ${JSON.stringify(guard1)}`);
+      expect(guard2 && guard2.faction === FACTION_HOSTILE, `the other guard should still be hostile: ${JSON.stringify(guard2)}`);
+      expect(hostObjects.props.every((p) => p.items > 0), `restored props lost their loot: ${JSON.stringify(hostObjects.props)}`);
+      const ids = [...hostObjects.creatures, ...hostObjects.props].map((o) => o.id);
+      for (const p of players) {
+        await p.waitFor('the restored objects', (KotOR, objIds) => objIds.every((id) => KotOR.GMManager.netIdMap.has(id)), SYNC_TIMEOUT, ids);
       }
     });
 

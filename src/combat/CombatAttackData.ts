@@ -285,7 +285,9 @@ export class CombatAttackData {
     const damageMultiplier = isCritial ? critMult : 1.0;
     const baseDamageType = this.attackWeapon.getBaseDamageType();
 
-    if(!creature.isSimpleCreature()){
+    // Creature weapons (claws, bites) use their monster damage; a held weapon its own, whoever holds it
+    const heldWeapon = this.attackWeapon === creature.equipment?.RIGHTHAND || this.attackWeapon === creature.equipment?.LEFTHAND;
+    if(!creature.isSimpleCreature() || heldWeapon){
       this.damageList[baseDamageType].addDamage(this.attackWeapon.getBaseDamage() * damageMultiplier);
       if(this.attackWeapon.hasDamageBonus()){
         this.damageList[this.attackWeapon.getDamageBonusType()].addDamage(this.attackWeapon.getDamageBonus() * damageMultiplier);

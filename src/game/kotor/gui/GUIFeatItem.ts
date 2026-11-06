@@ -87,8 +87,13 @@ export class GUIFeatItem extends GUIProtoItem {
           }
         });
 
+        // Tell the menu which feat this is (the Abilities screen shows its name and description)
         buttonIcon.addEventListener('click', (e) => {
           e.stopPropagation();
+          (this.menu as any).onAbilityPicked?.(feat);
+        });
+        buttonIcon.addEventListener('hover', () => {
+          (this.menu as any).onAbilityPicked?.(feat);
         });
 
         /* FEAT ICON */

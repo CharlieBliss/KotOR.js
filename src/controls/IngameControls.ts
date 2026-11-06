@@ -7,6 +7,10 @@ import { EngineState } from "@/enums/engine/EngineState";
 import { KeyMapAction } from "@/enums/controls/KeyMapAction";
 import { MiniGameType } from "@/enums/engine/MiniGameType";
 import { FollowerCamera } from "@/engine/FollowerCamera";
+import { FreeLookCamera } from "@/engine/FreeLookCamera";
+
+/** Free look: radians of turn per pixel of mouse movement */
+const FREELOOK_MOUSE_SENSITIVITY = 0.005;
 import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { GUIControlTypeMask } from "@/enums/gui/GUIControlTypeMask";
@@ -459,6 +463,8 @@ export class IngameControls {
       if(GameState.State == EngineState.PAUSED) return;
       if(!keymap.keyboardInput?.down) return;
       if(this.gamePadMovement) return;
+      // Free look moves the camera with these keys; it must not move a character as well
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
@@ -477,6 +483,8 @@ export class IngameControls {
       if(GameState.State == EngineState.PAUSED) return;
       if(!keymap.keyboardInput?.down) return;
       if(this.gamePadMovement) return;
+      // Free look moves the camera with these keys; it must not move a character as well
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
@@ -551,6 +559,7 @@ export class IngameControls {
     //ChangeLeader
     KeyMapper.Actions[KeyMapAction.ChangeChar].setProcessor( (keymap) => {
       if(!keymap.keyboardInput?.pressed && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       GameState.PartyManager.ShiftLeader();
     });
 
@@ -769,6 +778,7 @@ export class IngameControls {
 
     KeyMapper.Actions[KeyMapAction.FlyUp].setProcessor( (keymap, delta = 0) => {
       if(!keymap.keyboardInput?.down && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK || GameState.gmMode) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       followee.position.z += 5 * delta;
@@ -776,6 +786,7 @@ export class IngameControls {
 
     KeyMapper.Actions[KeyMapAction.FlyDown].setProcessor( (keymap, delta = 0) => {
       if(!keymap.keyboardInput?.down && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK || GameState.gmMode) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       followee.position.z -= 5 * delta;
@@ -960,7 +971,8 @@ export class IngameControls {
       }
     }
     
-    if(GameState.Mode == EngineMode.FREELOOK){
+    // The free camera belongs to the GM; a player in a GM session (e.g. before their character arrives) can't fly it
+    if(GameState.Mode == EngineMode.FREELOOK && (!GameState.gmMode || GameState.GMManager.isGMUser())){
       if(this.keyboard.action.Escape?.pressed){
         // In GM mode Esc first cancels an active placement/teleport tool, and is consumed so the
         // GUI key mapping processed below doesn't also open the Options menu this frame
@@ -971,22 +983,17 @@ export class IngameControls {
           GameState.MenuManager.MenuOptions.open();
         }
       }
+      // Turning is rebuilt from heading and tilt every frame, so the camera stays level (and an upside-down
+      // camera, e.g. after something aimed it with lookAt, rights itself)
       const dx = Mouse.MouseX - Mouse.OldMouseX;
       const dy = Mouse.MouseY - Mouse.OldMouseY;
-      if((Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy)){
-        GameState.currentCamera.rotation.order = 'YZX';
-        GameState.currentCamera.rotation.z -= dx * 0.005;
-        GameState.currentCamera.rotation.x = THREE.MathUtils.clamp(GameState.currentCamera.rotation.x - dy * 0.005, 0.05, Math.PI - 0.05);
-      }
+      const looking = (Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy);
       const turnSpeed = 2.0 * delta;
-      if(this.keyboard.action.LeftArrow?.down){
-        GameState.currentCamera.rotation.order = 'YZX';
-        GameState.currentCamera.rotation.z += turnSpeed;
-      }
-      if(this.keyboard.action.RightArrow?.down){
-        GameState.currentCamera.rotation.order = 'YZX';
-        GameState.currentCamera.rotation.z -= turnSpeed;
-      }
+      let yawDelta = looking ? -dx * FREELOOK_MOUSE_SENSITIVITY : 0;
+      const pitchDelta = looking ? -dy * FREELOOK_MOUSE_SENSITIVITY : 0;
+      if(this.keyboard.action.LeftArrow?.down) yawDelta += turnSpeed;
+      if(this.keyboard.action.RightArrow?.down) yawDelta -= turnSpeed;
+      FreeLookCamera.turn(GameState.currentCamera, yawDelta, pitchDelta);
       const fast = this.keyboard.action.ShiftLeft?.down || this.keyboard.action.ShiftRight?.down;
       const moveSpeed = (fast ? 30.0 : 12.0) * delta;
       GameState.currentCamera.updateMatrixWorld();

@@ -35,3 +35,6 @@ export * from "@/managers/LegalScreenManager";
 export * from "@/managers/EventManager";
 export * from "@/managers/GMManager";
 export * from "@/managers/GMNetworkManager";
+export * from "@/managers/ProjectileManager";
+export * from "@/managers/GMConversationManager";
+export * from "@/managers/GMNpcOrders";

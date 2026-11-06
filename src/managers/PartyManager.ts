@@ -488,6 +488,7 @@ export class PartyManager {
    * @returns void
    */
   static SwitchLeaderAtIndex(index: number = 0){
+    if(PartyManager.isLeaderLocked()) return;
     index = Math.abs(index);
 
     if(index >= PartyManager.party.length){
@@ -859,7 +860,15 @@ export class PartyManager {
    * Shift the current leader to the end of the party array
    * @returns void
    */
+  /**
+   * A player in a GM session controls only their own character: Tab and the party portraits can't switch it
+   */
+  static isLeaderLocked(): boolean {
+    return !!GameState.gmMode && !!GameState.GMManager && !GameState.GMManager.isGMUser();
+  }
+
   static ShiftLeader(){
+    if(PartyManager.isLeaderLocked()) return;
     PartyManager.party.push( PartyManager.party.shift() );
     PartyManager.UpdateLeader();
   }
