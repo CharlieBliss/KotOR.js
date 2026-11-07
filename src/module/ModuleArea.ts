@@ -660,10 +660,27 @@ export class ModuleArea extends ModuleObject {
     audioEngine.bgmLoopTime = delay;
   }
 
+  /** Whether this area is borrowed from the other game (OtherGameManager) */
+  isBorrowedScene(): boolean {
+    const name = this.module?.filename || GameState.module?.filename || '';
+    return GameState.Module.IsBorrowedModule(name);
+  }
+
+  /** Tables that areas index into by row (music, ambience): the other game's, for a borrowed area */
+  static BorrowedTables: (name: string) => any = () => undefined;
+
+  audioTable(name: string): any {
+    if(this.isBorrowedScene()){
+      const borrowed = ModuleArea.BorrowedTables(name);
+      if(borrowed) return borrowed;
+    }
+    return GameState.TwoDAManager.datatables.get(name);
+  }
+
   async musicBackgroundDaySet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the background music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const bgMusic = ambientmusic2DA.rows[index];
     this.audio.music.day = index;
     try{
@@ -681,7 +698,7 @@ export class ModuleArea extends ModuleObject {
   async musicBackgroundNightSet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the battle music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const bgMusic = ambientmusic2DA.rows[index];
     this.audio.music.night = index;
     try{
@@ -709,7 +726,7 @@ export class ModuleArea extends ModuleObject {
   async musicBattleSet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the battle music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const battleMusic = ambientmusic2DA.rows[index];
     this.audio.music.battle = index;
     try{
@@ -749,7 +766,7 @@ export class ModuleArea extends ModuleObject {
     const audioEngine = AudioEngine.GetAudioEngine();
 
     this.audio.ambient.day = index;
-    const ambientsound2DA = GameState.TwoDAManager.datatables.get('ambientsound');
+    const ambientsound2DA = this.audioTable('ambientsound');
     if(ambientsound2DA){
       //Load the ambient day sound
       const ambientDay = ambientsound2DA.rows[this.audio.ambient.day];
@@ -771,7 +788,7 @@ export class ModuleArea extends ModuleObject {
     const audioEngine = AudioEngine.GetAudioEngine();
 
     this.audio.ambient.night = index;
-    const ambientsound2DA = GameState.TwoDAManager.datatables.get('ambientsound');
+    const ambientsound2DA = this.audioTable('ambientsound');
     if(ambientsound2DA){
       //Load the ambient day sound
       const ambientDay = ambientsound2DA.rows[this.audio.ambient.night];
@@ -1378,7 +1395,8 @@ export class ModuleArea extends ModuleObject {
 
       try { await this.loadCameras(); } catch(e){ console.error(e); }
 
-      if(GameState.gmMode && GameState.GMManager?.keepDefaultPlaceables === false){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
+      const borrowed = this.isBorrowedScene();
+      if(borrowed || (GameState.gmMode && GameState.GMManager?.keepDefaultPlaceables === false)){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(20);
 
@@ -1387,7 +1405,7 @@ export class ModuleArea extends ModuleObject {
       GameState.MenuManager.LoadScreen.setProgress(30);
 
       try { await this.loadAreaEffects(); } catch(e){ console.error(e); }
-      if(GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
+      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures)){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
       if(!GameState.gmMode){ try { await this.loadParty(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(40);
@@ -1396,9 +1414,9 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(50);
 
-      if(GameState.gmMode && !GameState.GMManager?.keepDefaultTriggers){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
+      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultTriggers)){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
 
-      if(GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
+      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures)){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(60);
 
@@ -1408,11 +1426,12 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(70);
 
-      try { await this.loadDoors(); } catch(e){ console.error(e); }
+      // A borrowed scene's doors use the other game's door table, so they're left out (their doorways stay open)
+      if(this.isBorrowedScene()){ this.doors = []; } else { try { await this.loadDoors(); } catch(e){ console.error(e); } }
 
       this.doorWalkmeshes = this.doors.filter( (d) => { return d?.collisionManager?.walkmesh}).map( (d) => { return d.collisionManager.walkmesh; });
 
-      try { await this.loadStores(); } catch(e){ console.error(e); }
+      if(!this.isBorrowedScene()){ try { await this.loadStores(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(80);
 

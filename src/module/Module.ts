@@ -761,7 +761,17 @@ export class Module {
     }
   }
 
+  /** Modules from elsewhere: returns their archives, or undefined when a name isn't theirs */
+  static ArchiveSources: ((modName: string) => Promise<(RIMObject|ERFObject)[] | undefined>)[] = [];
+
+  /** A scene borrowed from the other game: only its area (rooms, walkmesh, sky) is used */
+  static IsBorrowedModule: (modName: string) => boolean = () => false;
+
   static async GetModuleArchives(modName = ''): Promise<(RIMObject|ERFObject)[]> {
+    for(const source of Module.ArchiveSources){
+      const borrowed = await source(modName);
+      if(borrowed) return borrowed;
+    }
     const archives: any[] = [];
     let archive = undefined;
 

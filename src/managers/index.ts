@@ -37,4 +37,5 @@ export * from "@/managers/GMManager";
 export * from "@/managers/GMNetworkManager";
 export * from "@/managers/ProjectileManager";
 export * from "@/managers/GMConversationManager";
-export * from "@/managers/GMNpcOrders";
+export * from "@/managers/GMNpcOrders";export * from "@/managers/OtherGameManager";
+export * from "@/managers/GMScenePlan";

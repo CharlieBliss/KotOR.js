@@ -33,6 +33,8 @@ import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import type { GameEffect } from "@/effects/GameEffect";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { ActionType } from "@/enums/actions/ActionType";
+import { GameEngineType } from "@/enums/engine/GameEngineType";
+import { OtherGameManager } from "@/managers/OtherGameManager";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
 import { TalentObjectType } from "@/enums/engine/TalentObjectType";
@@ -89,6 +91,8 @@ export interface GMCreatureSpawnConfig {
   armorResRef?: string;
   barkText?: string;
   aiDisabled?: boolean;
+  /** A preset only one game has the template for */
+  onlyIn?: 'kotor' | 'tsl';
   /** Items the creature carries, lootable from its body once it dies */
   lootResRefs?: string[];
 }
@@ -335,6 +339,47 @@ export class GMManager {
   static npcAiTimer: number = 0;
   /** What happens when a player's character falls; see GMDeathRule */
   static deathRule: GMDeathRule = 'kotor';
+
+  /** Players can only watch (a scene plan's cutscene): they can't move or act, and NPCs leave them alone */
+  static playersFrozen: boolean = false;
+
+  /** Where players joining this scene appear (a scene plan's start), instead of the camera target */
+  static sceneStartPoint: THREE.Vector3 | null = null;
+
+  static sessionRules(): GMSessionRules {
+    return { deathRule: this.deathRule, frozen: this.playersFrozen };
+  }
+
+  static setPlayersFrozen(on: boolean) {
+    this.playersFrozen = !!on;
+    if (on) {
+      // Anyone fighting a player stops; players stop what they were doing
+      for (const pc of this.getPlayerCharacters()) {
+        pc.clearAllActions();
+        (pc as any).gmHostDriven = false;
+      }
+      for (const cre of GameState.module?.area?.creatures || []) {
+        const target = (cre as ModuleCreature).combatData?.lastAttackTarget as ModuleObject | undefined;
+        if (target && this.isPlayerCharacter(target)) (cre as ModuleCreature).combatRound?.clearActions?.();
+      }
+    }
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+  }
+
+  /** Whether a player's character is frozen right now (on the GM's machine, or the player's own) */
+  static isPlayerFrozen(cre: ModuleObject): boolean {
+    if (!GameState.gmMode || !cre) return false;
+    if (GMNetworkManager.role === 'client') {
+      return !!GMNetworkManager.sessionRules?.frozen && (cre as any).gmNetId === GMNetworkManager.assignedActorNetId;
+    }
+    return this.playersFrozen && this.isPlayerCharacter(cre);
+  }
+
+  /** NPCs don't go after frozen players, or anything the GM has hidden (actors waiting for their cue) */
+  static isUntargetable(cre: ModuleObject): boolean {
+    return !!(cre as any)?.gmHidden || (this.playersFrozen && this.isPlayerCharacter(cre));
+  }
   /** KotOR rule: a fallen player gets up once no living enemy is this close (metres)... */
   static RECOVER_ENEMY_RANGE = 20;
   /** ...for this long (seconds) */
@@ -429,7 +474,7 @@ export class GMManager {
   static lastViewportClick: { x: number; y: number; at: number } = { x: 0, y: 0, at: 0 };
   static DOUBLE_CLICK_MS = 400;
 
-  // Curated Module Catalog (KotOR 1 & 2)
+  // Curated Module Catalog (KotOR; KotOR II's is CURATED_MODULES_TSL)
   static CURATED_MODULES: GMModuleEntry[] = [
     // Dantooine
     { resRef: 'danm14aa', planet: 'Dantooine', title: 'Courtyard (danm14aa)', description: 'Jedi Enclave exterior courtyard and grassy plains' },
@@ -492,6 +537,83 @@ export class GMManager {
     { resRef: 'sta_m45ad', planet: 'Star Forge', title: 'Viewing Platform (sta_m45ad)', description: 'Final confrontation arena with Darth Malak' },
   ];
 
+  /** KotOR II's curated scenes (CURATED_MODULES are KotOR's) */
+  static CURATED_MODULES_TSL: GMModuleEntry[] = [
+    // Ships
+    { resRef: '001ebo', planet: 'Ships', title: 'Ebon Hawk Interior (001ebo)', description: 'The party\'s freighter: cockpit, hold, crew quarters, medbay' },
+    { resRef: '151har', planet: 'Ships', title: 'Harbinger - Command Deck (151har)', description: 'Republic cruiser bridge and command corridors' },
+    { resRef: '152har', planet: 'Ships', title: 'Harbinger - Crew Quarters (152har)', description: 'Republic cruiser bunks and corridors' },
+    { resRef: '153har', planet: 'Ships', title: 'Harbinger - Engine Deck (153har)', description: 'Republic cruiser engine room and maintenance decks' },
+    { resRef: '852nih', planet: 'Ships', title: 'Ravager - Bridge (852nih)', description: 'Darth Nihilus\'s shattered flagship bridge' },
+    { resRef: '851nih', planet: 'Ships', title: 'Ravager - Command Deck (851nih)', description: 'Wrecked Sith warship decks and corridors' },
+    { resRef: '351nar', planet: 'Ships', title: 'Goto\'s Yacht (351nar)', description: 'A crime lord\'s luxury yacht above Nar Shaddaa' },
+    // Peragus
+    { resRef: '101per', planet: 'Peragus', title: 'Administration Level (101per)', description: 'Abandoned mining station offices and medbay' },
+    { resRef: '102per', planet: 'Peragus', title: 'Mining Tunnels (102per)', description: 'Dark asteroid mining tunnels and droid bays' },
+    { resRef: '103per', planet: 'Peragus', title: 'Fuel Depot (103per)', description: 'Explosive fuel storage and pipeworks' },
+    { resRef: '105per', planet: 'Peragus', title: 'Dormitories (105per)', description: 'Miners\' quarters, empty and silent' },
+    { resRef: '106per', planet: 'Peragus', title: 'Hangar Bay (106per)', description: 'Station hangar with a docked freighter' },
+    { resRef: '104per', planet: 'Peragus', title: 'Asteroid Exterior (104per)', description: 'Walkways on the asteroid surface, open to space' },
+    // Telos
+    { resRef: '201tel', planet: 'Telos', title: 'Citadel Station - Dock Module (201tel)', description: 'Station docks, customs and security checkpoints' },
+    { resRef: '202tel', planet: 'Telos', title: 'Citadel Station - Entertainment (202tel)', description: 'Station promenade with shops and cantina entrance' },
+    { resRef: '207tel', planet: 'Telos', title: 'Citadel Station - Cantina (207tel)', description: 'Station cantina with pazaak tables' },
+    { resRef: '203tel', planet: 'Telos', title: 'Citadel Station - Residential East (203tel)', description: 'Apartments and residential corridors' },
+    { resRef: '208tel', planet: 'Telos', title: 'Citadel Station - Bumani Exchange (208tel)', description: 'Corporate trading offices' },
+    { resRef: '209tel', planet: 'Telos', title: 'Czerka Offices (209tel)', description: 'Corporate offices on the station' },
+    { resRef: '231tel', planet: 'Telos', title: 'Restoration Zone (231tel)', description: 'Planetary restoration wilderness, grassland and lakes' },
+    { resRef: '232tel', planet: 'Telos', title: 'Underground Base (232tel)', description: 'Hidden military bunker beneath the surface' },
+    { resRef: '233tel', planet: 'Telos', title: 'Czerka Site (233tel)', description: 'Corporate excavation site in the wilderness' },
+    { resRef: '261tel', planet: 'Telos', title: 'Polar Plateau (261tel)', description: 'Frozen plateau and landing area' },
+    { resRef: '262tel', planet: 'Telos', title: 'Secret Academy (262tel)', description: 'Hidden Jedi academy in the ice' },
+    { resRef: '299tel', planet: 'Telos', title: 'HK Factory (299tel)', description: 'Droid manufacturing plant' },
+    // Nar Shaddaa
+    { resRef: '301nar', planet: 'Nar Shaddaa', title: 'Refugee Landing Pad (301nar)', description: 'Crowded landing pad in the smugglers\' moon' },
+    { resRef: '302nar', planet: 'Nar Shaddaa', title: 'Refugee Quad (302nar)', description: 'Refugee slums, shanties and alleys' },
+    { resRef: '303nar', planet: 'Nar Shaddaa', title: 'Docks (303nar)', description: 'Smugglers\' docks and warehouses' },
+    { resRef: '304nar', planet: 'Nar Shaddaa', title: 'Jekk\'Jekk Tarr (304nar)', description: 'Toxic-air cantina for non-humans' },
+    { resRef: '306nar', planet: 'Nar Shaddaa', title: 'Entertainment Promenade (306nar)', description: 'Neon promenade, pazaak den and cantina' },
+    // Dxun & Onderon
+    { resRef: '401dxn', planet: 'Dxun', title: 'Jungle Landing (401dxn)', description: 'Jungle clearing landing site' },
+    { resRef: '402dxn', planet: 'Dxun', title: 'Jungle (402dxn)', description: 'Dense moon jungle full of beasts' },
+    { resRef: '403dxn', planet: 'Dxun', title: 'Mandalorian Ruins (403dxn)', description: 'Mandalorian camp in ancient ruins' },
+    { resRef: '411dxn', planet: 'Dxun', title: 'Sith Tomb (411dxn)', description: 'Freedon Nadd\'s Sith tomb' },
+    { resRef: '501ond', planet: 'Onderon', title: 'Iziz Spaceport (501ond)', description: 'Walled-city spaceport' },
+    { resRef: '502ond', planet: 'Onderon', title: 'Merchant Quarter (502ond)', description: 'Iziz city streets and market' },
+    { resRef: '503ond', planet: 'Onderon', title: 'Iziz Cantina (503ond)', description: 'City cantina' },
+    { resRef: '506ond', planet: 'Onderon', title: 'Royal Palace (506ond)', description: 'Palace halls and throne room' },
+    { resRef: '512ond', planet: 'Onderon', title: 'Western Square (512ond)', description: 'City square and approach to the palace' },
+    // Dantooine
+    { resRef: '601dan', planet: 'Dantooine', title: 'Khoonda Plains (601dan)', description: 'Open grassland around the Khoonda settlement' },
+    { resRef: '602dan', planet: 'Dantooine', title: 'Khoonda (602dan)', description: 'Settlement hall and militia barracks' },
+    { resRef: '604dan', planet: 'Dantooine', title: 'Crystal Cave (604dan)', description: 'Cave of glowing lightsaber crystals' },
+    { resRef: '605dan', planet: 'Dantooine', title: 'Ruined Enclave Courtyard (605dan)', description: 'The ruined, looted Jedi Enclave' },
+    { resRef: '610dan', planet: 'Dantooine', title: 'Enclave Sublevel (610dan)', description: 'Dark, ruined underground levels of the Enclave' },
+    { resRef: '650dan', planet: 'Dantooine', title: 'Rebuilt Jedi Enclave (650dan)', description: 'Restored Enclave and council chamber' },
+    // Korriban
+    { resRef: '701kor', planet: 'Korriban', title: 'Valley of the Dark Lords (701kor)', description: 'Canyon of ancient Sith tombs' },
+    { resRef: '702kor', planet: 'Korriban', title: 'Sith Academy (702kor)', description: 'Abandoned Sith academy halls' },
+    { resRef: '710kor', planet: 'Korriban', title: 'Shyrack Cave (710kor)', description: 'Dark caves full of shyracks' },
+    { resRef: '711kor', planet: 'Korriban', title: 'Secret Tomb (711kor)', description: 'Hidden Sith tomb of visions' },
+    // Malachor V
+    { resRef: '901mal', planet: 'Malachor V', title: 'Surface (901mal)', description: 'Shattered battlefield world' },
+    { resRef: '902mal', planet: 'Malachor V', title: 'Depths (902mal)', description: 'Caverns beneath the surface' },
+    { resRef: '903mal', planet: 'Malachor V', title: 'Trayus Academy (903mal)', description: 'Sith academy halls' },
+    { resRef: '904mal', planet: 'Malachor V', title: 'Trayus Core (904mal)', description: 'Final confrontation chamber' },
+    { resRef: '906mal', planet: 'Malachor V', title: 'Trayus Proving Grounds (906mal)', description: 'Sith training arena' },
+  ];
+
+  /** Whether a creature preset's template exists in the running game */
+  static isPresetAvailable(preset: GMCreatureSpawnConfig): boolean {
+    return !preset.onlyIn || preset.onlyIn === (GameState.GameKey === GameEngineType.TSL ? 'tsl' : 'kotor');
+  }
+
+  /** The curated scenes for a game (default: the one running) */
+  static getCuratedModules(game?: 'kotor' | 'tsl'): GMModuleEntry[] {
+    const which = game || (GameState.GameKey === GameEngineType.TSL ? 'tsl' : 'kotor');
+    return which === 'tsl' ? this.CURATED_MODULES_TSL : this.CURATED_MODULES;
+  }
+
   // Curated Creature Presets
   /**
    * Creature presets: KotOR's own templates (.utc), so each keeps the game's look, stats, class, powers and gear.
@@ -525,7 +647,7 @@ export class GMManager {
     { name: 'Rakghoul', templateResRef: 'g_rakghoul01', appearanceId: 79, appearanceLabel: 'Creature_Rakghoul', factionId: 1, hp: 6, level: 1, classId: 8, barkText: '*Ferocious screech!*' },
     { name: 'Kinrath', templateResRef: 'c_kinrath', appearanceId: 88, appearanceLabel: 'Creature_Kinrath', factionId: 1, hp: 35, level: 4, classId: 8, barkText: '*Clicking mandibles*' },
     { name: 'Tuk\'ata', templateResRef: 'c_tukata', appearanceId: 89, appearanceLabel: 'Creature_Tukata', factionId: 1, hp: 56, level: 8, classId: 8, barkText: '*Low growl*' },
-    { name: 'Terentatek', templateResRef: 'g_terantanak', appearanceId: 353, appearanceLabel: 'Creature_Terantanak', factionId: 1, hp: 150, level: 10, classId: 0, barkText: '*Earth-shaking roar!*' },
+    { name: 'Terentatek', onlyIn: 'kotor', templateResRef: 'g_terantanak', appearanceId: 353, appearanceLabel: 'Creature_Terantanak', factionId: 1, hp: 150, level: 10, classId: 0, barkText: '*Earth-shaking roar!*' },
     { name: 'Rancor', templateResRef: 'g_rancor01', appearanceId: 80, appearanceLabel: 'Creature_Rancor', factionId: 1, hp: 350, level: 20, classId: 0, barkText: '*Deafening Rancor roar!*' },
     // Friendly: armed with what they carry, plus a weapon where the template has none
     { name: 'Republic Soldier', templateResRef: 'n_repsold', appearanceId: 38, appearanceLabel: 'Republic_Soldier_Mal_White', factionId: 2, hp: 8, level: 1, classId: 0, rightHandResRef: 'g_w_blstrrfl001', barkText: 'Reporting for duty! For the Republic!' },
@@ -2185,6 +2307,29 @@ export class GMManager {
     this.notifyChange();
   }
 
+  /** An open, quiet area to start GM mode in, for each game */
+  static DEFAULT_SCENE: Record<'kotor' | 'tsl', string> = { kotor: 'danm14aa', tsl: '601dan' };
+
+  static defaultSceneModule(): string {
+    return this.DEFAULT_SCENE[GameState.GameKey === GameEngineType.TSL ? 'tsl' : 'kotor'];
+  }
+
+  /**
+   * The module to load for a scene name: this game's own; the other game's, borrowed, when only it has one by
+   * that name (the curated scenes and blueprints name KotOR areas, so KotOR II borrows them); or else this
+   * game's default scene.
+   */
+  static async resolveSceneModule(moduleResRef: string): Promise<string> {
+    const name = String(moduleResRef || '').toLowerCase();
+    if (!name || OtherGameManager.isForeignModule(name)) return name;
+    if (!this.discoveredModules.length) await this.scanAvailableModules();
+    if (!this.discoveredModules.length || this.discoveredModules.includes(name)) return name;
+    if ((await OtherGameManager.listModules()).includes(name)) return OtherGameManager.foreignModuleName(name);
+    const fallback = this.defaultSceneModule();
+    GMNetworkManager.appendChat('System', `There's no "${name}" area in this game; loading ${fallback} instead.`);
+    return fallback;
+  }
+
   static async scanAvailableModules(): Promise<string[]> {
     try {
       const files = await GameFileSystem.readdir('modules');
@@ -2330,6 +2475,8 @@ export class GMManager {
     if (!moduleResRef) return;
     GameState.gmMode = true;
     this.active = true;
+    // The GM's machine decides which module that is (players load exactly what it sends)
+    if (GMNetworkManager.role !== 'client') moduleResRef = await this.resolveSceneModule(moduleResRef);
 
     // Conversations are with NPCs in this scene
     if (GMNetworkManager.role === 'host') {
@@ -2378,6 +2525,9 @@ export class GMManager {
 
     this.sceneLoading = true;
     this.selectedObject = null;
+    // A new scene starts unfrozen, with its own start point (a scene plan sets them again)
+    this.sceneStartPoint = null;
+    if (this.playersFrozen) this.setPlayersFrozen(false);
     this.spawnedPlayers = [];
     this.netIdMap.clear();
 
@@ -4206,7 +4356,7 @@ export class GMManager {
   static setDeathRule(rule: GMDeathRule) {
     if (!['kotor', 'gm', 'respawn'].includes(rule)) return;
     this.deathRule = rule;
-    GMNetworkManager.broadcastSessionRules({ deathRule: rule });
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
     this.notifyChange();
   }
 
@@ -4406,7 +4556,8 @@ export class GMManager {
     const usable = (c: ModuleObject | undefined, range: number): c is ModuleCreature =>
       !!c && c !== cre && BitWise.InstanceOf(c.objectType, ModuleObjectType.ModuleCreature) &&
       !c.isDead() && everyone.includes(c as ModuleCreature) &&
-      cre.position.distanceTo(c.position) <= range && cre.isHostile(c) && cre.canDetect?.(c as ModuleCreature) !== false;
+      cre.position.distanceTo(c.position) <= range && cre.isHostile(c) && cre.canDetect?.(c as ModuleCreature) !== false &&
+      !this.isUntargetable(c);
 
     const sight = cre.perceptionRange ? Math.max(cre.getPerceptionRangePrimary(), 1) : this.NPC_AI_SIGHT_RANGE;
     const current = cre.combatData.lastAttackTarget;
@@ -4586,7 +4737,7 @@ export class GMManager {
       keepDefaultCreatures: this.keepDefaultCreatures,
       keepDefaultTriggers: this.keepDefaultTriggers,
       keepDefaultPlaceables: this.keepDefaultPlaceables,
-      rules: { deathRule: this.deathRule },
+      rules: this.sessionRules(),
       actors: this.serializeActorsForTick(),
       doors,
       mines: this.getMines().map((m) => this.serializeMine(m)),
@@ -5289,7 +5440,7 @@ export class GMManager {
       objects,
       doors,
       players,
-      rules: { deathRule: this.deathRule },
+      rules: this.sessionRules(),
     };
   }
 
@@ -5675,6 +5826,8 @@ export class GMManager {
     const actor = this.getOwnedActor(peerId, intent.netId);
     if (!actor) return;
     (actor as any).gmIntentSeq = intent.seq;
+    // A watching player can't act (a late request from before the freeze is dropped too)
+    if (this.playersFrozen && intent.kind !== 'cancel') return;
 
     // Taking items and changing equipment don't interrupt anything the actor is doing
     if (intent.kind === 'loot') {
@@ -5814,6 +5967,7 @@ export class GMManager {
   static interceptMenuAction(pc: ModuleObject, entry: any, target: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client') return false;
     if (!pc || (pc as any).gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    if (this.isPlayerFrozen(pc)) return true;
     const targetNetId = target && target !== pc ? ((target as any).gmNetId as string | undefined) : undefined;
     const send = (ability: 'spell' | 'feat' | 'skill' | 'item', abilityId: number, resRef?: string) => {
       GMNetworkManager.sendIntent('ability', targetNetId, { ability, abilityId, resRef });
@@ -6105,6 +6259,7 @@ export class GMManager {
   static interceptInteraction(pc: ModuleObject, target: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client' || !target) return false;
     if (!pc || (pc as any).gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    if (this.isPlayerFrozen(pc)) return true;
     const targetNetId = (target as any).gmNetId as string | undefined;
     if (!targetNetId) return false;
 
@@ -6152,7 +6307,8 @@ export class GMManager {
         armorResRef: preset?.armorResRef ?? basePreset.armorResRef,
         possessImmediately: false,
         ownerPeerId: peerId
-      }
+      },
+      this.sceneStartPoint ? this.sceneStartPoint.clone() : undefined
     );
     return spawned ? ((spawned as any).gmNetId || null) : null;
   }

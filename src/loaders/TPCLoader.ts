@@ -20,6 +20,9 @@ import { TextureLoaderState } from "@/loaders/TextureLoaderState";
  * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
  */
 export class TPCLoader {
+
+  /** Where to look for a texture this game doesn't have (the other game's texture packs) */
+  static FallbackSources: ((resRef: string) => Promise<Uint8Array | undefined>)[] = [];
   
   async findTPC( resRef: string ): Promise<IFindTPCResult> {
     resRef = resRef.toLocaleLowerCase();
@@ -52,6 +55,13 @@ export class TPCLoader {
     if(resKey){
       const buffer = await KEYManager.Key.getFileBuffer( resKey);
       return { pack: TextureLoaderState.TextureQuality || 2, buffer: buffer };
+    }
+
+    for(const source of TPCLoader.FallbackSources){
+      const buffer = await source(resRef);
+      if(buffer){
+        return { pack: TextureLoaderState.TextureQuality || 2, buffer: buffer };
+      }
     }
 
     throw new Error('TPC not found in game resources!');

@@ -192,6 +192,8 @@ export type GMDeathRule = 'kotor' | 'gm' | 'respawn';
 /** Session-wide rules the GM sets, which players need to know */
 export interface GMSessionRules {
   deathRule: GMDeathRule;
+  /** Players can only watch: no moving or acting, and NPCs leave them alone */
+  frozen?: boolean;
 }
 
 export interface GMWorldSnapshot {

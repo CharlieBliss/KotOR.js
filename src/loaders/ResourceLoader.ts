@@ -133,6 +133,12 @@ export class ResourceLoader {
       });
   }
 
+  /**
+   * Where to look for a resource this game doesn't have, in order. The other game, when one of its scenes is
+   * borrowed (OtherGameManager).
+   */
+  static FallbackSources: ((resId: number, resRef: string) => Promise<Uint8Array | undefined>)[] = [];
+
   static async loadResource(resId: number, resRef: string): Promise<Uint8Array> {
 
     if(!resId){
@@ -165,6 +171,14 @@ export class ResourceLoader {
     if(data){
       ResourceLoader.setCache(null, resId, resRef, data);
       return data;
+    }
+
+    for(const source of ResourceLoader.FallbackSources){
+      data = await source(resId, resRef);
+      if(data){
+        ResourceLoader.setCache(null, resId, resRef, data);
+        return data;
+      }
     }
 
     //Resource Not Found

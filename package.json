@@ -13,6 +13,8 @@
     "gm:server": "node scripts/gm-server.js",
     "test:gm-e2e": "electron scripts/gm-e2e.js",
     "bench:abilities": "electron scripts/gm-ability-bench.js",
+    "catalog:scenes": "electron scripts/gm-scene-catalog.js",
+    "skill:pack": "node scripts/pack-skill.js",
     "electron:watch": "tsc-watch --project tsconfig.electron.json",
     "electron:compile": "tsc --project tsconfig.electron.json",
     "electron:build": "npm run webpack:prod && npm run electron:compile && npm run electron:icon && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false npx --yes electron-builder build --publish=never",

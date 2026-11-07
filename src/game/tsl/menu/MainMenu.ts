@@ -54,7 +54,7 @@ export class MainMenu extends K1_MainMenu {
       this.BTN_WARP.show();
       this.BTN_WARP.addEventListener('click', (e) => {
         e.stopPropagation();
-        GameState.EnterGMMode('danm14aa');
+        GameState.EnterGMMode(GameState.GMManager.defaultSceneModule());
       });
 
       this.BTN_NEWGAME.addEventListener('click', (e) => {

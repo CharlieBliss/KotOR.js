@@ -202,6 +202,7 @@ export class GMNpcOrders {
     let bestDistance = Infinity;
     for (const other of everyone) {
       if (!other || other === cre || other.isDead() || !cre.isHostile(other) || cre.canDetect?.(other) === false) continue;
+      if (GameState.GMManager?.isUntargetable(other)) continue;
       const d = other.position.distanceTo(centre);
       if (d > range || d >= bestDistance) continue;
       if (mustSee && !cre.hasLineOfSight(other, Math.max(range, 30))) continue;

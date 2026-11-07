@@ -1178,6 +1178,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   canMove(){
+    // A GM can freeze players to watch a scene
+    if(GameState.gmMode && GameState.GMManager?.isPlayerFrozen(this)) return false;
     return !this.isParalyzed() && !this.isStunned() && (
       this.animationState.index != ModuleCreatureAnimState.DEAD && 
       this.animationState.index != ModuleCreatureAnimState.DEAD1 && 

@@ -28,14 +28,22 @@ export const GMPanel: React.FC = () => {
   // Scene tab states
   const [planetFilter, setPlanetFilter] = useState<string>('All');
   const [sceneSearch, setSceneSearch] = useState<string>('');
-  const [customModuleResRef, setCustomModuleResRef] = useState<string>('danm14aa');
+  const [customModuleResRef, setCustomModuleResRef] = useState<string>(() => GMManager.defaultSceneModule());
+  // The other KotOR game's areas, borrowed as scenes (OtherGameManager)
+  const [otherModules, setOtherModules] = useState<string[] | null>(null);
+  const [otherStatus, setOtherStatus] = useState<string>('');
+  const [otherQuery, setOtherQuery] = useState<string>('');
+  // A scene plan to import (from the kotor-gm-scenes skill)
+  const [planJson, setPlanJson] = useState<string>('');
+  const [planProblems, setPlanProblems] = useState<KotOR.GMPlanProblem[]>([]);
+  const [planImporting, setPlanImporting] = useState<boolean>(false);
   const [keepCreatures, setKeepCreatures] = useState<boolean>(GMManager.keepDefaultCreatures);
   const [keepTriggers, setKeepTriggers] = useState<boolean>(GMManager.keepDefaultTriggers);
   const [keepPlaceables, setKeepPlaceables] = useState<boolean>(GMManager.keepDefaultPlaceables);
   const [preserveParty, setPreserveParty] = useState<boolean>(GMManager.preservePartyOnWarp);
 
   // Scene Builder (Office, Temple, etc.) tab states
-  const [blueprintBgModule, setBlueprintBgModule] = useState<string>('danm14aa');
+  const [blueprintBgModule, setBlueprintBgModule] = useState<string>(() => GMManager.defaultSceneModule());
   const [blueprintSpawnNPCs, setBlueprintSpawnNPCs] = useState<boolean>(true);
   const [blueprintClearExisting, setBlueprintClearExisting] = useState<boolean>(true);
   const [blueprintOriginMode, setBlueprintOriginMode] = useState<'entry' | 'camera'>('entry');
@@ -367,6 +375,12 @@ export const GMPanel: React.FC = () => {
   }
 
   const currentModuleName = KotOR.GameState.module?.filename || 'Loading...';
+  // Each game has its own curated scenes; the other game's are offered under "Scenes from ..."
+  const runningTSL = String(KotOR.ApplicationProfile.GameKey) === 'TSL';
+  const curatedModules = GMManager.getCuratedModules();
+  const otherCuratedModules = GMManager.getCuratedModules(runningTSL ? 'kotor' : 'tsl');
+  const curatedSceneName = (resRef: string) => resRef;
+  const otherTitle = KotOR.OtherGameManager.otherTitle();
   const currentArea = KotOR.GameState.module?.area;
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
@@ -474,8 +488,8 @@ export const GMPanel: React.FC = () => {
     if (target) GMManager.possessCharacter(target);
   };
 
-  const planets = ['All', ...Array.from(new Set(GMManager.CURATED_MODULES.map(m => m.planet)))];
-  const filteredCuratedModules = GMManager.CURATED_MODULES.filter(m => {
+  const planets = ['All', ...Array.from(new Set(curatedModules.map(m => m.planet)))];
+  const filteredCuratedModules = curatedModules.filter(m => {
     if (planetFilter !== 'All' && m.planet !== planetFilter) return false;
     if (!sceneSearch.trim()) return true;
     const q = sceneSearch.toLowerCase();
@@ -638,6 +652,13 @@ export const GMPanel: React.FC = () => {
             >
               {GMManager.npcAiEnabled ? 'NPC AI: On' : 'NPC AI: Off'}
             </button>
+            <button
+              className={`gm-btn small ${GMManager.playersFrozen ? 'warning active' : ''}`}
+              onClick={() => GMManager.setPlayersFrozen(!GMManager.playersFrozen)}
+              title="Players can only watch: they can't move or act, and NPCs leave them alone"
+            >
+              {GMManager.playersFrozen ? 'Players: Watching' : 'Players: Free'}
+            </button>
           </div>
         )}
       </div>
@@ -777,8 +798,8 @@ export const GMPanel: React.FC = () => {
                         value={blueprintBgModule}
                         onChange={e => setBlueprintBgModule(e.target.value)}
                       >
-                        <option value="danm14aa">Dantooine Courtyard — Default Open Stage (danm14aa)</option>
-                        {GMManager.CURATED_MODULES.map(m => (
+                        <option value={GMManager.defaultSceneModule()}>Default open stage ({GMManager.defaultSceneModule()})</option>
+                        {curatedModules.map(m => (
                           <option key={m.resRef} value={m.resRef}>{m.planet} — {m.title}</option>
                         ))}
                       </select>
@@ -1028,6 +1049,92 @@ export const GMPanel: React.FC = () => {
             {drawerTab === 'scenes' && (
               <>
                 <div className="gm-section">
+                  <div className="gm-section-title">
+                    <span>Scene plan</span>
+                    <label className="gm-btn small" title="A .json scene plan (from the kotor-gm-scenes Claude skill)">
+                      Open file…
+                      <input
+                        type="file"
+                        accept=".json,application/json"
+                        style={{ display: 'none' }}
+                        onChange={async (e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) setPlanJson(await file.text());
+                        }}
+                      />
+                    </label>
+                  </div>
+                  <textarea
+                    className="gm-input"
+                    style={{ minHeight: 70, fontFamily: 'monospace', fontSize: 11 }}
+                    placeholder="Paste a scene plan here, or open its file"
+                    value={planJson}
+                    onChange={(e) => { setPlanJson(e.target.value); setPlanProblems([]); }}
+                  />
+                  <div className="gm-row">
+                    <button
+                      className="gm-btn success"
+                      style={{ flex: 1 }}
+                      disabled={!planJson.trim() || planImporting}
+                      onClick={async () => {
+                        const { plan, problems } = KotOR.GMScenePlan.parse(planJson);
+                        setPlanProblems(problems);
+                        if (!plan) return;
+                        setPlanImporting(true);
+                        try {
+                          await KotOR.GMScenePlan.import(plan);
+                        } finally {
+                          setPlanImporting(false);
+                          forceUpdate();
+                        }
+                      }}
+                      title="Loads the plan's area, places its actors and props, and moves the players to their start"
+                    >
+                      {planImporting ? 'Setting the scene…' : 'Import and set the scene'}
+                    </button>
+                  </div>
+                  {planProblems.map((p, i) => (
+                    <div key={i} className="gm-hint" style={{ color: p.level === 'error' ? '#ff8a80' : '#ffd740' }}>
+                      {p.level === 'error' ? 'Error' : 'Note'} ({p.where}): {p.message}
+                    </div>
+                  ))}
+                </div>
+
+                {KotOR.GMScenePlan.active && (() => {
+                  const runner = KotOR.GMScenePlan.active;
+                  const plan = runner.plan;
+                  return (
+                    <div className="gm-section">
+                      <div className="gm-section-title">
+                        <span>{plan.title}</span>
+                        <button className="gm-btn small" onClick={() => { KotOR.GMScenePlan.active = null; forceUpdate(); }} title="Put the plan away (the scene stays)">Close</button>
+                      </div>
+                      {plan.summary && <div className="gm-hint">{plan.summary}</div>}
+                      {plan.gmNotes && <div className="gm-hint"><b>GM notes:</b> {plan.gmNotes}</div>}
+                      {plan.players.note && <div className="gm-hint"><b>Players:</b> {plan.players.note}</div>}
+                      {runner.log.map((line, i) => (
+                        <div key={i} className="gm-hint" style={{ color: '#ffd740' }}>{line}</div>
+                      ))}
+                      <div className="gm-list" style={{ maxHeight: 260 }}>
+                        {(plan.beats || []).map((beat, i) => (
+                          <div key={i} className={`gm-card ${runner.beatsRun.has(i) ? 'selected' : ''}`}>
+                            <div className="gm-card-info">
+                              <div className="gm-card-title">{i + 1}. {beat.title}{runner.beatsRun.has(i) ? ' ✓' : ''}</div>
+                              {beat.narration && <div className="gm-card-sub">“{beat.narration}”</div>}
+                              {beat.notes && <div className="gm-card-sub">{beat.notes}</div>}
+                            </div>
+                            <button className="gm-btn small success" onClick={() => { runner.runBeat(i); forceUpdate(); }} title="Say its narration and do its actions">
+                              {runner.beatsRun.has(i) ? 'Again' : 'Run'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="gm-section">
                   <div className="gm-section-title">Scene Load Options</div>
                   <label className="gm-checkbox">
                     <input
@@ -1105,9 +1212,9 @@ export const GMPanel: React.FC = () => {
                     {filteredCuratedModules.map(mod => (
                       <div
                         key={mod.resRef}
-                        className={`gm-card ${currentModuleName === mod.resRef ? 'selected' : ''}`}
+                        className={`gm-card ${currentModuleName === curatedSceneName(mod.resRef) ? 'selected' : ''}`}
                         onClick={() =>
-                          GMManager.loadScene(mod.resRef, {
+                          GMManager.loadScene(curatedSceneName(mod.resRef), {
                             keepCreatures,
                             keepTriggers,
                             keepPlaceables,
@@ -1163,6 +1270,60 @@ export const GMPanel: React.FC = () => {
                     </button>
                   </div>
                 </div>
+
+                <div className="gm-section">
+                  <div className="gm-section-title">
+                    <span>Scenes from {otherTitle}</span>
+                    {otherModules === null && (
+                      <button
+                        className="gm-btn small active"
+                        onClick={async () => {
+                          setOtherStatus(`Opening ${otherTitle}…`);
+                          const list = await KotOR.OtherGameManager.listModules();
+                          setOtherModules(list);
+                          setOtherStatus(list.length ? '' : (KotOR.OtherGameManager.lastError || `No ${otherTitle} areas found.`));
+                        }}
+                        title={`Borrow an area from ${otherTitle}: its rooms, sky and lighting, without its characters or objects`}
+                      >
+                        Show
+                      </button>
+                    )}
+                  </div>
+                  <div className="gm-hint">
+                    The area only (terrain, buildings, sky, music); fill it with this game's characters and objects.
+                    Players need {otherTitle} set up in their launcher too.
+                  </div>
+                  {otherStatus && <div className="gm-hint">{otherStatus}</div>}
+                  {otherModules && otherModules.length > 0 && (
+                    <>
+                      <input
+                        className="gm-input"
+                        placeholder={`Search ${otherModules.length} areas (e.g. danm, tat_, ebo_)`}
+                        value={otherQuery}
+                        onChange={e => setOtherQuery(e.target.value)}
+                      />
+                      <div className="gm-list" style={{ maxHeight: 220 }}>
+                        {otherModules.filter(m => !otherQuery.trim() || m.includes(otherQuery.trim().toLowerCase())).map(m => {
+                          const name = KotOR.OtherGameManager.foreignModuleName(m);
+                          const known = otherCuratedModules.find(c => c.resRef === m);
+                          return (
+                            <div
+                              key={m}
+                              className={`gm-card ${currentModuleName === name ? 'selected' : ''}`}
+                              onClick={() => GMManager.loadScene(name, { keepCreatures, keepTriggers, keepPlaceables, preserveParty })}
+                            >
+                              <div className="gm-card-info">
+                                <div className="gm-card-title">{known ? `${known.planet} — ${known.title}` : m}</div>
+                                <div className="gm-card-sub">{known?.description || `${otherTitle} area`}</div>
+                              </div>
+                              <button className="gm-btn small active">Load</button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
               </>
             )}
 
@@ -1194,7 +1355,7 @@ export const GMPanel: React.FC = () => {
                         <div className="gm-field">
                           <label>Creature</label>
                           <select className="gm-select" value={encounterPreset} onChange={e => setEncounterPreset(Number(e.target.value))}>
-                            {GMManager.CREATURE_PRESETS.map((preset, idx) => <option key={idx} value={idx}>{preset.name}</option>)}
+                            {GMManager.CREATURE_PRESETS.map((preset, idx) => GMManager.isPresetAvailable(preset) ? <option key={idx} value={idx}>{preset.name}</option> : null)}
                           </select>
                         </div>
                         <div className="gm-field">
@@ -1233,7 +1394,7 @@ export const GMPanel: React.FC = () => {
 
                       {creatureSource === 'presets' ? (
                         <div className="gm-list" style={{ maxHeight: 200 }}>
-                          {GMManager.CREATURE_PRESETS.map((preset, idx) => (
+                          {GMManager.CREATURE_PRESETS.map((preset, idx) => !GMManager.isPresetAvailable(preset) ? null : (
                             <div
                               key={idx}
                               className={`gm-card ${creaturePick.name === preset.name && creaturePick.templateResRef === preset.templateResRef ? 'selected' : ''}`}

@@ -1004,7 +1004,8 @@ export class GameState implements EngineContext {
     GameState.MenuManager.MainMenu.Start();
   }
 
-  static EnterGMMode(moduleName = 'danm14aa'){
+  static EnterGMMode(moduleName = ''){
+    moduleName = moduleName || GameState.GMManager.defaultSceneModule();
     GameState.gmMode = true;
     GameState.isLoadingSave = false;
     GameState.GMManager.loadScene(moduleName);
