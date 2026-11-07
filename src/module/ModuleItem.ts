@@ -458,13 +458,15 @@ export class ModuleItem extends ModuleObject {
   }
 
   /**
-   * The spells.2da row a Cast Spell property casts. Its subtype is a row of iprp_spells.2da, whose
-   * spellindex is the spell (e.g. a medpac's subtype 64 is its healing spell).
+   * The spells.2da row a Cast Spell property casts. In KotOR its subtype is that row itself (a medpac's 64 is
+   * ITEM_ABILITY_MED_PACK, a frag grenade's 87 ITEM_ABILITY_GRENADE_FRAGMENTATION). iprp_spells.2da is a table
+   * left over from Neverwinter Nights: its spellindex points at unrelated powers, so it isn't used.
    */
   static GetCastSpellId(property: ItemProperty): number {
-    const row = GameState.TwoDAManager.datatables.get('iprp_spells')?.rows[property?.subType];
-    const spellId = parseInt(row?.spellindex);
-    return Number.isFinite(spellId) ? spellId : -1;
+    const spellId = Number(property?.subType);
+    if(!Number.isInteger(spellId) || spellId < 0) return -1;
+    const spells = GameState.TwoDAManager.datatables.get('spells');
+    return !spells || spells.rows[spellId] ? spellId : -1;
   }
 
   /**
@@ -478,6 +480,25 @@ export class ModuleItem extends ModuleObject {
     if(label === 'Single_Use') return { single: true, charges: 0 };
     const charges = label.match(/^(\d+)_Charges?\/Use$/);
     return { single: false, charges: charges ? parseInt(charges[1]) : 0 };
+  }
+
+  /**
+   * Who a usable item is used on, from the spell it casts: 'hostile' for grenades and droid weapons (an enemy),
+   * 'self' for the rest (medpacs, stims, adrenals, shields, repair kits); undefined if it can't be used now.
+   */
+  getUseTargeting(): 'self' | 'hostile' | undefined {
+    const property = this.getUsableCastSpellProperties()[0];
+    if(!property) return undefined;
+    const spell = GameState.TwoDAManager.datatables.get('spells')?.rows[ModuleItem.GetCastSpellId(property)];
+    if(!spell) return undefined;
+    const hostile = String(spell.impactscript || '').toLowerCase() === 'k_sup_grenade' ||
+      (spell.forcehostile !== undefined && spell.forcehostile !== '****' && spell.forcehostile !== '');
+    return hostile ? 'hostile' : 'self';
+  }
+
+  /** The resref that names this item (equipped or carried) */
+  getItemResRef(): string {
+    return this.getEquippedRes?.() || this.getInventoryRes?.() || this.getTemplateResRef?.() || '';
   }
 
   /** The item's usable Cast Spell properties, with enough charges left for a use */

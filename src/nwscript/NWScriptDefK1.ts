@@ -2992,7 +2992,13 @@ NWScriptDefK1.Actions = {
     comment: "224: the effect of body fule.. convers HP -> FP i think\n",
     name: "EffectBodyFuel",
     type: NWScriptDataType.EFFECT,
-    args: []
+    args: [],
+    action: function(this: NWScriptInstance, args: []){
+      const effect = new GameState.GameEffectFactory.EffectBodyFuel();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      return effect.initialize();
+    }
   },
   225:{
     comment: "225: Get the orientation value from lLocation.\n",
@@ -3657,7 +3663,11 @@ NWScriptDefK1.Actions = {
     comment: "274: - oCreature\n- nImmunityType: IMMUNITY_TYPE_*\n- oVersus: if this is specified, then we also check for the race and\nalignment of oVersus\n* Returns TRUE if oCreature has immunity of type nImmunity versus oVersus.\n",
     name: "GetIsImmune",
     type: NWScriptDataType.INTEGER,
-    args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT]
+    args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
+    action: function(this: NWScriptInstance, args: [ModuleObject, number, ModuleObject]){
+      if(!BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleCreature)) return NW_FALSE;
+      return (args[0] as ModuleCreature).isImmune(args[1]) ? NW_TRUE : NW_FALSE;
+    }
   },
   275:{
     comment: "275: Creates a Damage Immunity Increase effect.\n- nDamageType: DAMAGE_TYPE_*\n- nPercentImmunity\n",
@@ -6172,7 +6182,14 @@ NWScriptDefK1.Actions = {
     comment: "485: Create a Modify Attacks effect to add attacks.\n- nAttacks: maximum is 5, even with the effect stacked\n* Returns an effect of type EFFECT_TYPE_INVALIDEFFECT if nAttacks > 5.\n",
     name: "EffectModifyAttacks",
     type: NWScriptDataType.EFFECT,
-    args: [NWScriptDataType.INTEGER]
+    args: [NWScriptDataType.INTEGER],
+    action: function(this: NWScriptInstance, args: [number]){
+      const effect = new GameState.GameEffectFactory.EffectModifyNumAttacks();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, Math.max(0, Math.min(5, args[0] | 0)));
+      return effect.initialize();
+    }
   },
   486:{
     comment: "486: Get the last trap detected by oTarget.\n* Return value on error: OBJECT_INVALID\n",
@@ -8388,7 +8405,18 @@ NWScriptDefK1.Actions = {
     comment: "702. EffectLightsaberThrow\nThis function throws a lightsaber at a target\nIf multiple targets are specified, then the lightsaber travels to them\nsequentially, returning to the first object specified\nThis effect is applied to an object, so an effector is not needed\n",
     name: "EffectLightsaberThrow",
     type: NWScriptDataType.EFFECT,
-    args: [NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.INTEGER]
+    args: [NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.INTEGER],
+    action: function(this: NWScriptInstance, args: [ModuleObject, ModuleObject, ModuleObject, number]){
+      const effect = new GameState.GameEffectFactory.EffectLightSaberThrow();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      for(let i = 0; i < 3; i++){
+        const target = args[i] as ModuleObject;
+        if(BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)) effect.setObject(i, target);
+      }
+      effect.setInt(0, args[3] | 0);
+      return effect.initialize();
+    }
   },
   703:{
     comment: "703.\ncreates the effect of a whirl wind.\n",

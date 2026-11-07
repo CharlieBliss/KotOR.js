@@ -201,7 +201,7 @@ export class GMNpcOrders {
     let best: ModuleCreature | null = null;
     let bestDistance = Infinity;
     for (const other of everyone) {
-      if (!other || other === cre || other.isDead() || !cre.isHostile(other)) continue;
+      if (!other || other === cre || other.isDead() || !cre.isHostile(other) || cre.canDetect?.(other) === false) continue;
       const d = other.position.distanceTo(centre);
       if (d > range || d >= bestDistance) continue;
       if (mustSee && !cre.hasLineOfSight(other, Math.max(range, 30))) continue;

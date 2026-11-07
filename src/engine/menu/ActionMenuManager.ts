@@ -3,6 +3,7 @@ import { ActionMenuPanel } from "@/engine/menu/ActionMenuPanel";
 import { ActionMenuItem } from "@/engine/menu/ActionMenuItem";
 import type { ModuleObject } from "@/module/ModuleObject";
 import type { ModuleCreature } from "@/module/ModuleCreature";
+import type { ModuleItem } from "@/module/ModuleItem";
 import { IActionPanelLists } from "@/interface/gui/IActionPanelLists";
 import { GameEngineType } from "@/enums/engine/GameEngineType";
 import { ActionType } from "@/enums/actions/ActionType";
@@ -70,8 +71,9 @@ export class ActionMenuManager {
     }
 
     const securityTalent = ActionMenuManager.oPC.skills[SkillType.SECURITY];
-    const bHasSecuritySkill = ActionMenuManager.oPC.getSkillLevel(SkillType.SECURITY) >= 1;
-    const bHasDemolitionsSkill = ActionMenuManager.oPC.getSkillLevel(SkillType.DEMOLITIONS) >= 1;
+    const ranks = (skill: SkillType) => ActionMenuManager.oPC.getSkillRanks?.(skill) ?? ActionMenuManager.oPC.getSkillLevel(skill);
+    const bHasSecuritySkill = ranks(SkillType.SECURITY) >= 1;
+    const bHasDemolitionsSkill = ranks(SkillType.DEMOLITIONS) >= 1;
 
     if(ActionMenuManager.oTarget instanceof GameState.Module.ModuleArea.ModuleObject){
 
@@ -201,7 +203,7 @@ export class ActionMenuManager {
             }
           }
         }
-      }else if(ActionMenuManager.oTarget instanceof GameState.Module.ModuleArea.ModuleCreature && ActionMenuManager.oTarget.isHostile(GameState.PartyManager.party[0] as ModuleObject)){
+      }else if(ActionMenuManager.oTarget instanceof GameState.Module.ModuleArea.ModuleCreature && ActionMenuManager.oTarget.isHostile(ActionMenuManager.oPC as ModuleObject)){
         ActionMenuManager.ActionPanels.targetPanels[0].addAction(new GameState.ActionMenuManager.ActionMenuItem({
           action: {
             type: ActionType.ActionPhysicalAttacks,
@@ -261,6 +263,14 @@ export class ActionMenuManager {
           }));
         }
 
+        for(const item of ActionMenuManager.getUsableItems('hostile')){
+          ActionMenuManager.ActionPanels.targetPanels[2].addAction(new GameState.ActionMenuManager.ActionMenuItem({
+            item,
+            target: ActionMenuManager.oTarget,
+            icon: item.getIcon()
+          }));
+        }
+
       }else if(ActionMenuManager.oTarget instanceof GameState.Module.ModuleArea.ModuleTrigger){
         if(ActionMenuManager.oTarget.type == ModuleTriggerType.TRAP){
           /**
@@ -305,7 +315,65 @@ export class ActionMenuManager {
       }));
     }
 
+    if(ActionMenuManager.oPC.canEnterStealth?.() || ActionMenuManager.oPC.stealthMode){
+      ActionMenuManager.ActionPanels.selfPanels[0].addAction(new GameState.ActionMenuManager.ActionMenuItem({
+        action: { type: ActionMenuManager.STEALTH_ACTION },
+        target: ActionMenuManager.oPC,
+        icon: ActionMenuManager.oPC.skills?.[SkillType.STEALTH]?.getIcon?.() || ''
+      }));
+    }
+
+    for(const item of ActionMenuManager.getUsableItems('self')){
+      ActionMenuManager.ActionPanels.selfPanels[2].addAction(new GameState.ActionMenuManager.ActionMenuItem({
+        item,
+        target: ActionMenuManager.oPC,
+        icon: item.getIcon()
+      }));
+    }
+
     return ActionMenuManager.ActionPanels;
+  }
+
+  /** The menu entry that toggles stealth (not an engine action type) */
+  static STEALTH_ACTION = 'stealth';
+
+  /**
+   * Usable items for the menu: what it carries and wears that casts a spell, one entry per kind of item.
+   * 'self' items (medpacs, stims, shields) go on the self menu; 'hostile' ones (grenades, droid weapons) on an enemy.
+   */
+  static getUsableItems(use: 'self' | 'hostile'): ModuleItem[] {
+    const pc = ActionMenuManager.oPC;
+    if(!pc) return [];
+    const items = [...(pc.getInventory?.() || []), ...Object.values(pc.equipment || {})] as ModuleItem[];
+    const seen = new Set<string>();
+    const out: ModuleItem[] = [];
+    for(const item of items){
+      if(!item?.getUseTargeting || item.getUseTargeting() !== use) continue;
+      const key = item.getItemResRef();
+      if(seen.has(key)) continue;
+      seen.add(key);
+      out.push(item);
+    }
+    return out;
+  }
+
+  /** Run one menu entry: an attack, a talent, an item, stealth or a queued action */
+  static runMenuItem(action: any, target: ModuleObject){
+    const pc = ActionMenuManager.oPC;
+    if(!pc || !action) return;
+    // In a GM session a player's character acts on the GM's machine
+    if(GameState.gmMode && GameState.GMManager?.interceptMenuAction?.(pc, action, target)) return;
+    if(action.item){
+      action.item.useItemOnObject(pc, target);
+    }else if(action.action?.type === ActionMenuManager.STEALTH_ACTION){
+      pc.setStealthMode(!pc.stealthMode);
+    }else if(action.action && action.action.type == ActionType.ActionPhysicalAttacks){
+      pc.attackCreature(target, undefined);
+    }else if(action.talent instanceof TalentObject){
+      action.talent.useTalentOnObject(target, pc);
+    }else if(action.action){
+      pc.actionQueue.addFront(action.action);
+    }
   }
 
   static targetActionCount(){
@@ -329,25 +397,7 @@ export class ActionMenuManager {
 
     const action = ActionMenuManager.ActionPanels.targetPanels[index].getSelectedAction();
     if(action){
-      if(index==0){
-        if(action.action && action.action.type == ActionType.ActionPhysicalAttacks){
-          ActionMenuManager.oPC.attackCreature(action.target, undefined);
-        }else if(action.action){
-          console.log('onTargetMenuAction', action);
-          ActionMenuManager.oPC.actionQueue.addFront(
-            action.action
-          ); 
-        }else if(action.talent instanceof TalentObject){
-          action.talent.useTalentOnObject(action.target, ActionMenuManager.oPC);
-        }
-      }else if(action.talent){
-        action.talent.useTalentOnObject(action.target, ActionMenuManager.oPC);
-      }else if(action.action){
-        console.log('onTargetMenuAction', action);
-        ActionMenuManager.oPC.actionQueue.addFront(
-          action.action
-        );
-      }
+      ActionMenuManager.runMenuItem(action, action.target || ActionMenuManager.oTarget);
     }
   }
 
@@ -356,11 +406,7 @@ export class ActionMenuManager {
     
     const action = ActionMenuManager.ActionPanels.selfPanels[index].getSelectedAction();
     if(!action){ return; }
-
-    if(action.talent instanceof TalentObject){
-      //GameState.getCurrentPlayer().useTalent(action.talent, action.target);
-      action.talent.useTalentOnObject(ActionMenuManager.oPC, ActionMenuManager.oPC);
-    }
+    ActionMenuManager.runMenuItem(action, ActionMenuManager.oPC);
   }
 
 }

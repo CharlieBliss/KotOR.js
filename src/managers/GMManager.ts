@@ -29,6 +29,11 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import type { GameEffect } from "@/effects/GameEffect";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
+import { ActionType } from "@/enums/actions/ActionType";
+import { ActionParameterType } from "@/enums/actions/ActionParameterType";
+import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
+import { TalentObjectType } from "@/enums/engine/TalentObjectType";
+import { SkillType } from "@/enums/nwscript/SkillType";
 import { BitWise } from "@/utility/BitWise";
 import { Utility } from "@/utility/Utility";
 import { GameFileSystem } from "@/utility/GameFileSystem";
@@ -4297,7 +4302,7 @@ export class GMManager {
     const usable = (c: ModuleObject | undefined, range: number): c is ModuleCreature =>
       !!c && c !== cre && BitWise.InstanceOf(c.objectType, ModuleObjectType.ModuleCreature) &&
       !c.isDead() && everyone.includes(c as ModuleCreature) &&
-      cre.position.distanceTo(c.position) <= range && cre.isHostile(c);
+      cre.position.distanceTo(c.position) <= range && cre.isHostile(c) && cre.canDetect?.(c as ModuleCreature) !== false;
 
     const sight = cre.perceptionRange ? Math.max(cre.getPerceptionRangePrimary(), 1) : this.NPC_AI_SIGHT_RANGE;
     const current = cre.combatData.lastAttackTarget;
@@ -4420,6 +4425,7 @@ export class GMManager {
       scale: (obj as any).gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
       hidden: !!(obj as any).gmHidden,
+      stealth: !!(obj as any).stealthMode,
       hostDriven: !!(obj as any).gmHostDriven,
       intentSeq: (obj as any).gmIntentSeq || 0,
       rightHandResRef,
@@ -4558,6 +4564,8 @@ export class GMManager {
         if (localObj) {
           if (BitWise.InstanceOf(localObj.objectType, ModuleObjectType.ModuleCreature)) {
             this.setCreatureHP(localObj as ModuleCreature, actor.hp, actor.maxHp);
+            const own = localObj as ModuleCreature;
+            if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
           } else {
             localObj.setMaxHP(actor.maxHp);
             localObj.currentHP = actor.hp;
@@ -4602,6 +4610,7 @@ export class GMManager {
       } else {
         const cre = existing as ModuleCreature;
         cre.setFacing(actor.facing, false);
+        if (!!cre.stealthMode !== !!actor.stealth) cre.setStealthMode(!!actor.stealth, true);
         if (cre.factionId !== actor.factionId) {
           this.assignFaction(cre, actor.factionId);
         }
@@ -5563,9 +5572,22 @@ export class GMManager {
       return;
     }
 
+    if (intent.kind === 'stealth') {
+      (actor as ModuleCreature).setStealthMode(!(actor as ModuleCreature).stealthMode);
+      return;
+    }
+
     actor.clearAllActions();
     if (intent.kind === 'cancel') {
       (actor as any).gmHostDriven = false;
+      return;
+    }
+    if (intent.kind === 'ability') {
+      (actor as any).gmNetTarget = undefined;
+      this.useAbilityOnHost(actor as ModuleCreature, intent).then((ok) => {
+        (actor as any).gmHostDriven = ok;
+        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
+      }).catch((e) => console.warn('[GMManager] ability failed', e));
       return;
     }
 
@@ -5588,6 +5610,112 @@ export class GMManager {
       return;
     }
     (actor as any).gmHostDriven = true;
+  }
+
+  /**
+   * Host: use a Force power, feat, skill or item a player picked from KotOR's action menu, through the same
+   * engine path as anyone else. It must be theirs: a power or feat their character knows, a skill they have
+   * ranks in, an item they carry or wear. Returns false when it can't be used.
+   */
+  static async useAbilityOnHost(actor: ModuleCreature, intent: GMClientIntent): Promise<boolean> {
+    if (!actor || actor.isDead()) return false;
+    const target = intent.targetNetId ? this.netIdMap.get(intent.targetNetId) : actor;
+    if (!target || (target as any).gmHidden) return false;
+    const id = Number(intent.abilityId);
+
+    switch (intent.ability) {
+      case 'spell': {
+        const spell = actor.getSpells().find((s: any) => s.id === id);
+        if (!spell) return false;
+        spell.useTalentOnObject(target, actor);
+        return true;
+      }
+      case 'feat': {
+        const feat = actor.getFeats().find((f: any) => f.id === id);
+        if (!feat) return false;
+        feat.useTalentOnObject(target, actor);
+        return true;
+      }
+      case 'skill': {
+        if (id === SkillType.SECURITY) {
+          // A security tunneler, if they used one; otherwise their Security ranks
+          let tool: ModuleItem | undefined;
+          if (intent.resRef) {
+            if (!this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return false;
+            tool = await this.createItemFromResRefAsync(intent.resRef);
+          } else if ((actor.getSkillRanks?.(id) ?? 0) < 1) {
+            return false;
+          }
+          const action = new GameState.ActionFactory.ActionUnlockObject();
+          action.setParameter(0, ActionParameterType.DWORD, target);
+          action.setParameter(1, ActionParameterType.DWORD, tool || ModuleObjectConstant.OBJECT_INVALID);
+          actor.actionQueue.add(action);
+          return true;
+        }
+        const skill = actor.skills?.[id];
+        if (!skill || (actor.getSkillRanks?.(id) ?? 0) < 1) return false;
+        skill.useTalentOnObject(target, actor);
+        return true;
+      }
+      case 'item': {
+        const resRef = String(intent.resRef || '');
+        if (!resRef) return false;
+        // Worn items (droid shields and utilities) use their own charges
+        const worn = Object.values(actor.equipment || {}).find((i: any) => i?.getItemResRef?.() === resRef) as ModuleItem | undefined;
+        if (worn) {
+          if (!worn.getUseTargeting()) return false;
+          worn.useItemOnObject(actor, target);
+          return true;
+        }
+        // Carried items come out of the player's inventory, one per use when they're single-use
+        if (!this.getPlayerInventory(actor).some((e) => e.resRef === resRef)) return false;
+        const item = await this.createItemFromResRefAsync(resRef);
+        const property = item?.getUsableCastSpellProperties()[0];
+        if (!item || !property) return false;
+        if (ModuleItem.GetCastSpellUseCost(property).single) this.removeFromPlayerInventory(actor, resRef);
+        item.possessor = actor;
+        item.useItemOnObject(actor, target);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Client: a pick from KotOR's action menu becomes a request to the GM's machine, which owns the world.
+   * Returns true when it was sent (or can't be sent and shouldn't run locally).
+   */
+  static interceptMenuAction(pc: ModuleObject, entry: any, target: ModuleObject): boolean {
+    if (GMNetworkManager.role !== 'client') return false;
+    if (!pc || (pc as any).gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    const targetNetId = target && target !== pc ? ((target as any).gmNetId as string | undefined) : undefined;
+    const send = (ability: 'spell' | 'feat' | 'skill' | 'item', abilityId: number, resRef?: string) => {
+      GMNetworkManager.sendIntent('ability', targetNetId, { ability, abilityId, resRef });
+      return true;
+    };
+
+    if (entry.item) return send('item', -1, entry.item.getItemResRef());
+    if (entry.action?.type === 'stealth') {
+      GMNetworkManager.sendIntent('stealth');
+      return true;
+    }
+    if (entry.action?.type === ActionType.ActionPhysicalAttacks) {
+      if (targetNetId) GMNetworkManager.sendIntent('attack', targetNetId);
+      return true;
+    }
+    const talent = entry.talent;
+    if (talent) {
+      if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)) return send('spell', talent.id);
+      if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)) return send('feat', talent.id);
+      if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)) return send('skill', talent.id);
+    }
+    if (entry.action?.type === ActionType.ActionUnlockObject) {
+      const tool = entry.action.getParameter?.(1);
+      return send('skill', SkillType.SECURITY, tool && typeof tool === 'object' ? tool.getItemResRef?.() : undefined);
+    }
+    // Mines are module triggers, which aren't shared over the network yet
+    GMNetworkManager.appendChat('System', "That can't be done in a GM session yet.");
+    return true;
   }
 
   /**

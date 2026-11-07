@@ -16,6 +16,9 @@ import { EffectConcealment } from "@/effects/EffectConcealment";
 import { EffectDamage } from "@/effects/EffectDamage";
 import { EffectDamageDecrease } from "@/effects/EffectDamageDecrease";
 import { EffectDamageForcePoints } from "@/effects/EffectDamageForcePoints";
+import { EffectModifyNumAttacks } from "@/effects/EffectModifyNumAttacks";
+import { EffectBodyFuel } from "@/effects/EffectBodyFuel";
+import { EffectLightSaberThrow } from "@/effects/EffectLightSaberThrow";
 import { EffectDamageImmunityDecrease } from "@/effects/EffectDamageImmunityDecrease";
 import { EffectDamageImmunityIncrease } from "@/effects/EffectDamageImmunityIncrease";
 import { EffectDamageIncrease } from "@/effects/EffectDamageIncrease";
@@ -112,7 +115,7 @@ export class GameEffectFactory {
   static EffectDamage: typeof EffectDamage = EffectDamage;
   static EffectHeal: typeof EffectHeal = EffectHeal;
   static EffectLink: typeof EffectLink = EffectLink;
-  // static EffectModifyNumAttacks: typeof EffectModifyNumAttacks = EffectModifyNumAttacks;
+  static EffectModifyNumAttacks: typeof EffectModifyNumAttacks = EffectModifyNumAttacks;
   // static EffectCurse: typeof EffectCurse = EffectCurse;
   // static EffectSilence: typeof EffectSilence = EffectSilence;
   static EffectInvisibility: typeof EffectInvisibility = EffectInvisibility;
@@ -152,9 +155,9 @@ export class GameEffectFactory {
   static EffectBlasterDeflectionDecrease: typeof EffectBlasterDeflectionDecrease = EffectBlasterDeflectionDecrease;
   static EffectDamageForcePoints: typeof EffectDamageForcePoints = EffectDamageForcePoints;
   static EffectHealForcePoints: typeof EffectHealForcePoints = EffectHealForcePoints;
-  // static EffectBodyFuel: typeof EffectBodyFuel = EffectBodyFuel;
+  static EffectBodyFuel: typeof EffectBodyFuel = EffectBodyFuel;
   // static EffectPsychicStatic: typeof EffectPsychicStatic = EffectPsychicStatic;
-  // static EffectLightSaberThrow: typeof EffectLightSaberThrow = EffectLightSaberThrow;
+  static EffectLightSaberThrow: typeof EffectLightSaberThrow = EffectLightSaberThrow;
   static EffectAssuredHit: typeof EffectAssuredHit = EffectAssuredHit;
   static EffectForceJump: typeof EffectForceJump = EffectForceJump;
   static EffectAssuredDeflection: typeof EffectAssuredDeflection = EffectAssuredDeflection;
@@ -361,6 +364,15 @@ export class GameEffectFactory {
       break;
       case GameEffectType.EffectDamageForcePoints: //EffectDamageForcePoints
         effect = new EffectDamageForcePoints();
+      break;
+      case GameEffectType.EffectModifyNumAttacks:
+        effect = new EffectModifyNumAttacks();
+      break;
+      case GameEffectType.EffectBodyFuel:
+        effect = new EffectBodyFuel();
+      break;
+      case GameEffectType.EffectLightSaberThrow:
+        effect = new EffectLightSaberThrow();
       break;
       case GameEffectType.EffectHealForcePoints: //EffectHealForcePoints
         effect = new EffectHealForcePoints();

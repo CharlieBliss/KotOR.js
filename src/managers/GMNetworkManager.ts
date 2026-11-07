@@ -42,10 +42,13 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth';
+
+/** What a player uses from KotOR's action menu: a Force power, feat, skill or item */
+export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item';
 
 /** Intents where the host walks and acts for the player, so it takes over the actor's position */
-const HOST_DRIVEN_INTENTS: GMIntentKind[] = ['open', 'use', 'attack'];
+const HOST_DRIVEN_INTENTS: GMIntentKind[] = ['open', 'use', 'attack', 'ability'];
 
 /**
  * A visual the host just showed on a networked object, replayed on clients
@@ -102,8 +105,11 @@ export interface GMClientIntent {
   seq: number;
   /** equip / unequip: the equipment slot (ModuleCreatureArmorSlot) */
   slot?: number;
-  /** equip: which inventory item to put in the slot */
+  /** equip: which inventory item to put in the slot; ability: the item used (an item, or a security tunneler) */
   resRef?: string;
+  /** ability: what kind, and its id (spells.2da, feat.2da or skills.2da row) */
+  ability?: GMAbilityKind;
+  abilityId?: number;
 }
 
 export interface GMPeerInfo {
@@ -136,6 +142,8 @@ export interface GMSerializedActor {
   intentSeq?: number;
   /** Hidden from players by the GM: never spawned or updated on their machines */
   hidden?: boolean;
+  /** In stealth (shown see-through) */
+  stealth?: boolean;
   rightHandResRef?: string;
   leftHandResRef?: string;
   armorResRef?: string;
@@ -857,7 +865,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (HOST_DRIVEN_INTENTS.includes(kind)) {

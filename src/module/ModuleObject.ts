@@ -2602,13 +2602,21 @@ export class ModuleObject {
    * @returns 
    */
   resistForce(oCaster: ModuleObject){
+    // Only a creature with Force resistance can resist: the caster rolls d20 + its level against it (the
+    // Aurora rules KotOR uses; Resist Force, Force Immunity and some beasts give it). Saving throws are separate.
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(oCaster, ModuleObjectType.ModuleCreature)){
-      //https://gamefaqs.gamespot.com/boards/516675-star-wars-knights-of-the-old-republic/62811657
-      //1d20 + their level vs. a DC of your level plus 10
-      let roll = Dice.roll(1, DiceType.d20, (this as any).getTotalClassLevel());
-      return (roll > 10 + (oCaster as any).getTotalClassLevel());
+      if(oCaster === this) return 0;
+      const resistance = (this as any).getForceResistance?.() || 0;
+      if(resistance <= 0) return 0;
+      const casterLevel = (oCaster as any).getTotalClassLevel?.() || 0;
+      return Dice.roll(1, DiceType.d20, casterLevel) < resistance ? 1 : 0;
     }
     return 0;
+  }
+
+  /** Whether an effect can't take hold on it (an immunity); creatures override this */
+  isImmuneToEffect(effect: GameEffect): boolean {
+    return false;
   }
 
   /**
@@ -2656,6 +2664,8 @@ export class ModuleObject {
       }
       return;
     }
+
+    if(this.isImmuneToEffect(effect)) return;
 
     effect.setAttachedObject(this);
     effect.loadModel();

@@ -330,6 +330,7 @@ export class CombatRound {
    */
   addAction(action: CombatRoundAction){
     action.owner = this.owner;
+    if((this.owner as any)?.stealthMode) (this.owner as any).setStealthMode(false);
     this.scheduledActionList.push(action);
   }
 
@@ -771,7 +772,10 @@ export class CombatRound {
       deflectBonus = 4;
     }else if(targetCreature.getHasFeat(CombatFeatType.JEDI_DEFENSE)){
       deflectBonus = 2;
-    }else{
+    }
+    // Deflection effects and item properties add to it, and can grant it without the feat
+    deflectBonus += targetCreature.getBlasterDeflectionBonus?.() || 0;
+    if(deflectBonus <= 0){
       return false;
     }
 
@@ -811,7 +815,13 @@ export class CombatRound {
     const attack = this.attackList[this.currentAttack];
     const targetAC = combatAction.target ? combatAction.target.getAC() : 10;
 
-    const isHit = hasAssuredHit || naturalRoll === 20 || (naturalRoll !== 1 && (isCritical || attackRoll >= targetAC));
+    let isHit = hasAssuredHit || naturalRoll === 20 || (naturalRoll !== 1 && (isCritical || attackRoll >= targetAC));
+    // Concealment on the target, or a miss chance on the attacker, can still turn a hit into a miss
+    if(isHit && !hasAssuredHit){
+      const target = combatAction.target as ModuleCreature;
+      const missChance = Math.max(target?.getConcealment?.() || 0, creature.getMissChance?.() || 0);
+      if(missChance > 0 && Math.floor(Math.random() * 100) < missChance) isHit = false;
+    }
 
     if(isHit){
       if(this.checkBlasterDeflection(combatAction.target, weapon, attackRoll)){

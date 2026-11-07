@@ -261,14 +261,16 @@ export class EffectVisualEffect extends GameEffect {
             context: this.object.context,
           }).then((model: OdysseyModel3D) => {
             this.impact_head_model = model;
-            if(this.object.model.headconjure){
+            if(this.object?.model?.headconjure){
               this.object.model.headconjure.add(this.impact_head_model);
               TextureLoader.LoadQueue();
-            }else if(this.object.model.headhook){
+            }else if(this.object?.model?.headhook){
               this.object.model.headhook.add(this.impact_head_model);
               TextureLoader.LoadQueue();
             }else{
-              this.impact_root_model.dispose();
+              // No head to attach it to (droids and some creatures)
+              this.impact_head_model.dispose();
+              this.impact_head_model = undefined;
             }
           })
         }

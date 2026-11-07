@@ -8,6 +8,7 @@ import { AudioEmitter } from "@/audio/AudioEmitter";
 import { CreatureClass } from "@/combat/CreatureClass";
 import { EffectRacialType } from "@/effects";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { ModuleItemProperty } from "@/enums/module/ModuleItemProperty";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { GFFDataType } from "@/enums/resource/GFFDataType";
 import { GameState } from "@/GameState";
@@ -53,6 +54,7 @@ import { CombatRoundAction } from "@/combat";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import type { Action } from "@/actions/Action";
 import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
+import { SkillType } from "@/enums/nwscript/SkillType";
 import { EngineDebugType } from "@/enums/engine/EngineDebugType";
 import { TextSprite3D } from "@/engine/TextSprite3D";
 import { UIIconTimerType } from "@/enums/engine/UIIconTimerType";
@@ -606,7 +608,9 @@ export class ModuleCreature extends ModuleObject {
         this.forceVector.x = ( Math.cos(this.rotation.z + Math.PI/2) * forceDelta );
         this.forceVector.y = ( Math.sin(this.rotation.z + Math.PI/2) * forceDelta );
         if(this.forceVector.length()){
-          if(this.animSpeed > 0.75){
+          if(this.stealthMode){
+            this.setAnimationState(ModuleCreatureAnimState.WALK_STEALTH);
+          }else if(this.animSpeed > 0.75){
             this.setAnimationState(ModuleCreatureAnimState.RUNNING);
           }else{
             this.setAnimationState(ModuleCreatureAnimState.WALKING);
@@ -625,7 +629,7 @@ export class ModuleCreature extends ModuleObject {
         this.speed = 0;
       }
 
-      if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING )){
+      if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING || this.animationState.index == ModuleCreatureAnimState.WALK_STEALTH )){
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
         this.speed = 0;
         this.force = 0;
@@ -931,6 +935,10 @@ export class ModuleCreature extends ModuleObject {
       }
 
       let distance = this.position.distanceTo(creature.position);
+      if(!this.canDetect(creature)){
+        this.notifyPerceptionSeenObject(creature, false);
+        continue;
+      }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
         if(GameState.PartyManager.party.indexOf(this) == -1){
           if(this.isHostile(creature)){
@@ -962,6 +970,10 @@ export class ModuleCreature extends ModuleObject {
       }
 
       let distance = this.position.distanceTo(creature.position);
+      if(!this.canDetect(creature)){
+        this.notifyPerceptionSeenObject(creature, false);
+        continue;
+      }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
         if(GameState.PartyManager.party.indexOf(this) == -1){
           if(this.isHostile(creature)){
@@ -975,13 +987,16 @@ export class ModuleCreature extends ModuleObject {
       }
     }
 
-    for(let i = 0, triglen = this.area.triggers.length; i < triglen; i++){
-      const trig = this.area.triggers[i];
-      if(trig.type != ModuleTriggerType.TRAP){ continue; }
-      if(trig.trapDetected){ continue; }
-      const actionFlag = new GameState.ActionFactory.ActionFlagMine();
-      actionFlag.setParameter(0, ActionParameterType.DWORD, trig);
-      this.actionQueue.addFront(actionFlag);
+    if(this.canSpotMines()){
+      for(let i = 0, triglen = this.area.triggers.length; i < triglen; i++){
+        const trig = this.area.triggers[i];
+        if(trig.type != ModuleTriggerType.TRAP || trig.trapDetected){ continue; }
+        if(this.position.distanceTo(trig.position) > ModuleCreature.MINE_DETECT_RANGE){ continue; }
+        const roll = 1 + Math.floor(Math.random() * 20) + this.getSkillLevel(SkillType.AWARENESS);
+        if(roll >= (Number(trig.trapDetectDC) || 0)){
+          trig.detectTrap();
+        }
+      }
     }
     
   }
@@ -2734,7 +2749,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getSTRBonus() || 0) +
       (this.equipment.CLAW1?.getSTRBonus() || 0) +
       (this.equipment.CLAW2?.getSTRBonus() || 0) +
-      (this.equipment.HIDE?.getSTRBonus() || 0);
+      (this.equipment.HIDE?.getSTRBonus() || 0) +
+      this.getAbilityEffectBonus(0);
     }
   }
 
@@ -2754,7 +2770,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getDEXBonus() || 0) +
       (this.equipment.CLAW1?.getDEXBonus() || 0) +
       (this.equipment.CLAW2?.getDEXBonus() || 0) +
-      (this.equipment.HIDE?.getDEXBonus() || 0);
+      (this.equipment.HIDE?.getDEXBonus() || 0) +
+      this.getAbilityEffectBonus(1);
     }
   }
 
@@ -2774,7 +2791,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getCONBonus() || 0) +
       (this.equipment.CLAW1?.getCONBonus() || 0) +
       (this.equipment.CLAW2?.getCONBonus() || 0) +
-      (this.equipment.HIDE?.getCONBonus() || 0);
+      (this.equipment.HIDE?.getCONBonus() || 0) +
+      this.getAbilityEffectBonus(2);
     }
   }
 
@@ -2794,7 +2812,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getCHABonus() || 0) +
       (this.equipment.CLAW1?.getCHABonus() || 0) +
       (this.equipment.CLAW2?.getCHABonus() || 0) +
-      (this.equipment.HIDE?.getCHABonus() || 0);
+      (this.equipment.HIDE?.getCHABonus() || 0) +
+      this.getAbilityEffectBonus(5);
     }
   }
 
@@ -2814,7 +2833,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getWISBonus() || 0) +
       (this.equipment.CLAW1?.getWISBonus() || 0) +
       (this.equipment.CLAW2?.getWISBonus() || 0) +
-      (this.equipment.HIDE?.getWISBonus() || 0);
+      (this.equipment.HIDE?.getWISBonus() || 0) +
+      this.getAbilityEffectBonus(4);
     }
   }
 
@@ -2834,7 +2854,8 @@ export class ModuleCreature extends ModuleObject {
       (this.equipment.BELT?.getINTBonus() || 0) +
       (this.equipment.CLAW1?.getINTBonus() || 0) +
       (this.equipment.CLAW2?.getINTBonus() || 0) +
-      (this.equipment.HIDE?.getINTBonus() || 0);
+      (this.equipment.HIDE?.getINTBonus() || 0) +
+      this.getAbilityEffectBonus(3);
     }
   }
 
@@ -2965,7 +2986,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getMovementSpeed(){
-    return (this.isWalking() ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
+    return ((this.isWalking() || this.stealthMode) ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
   }
 
   getHitDistance(){
@@ -3123,9 +3144,226 @@ export class ModuleCreature extends ModuleObject {
     return this.skills[value].rank > 0;
   }
 
+  /**
+   * A skill's total, as KotOR's GetSkillRank and its skill checks use it: ranks + the key ability's modifier +
+   * Skill Increase / Decrease effects. getSkillRanks gives the ranks alone.
+   */
   getSkillLevel(value: number){
-    return this.skills[value].rank;
+    const skill = this.skills[value];
+    if(!skill) return 0;
+    const ability = String(skill.keyAbility || '').toUpperCase();
+    const score = ability === 'STR' ? this.getSTR() : ability === 'DEX' ? this.getDEX() : ability === 'CON' ? this.getCON() :
+      ability === 'INT' ? this.getINT() : ability === 'WIS' ? this.getWIS() : ability === 'CHA' ? this.getCHA() : 10;
+    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value);
   }
+
+  /** Skill bonuses and penalties on what it wears (stealth units, Calrissian's belt...): subtype = SKILL_* */
+  getSkillItemBonus(skill: number): number {
+    if(!this.equipment) return 0;
+    const amount = (property: any) => Number(property.getValue?.()) || Number(property.costValue) || 0;
+    let total = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Skill)){
+      if(Number(property.subType) === skill) total += amount(property);
+    }
+    for(const property of this.getEquippedProperties(ModuleItemProperty.DecreasedSkill)){
+      if(Number(property.subType) === skill) total -= amount(property);
+    }
+    return total;
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Stealth (KotOR: a stealth unit worn in the belt slot lets a creature go into stealth; hostile creatures
+  // then only notice it if they win an Awareness check against its Stealth)
+  // ---------------------------------------------------------------------------------------------------
+
+  static STEALTH_UNIT_BASE_ITEM = 88;
+  /** How long one Awareness-vs-Stealth result holds before it's rolled again (seconds) */
+  static STEALTH_CHECK_SECONDS = 6;
+
+  stealthMode: boolean = false;
+  stealthChecks: Map<ModuleCreature, { seen: boolean; until: number }> = new Map();
+
+  canEnterStealth(): boolean {
+    return !this.isDead() && this.equipment?.BELT?.baseItemId === ModuleCreature.STEALTH_UNIT_BASE_ITEM;
+  }
+
+  /** Go into or out of stealth. force skips the stealth-unit check (a replica mirroring the host) */
+  setStealthMode(on: boolean, force: boolean = false): boolean {
+    if(on && !force && !this.canEnterStealth()) return false;
+    if(this.stealthMode === on) return true;
+    this.stealthMode = on;
+    this.setOpacity(on ? 0.35 : 1);
+    if(!on){
+      // Everyone gets a fresh look once it's out of stealth
+      for(const creature of GameState.module?.area?.creatures || []){
+        (creature as ModuleCreature).stealthChecks?.delete(this);
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Whether it notices another creature: always, unless that creature is a hostile in stealth. Then it's an
+   * Awareness check (d20 + Awareness) against the other's Stealth (d20 + Stealth), held for a few seconds.
+   */
+  canDetect(other: ModuleCreature): boolean {
+    if(!other || other === this || !other.stealthMode || !this.isHostile(other)) return true;
+    const now = performance.now() / 1000;
+    const cached = this.stealthChecks.get(other);
+    if(cached && cached.until > now) return cached.seen;
+    const awareness = 1 + Math.floor(Math.random() * 20) + this.getSkillLevel(SkillType.AWARENESS);
+    const stealth = 1 + Math.floor(Math.random() * 20) + other.getSkillLevel(SkillType.STEALTH);
+    const seen = awareness >= stealth;
+    this.stealthChecks.set(other, { seen, until: now + ModuleCreature.STEALTH_CHECK_SECONDS });
+    return seen;
+  }
+
+  /** Mines it can spot: party members and players' characters roll Awareness against a mine's detect DC */
+  static MINE_DETECT_RANGE = 10;
+
+  canSpotMines(): boolean {
+    return GameState.PartyManager?.party?.includes(this) || !!(this as any).gmOwnerPeerId;
+  }
+
+  getSkillRanks(value: number){
+    return this.skills[value]?.rank || 0;
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Passive effects, read by the rules (effects only carry their numbers)
+  // ---------------------------------------------------------------------------------------------------
+
+  /** Sum the amount (int index amountAt) of every effect of one type matching a test, minus its opposite */
+  sumEffects(increase: GameEffectType, decrease: GameEffectType | undefined, amountAt: number, matches?: (e: any) => boolean): number {
+    let total = 0;
+    for(const eff of this.effects || []){
+      if(!eff || (matches && !matches(eff))) continue;
+      if(eff.type === increase) total += eff.getInt(amountAt) || 0;
+      else if(decrease !== undefined && eff.type === decrease) total -= eff.getInt(amountAt) || 0;
+    }
+    return total;
+  }
+
+  /** Ability Increase / Decrease effects (adrenals, stims, Force Valor...): ABILITY_* in int 0, amount in int 1 */
+  getAbilityEffectBonus(ability: number): number {
+    if(!this.effects?.length) return 0;
+    return this.sumEffects(GameEffectType.EffectAbilityIncrease, GameEffectType.EffectAbilityDecrease, 1, (e) => e.getInt(0) === ability);
+  }
+
+  /** Skill Increase / Decrease effects: SKILL_* in int 0 (255: every skill), amount in int 1 */
+  getSkillEffectBonus(skill: number): number {
+    if(!this.effects?.length) return 0;
+    return this.sumEffects(GameEffectType.EffectSkillIncrease, GameEffectType.EffectSkillDecrease, 1, (e) => e.getInt(0) === skill || e.getInt(0) === 255);
+  }
+
+  /** Item properties of one kind on everything it wears and holds */
+  getEquippedProperties(kind: ModuleItemProperty): any[] {
+    const out: any[] = [];
+    for(const item of Object.values(this.equipment || {})){
+      for(const property of (item as any)?.properties || []){
+        if(property?.is?.(kind) && (!property.isUseable || property.isUseable())) out.push(property);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Force resistance: Force Resistance Increase / Decrease effects (Resist Force, Force Immunity...) and
+   * Improved Force Resistance on what it wears (some beasts' hides)
+   */
+  getForceResistance(): number {
+    let items = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.ImprovedMagicResist)){
+      items = Math.max(items, Number(property.getValue?.()) || 0);
+    }
+    return Math.max(0, items + this.sumEffects(GameEffectType.EffectForceResistanceIncrease, GameEffectType.EffectForceResistanceDecrease, 0));
+  }
+
+  /** Bonus to deflect blaster bolts with a lightsaber (Blaster Deflection effects and item properties) */
+  getBlasterDeflectionBonus(): number {
+    let items = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Blaster_Bolt_Deflect_Increase)) items += Number(property.getValue?.()) || 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Blaster_Bolt_Defect_Decrease)) items -= Number(property.getValue?.()) || 0;
+    return items + this.sumEffects(GameEffectType.EffectBlasterDeflectionIncrease, GameEffectType.EffectBlasterDeflectionDecrease, 0);
+  }
+
+  /** Percent chance an attack on it misses anyway (Concealment; the best one counts) */
+  getConcealment(): number {
+    let best = 0;
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectConcealment) best = Math.max(best, eff.getInt(0) || 0);
+    }
+    return Math.min(100, best);
+  }
+
+  /** Percent chance its own attacks miss anyway (Miss Chance; the worst one counts) */
+  getMissChance(): number {
+    let worst = 0;
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectMissChance) worst = Math.max(worst, eff.getInt(0) || 0);
+    }
+    return Math.min(100, worst);
+  }
+
+  /**
+   * Immune to IMMUNITY_TYPE_* (poison, mind-affecting, paralysis...): an Immunity effect, or an Immunity
+   * property on something it wears (droids' and beasts' hides carry theirs).
+   */
+  isImmune(immunityType: number): boolean {
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectImmunity && eff.getInt(0) === immunityType) return true;
+    }
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Immunity)){
+      if((ModuleCreature.ITEM_IMMUNITY_COVERS[Number(property.subType)] || []).includes(immunityType)) return true;
+    }
+    return false;
+  }
+
+  /** IMMUNITY_TYPE_* that blocks an effect, if any (as the Aurora engine checks when an effect is applied) */
+  static immunityAgainst(effect: any): number {
+    switch(effect?.type){
+      case GameEffectType.EffectPoison: return 2;
+      case GameEffectType.EffectDisease: return 3;
+      case GameEffectType.EffectSlow: return 9;
+      case GameEffectType.EffectEntangle: return 10;
+      case GameEffectType.EffectAbilityDecrease: return 19;
+      case GameEffectType.EffectAttackDecrease: return 20;
+      case GameEffectType.EffectDamageDecrease: return 21;
+      case GameEffectType.EffectDamageImmunityDecrease: return 22;
+      case GameEffectType.EffectACDecrease: return 23;
+      case GameEffectType.EffectMovementSpeedDecrease: return 24;
+      case GameEffectType.EffectSavingThrowDecrease: return 25;
+      case GameEffectType.EffectForceResistanceDecrease: return 26;
+      case GameEffectType.EffectSkillDecrease: return 27;
+      case GameEffectType.EffectKnockdown: return 28;
+      case GameEffectType.EffectSetState:
+        // 1 confused, 2 frightened, 4 stunned, 5 paralyzed, 6 asleep, 8 horrified
+        return ({ 1: 16, 2: 4, 4: 12, 5: 6, 6: 13, 8: 4 } as Record<number, number>)[effect.getInt(0)] || 0;
+    }
+    return 0;
+  }
+
+  isImmuneToEffect(effect: any): boolean {
+    const immunity = ModuleCreature.immunityAgainst(effect);
+    return immunity > 0 && this.isImmune(immunity);
+  }
+
+  /**
+   * What an item's Immunity property (its subtype, a row of iprp_immunity.2da) makes it immune to, as
+   * IMMUNITY_TYPE_*. Mind immunity covers every mind-affecting state, as in the Aurora rules.
+   */
+  static ITEM_IMMUNITY_COVERS: Record<number, number[]> = {
+    0: [30],                              // Backstab: sneak attack
+    1: [19, 29],                          // Level / ability drain
+    2: [1, 4, 12, 13, 14, 15, 16, 18],    // Mind spells: fear, stun, sleep, charm, dominate, confusion, daze
+    3: [2],                               // Poison
+    4: [3],                               // Disease
+    5: [4],                               // Fear
+    6: [28],                              // Knockdown
+    7: [6],                               // Paralysis
+    8: [31],                              // Critical hits
+    9: [32],                              // Death
+  };
 
   getHasSpell(id = 0){
     return (this.getSpell(id) instanceof TalentSpell) ? true : false;
@@ -3530,6 +3768,26 @@ export class ModuleCreature extends ModuleObject {
       break;
       case ModuleCreatureArmorSlot.CLAW3:
         this.equipment.CLAW3 = item;
+      break;
+      // Headgear shows on the model; gloves, belts, implants and armbands only change the character
+      case ModuleCreatureArmorSlot.HEAD:
+        this.equipment.HEAD = item;
+        await this.loadModel();
+      break;
+      case ModuleCreatureArmorSlot.ARMS:
+        this.equipment.ARMS = item;
+      break;
+      case ModuleCreatureArmorSlot.BELT:
+        this.equipment.BELT = item;
+      break;
+      case ModuleCreatureArmorSlot.IMPLANT:
+        this.equipment.IMPLANT = item;
+      break;
+      case ModuleCreatureArmorSlot.LEFTARMBAND:
+        this.equipment.LEFTARMBAND = item;
+      break;
+      case ModuleCreatureArmorSlot.RIGHTARMBAND:
+        this.equipment.RIGHTARMBAND = item;
       break;
     }
   }
