@@ -10,8 +10,8 @@ import type { ModuleCreature } from "@/module/ModuleCreature";
  *
  * Lightsaber Throw (EffectLightsaberThrow): applied to the thrower, it sends the thrower's lightsaber at up to
  * three targets in turn (objects 0-2; one with plain Saber Throw, three with the advanced power). Each target gets
- * an attack roll with the saber, as a melee attack would (d20 + base attack bonus + the better of Strength and
- * Dexterity, a natural 20 always hits), and takes the saber's damage plus Strength on a hit.
+ * an attack roll with the saber, as a melee attack would (d20 + base attack bonus + Strength, a natural 20 always
+ * hits), and takes the saber's damage plus Strength on a hit.
  *
  * KotOR JS - A remake of the Odyssey Game Engine that powered KotOR I & II
  *
@@ -49,7 +49,7 @@ export class EffectLightSaberThrow extends GameEffect {
   static strike(thrower: ModuleCreature, target: ModuleCreature, saber: any): boolean {
     const mod = (score: number) => Math.floor(((score || 10) - 10) / 2);
     const strMod = mod(thrower.getSTR?.());
-    const attackMod = (thrower.getBaseAttackBonus?.() || 0) + Math.max(strMod, mod(thrower.getDEX?.()));
+    const attackMod = (thrower.getBaseAttackBonus?.() || 0) + (thrower.getAttackAbilityModifier?.(saber) ?? strMod);
     const roll = 1 + Math.floor(Math.random() * 20);
     const hit = roll === 20 || (roll !== 1 && roll + attackMod >= (target.getAC?.() || 10));
     if(!hit) return false;

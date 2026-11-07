@@ -2728,6 +2728,7 @@ export class ModuleCreature extends ModuleObject {
         }
       }
     }
+    featBonus += this.getFeatDefenseBonus();
     return baseac + (this.naturalAC || 0) + classBonus + armorAC + dexBonus + featBonus + effectBonus;
 
     return baseac + classBonus + armorAC + dexBonus;
@@ -3086,22 +3087,89 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
+  /** The classes' base attack bonus (what GetBaseAttackBonus returns); getAttackAbilityModifier adds the ability */
   getBaseAttackBonus(){
     let bab = 0;
     for(let i = 0, len = this.classes.length; i < len; i++){
       bab += this.classes[i].getBaseAttackBonus();
     }
-
-    let strMod = Math.floor(( this.getSTR() - 10) / 2);
-    let dexMod = Math.floor(( this.getDEX() - 10) / 2);
-
-    if(strMod >= dexMod){
-      bab += strMod;
-    }else if(dexMod > strMod){
-      bab += dexMod;
-    }
-
     return bab;
+  }
+
+  /** The ability an attack adds (KotOR): Dexterity with a ranged weapon, Strength in melee or unarmed */
+  getAttackAbilityModifier(weapon?: any): number {
+    const score = weapon?.isRangedWeapon?.() ? this.getDEX() : this.getSTR();
+    return Math.floor((score - 10) / 2);
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Passive feats (numbers from the feats' own descriptions in the game)
+  // ---------------------------------------------------------------------------------------------------
+
+  /** The best of a chain of feats that replace each other: [feat id, value] from the lowest to the highest */
+  getFeatChainValue(chain: [number, number][]): number {
+    for(let i = chain.length - 1; i >= 0; i--){
+      if(this.getHasFeat(chain[i][0])) return chain[i][1];
+    }
+    return 0;
+  }
+
+  static DEFENSE_FEAT_CHAINS: [number, number][][] = [
+    [[CombatFeatType.SCOUNDRELS_LUCK, 2], [CombatFeatType.IMPROVED_SCOUNDRELS_LUCK, 4], [CombatFeatType.MASTER_SCOUNDRELS_LUCK, 6]],
+    [[CombatFeatType.JEDI_SENSE, 2], [CombatFeatType.KNIGHT_SENSE, 4], [CombatFeatType.MASTER_SENSE, 6]],
+    [[CombatFeatType.LOGIC_UPGRADE_COMBAT, 2], [CombatFeatType.LOGIC_UPGRADE_TACTICIAN, 4], [CombatFeatType.LOGIC_UPGRADE_BATTLE_DROID, 6]],
+  ];
+
+  /** Defense from always-on feats: Scoundrel's Luck, Jedi Sense, droids' logic upgrades (+2 / +4 / +6) */
+  getFeatDefenseBonus(): number {
+    let total = 0;
+    for(const chain of ModuleCreature.DEFENSE_FEAT_CHAINS) total += this.getFeatChainValue(chain);
+    return total;
+  }
+
+  /** Skill feats (+1 / +2 / +3): Caution, Empathy and Gear Head, and the skills each one helps */
+  static SKILL_FEAT_CHAINS: { chain: [number, number][]; skills: number[] }[] = [
+    { chain: [[CombatFeatType.CAUTIOUS, 1], [CombatFeatType.IMPROVED_CAUTION, 2], [CombatFeatType.MASTER_CAUTION, 3]], skills: [SkillType.DEMOLITIONS, SkillType.STEALTH] },
+    { chain: [[CombatFeatType.EMPATHY, 1], [CombatFeatType.IMPROVED_EMPATHY, 2], [CombatFeatType.MASTER__EMPATHY, 3]], skills: [SkillType.PERSUADE, SkillType.AWARENESS, SkillType.TREAT_INJURY] },
+    { chain: [[CombatFeatType.GEAR_HEAD, 1], [CombatFeatType.GEAR_HEAD_ADEPT, 2], [CombatFeatType.GEAR_HEAD_MASTER, 3]], skills: [SkillType.REPAIR, SkillType.SECURITY, SkillType.COMPUTER_USE] },
+  ];
+
+  getSkillFeatBonus(skill: number): number {
+    let total = 0;
+    for(const entry of ModuleCreature.SKILL_FEAT_CHAINS){
+      if(entry.skills.includes(skill)) total += this.getFeatChainValue(entry.chain);
+    }
+    return total;
+  }
+
+  /** Sentinels' Force Immunity: Fear; Stun (and fear); Paralysis (and the rest), as IMMUNITY_TYPE_* */
+  getFeatImmunities(): number[] {
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_PARALYSIS)) return [4, 12, 6];
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_STUN)) return [4, 12];
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_FEAR)) return [4];
+    return [];
+  }
+
+  /** Uncanny Dodge: +2 / +4 on saves against grenades */
+  getGrenadeSaveBonus(): number {
+    return this.getFeatChainValue([[CombatFeatType.UNCANNY_DODGE_1, 2], [CombatFeatType.UNCANNY_DODGE_2, 4]]);
+  }
+
+  /**
+   * Whether it can wear or wield an item, as KotOR's equip screen decides: every feat its base item requires
+   * (weapon and armour proficiencies, implant levels, Jedi Defense for robes), and droid or human only items.
+   */
+  canUseItem(item: any): boolean {
+    const base = item?.baseItem;
+    if(!base) return true;
+    const doh = Number(base.droidOrHuman) || 0;
+    const race = this.getRace();
+    if(doh === 1 && race === 5) return false;
+    if(doh === 2 && race !== 5) return false;
+    for(const feat of [base.requiredFeat0, base.requiredFeat1, base.requiredFeat2, base.requiredFeat3, base.requiredFeat4]){
+      if(typeof feat === 'number' && feat >= 0 && !this.getHasFeat(feat)) return false;
+    }
+    return true;
   }
 
   getFeats(){
@@ -3154,7 +3222,7 @@ export class ModuleCreature extends ModuleObject {
     const ability = String(skill.keyAbility || '').toUpperCase();
     const score = ability === 'STR' ? this.getSTR() : ability === 'DEX' ? this.getDEX() : ability === 'CON' ? this.getCON() :
       ability === 'INT' ? this.getINT() : ability === 'WIS' ? this.getWIS() : ability === 'CHA' ? this.getCHA() : 10;
-    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value);
+    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value) + this.getSkillFeatBonus(value);
   }
 
   /** Skill bonuses and penalties on what it wears (stealth units, Calrissian's belt...): subtype = SKILL_* */
@@ -3181,6 +3249,8 @@ export class ModuleCreature extends ModuleObject {
   static STEALTH_CHECK_SECONDS = 6;
 
   stealthMode: boolean = false;
+  /** Left stealth by attacking: that first attack is a Sneak Attack */
+  sneakAttackFromStealth: boolean = false;
   stealthChecks: Map<ModuleCreature, { seen: boolean; until: number }> = new Map();
 
   canEnterStealth(): boolean {
@@ -3192,6 +3262,7 @@ export class ModuleCreature extends ModuleObject {
     if(on && !force && !this.canEnterStealth()) return false;
     if(this.stealthMode === on) return true;
     this.stealthMode = on;
+    if(on) this.sneakAttackFromStealth = false;
     this.setOpacity(on ? 0.35 : 1);
     if(!on){
       // Everyone gets a fresh look once it's out of stealth
@@ -3316,7 +3387,7 @@ export class ModuleCreature extends ModuleObject {
     for(const property of this.getEquippedProperties(ModuleItemProperty.Immunity)){
       if((ModuleCreature.ITEM_IMMUNITY_COVERS[Number(property.subType)] || []).includes(immunityType)) return true;
     }
-    return false;
+    return this.getFeatImmunities().includes(immunityType);
   }
 
   /** IMMUNITY_TYPE_* that blocks an effect, if any (as the Aurora engine checks when an effect is applied) */

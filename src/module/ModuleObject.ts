@@ -2502,9 +2502,26 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  fortitudeSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  /** SAVING_THROW_TYPE_* a creature can be immune to, as IMMUNITY_TYPE_* */
+  static SAVE_TYPE_IMMUNITY: Record<number, number> = { 4: 32, 5: 3, 8: 4, 10: 1, 12: 2, 14: 5, 18: 6 };
+
+  /** A save made against an effect it's immune to; and bonuses that depend on what's being saved against */
+  saveImmune(nSaveType: number): boolean {
+    const immunity = ModuleObject.SAVE_TYPE_IMMUNITY[nSaveType];
+    return !!immunity && !!(this as any).isImmune?.(immunity);
+  }
+
+  saveSituationalBonus(fromSpellId: number): number {
+    if(fromSpellId < 0) return 0;
+    const spell = GameState.TwoDAManager?.datatables.get('spells')?.rows[fromSpellId];
+    const grenade = String(spell?.impactscript || '').toLowerCase() === 'k_sup_grenade';
+    return grenade ? ((this as any).getGrenadeSaveBonus?.() || 0) : 0;
+  }
+
+  fortitudeSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getCON());
+    let bonus = CombatRound.GetMod(this.getCON()) + this.saveSituationalBonus(fromSpellId);
     
     if(roll === 20) return 1;
     if(roll === 1) return 0;
@@ -2530,9 +2547,10 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  reflexSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  reflexSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getDEX());
+    let bonus = CombatRound.GetMod(this.getDEX()) + this.saveSituationalBonus(fromSpellId);
     
     if(roll === 20) return 1;
     if(roll === 1) return 0;
@@ -2566,9 +2584,10 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  willSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  willSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getWIS());
+    let bonus = CombatRound.GetMod(this.getWIS()) + this.saveSituationalBonus(fromSpellId);
 
     if(roll === 20) return 1;
     if(roll === 1) return 0;

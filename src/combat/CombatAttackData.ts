@@ -230,6 +230,11 @@ export class CombatAttackData {
     if(!BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)) return false;
     const targetCreature = target as ModuleCreature;
     if(this.sneakAttack) return true;
+    // The first attack out of stealth
+    if((creature as any).sneakAttackFromStealth){
+      (creature as any).sneakAttackFromStealth = false;
+      return true;
+    }
     if(targetCreature.isDebilitated() || targetCreature.isStunned() || targetCreature.isParalyzed()){
       return true;
     }

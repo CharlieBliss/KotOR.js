@@ -5414,11 +5414,17 @@ export class GMManager {
   static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string) {
     const slotName = ModuleCreatureArmorSlot[slot];
     if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName) || !resRef) return;
+    if (!this.getPlayerInventory(actor).some((e) => e.resRef === resRef)) return;
+    const wanted = await this.createItemFromResRefAsync(resRef);
+    if (wanted && actor.canUseItem?.(wanted) === false) {
+      GMNetworkManager.appendChat('System', `${actor.getName()} can't use that: it needs a feat they don't have.`);
+      return;
+    }
     if (!this.removeFromPlayerInventory(actor, resRef)) return;
     const current: ModuleItem | undefined = (actor.equipment as any)[slotName];
     const currentResRef = current?.getEquippedRes() || current?.getInventoryRes();
     if (currentResRef) this.addToPlayerInventory(actor, [{ resRef: currentResRef, stack: 1 }]);
-    const item = await this.createItemFromResRefAsync(resRef);
+    const item = wanted || await this.createItemFromResRefAsync(resRef);
     await actor.equipItem(slot, item);
   }
 

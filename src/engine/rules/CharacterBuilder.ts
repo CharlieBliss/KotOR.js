@@ -81,6 +81,10 @@ export class CharacterBuilder {
     build.maxHp = Math.max(level, level * (hitDie + mod(attributes.con)));
     build.maxFp = forceDie > 0 ? Math.max(0, level * (forceDie + mod(attributes.wis))) : 0;
     build.feats = this.buildFeats(cls, level);
+    // Toughness and Master Toughness: +1 vitality per level each; Wookiee Toughness +2; Force Sensitive +40 FP
+    const has = (feat: number) => build.feats.includes(feat);
+    build.maxHp += level * ((has(84) ? 1 : 0) + (has(124) ? 1 : 0) + (has(95) ? 2 : 0));
+    if (has(116)) build.maxFp += 40;
     build.powers = this.buildPowers(cls, level, options.alignment || 'light');
     build.skillRanks = this.buildSkills(cls, level, attributes);
     return build;

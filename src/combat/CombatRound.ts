@@ -330,7 +330,10 @@ export class CombatRound {
    */
   addAction(action: CombatRoundAction){
     action.owner = this.owner;
-    if((this.owner as any)?.stealthMode) (this.owner as any).setStealthMode(false);
+    if((this.owner as any)?.stealthMode){
+      (this.owner as any).setStealthMode(false);
+      (this.owner as any).sneakAttackFromStealth = true;
+    }
     this.scheduledActionList.push(action);
   }
 
@@ -536,7 +539,7 @@ export class CombatRound {
    */
   calculateAttackBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
     if(!creature) return 0;
-    let bonus = creature.getBaseAttackBonus() + (weapon?.getAttackBonus() || 0);
+    let bonus = creature.getBaseAttackBonus() + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0);
 
     // If weapon.possessor wasn't bound, check Weapon Focus directly on creature
     if(weapon && weapon.possessor !== creature){
@@ -709,11 +712,8 @@ export class CombatRound {
       }else if(creature.getHasFeat(CombatFeatType.TWO_WEAPON_ADVANCED)){
         penalty = 4;
       }
-      if(
-        rightHand?.getBaseItem()?.weaponWield == WeaponWield.TWO_HANDED_SWORD ||
-        rightHand?.getBaseItem()?.weaponWield == WeaponWield.BLASTER_PISTOL ||
-        leftHand?.getBaseItem()?.weaponSize == WeaponSize.SMALL
-      ){
+      // A "balanced" (small) weapon in the off hand lowers the main-hand penalty by 2 (the feats' text: 2/0)
+      if(leftHand?.getBaseItem()?.weaponSize == WeaponSize.SMALL){
         penalty -= 2;
       }
       return Math.max(penalty, 0);
@@ -731,12 +731,7 @@ export class CombatRound {
       }else if(creature.getHasFeat(CombatFeatType.TWO_WEAPON_FIGHTING)){
         penalty = 6;
       }
-      if(
-        leftHand?.getBaseItem()?.weaponSize == WeaponSize.SMALL ||
-        rightHand?.getBaseItem()?.weaponWield == WeaponWield.TWO_HANDED_SWORD
-      ){
-        penalty -= 2;
-      }
+      // -10 / -6 / -4 / -2: a double-bladed weapon counts as two weapons, and nothing lowers this further
       return Math.max(penalty, 0);
     }
 
@@ -765,17 +760,19 @@ export class CombatRound {
       return false;
     }
 
+    // Jedi Defense lets a Jedi deflect at all; Advanced and Master add +3 / +6. Deflection effects and items
+    // add to it, and can grant it without the feat.
+    const hasJediDefense = targetCreature.getHasFeat(CombatFeatType.JEDI_DEFENSE) ||
+      targetCreature.getHasFeat(CombatFeatType.ADVANCED_JEDI_DEFENSE) || targetCreature.getHasFeat(CombatFeatType.MASTER_JEDI_DEFENSE);
     let deflectBonus = 0;
     if(targetCreature.getHasFeat(CombatFeatType.MASTER_JEDI_DEFENSE)){
       deflectBonus = 6;
     }else if(targetCreature.getHasFeat(CombatFeatType.ADVANCED_JEDI_DEFENSE)){
-      deflectBonus = 4;
-    }else if(targetCreature.getHasFeat(CombatFeatType.JEDI_DEFENSE)){
-      deflectBonus = 2;
+      deflectBonus = 3;
     }
-    // Deflection effects and item properties add to it, and can grant it without the feat
-    deflectBonus += targetCreature.getBlasterDeflectionBonus?.() || 0;
-    if(deflectBonus <= 0){
+    const itemBonus = targetCreature.getBlasterDeflectionBonus?.() || 0;
+    deflectBonus += itemBonus;
+    if(!hasJediDefense && itemBonus <= 0){
       return false;
     }
 
@@ -783,8 +780,30 @@ export class CombatRound {
       targetCreature.combatRound.deflectArrow = false;
     }
 
-    const deflectRoll = Dice.roll(1, DiceType.d20, targetCreature.getBaseAttackBonus() + deflectBonus);
-    return deflectRoll >= attackRoll;
+    // An opposed roll with the lightsaber against the attack roll
+    const deflectRoll = Dice.roll(1, DiceType.d20,
+      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus);
+    if(deflectRoll < attackRoll) return false;
+    // "If the attack is beaten by 10 or more, the bolt is deflected back at the enemy"
+    if(deflectRoll >= attackRoll + 10) this.reflectBolt(targetCreature, weapon);
+    return true;
+  }
+
+  /** A bolt deflected back at whoever fired it: the weapon's damage, on them */
+  reflectBolt(deflector: ModuleCreature, weapon: ModuleItem){
+    const shooter = this.owner as ModuleCreature;
+    if(!shooter || shooter === deflector || shooter.isDead?.()) return;
+    const amount = Math.max(1, (weapon.getBaseDamage?.() || 0) + (weapon.getDamageBonus?.() || 0));
+    const type = weapon.getBaseDamageType?.() ?? 0;
+    const index = type >= 0 && type <= 15 ? type : 14;
+    const damage = new GameState.GameEffectFactory.EffectDamage();
+    damage.setCreator(deflector);
+    damage.setSpellId(-1);
+    damage.setInt(index, amount);
+    damage.setInt(16, 1000);
+    damage.setInt(17, 1 << index);
+    damage.initialize();
+    shooter.addEffect(damage);
   }
 
   /**

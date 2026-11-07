@@ -1480,7 +1480,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].fortitudeSave(args[1], args[2], args[3]);
+        return args[0].fortitudeSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }
@@ -1492,7 +1492,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].reflexSave(args[1], args[2], args[3]);
+        return args[0].reflexSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }
@@ -1504,7 +1504,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].willSave(args[1], args[2], args[3]);
+        return args[0].willSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }

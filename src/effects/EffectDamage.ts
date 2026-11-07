@@ -195,6 +195,7 @@ export class EffectDamage extends GameEffect {
       if(
         typeof creature.getHasFeat === 'function' && (
           creature.getHasFeat(CombatFeatType.IMPROVED_TOUGHNESS) ||
+          creature.getHasFeat(CombatFeatType.WOOKIE_ENDURANCE) ||
           creature.getHasFeat(CombatFeatType.MASTER_TOUGHNESS) ||
           creature.getHasFeat(CombatFeatType.WOOKIEE_TOUGHNESS_II) ||
           creature.getHasFeat(CombatFeatType.WOOKIEE_TOUGHNESS_III)
