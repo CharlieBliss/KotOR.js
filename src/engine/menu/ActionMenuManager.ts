@@ -323,6 +323,22 @@ export class ActionMenuManager {
       }));
     }
 
+    // Mines carried can be laid in front of you
+    const minesToLay = new Set<string>();
+    for(const item of ActionMenuManager.oPC.getInventory?.() || []){
+      if(item?.baseItemId != 58 || minesToLay.has(item.getItemResRef())) continue;
+      minesToLay.add(item.getItemResRef());
+      const layMine = new GameState.ActionFactory.ActionSetMine();
+      layMine.setOwner(ActionMenuManager.oPC as ModuleObject);
+      layMine.setParameter(0, ActionParameterType.DWORD, item);
+      layMine.setParameter(1, ActionParameterType.DWORD, ActionMenuManager.oPC);
+      ActionMenuManager.ActionPanels.selfPanels[3].addAction(new GameState.ActionMenuManager.ActionMenuItem({
+        action: layMine,
+        target: ActionMenuManager.oPC,
+        icon: item.getIcon()
+      }));
+    }
+
     for(const item of ActionMenuManager.getUsableItems('self')){
       ActionMenuManager.ActionPanels.selfPanels[2].addAction(new GameState.ActionMenuManager.ActionMenuItem({
         item,

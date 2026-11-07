@@ -66,7 +66,15 @@ export class ActionDisarmMine extends Action {
           return ActionStatus.FAILED;
         }
 
-        //todo: disarm skill check
+
+        // Demolitions (d20 + skill) against the mine's DC; a failed try leaves it where it is
+        const roll = 1 + Math.floor(Math.random() * 20);
+        const skill = (this.owner as any).getSkillLevel?.(1) || 0;
+        const success = roll + skill >= trap.getDisarmDC();
+        GameState.GMManager?.announceSkillRoll?.(this.owner, 'Disarm mine', roll, skill, trap.getDisarmDC(), success);
+        if(!success){
+          return ActionStatus.COMPLETE;
+        }
 
         trap.destroy();
       }

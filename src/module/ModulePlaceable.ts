@@ -463,6 +463,12 @@ export class ModulePlaceable extends ModuleObject {
 
   use(object: ModuleObject){
 
+    // A GM can put a skill check in front of an object (Computer Use for a terminal, Repair for a panel...)
+    if(GameState.gmMode && GameState.GMManager?.skillGatePasses(this, object) === false){
+      this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      return;
+    }
+
     this.lastUsedBy = object;
 
     this.attemptUnlockWithKey(object);

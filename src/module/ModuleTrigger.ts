@@ -14,6 +14,7 @@ import { EngineMode } from "@/enums/engine/EngineMode";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ActionParameterType, ModuleDoorAnimState, ModuleObjectConstant, SignalEventType } from "@/enums";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
+import { NWScript } from "@/nwscript/NWScript";
 
 
 const OBJECTS_INSIDE_UPDATE_THRESHOLD = 15; // 15 frame ticks
@@ -71,6 +72,67 @@ export class ModuleTrigger extends ModuleObject {
     this.container.add(this.reticleNode);
     this.reticleNode.position.z = this.highlightHeight;
 
+  }
+
+  /** The traps.2da row for this mine */
+  getTrapRow(): any {
+    return GameState.TwoDAManager.datatables.get('traps')?.rows[this.trapType];
+  }
+
+  /**
+   * Demolitions DCs, as the skill's description gives them: setting a mine takes its set DC (15 / 20 / 25),
+   * disarming it +5, recovering it +10. A mine placed with its own disarm DC keeps it.
+   */
+  getSetDC(): number {
+    return parseInt(this.getTrapRow()?.setdc) || 15;
+  }
+
+  getDisarmDC(): number {
+    return Number(this.trapDisarmDC) > 0 ? Number(this.trapDisarmDC) : this.getSetDC() + 5;
+  }
+
+  getRecoverDC(): number {
+    return this.getDisarmDC() + 5;
+  }
+
+  /**
+   * Lay a mine (a traps.2da row) on the ground: a small trap trigger owned by the setter's faction, so it goes
+   * off under their enemies. Its own side knows where it is.
+   */
+  static CreateMine(area: any, position: THREE.Vector3, trapType: number, owner: ModuleObject | undefined, factionId?: number): ModuleTrigger | undefined {
+    const row = GameState.TwoDAManager.datatables.get('traps')?.rows[trapType];
+    if(!row || !area) return undefined;
+    const trigger = new ModuleTrigger();
+    trigger.initialized = true;
+    trigger.type = ModuleTriggerType.TRAP;
+    trigger.trapType = trapType;
+    trigger.factionId = factionId ?? owner?.factionId ?? 1;
+    trigger.faction = GameState.FactionManager.factions.get(trigger.factionId);
+    trigger.setByPlayerParty = owner && (owner as any).isPartyMember?.() ? 1 : 0;
+    trigger.trapOneShot = true;
+    trigger.trapDetectable = true;
+    trigger.trapDisarmable = true;
+    const setterSkill = owner ? ((owner as any).getSkillLevel?.(1) || 0) : 0;
+    // Spotting someone else's mine: its detect DC, plus how well it was hidden
+    trigger.trapDetectDC = (parseInt(row.detectdcmod) || 20) + setterSkill;
+    trigger.trapDisarmDC = (parseInt(row.setdc) || 15) + 5;
+    trigger.trapDetected = !!owner;
+    trigger.position.copy(position);
+    trigger.vertices = [
+      new THREE.Vector3(-1, -1, 0), new THREE.Vector3(1, -1, 0),
+      new THREE.Vector3(1, 1, 0), new THREE.Vector3(-1, 1, 0),
+    ];
+    if(row.trapscript && row.trapscript !== '****'){
+      const script = NWScript.Load(row.trapscript);
+      if(script){
+        script.caller = trigger;
+        trigger.scripts[ModuleObjectScript.TriggerOnTrapTriggered] = script;
+      }
+    }
+    area.attachObject(trigger);
+    trigger.load();
+    if(GameState.gmMode) GameState.GMManager?.onMineChanged?.(trigger);
+    return trigger;
   }
 
   getReticleNode(){
@@ -249,6 +311,7 @@ export class ModuleTrigger extends ModuleObject {
   detectTrap(){
     if(this.trapDetected){ return; }
     this.trapDetected = true;
+    if(GameState.gmMode) GameState.GMManager?.onMineChanged?.(this);
 
     if(this.trapDetected){
       this.trapModel?.playAnimation('detect', false);
@@ -446,6 +509,7 @@ export class ModuleTrigger extends ModuleObject {
     if(!object){ return; }
     console.log('ModuleTrigger.onEnter', this.type,  this.getTag());
     if(this.type == ModuleTriggerType.TRAP && !this.trapTriggered){
+      if(GameState.gmMode && GameState.GMManager?.isMineReplica?.(this)){ return; }
       if(object.isHostile(this)){
         this.trapTriggered = true;
         console.log('ModuleTrigger.onEnter', 'Trap Triggered')
@@ -456,6 +520,10 @@ export class ModuleTrigger extends ModuleObject {
         event.setTime(GameState.module.timeManager.pauseTime);
         event.eventType = SignalEventType.OnTrapTriggered;
         GameState.module.addEvent(event);
+        // A mine is used up when it goes off: take it away once its script has run
+        if(this.trapOneShot !== false){
+          setTimeout(() => { if(this.area) this.destroy(); }, 1500);
+        }
       }
     }else if(this.linkedToModule && (GameState.Mode != EngineMode.DIALOG)){
       if(object == GameState.getCurrentPlayer()){
@@ -612,6 +680,9 @@ export class ModuleTrigger extends ModuleObject {
     if(this.template.RootNode.hasField('TrapFlag'))
       this.trapFlag = this.template.getFieldByLabel('TrapFlag').getValue();
 
+    if(this.template.RootNode.hasField('TrapDisarmDC'))
+      this.trapDisarmDC = this.template.getFieldByLabel('TrapDisarmDC').getValue();
+
     if(this.template.RootNode.hasField('TrapType'))
       this.trapType = this.template.getFieldByLabel('TrapType').getValue();
 
@@ -662,6 +733,7 @@ export class ModuleTrigger extends ModuleObject {
   }
 
   destroy(): void {
+    if(GameState.gmMode) GameState.GMManager?.onMineRemoved?.(this);
     super.destroy();
 
     if(this.trapModel){

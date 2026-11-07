@@ -3293,6 +3293,7 @@ export class ModuleCreature extends ModuleObject {
   static MINE_DETECT_RANGE = 10;
 
   canSpotMines(): boolean {
+    if(GameState.gmMode && GameState.GMManager?.isMineReplica?.(undefined)) return false;
     return GameState.PartyManager?.party?.includes(this) || !!(this as any).gmOwnerPeerId;
   }
 

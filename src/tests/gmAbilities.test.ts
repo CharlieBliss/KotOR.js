@@ -130,3 +130,106 @@ describe("players' abilities in a GM session", () => {
     await flush();
   });
 });
+
+describe("GM checks", () => {
+  test("a skill check is d20 + the skill's total against the DC, announced to everyone unless secret", () => {
+    GMNetworkManager.role = "host";
+    jest.spyOn(Math, "random").mockReturnValue(0.5); // d20 = 11
+    const pc = actor("pc_1", { getSkillLevel: () => 4 });
+    const chat = jest.spyOn(GMNetworkManager, "sendChat").mockImplementation(() => {});
+    const [r] = GMManager.callCheck([pc], { kind: "skill", skill: 4 }, 15);
+    expect(r).toMatchObject({ roll: 11, bonus: 4, total: 15, success: true, label: "Persuade" });
+    expect(chat).toHaveBeenCalledWith("Check", "pc_1: Persuade 11 + 4 = 15 vs DC 15, success");
+
+    chat.mockClear();
+    GMManager.callCheck([pc], { kind: "skill", skill: 4 }, 16, true);
+    expect(chat).not.toHaveBeenCalled();
+  });
+
+  test("a skill-gated object can't be used until its check is passed once", () => {
+    GMNetworkManager.role = "host";
+    jest.spyOn(GMNetworkManager, "sendChat").mockImplementation(() => {});
+    const terminal: any = { objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModulePlaceable };
+    GMManager.setSkillGate(terminal, { skill: 0, dc: 20 });
+    const slicer = actor("pc_1", { getSkillLevel: () => 5 });
+
+    jest.spyOn(Math, "random").mockReturnValue(0); // d20 = 1
+    expect(GMManager.skillGatePasses(terminal, slicer)).toBe(false);
+    jest.spyOn(Math, "random").mockReturnValue(0.99); // d20 = 20
+    expect(GMManager.skillGatePasses(terminal, slicer)).toBe(true);
+    // Passed for good: no more rolls
+    jest.spyOn(Math, "random").mockReturnValue(0);
+    expect(GMManager.skillGatePasses(terminal, slicer)).toBe(true);
+  });
+});
+
+describe("mines", () => {
+  const traps = { 4: { label: "TRAP_FRAGMENTATION_MINE_AVERAGE", setdc: "20", detectdcmod: "30", disarmdcmod: "25", resref: "g_i_trapkit005" } };
+  beforeEach(() => {
+    (GameState as any).TwoDAManager = { datatables: new Map([["traps", { rows: traps }]]) };
+  });
+
+  test("Demolitions DCs follow the skill's description: set, +5 to disarm, +10 to recover", () => {
+    const { ModuleTrigger } = jest.requireActual("@/module/ModuleTrigger") as any;
+    const mine = Object.assign(Object.create(ModuleTrigger.prototype), { trapType: 4, trapDisarmDC: 0 });
+    expect(mine.getSetDC()).toBe(20);
+    expect(mine.getDisarmDC()).toBe(25);
+    expect(mine.getRecoverDC()).toBe(30);
+    // A mine placed with its own disarm DC keeps it
+    mine.trapDisarmDC = 28;
+    expect(mine.getRecoverDC()).toBe(33);
+  });
+
+  test("a player's mine picks go to the host; a mine is named by its network id", () => {
+    GMNetworkManager.role = "client";
+    GMNetworkManager.assignedActorNetId = "pc_1";
+    const pc = actor("pc_1");
+    const mine: any = { objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModuleTrigger, type: 2, position: new THREE.Vector3(1, 2, 0), trapType: 4 };
+
+    GMManager.interceptMenuAction(pc, { action: { type: ActionType.ActionDisarmMine } }, mine);
+    expect(sent.at(-1)!.payload).toMatchObject({ kind: "mine", mine: "disarm", targetNetId: "trap_10_20_4" });
+
+    const kit = { getItemResRef: () => "g_i_trapkit005" };
+    GMManager.interceptMenuAction(pc, { action: { type: ActionType.ActionSetMine, getParameter: () => kit } }, pc);
+    expect(sent.at(-1)!.payload).toMatchObject({ kind: "mine", mine: "lay", resRef: "g_i_trapkit005", targetNetId: undefined });
+  });
+
+  test("host: Demolitions needs ranks, the mine must be theirs to lay, and only spotted mines can be disarmed", async () => {
+    GMNetworkManager.role = "host";
+    const novice = actor("pc_1", { getSkillRanks: () => 0 });
+    expect(await GMManager.useMineOnHost(novice, { netId: "pc_1", kind: "mine", seq: 1, mine: "lay", resRef: "g_i_trapkit005" })).toBe(false);
+
+    const sapper = actor("pc_2", { getSkillRanks: () => 4 });
+    (GameState as any).ActionFactory = { ActionSetMine: jest.fn(() => ({ setOwner: jest.fn(), setParameter: jest.fn() })), ActionDisarmMine: jest.fn(() => ({ setOwner: jest.fn(), setParameter: jest.fn() })) };
+    jest.spyOn(GMManager, "createItemFromResRefAsync").mockResolvedValue({ getItemResRef: () => "g_i_trapkit005" } as any);
+    // Not in their inventory
+    expect(await GMManager.useMineOnHost(sapper, { netId: "pc_2", kind: "mine", seq: 2, mine: "lay", resRef: "g_i_trapkit005" })).toBe(false);
+    GMManager.addToPlayerInventory(sapper, [{ resRef: "g_i_trapkit005", stack: 1 }]);
+    expect(await GMManager.useMineOnHost(sapper, { netId: "pc_2", kind: "mine", seq: 3, mine: "lay", resRef: "g_i_trapkit005" })).toBe(true);
+
+    const hidden: any = { objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModuleTrigger, type: 2, trapDetected: false };
+    GMManager.registerNetObject("mine_1", hidden);
+    expect(await GMManager.useMineOnHost(sapper, { netId: "pc_2", kind: "mine", seq: 4, mine: "disarm", targetNetId: "mine_1" })).toBe(false);
+    hidden.trapDetected = true;
+    expect(await GMManager.useMineOnHost(sapper, { netId: "pc_2", kind: "mine", seq: 5, mine: "disarm", targetNetId: "mine_1" })).toBe(true);
+  });
+
+  test("on a player's machine mines are only a mirror: none go off or get spotted there", () => {
+    GMNetworkManager.role = "client";
+    expect(GMManager.isMineReplica()).toBe(true);
+    GMNetworkManager.role = "host";
+    expect(GMManager.isMineReplica()).toBe(false);
+  });
+
+  test("host: a GM session player's mine comes out of, and a recovered one goes into, their inventory", () => {
+    GMNetworkManager.role = "host";
+    (GameState as any).gmMode = true;
+    const pc = actor("pc_1");
+    GMManager.addToPlayerInventory(pc, [{ resRef: "g_i_trapkit005", stack: 2 }]);
+    expect(GMManager.consumePlayerItem(pc, { getItemResRef: () => "g_i_trapkit005" } as any)).toBe(true);
+    expect(GMManager.giveRecoveredMine(pc, "g_i_trapkit004")).toBe(true);
+    expect(GMManager.getPlayerInventory(pc)).toEqual([{ resRef: "g_i_trapkit005", stack: 1 }, { resRef: "g_i_trapkit004", stack: 1 }]);
+    // NPCs and the GM's own characters use their own inventories
+    expect(GMManager.consumePlayerItem(actor("cre_0", { gmOwnerPeerId: undefined }), { getItemResRef: () => "x" } as any)).toBe(false);
+  });
+});

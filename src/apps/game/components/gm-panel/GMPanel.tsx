@@ -7,6 +7,7 @@ import { BitWise } from "@/utility/BitWise";
 import type {
   GMCreatureSpawnConfig,
   GMCreatureTemplateInfo,
+  GMCheck,
   GMPlaceableSpawnConfig,
   GMPlaceablePropCategory,
   GMPlayerSpawnConfig,
@@ -61,6 +62,11 @@ export const GMPanel: React.FC = () => {
 
   // Players tab states
   const [playerCfg, setPlayerCfg] = useState<GMPlayerSpawnConfig>({ ...GMManager.pendingPlayerConfig });
+  // A check the GM calls for: who (a player net id, 'all' or 'selected'), what, how hard, and whether players see it
+  const [checkWho, setCheckWho] = useState<string>('all');
+  const [checkWhat, setCheckWhat] = useState<string>('skill:4');
+  const [checkDc, setCheckDc] = useState<number>(15);
+  const [checkSecret, setCheckSecret] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Inspector tab states
@@ -392,7 +398,8 @@ export const GMPanel: React.FC = () => {
   const placingName =
     tool === 'place_creature' ? GMManager.pendingCreatureConfig?.name :
     tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
-    tool === 'place_player' ? GMManager.pendingPlayerConfig?.name : '';
+    tool === 'place_player' ? GMManager.pendingPlayerConfig?.name :
+    tool === 'place_mine' ? `mine: ${GMManager.getMineTypes().find((m) => m.id === GMManager.pendingMineType)?.label || 'mine'}` : '';
   const teleportTarget = GMManager.getTeleportTarget();
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
@@ -1556,6 +1563,26 @@ export const GMPanel: React.FC = () => {
                         </button>
                       </div>
 
+                      <div className="gm-field" title="A hidden mine, hostile to the players. They can spot it with Awareness, then disarm or recover it with Demolitions.">
+                        <label>Mines</label>
+                        <div className="gm-row">
+                          <select
+                            className="gm-select"
+                            style={{ flex: 1 }}
+                            value={GMManager.pendingMineType}
+                            onChange={e => { GMManager.pendingMineType = Number(e.target.value); forceUpdate(); }}
+                          >
+                            {GMManager.getMineTypes().map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                          </select>
+                          <button
+                            className={`gm-btn warning ${GMManager.activeTool === 'place_mine' ? 'active' : ''}`}
+                            onClick={() => GMManager.setToolMode(GMManager.activeTool === 'place_mine' ? 'select' : 'place_mine')}
+                          >
+                            {GMManager.activeTool === 'place_mine' ? 'Click the ground (Esc to stop)' : 'Place mine'}
+                          </button>
+                        </div>
+                      </div>
+
                       <div className="gm-grid-2">
                         <div className="gm-field">
                           <label>Grid snap</label>
@@ -1699,6 +1726,34 @@ export const GMPanel: React.FC = () => {
                           )}
                         </div>
 
+                        <div className="gm-row" title="Using it takes a skill check first; passing once opens it for good">
+                          <label className="gm-checkbox" style={{ flex: 1 }}>
+                            Needs
+                            <select
+                              className="gm-select"
+                              value={placeableCfg.skillGate ? String(placeableCfg.skillGate.skill) : ''}
+                              onChange={e => updatePlaceableCfg({ skillGate: e.target.value === '' ? undefined : { skill: Number(e.target.value), dc: placeableCfg.skillGate?.dc || 15 } })}
+                            >
+                              <option value="">no skill check</option>
+                              {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
+                            </select>
+                          </label>
+                          {placeableCfg.skillGate && (
+                            <label className="gm-checkbox">
+                              DC
+                              <input
+                                className="gm-input"
+                                style={{ width: 56 }}
+                                type="number"
+                                min={1}
+                                max={60}
+                                value={placeableCfg.skillGate.dc}
+                                onChange={e => updatePlaceableCfg({ skillGate: { ...placeableCfg.skillGate!, dc: Number(e.target.value) || 15 } })}
+                              />
+                            </label>
+                          )}
+                        </div>
+
                         {placeableCfg.hasInventory && (
                           <div className="gm-field">
                             <label>Loot ({placeableCfg.lootResRefs.join(', ') || 'empty'})</label>
@@ -1769,6 +1824,66 @@ export const GMPanel: React.FC = () => {
                     </div>
                   </div>
                 )}
+
+                {(() => {
+                  const players = GMManager.getPlayerCharacters().filter((pc) => !pc.isDead());
+                  const targets = (): KotOR.ModuleCreature[] => {
+                    if (checkWho === 'all') return players;
+                    if (checkWho === 'selected') return selectedCreature ? [selectedCreature] : [];
+                    const pc = GMManager.netIdMap.get(checkWho);
+                    return pc ? [pc as KotOR.ModuleCreature] : [];
+                  };
+                  const parseCheck = (value: string): GMCheck => {
+                    const [kind, id] = value.split(':');
+                    return kind === 'skill' ? { kind: 'skill', skill: Number(id) } : { kind: 'save', save: id as 'fortitude' | 'reflex' | 'will' };
+                  };
+                  return (
+                    <div className="gm-section">
+                      <div className="gm-section-title">Call for a check</div>
+                      <div className="gm-grid-2">
+                        <div className="gm-field">
+                          <label>Who</label>
+                          <select className="gm-select" value={checkWho} onChange={e => setCheckWho(e.target.value)}>
+                            <option value="all">Every player ({players.length})</option>
+                            {selectedCreature && <option value="selected">Selected: {selectedCreature.getName()}</option>}
+                            {players.map((pc) => (
+                              <option key={(pc as any).gmNetId} value={(pc as any).gmNetId}>{pc.getName()}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="gm-field">
+                          <label>Check</label>
+                          <select className="gm-select" value={checkWhat} onChange={e => setCheckWhat(e.target.value)}>
+                            <optgroup label="Skills">
+                              {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={`skill:${i}`}>{name}</option>)}
+                            </optgroup>
+                            <optgroup label="Saving throws">
+                              <option value="save:fortitude">Fortitude</option>
+                              <option value="save:reflex">Reflex</option>
+                              <option value="save:will">Will</option>
+                            </optgroup>
+                          </select>
+                        </div>
+                        <div className="gm-field">
+                          <label title="Easy 10, average 15, hard 20, very hard 25">Difficulty (DC)</label>
+                          <input className="gm-input" type="number" min={1} max={60} value={checkDc} onChange={e => setCheckDc(Number(e.target.value) || 0)} />
+                        </div>
+                        <label className="gm-checkbox" title="Only you see the result">
+                          <input type="checkbox" checked={checkSecret} onChange={e => setCheckSecret(e.target.checked)} />
+                          Secret roll
+                        </label>
+                      </div>
+                      <button
+                        className="gm-btn success"
+                        disabled={!targets().length}
+                        onClick={() => { GMManager.callCheck(targets(), parseCheck(checkWhat), checkDc, checkSecret); forceUpdate(); }}
+                        title="Rolls d20 + the skill (or save) for each, as KotOR does; results go to chat"
+                      >
+                        Roll
+                      </button>
+                    </div>
+                  );
+                })()}
 
                 {GMNetworkManager.role === 'host' && (
                   <div className="gm-section">
@@ -2223,6 +2338,40 @@ export const GMPanel: React.FC = () => {
                               {(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
                             </button>
                           </div>
+
+                          {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable) && (() => {
+                            const gate = (selectedObj as any).gmSkillGate as { skill: number; dc: number } | undefined;
+                            return (
+                              <div className="gm-row" title="Using it takes a skill check first; passing once opens it for good">
+                                <label className="gm-checkbox" style={{ flex: 1 }}>
+                                  Needs
+                                  <select
+                                    className="gm-select"
+                                    value={gate ? String(gate.skill) : ''}
+                                    onChange={e => GMManager.setSkillGate(selectedObj, e.target.value === '' ? undefined : { skill: Number(e.target.value), dc: gate?.dc || 15 })}
+                                  >
+                                    <option value="">no skill check</option>
+                                    {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
+                                  </select>
+                                </label>
+                                {gate && (
+                                  <label className="gm-checkbox">
+                                    DC
+                                    <input
+                                      className="gm-input"
+                                      style={{ width: 56 }}
+                                      type="number"
+                                      min={1}
+                                      max={60}
+                                      value={gate.dc}
+                                      onChange={e => GMManager.setSkillGate(selectedObj, { skill: gate.skill, dc: Number(e.target.value) || 15 })}
+                                    />
+                                  </label>
+                                )}
+                                {(selectedObj as any).gmSkillGateSolved && <span className="gm-badge">passed</span>}
+                              </div>
+                            );
+                          })()}
 
                           {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable) && (
                             <div className="gm-field">

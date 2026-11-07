@@ -20,6 +20,9 @@ import { CreatureClass } from "@/combat/CreatureClass";
 import { CharacterBuilder } from "@/engine/rules/CharacterBuilder";
 import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import type { GMNpcOrder, GMPoint } from "@/managers/GMNpcOrders";
+import type { GMSerializedMine } from "@/managers/GMNetworkManager";
+import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
+import type { ModuleTrigger } from "@/module/ModuleTrigger";
 import type { ICharacterBuild } from "@/engine/rules/CharacterBuilder";
 import { TalentFeat, TalentSpell } from "@/talents";
 import { ModuleObject, ModuleCreature, ModulePlayer, ModulePlaceable, ModuleDoor, ModuleItem } from "@/module";
@@ -54,7 +57,7 @@ import {
 } from "@/managers/GMNetworkManager";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
-export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport'
+export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine'
   // Ordering an NPC (GMNpcOrders): click the ground to move it, a creature to attack or follow, points to patrol
   | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol';
 
@@ -88,6 +91,19 @@ export interface GMCreatureSpawnConfig {
   aiDisabled?: boolean;
   /** Items the creature carries, lootable from its body once it dies */
   lootResRefs?: string[];
+}
+
+/** A check the GM calls for: a skill (SKILL_*) or a saving throw */
+export type GMCheck = { kind: 'skill'; skill: number } | { kind: 'save'; save: 'fortitude' | 'reflex' | 'will' };
+
+export interface GMCheckResult {
+  name: string;
+  label: string;
+  roll: number;
+  bonus: number;
+  total: number;
+  dc: number;
+  success: boolean;
 }
 
 /** What a creature template (.utc) holds, for choosing one in the GM panel */
@@ -136,6 +152,14 @@ export interface GMPlaceableSpawnConfig {
   openLockDC: number;
   lootResRefs: string[];
   barkText?: string;
+  /** Using it takes a skill check first (a terminal needing Computer Use, a panel needing Repair...) */
+  skillGate?: GMSkillGate;
+}
+
+/** A skill check that stands between a player and using an object; passing it once opens it for good */
+export interface GMSkillGate {
+  skill: number;
+  dc: number;
 }
 
 export interface GMSceneBlueprintItem {
@@ -2050,6 +2074,8 @@ export class GMManager {
       const player = await this.spawnPlayerCharacter(this.pendingPlayerConfig, spawnPos, facing);
       if (player) this.selectObject(player);
       this.setToolMode('select');
+    } else if (this.activeTool === 'place_mine') {
+      this.placeMine(this.pendingMineType, spawnPos);
     } else if (this.activeTool === 'teleport') {
       const target = this.getTeleportTarget();
       if (target) {
@@ -2064,7 +2090,7 @@ export class GMManager {
   }
 
   static isPlacementTool(tool: GMToolMode): boolean {
-    return tool === 'place_creature' || tool === 'place_placeable' || tool === 'place_player';
+    return tool === 'place_creature' || tool === 'place_placeable' || tool === 'place_player' || tool === 'place_mine';
   }
 
   static rotatePlacement(degrees: number) {
@@ -2865,6 +2891,7 @@ export class GMManager {
     }
     const scale = typeof config.scale === 'number' && config.scale > 0 ? config.scale : 1.0;
     (plc as any).gmScale = scale;
+    if (config.skillGate) (plc as any).gmSkillGate = { ...config.skillGate };
     (plc as any).gmSpawnConfig = {
       ...config,
       appearanceId: resolvedAppearanceId,
@@ -4099,6 +4126,83 @@ export class GMManager {
     return [...new Set(all)].filter((c) => this.isPlayerCharacter(c));
   }
 
+  // =========================================================================
+  // GM checks: skills and saving throws, rolled on the GM's machine
+  // =========================================================================
+
+  /** skills.2da order (SKILL_*) */
+  static SKILL_NAMES = ['Computer Use', 'Demolitions', 'Stealth', 'Awareness', 'Persuade', 'Repair', 'Security', 'Treat Injury'];
+
+  static checkLabel(check: GMCheck): string {
+    if (check.kind === 'skill') return this.SKILL_NAMES[check.skill] || `Skill ${check.skill}`;
+    return check.save === 'fortitude' ? 'Fortitude save' : check.save === 'reflex' ? 'Reflex save' : 'Will save';
+  }
+
+  /**
+   * Roll a check as KotOR does: d20 + the skill's total (ranks, ability, feats, items, effects), or d20 + the save
+   * and its ability, against a difficulty. Saves succeed on a natural 20 and fail on a 1; skills don't.
+   */
+  static rollCheck(cre: ModuleCreature, check: GMCheck, dc: number): GMCheckResult {
+    const roll = 1 + Math.floor(Math.random() * 20);
+    const mod = (score: number) => Math.floor(((score || 10) - 10) / 2);
+    let bonus = 0;
+    if (check.kind === 'skill') {
+      bonus = cre.getSkillLevel(check.skill);
+    } else if (check.save === 'fortitude') {
+      bonus = cre.getFortitudeSave() + mod(cre.getCON());
+    } else if (check.save === 'reflex') {
+      bonus = cre.getReflexSave() + mod(cre.getDEX());
+    } else {
+      bonus = cre.getWillSave() + mod(cre.getWIS());
+    }
+    const total = roll + bonus;
+    let success = total >= dc;
+    if (check.kind === 'save' && roll === 20) success = true;
+    if (check.kind === 'save' && roll === 1) success = false;
+    return { name: cre.getName() || 'Someone', label: this.checkLabel(check), roll, bonus, total, dc, success };
+  }
+
+  static describeCheck(r: GMCheckResult): string {
+    const sign = r.bonus >= 0 ? '+' : '-';
+    return `${r.name}: ${r.label} ${r.roll} ${sign} ${Math.abs(r.bonus)} = ${r.total} vs DC ${r.dc}, ${r.success ? 'success' : 'failure'}`;
+  }
+
+  /** Roll a check for each creature and announce it: to everyone, or only to the GM when secret */
+  static callCheck(creatures: ModuleCreature[], check: GMCheck, dc: number, secret: boolean = false): GMCheckResult[] {
+    const results = creatures.filter((c) => c && !c.isDead()).map((c) => this.rollCheck(c, check, dc));
+    for (const r of results) {
+      const text = this.describeCheck(r);
+      if (secret || GMNetworkManager.role !== 'host') GMNetworkManager.appendChat(secret ? 'Check (secret)' : 'Check', text);
+      else GMNetworkManager.sendChat('Check', text);
+    }
+    return results;
+  }
+
+  /** Give an object a skill check to pass before it can be used, or undefined to remove it */
+  static setSkillGate(obj: ModuleObject, gate: GMSkillGate | undefined) {
+    if (!obj) return;
+    if (gate) (obj as any).gmSkillGate = { skill: gate.skill, dc: gate.dc };
+    else delete (obj as any).gmSkillGate;
+    delete (obj as any).gmSkillGateSolved;
+    const config = (obj as any).gmSpawnConfig;
+    if (config) config.skillGate = gate ? { ...gate } : undefined;
+    this.notifyChange();
+  }
+
+  /**
+   * Using an object with a skill gate: the user rolls the skill against its difficulty (on the GM's machine,
+   * where objects are used). Passing opens it for good; failing blocks this use, and they can try again.
+   */
+  static skillGatePasses(obj: ModuleObject, user: ModuleObject): boolean {
+    const gate = (obj as any)?.gmSkillGate as GMSkillGate | undefined;
+    if (!gate || (obj as any).gmSkillGateSolved) return true;
+    if (!user || !BitWise.InstanceOf(user.objectType, ModuleObjectType.ModuleCreature)) return true;
+    const result = this.callCheck([user as ModuleCreature], { kind: 'skill', skill: gate.skill }, gate.dc)[0];
+    if (!result) return false;
+    if (result.success) (obj as any).gmSkillGateSolved = true;
+    return result.success;
+  }
+
   static setDeathRule(rule: GMDeathRule) {
     if (!['kotor', 'gm', 'respawn'].includes(rule)) return;
     this.deathRule = rule;
@@ -4484,7 +4588,8 @@ export class GMManager {
       keepDefaultPlaceables: this.keepDefaultPlaceables,
       rules: { deathRule: this.deathRule },
       actors: this.serializeActorsForTick(),
-      doors
+      doors,
+      mines: this.getMines().map((m) => this.serializeMine(m)),
     };
   }
 
@@ -4527,6 +4632,13 @@ export class GMManager {
   }
 
   static async syncSnapshotEntitiesOnClient(snapshot: GMWorldSnapshot) {
+    if (Array.isArray(snapshot.mines)) {
+      const known = new Set(snapshot.mines.map((m) => m.netId));
+      for (const mine of this.getMines()) {
+        if (!known.has(this.mineNetId(mine))) this.removeMineOnClient(this.mineNetId(mine));
+      }
+      for (const mine of snapshot.mines) this.applyMineOnClient(mine);
+    }
     if (snapshot.rules?.deathRule) {
       GMNetworkManager.sessionRules = { ...GMNetworkManager.sessionRules, ...snapshot.rules };
     }
@@ -5588,6 +5700,14 @@ export class GMManager {
       (actor as any).gmHostDriven = false;
       return;
     }
+    if (intent.kind === 'mine') {
+      (actor as any).gmNetTarget = undefined;
+      this.useMineOnHost(actor as ModuleCreature, intent).then((ok) => {
+        (actor as any).gmHostDriven = ok;
+        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
+      }).catch((e) => console.warn('[GMManager] mine failed', e));
+      return;
+    }
     if (intent.kind === 'ability') {
       (actor as any).gmNetTarget = undefined;
       this.useAbilityOnHost(actor as ModuleCreature, intent).then((ok) => {
@@ -5715,13 +5835,181 @@ export class GMManager {
       if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)) return send('feat', talent.id);
       if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)) return send('skill', talent.id);
     }
+    const mineAction = ({
+      [ActionType.ActionSetMine]: 'set', [ActionType.ActionDisarmMine]: 'disarm', [ActionType.ActionRecoverMine]: 'recover',
+    } as Record<number, 'set' | 'disarm' | 'recover'>)[entry.action?.type];
+    if (mineAction) {
+      const item = mineAction === 'set' ? entry.action.getParameter?.(0) : undefined;
+      const layingHere = mineAction === 'set' && (!target || target === pc);
+      const onWhat = layingHere ? undefined : (mineAction === 'set' ? targetNetId : this.mineNetId(target as ModuleTrigger));
+      if (!layingHere && !onWhat) return true;
+      GMNetworkManager.sendIntent('mine', onWhat, { mine: layingHere ? 'lay' : mineAction, resRef: item?.getItemResRef?.() });
+      return true;
+    }
     if (entry.action?.type === ActionType.ActionUnlockObject) {
       const tool = entry.action.getParameter?.(1);
       return send('skill', SkillType.SECURITY, tool && typeof tool === 'object' ? tool.getItemResRef?.() : undefined);
     }
-    // Mines are module triggers, which aren't shared over the network yet
     GMNetworkManager.appendChat('System', "That can't be done in a GM session yet.");
     return true;
+  }
+
+  // =========================================================================
+  // Mines (Demolitions) in GM sessions: the GM's machine owns them and tells players
+  // =========================================================================
+
+  /** traps.2da row the GM's mine tool places */
+  static pendingMineType: number = 4;
+
+  static isMine(obj: ModuleObject | undefined): obj is ModuleTrigger {
+    return !!obj && BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleTrigger) && (obj as ModuleTrigger).type === ModuleTriggerType.TRAP;
+  }
+
+  static getMines(): ModuleTrigger[] {
+    return (GameState.module?.area?.triggers || []).filter((t) => this.isMine(t)) as ModuleTrigger[];
+  }
+
+  /**
+   * A mine's network id. The module's own mines get one from where they are, the same on every machine;
+   * mines laid during the session get one from the GM's machine.
+   */
+  static mineNetId(mine: ModuleTrigger | undefined): string {
+    if (!mine) return '';
+    if (!(mine as any).gmNetId) {
+      const p = mine.position;
+      const id = `trap_${Math.round(p.x * 10)}_${Math.round(p.y * 10)}_${mine.trapType}`;
+      (mine as any).gmNetId = GMNetworkManager.role === 'client' ? id : (this.netIdMap.has(id) ? this.getNextNetId('mine') : id);
+      this.registerNetObject((mine as any).gmNetId, mine);
+    }
+    return (mine as any).gmNetId;
+  }
+
+  static serializeMine(mine: ModuleTrigger): GMSerializedMine {
+    return {
+      netId: this.mineNetId(mine),
+      trapType: mine.trapType,
+      x: mine.position.x, y: mine.position.y, z: mine.position.z,
+      factionId: mine.factionId,
+      detected: !!mine.trapDetected,
+    };
+  }
+
+  /** On a player's machine, mines only mirror the GM's: they don't go off, and nobody spots them there */
+  static isMineReplica(_mine?: ModuleTrigger): boolean {
+    return GMNetworkManager.role === 'client';
+  }
+
+  /** Host: a mine was laid or spotted */
+  static onMineChanged(mine: ModuleTrigger) {
+    if (GMNetworkManager.role !== 'host') return;
+    GMNetworkManager.sendPacket({ type: 'mine.state', senderId: GMNetworkManager.peerId, timestamp: Date.now(), payload: this.serializeMine(mine) });
+  }
+
+  /** Host: a mine went off, was disarmed or recovered */
+  static onMineRemoved(mine: ModuleTrigger) {
+    const netId = (mine as any).gmNetId;
+    if (!netId) return;
+    this.netIdMap.delete(netId);
+    if (GMNetworkManager.role === 'host') {
+      GMNetworkManager.sendPacket({ type: 'mine.remove', senderId: GMNetworkManager.peerId, timestamp: Date.now(), payload: { netId } });
+    }
+  }
+
+  static applyMineOnClient(state: GMSerializedMine) {
+    const area = GameState.module?.area;
+    if (!area || !state) return;
+    // Match the module's own mines by their id, which every machine works out the same way
+    for (const mine of this.getMines()) this.mineNetId(mine);
+    let mine = this.netIdMap.get(state.netId) as ModuleTrigger | undefined;
+    if (!mine) {
+      mine = GameState.Module.ModuleArea.ModuleTrigger.CreateMine(area, new THREE.Vector3(state.x, state.y, state.z), state.trapType, undefined, state.factionId);
+      if (!mine) return;
+      (mine as any).gmNetId = state.netId;
+      this.registerNetObject(state.netId, mine);
+    }
+    if (state.detected) mine.trapDetected = true;
+  }
+
+  static removeMineOnClient(netId: string) {
+    const mine = this.netIdMap.get(netId) as ModuleTrigger | undefined;
+    this.netIdMap.delete(netId);
+    if (mine && this.isMine(mine) && mine.area) mine.destroy();
+  }
+
+  /** GM: place a mine (hostile to the players) */
+  static placeMine(trapType: number, position: THREE.Vector3): ModuleTrigger | undefined {
+    const mine = GameState.Module.ModuleArea.ModuleTrigger.CreateMine(GameState.module?.area, position.clone(), trapType, undefined, 1);
+    if (mine) this.onMineChanged(mine);
+    this.notifyChange();
+    return mine;
+  }
+
+  /** The mine kinds the GM can place: traps.2da rows with a mine item */
+  static getMineTypes(): { id: number; label: string }[] {
+    const rows = GameState.TwoDAManager?.datatables.get('traps')?.rows || {};
+    return Object.values(rows).filter((r: any) => r.resref && r.resref !== '****').map((r: any) => ({
+      id: Number(r.__index),
+      label: GameState.TLKManager?.GetStringById(Number(r.name))?.Value || String(r.label),
+    }));
+  }
+
+  /** Host: a player's Demolitions pick (lay, set on a door or container, disarm, recover) */
+  static async useMineOnHost(actor: ModuleCreature, intent: GMClientIntent): Promise<boolean> {
+    if (!actor || actor.isDead()) return false;
+    if ((actor.getSkillRanks?.(SkillType.DEMOLITIONS) ?? 0) < 1) return false;
+    const target = intent.targetNetId ? this.netIdMap.get(intent.targetNetId) : undefined;
+    switch (intent.mine) {
+      case 'lay':
+      case 'set': {
+        const resRef = String(intent.resRef || '');
+        if (!resRef || !this.getPlayerInventory(actor).some((e) => e.resRef === resRef)) return false;
+        const item = await this.createItemFromResRefAsync(resRef);
+        if (!item) return false;
+        const onTarget = intent.mine === 'set' ? target : actor;
+        if (!onTarget) return false;
+        const action = new GameState.ActionFactory.ActionSetMine();
+        action.setOwner(actor);
+        action.setParameter(0, ActionParameterType.DWORD, item);
+        action.setParameter(1, ActionParameterType.DWORD, onTarget);
+        action.setParameter(2, ActionParameterType.FLOAT, onTarget.position.x);
+        action.setParameter(3, ActionParameterType.FLOAT, onTarget.position.y);
+        action.setParameter(4, ActionParameterType.FLOAT, onTarget.position.z);
+        actor.actionQueue.add(action);
+        return true;
+      }
+      case 'disarm':
+      case 'recover': {
+        if (!this.isMine(target) || !target.trapDetected) return false;
+        const action = intent.mine === 'disarm' ? new GameState.ActionFactory.ActionDisarmMine() : new GameState.ActionFactory.ActionRecoverMine();
+        action.setOwner(actor);
+        action.setParameter(0, ActionParameterType.DWORD, target);
+        actor.actionQueue.add(action);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Host: a player's mine came out of their inventory (true when it was a GM session player's) */
+  static consumePlayerItem(owner: ModuleObject, item: ModuleItem): boolean {
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !(owner as any)?.gmOwnerPeerId) return false;
+    this.removeFromPlayerInventory(owner, item.getItemResRef());
+    return true;
+  }
+
+  /** Host: a recovered mine goes into a GM session player's inventory (true when it did) */
+  static giveRecoveredMine(owner: ModuleObject, resRef: string): boolean {
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !(owner as any)?.gmOwnerPeerId) return false;
+    this.addToPlayerInventory(owner, [{ resRef, stack: 1 }]);
+    return true;
+  }
+
+  /** A Demolitions roll, said in chat in a GM session */
+  static announceSkillRoll(owner: ModuleObject, label: string, roll: number, bonus: number, dc: number, success: boolean) {
+    if (!GameState.gmMode) return;
+    const text = this.describeCheck({ name: owner?.getName?.() || 'Someone', label, roll, bonus, total: roll + bonus, dc, success });
+    if (GMNetworkManager.role === 'host') GMNetworkManager.sendChat('Check', text);
+    else GMNetworkManager.appendChat('Check', text);
   }
 
   /**

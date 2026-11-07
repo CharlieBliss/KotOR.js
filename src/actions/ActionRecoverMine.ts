@@ -66,13 +66,28 @@ export class ActionRecoverMine extends Action {
           return ActionStatus.FAILED;
         }
 
-        //todo: recover skill check
 
+        // Demolitions (d20 + skill) against the mine's DC; a failed try leaves it where it is
+        const roll = 1 + Math.floor(Math.random() * 20);
+        const skill = (this.owner as any).getSkillLevel?.(1) || 0;
+        const success = roll + skill >= trap.getRecoverDC();
+        GameState.GMManager?.announceSkillRoll?.(this.owner, 'Recover mine', roll, skill, trap.getRecoverDC(), success);
+        if(!success){
+          return ActionStatus.COMPLETE;
+        }
+
+        // The mine goes back into the inventory as its item (traps.2da resref, an item template)
+        const resRef = String(trap.trapResRef || trap.getTrapRow()?.resref || '');
         trap.destroy();
-        const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utp'], trap.trapResRef);
-        if(buffer){
-          const item = new GameState.Module.ModuleArea.ModuleItem(new GFFObject(buffer));
-          this.owner.addItem(item);
+        if(resRef && resRef !== '****'){
+          if(GameState.GMManager?.giveRecoveredMine?.(this.owner, resRef)) return ActionStatus.COMPLETE;
+          ResourceLoader.loadResource(ResourceTypes['uti'], resRef).then((buffer) => {
+            if(!buffer) return;
+            const item = new GameState.Module.ModuleArea.ModuleItem(new GFFObject(buffer));
+            item.inventoryRes = resRef;
+            item.initProperties();
+            this.owner.addItem(item);
+          }).catch(() => {});
         }
       }
 
