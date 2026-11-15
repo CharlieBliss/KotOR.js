@@ -23,6 +23,7 @@ import { OdysseyModel, OdysseyModelAnimation, OdysseyWalkMesh } from "@/odyssey"
 import { CExoLocString } from "@/resource/CExoLocString";
 import { GFFField } from "@/resource/GFFField";
 import { GFFObject } from "@/resource/GFFObject";
+import { ANIMATION_ID_STATES, CREATURE_ANIMATION_ROWS } from "@/module/data/animations";
 import { ResourceLoader } from "@/loaders";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { LIPObject } from "@/resource/LIPObject";
@@ -54,7 +55,6 @@ import type { SWPortrait } from "@/engine/rules/SWPortrait";
 import type { IHeardString } from "@/interface/dialog/IHeardString";
 import type { SWRange } from "@/engine/rules/SWRange";
 import { TURN_SPEED_SLOW } from "@/engine/TurnSpeeds";
-
 
 /**
 * ModuleObject class.
@@ -546,7 +546,6 @@ export class ModuleObject {
       this.collisionManager.roomCheck(delta);
     }
 
-
     this.sphere.center.copy(this.position);
     this.sphere.radius = this.getHitDistance() * 2;
 
@@ -828,147 +827,8 @@ export class ModuleObject {
     if(id >= 10000)
       return id;
 
-    switch(id){
-      case 0:  //PAUSE
-        return ModuleCreatureAnimState.PAUSE;
-      case 1:  //PAUSE2
-        return ModuleCreatureAnimState.PAUSE2;
-      case 2:  //LISTEN
-        return ModuleCreatureAnimState.LISTEN;
-      case 3:  //MEDITATE
-        return ModuleCreatureAnimState.MEDITATE;
-      case 4:  //WORSHIP
-        return ModuleCreatureAnimState.WORSHIP;
-      case 5:  //TALK_NORMAL
-        return ModuleCreatureAnimState.TALK_NORMAL;
-      case 6:  //TALK_PLEADING
-        return ModuleCreatureAnimState.TALK_PLEADING;
-      case 7:  //TALK_FORCEFUL
-        return ModuleCreatureAnimState.TALK_FORCEFUL;
-      case 8:  //TALK_LAUGHING
-        return ModuleCreatureAnimState.TALK_LAUGHING;
-      case 9:  //TALK_SAD
-        return ModuleCreatureAnimState.TALK_SAD;
-      case 10: //GET_LOW
-        return ModuleCreatureAnimState.GET_LOW;
-      case 11: //GET_MID
-        return ModuleCreatureAnimState.GET_MID;
-      case 12: //PAUSE_TIRED
-        return ModuleCreatureAnimState.PAUSE_TIRED;
-      case 13: //PAUSE_DRUNK
-        return ModuleCreatureAnimState.PAUSE_DRUNK;
-      case 14: //FLIRT
-        return ModuleCreatureAnimState.FLIRT;
-      case 15: //USE_COMPUTER
-        return ModuleCreatureAnimState.USE_COMPUTER;
-      case 16: //DANCE
-        return ModuleCreatureAnimState.DANCE;
-      case 17: //DANCE1
-        return ModuleCreatureAnimState.DANCE1;
-      case 18: //HORROR
-        return ModuleCreatureAnimState.HORROR;
-      case 19: //READY
-        return ModuleCreatureAnimState.READY;
-      case 20: //DEACTIVATE
-        return ModuleCreatureAnimState.DEACTIVATE;
-      case 21: //SPASM
-        return ModuleCreatureAnimState.SPASM;
-      case 22: //SLEEP
-        return ModuleCreatureAnimState.SLEEP;
-      case 23: //PRONE
-        return ModuleCreatureAnimState.PRONE;
-      case 24: //PAUSE3
-        return ModuleCreatureAnimState.PAUSE3;
-      case 25: //WELD
-        return ModuleCreatureAnimState.WELD;
-      case 26: //DEAD
-        return ModuleCreatureAnimState.DEAD;
-      case 27: //TALK_INJURED
-        return ModuleCreatureAnimState.TALK_INJURED;
-      case 28: //LISTEN_INJURED
-        return ModuleCreatureAnimState.LISTEN_INJURED;
-      case 29: //TREAT_INJURED
-        return ModuleCreatureAnimState.TREAT_INJURED_LP;
-      case 30: //DEAD_PRONE
-        return ModuleCreatureAnimState.DEAD_PRONE;
-      case 31: //KNEEL_TALK_ANGRY
-        return ModuleCreatureAnimState.KNEEL_TALK_ANGRY;
-      case 32: //KNEEL_TALK_SAD
-        return ModuleCreatureAnimState.KNEEL_TALK_SAD;
-      case 35: //MEDITATE LOOP
-        return ModuleCreatureAnimState.MEDITATE;
-      case 100: //HEAD_TURN_LEFT
-        return ModuleCreatureAnimState.HEAD_TURN_LEFT;
-      case 101: //HEAD_TURN_RIGHT
-        return ModuleCreatureAnimState.HEAD_TURN_RIGHT;
-      case 102: //PAUSE_SCRATCH_HEAD
-        return ModuleCreatureAnimState.PAUSE_SCRATCH_HEAD;
-      case 103: //PAUSE_BORED
-        return ModuleCreatureAnimState.PAUSE_BORED;
-      case 104: //SALUTE
-        return ModuleCreatureAnimState.SALUTE;
-      case 105: //BOW
-        return ModuleCreatureAnimState.BOW;
-      case 106: //GREETING
-        return ModuleCreatureAnimState.GREETING;
-      case 107: //TAUNT
-        return ModuleCreatureAnimState.TAUNT;
-      case 108: //VICTORY1
-        return ModuleCreatureAnimState.VICTORY;
-      case 109: //VICTORY2
-        return ModuleCreatureAnimState.VICTORY;
-      case 110: //VICTORY3
-        return ModuleCreatureAnimState.VICTORY;
-      case 112: //INJECT
-        return ModuleCreatureAnimState.INJECT;
-      case 113: //USE_COMPUTER
-        return ModuleCreatureAnimState.USE_COMPUTER;
-      case 114: //PERSUADE
-        return ModuleCreatureAnimState.PERSUADE;
-      case 115: //ACTIVATE
-        return ModuleCreatureAnimState.ACTIVATE_ITEM;
-      case 116: //CHOKE
-        return ModuleCreatureAnimState.CHOKE;
-      case 117: //THROW_HIGH
-        return ModuleCreatureAnimState.THROW_HIGH;
-      case 118: //THROW_LOW
-        return ModuleCreatureAnimState.THROW_LOW;
-      case 119: //CUSTOM01
-        return ModuleCreatureAnimState.CUSTOM01;
-      case 120: //TREAT_INJURED
-        return ModuleCreatureAnimState.TREAT_INJURED;
-      case 123: //DIVE_ROLL
-        return ModuleCreatureAnimState.DIVE_ROLL;
-
-      // Placeable animation constants
-      case 200: 
-        return ModulePlaceableAnimState.ACTIVATE;
-      case 201: 
-        return ModulePlaceableAnimState.DEACTIVATE;
-      case 202: 
-        return ModulePlaceableAnimState.OPEN;
-      case 203: 
-        return ModulePlaceableAnimState.CLOSE;
-      case 204: 
-        return ModulePlaceableAnimState.ANIMLOOP01;
-      case 205: 
-        return ModulePlaceableAnimState.ANIMLOOP02;
-      case 206: 
-        return ModulePlaceableAnimState.ANIMLOOP03;
-      case 207: 
-        return ModulePlaceableAnimState.ANIMLOOP04;
-      case 208: 
-        return ModulePlaceableAnimState.ANIMLOOP05;
-      case 209: 
-        return ModulePlaceableAnimState.ANIMLOOP06;
-      case 210: 
-        return ModulePlaceableAnimState.ANIMLOOP07;
-      case 211: 
-        return ModulePlaceableAnimState.ANIMLOOP08;
-      case 212: 
-        return ModulePlaceableAnimState.ANIMLOOP09;
-      case 213: 
-        return ModulePlaceableAnimState.ANIMLOOP10;
+    if(id in ANIMATION_ID_STATES){
+      return ANIMATION_ID_STATES[id];
     }
 
     //console.error('Animation case missing', id);
@@ -1022,6 +882,11 @@ export class ModuleObject {
         }
       }
       
+      const row = CREATURE_ANIMATION_ROWS[animation_constant];
+      if(row){
+        return animations2DA.rows[row.simple !== undefined && this.isSimpleCreature() ? row.simple : row.row];
+      }
+
       switch( animation_constant ){
         case ModuleCreatureAnimState.PAUSE:
         case ModuleCreatureAnimState.PAUSE_ALT:
@@ -1074,55 +939,6 @@ export class ModuleObject {
             }else{
               return animations2DA.rows[8];
             }
-          }
-        break;
-        case ModuleCreatureAnimState.PAUSE_BORED:
-          return animations2DA.rows[13];
-        break;
-        case ModuleCreatureAnimState.PAUSE_TIRED:
-          return animations2DA.rows[14];
-        break;
-        case ModuleCreatureAnimState.PAUSE_DRUNK:
-          return animations2DA.rows[15];
-        break;
-        case ModuleCreatureAnimState.PAUSE_INJ:
-          return animations2DA.rows[8];
-        break;
-        case ModuleCreatureAnimState.DEAD:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[275];
-          }else{
-            return animations2DA.rows[81];
-          }
-        break;
-        case ModuleCreatureAnimState.DEAD1:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[275];
-          }else{
-            return animations2DA.rows[83];
-          }
-        break;
-        case ModuleCreatureAnimState.DIE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[274];
-          }else{
-            return animations2DA.rows[80];
-          }
-        break;
-        case ModuleCreatureAnimState.DIE1:
-          return animations2DA.rows[82];
-        break;
-        case ModuleCreatureAnimState.GET_UP_DEAD:
-          return animations2DA.rows[381];
-        break;
-        case ModuleCreatureAnimState.GET_UP_DEAD1:
-          return animations2DA.rows[382];
-        break;
-        case ModuleCreatureAnimState.WALK_INJ:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[254];
-          }else{
-            return animations2DA.rows[1];
           }
         break;
         case ModuleCreatureAnimState.WALKING:
@@ -1179,10 +995,6 @@ export class ModuleObject {
             }
           }
         break;
-        case ModuleCreatureAnimState.RUN_INJ:
-          return animations2DA.rows[4];
-        break;
-        //COMBAT READY
         case ModuleCreatureAnimState.READY:
         case ModuleCreatureAnimState.READY_ALT:
           if(this.isSimpleCreature()){
@@ -1210,234 +1022,6 @@ export class ModuleObject {
             }
           }
         break;
-        case ModuleCreatureAnimState.DODGE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[281];
-          }else{
-            return animations2DA.rows[302];
-          }
-        break;
-        case ModuleCreatureAnimState.SPASM:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[268];
-          }else{
-            return animations2DA.rows[77];
-          }
-        break;
-        case ModuleCreatureAnimState.TAUNT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[263];
-          }else{
-            return animations2DA.rows[33];
-          }
-        break;
-        case ModuleCreatureAnimState.GREETING:
-          return animations2DA.rows[31];
-        break;
-        case ModuleCreatureAnimState.LISTEN:
-          return animations2DA.rows[18];
-        break;
-        case ModuleCreatureAnimState.LISTEN_INJURED:
-          return animations2DA.rows[371];
-        break;
-        case ModuleCreatureAnimState.TALK_NORMAL:
-          return animations2DA.rows[25];
-        break;
-        case ModuleCreatureAnimState.TALK_PLEADING:
-          return animations2DA.rows[27];
-        break;
-        case ModuleCreatureAnimState.TALK_FORCEFUL:
-          return animations2DA.rows[26];
-        break;
-        case ModuleCreatureAnimState.TALK_LAUGHING:
-          return animations2DA.rows[29];
-        break;
-        case ModuleCreatureAnimState.TALK_SAD:
-          return animations2DA.rows[28];
-        break;
-        case ModuleCreatureAnimState.TALK_INJURED:
-          return animations2DA.rows[370];
-        break;
-        case ModuleCreatureAnimState.SALUTE:
-          return animations2DA.rows[16];
-        break;
-        case ModuleCreatureAnimState.BOW:
-          return animations2DA.rows[19];
-        break;
-        case ModuleCreatureAnimState.VICTORY:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[260];
-          }else{
-            return animations2DA.rows[17];
-          }
-        break;
-        case ModuleCreatureAnimState.HEAD_TURN_LEFT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[258];
-          }else{
-            return animations2DA.rows[11];
-          }
-        break;
-        case ModuleCreatureAnimState.HEAD_TURN_RIGHT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[259];
-          }else{
-            return animations2DA.rows[10];
-          }
-        break;
-        case ModuleCreatureAnimState.TURN_LEFT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[253];
-          }else{
-            return animations2DA.rows[290];
-          }
-        break;
-        case ModuleCreatureAnimState.TURN_RIGHT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[253];
-          }else{
-            return animations2DA.rows[291];
-          }
-        break;
-        case ModuleCreatureAnimState.GET_LOW:
-          return animations2DA.rows[40];
-        break;
-        case ModuleCreatureAnimState.GET_MID:
-          return animations2DA.rows[41];
-        break;
-        case ModuleCreatureAnimState.INJECT:
-          return animations2DA.rows[37];
-        break;
-        case ModuleCreatureAnimState.DAMAGE:
-          return animations2DA.rows[303];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER_LP:
-          return animations2DA.rows[44];
-        break;
-        case ModuleCreatureAnimState.WHIRLWIND:
-          return animations2DA.rows[75];
-        break;
-        case ModuleCreatureAnimState.DEACTIVATE:
-          return animations2DA.rows[270];
-        break;
-        case ModuleCreatureAnimState.FLIRT:
-          return animations2DA.rows[32];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER:
-          return animations2DA.rows[43];
-        break;
-        case ModuleCreatureAnimState.DANCE:
-          return animations2DA.rows[53];
-        break;
-        case ModuleCreatureAnimState.DANCE1:
-          return animations2DA.rows[54];
-        break;
-        case ModuleCreatureAnimState.HORROR:
-          return animations2DA.rows[74];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER2:
-          return animations2DA.rows[43];
-        break;
-        case ModuleCreatureAnimState.PERSUADE:
-          return animations2DA.rows[68];
-        break;
-        case ModuleCreatureAnimState.ACTIVATE_ITEM:
-          return animations2DA.rows[38];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_DOOR:
-          return animations2DA.rows[47];
-        break;
-        case ModuleCreatureAnimState.THROW_HIGH:
-          return animations2DA.rows[57];
-        break;
-        case ModuleCreatureAnimState.THROW_LOW:
-          return animations2DA.rows[58];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_CONTAINER:
-          return animations2DA.rows[48];
-        break;
-        case ModuleCreatureAnimState.DISABLE_MINE:
-          return animations2DA.rows[51];
-        break;
-        case ModuleCreatureAnimState.WALK_STEALTH:
-          return animations2DA.rows[5];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_DOOR2:
-          return animations2DA.rows[47];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_CONTAINER2:
-          return animations2DA.rows[48];
-        break;
-        case ModuleCreatureAnimState.ACTIVATE_ITEM2:
-          return animations2DA.rows[38];
-        break;
-        case ModuleCreatureAnimState.SLEEP:
-          return animations2DA.rows[76];
-        break;
-        case ModuleCreatureAnimState.PARALYZED:
-          return animations2DA.rows[78];
-        break;
-        case ModuleCreatureAnimState.PRONE:
-          return animations2DA.rows[79];
-        break;
-        case ModuleCreatureAnimState.SET_MINE:
-          return animations2DA.rows[52];
-        break;
-        case ModuleCreatureAnimState.DISABLE_MINE2:
-          return animations2DA.rows[51];
-        break;
-        case ModuleCreatureAnimState.CUSTOM01:
-          return animations2DA.rows[346];
-        break;
-        case ModuleCreatureAnimState.FBLOCK:
-          return animations2DA.rows[355];
-        break;
-        case ModuleCreatureAnimState.CHOKE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[264];
-          }else{
-            return animations2DA.rows[72];
-          }
-        break;
-        case ModuleCreatureAnimState.WELD:
-          return animations2DA.rows[360];
-        break;
-        case ModuleCreatureAnimState.TREAT_INJURED:
-          return animations2DA.rows[34];
-        break;
-        case ModuleCreatureAnimState.TREAT_INJURED_LP:
-          return animations2DA.rows[35];
-        break;
-        case ModuleCreatureAnimState.CATCH_SABER:
-          return animations2DA.rows[71];
-        break;
-        case ModuleCreatureAnimState.THROW_SABER_LP:
-          return animations2DA.rows[70];
-        break;
-        case ModuleCreatureAnimState.THROW_SABER:
-          return animations2DA.rows[69];
-        break;
-        case ModuleCreatureAnimState.KNEEL_TALK_ANGRY:
-          return animations2DA.rows[384];
-        break;
-        case ModuleCreatureAnimState.KNEEL_TALK_SAD:
-          return animations2DA.rows[385];
-        break;
-        case ModuleCreatureAnimState.KNOCKED_DOWN:
-          return animations2DA.rows[85];
-        break;
-        case ModuleCreatureAnimState.KNOCKED_DOWN2:
-          return animations2DA.rows[85];
-        break;
-        case ModuleCreatureAnimState.DEAD_PRONE:
-          return animations2DA.rows[375];
-        break;
-        case ModuleCreatureAnimState.KNEEL:
-          return animations2DA.rows[23];
-        break;
-        case ModuleCreatureAnimState.KNEEL1:
-          return animations2DA.rows[23];
-        break;
         case ModuleCreatureAnimState.FLOURISH:
           switch( this.getCombatAnimationWeaponType() ){
             case 1:
@@ -1464,89 +1048,6 @@ export class ModuleObject {
         break;
         
         //BEGIN TSL ANIMATIONS
-        case ModuleCreatureAnimState.TOUCH_HEART:
-          return animations2DA.rows[462];
-        break;
-        case ModuleCreatureAnimState.ROLL_EYES:
-          return animations2DA.rows[463];
-        break;
-        case ModuleCreatureAnimState.USE_ITEM_ON_OTHER:
-          return animations2DA.rows[464];
-        break;
-        case ModuleCreatureAnimState.STAND_ATTENTION:
-          return animations2DA.rows[465];
-        break;
-        case ModuleCreatureAnimState.NOD_YES:
-          return animations2DA.rows[466];
-        break;
-        case ModuleCreatureAnimState.NOD_NO:
-          return animations2DA.rows[467];
-        break;
-        case ModuleCreatureAnimState.POINT:
-          return animations2DA.rows[468];
-        break;
-        case ModuleCreatureAnimState.POINT_LP:
-          return animations2DA.rows[469];
-        break;
-        case ModuleCreatureAnimState.POINT_DOWN:
-          return animations2DA.rows[470];
-        break;
-        case ModuleCreatureAnimState.SCANNING:
-          return animations2DA.rows[471];
-        break;
-        case ModuleCreatureAnimState.SHRUG:
-          return animations2DA.rows[472];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_DRUNK:
-          return animations2DA.rows[317];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_PAZAAK:
-          return animations2DA.rows[318];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_COMP1:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_COMP2:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.CUT_HANDS:
-          return animations2DA.rows[557];
-        break;
-        case ModuleCreatureAnimState.L_HAND_CHOP:
-          return animations2DA.rows[558];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE:
-          return animations2DA.rows[559];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE_LP:
-          return animations2DA.rows[560];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE_STAND:
-          return animations2DA.rows[561];
-        break;
-        case ModuleCreatureAnimState.BAO_DUR_POWER_PUNCH:
-          return animations2DA.rows[562];
-        break;
-        case ModuleCreatureAnimState.POINT_UP:
-          return animations2DA.rows[563];
-        break;
-        case ModuleCreatureAnimState.POINT_UP_LOWER:
-          return animations2DA.rows[564];
-        break;
-        case ModuleCreatureAnimState.HOOD_OFF:
-          return animations2DA.rows[565];
-        break;
-        case ModuleCreatureAnimState.HOOD_ON:
-          return animations2DA.rows[566];
-        break;
-        case ModuleCreatureAnimState.DIVE_ROLL:
-          return animations2DA.rows[567];
-        break;
-        //END TSL ANIMATIONS
-
       }
 
     }
@@ -2004,9 +1505,6 @@ export class ModuleObject {
     }
     return false;
   }
-  _oldIsDebilitated() {
-    return false;
-  }
 
   /**
    * Check if the object is stunned
@@ -2020,9 +1518,6 @@ export class ModuleObject {
         }
       }
     }
-    return false;
-  }
-  _oldIsStunned() {
     return false;
   }
 
@@ -2040,9 +1535,6 @@ export class ModuleObject {
     }
     return false;
   }
-  _oldIsParalyzed() {
-    return false;
-  }
 
   /**
    * Check if the object is poisoned
@@ -2051,9 +1543,6 @@ export class ModuleObject {
   isPoisoned() {
     return this.hasEffect(GameEffectType.EffectPoison);
   }
-  _oldIsPoisoned() {
-    return false;
-  }
 
   /**
    * Check if the object is diseased
@@ -2061,9 +1550,6 @@ export class ModuleObject {
    */
   isDiseased(): any {
     return this.hasEffect(GameEffectType.EffectDisease);
-  }
-  _oldIsDiseased(): any {
-    return false;
   }
 
   /**

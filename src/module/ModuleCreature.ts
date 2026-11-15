@@ -26,6 +26,7 @@ import { TalentSpell } from "@/talents/TalentSpell";
 import { OdysseyModel3D, OdysseyObject3D } from "@/three/odyssey";
 import { OdysseyModel, OdysseyModelAnimation } from "@/odyssey";
 import { EquipmentSlots } from "@/module/creature/EquipmentSlots";
+import { CreatureTemplate } from "@/module/creature/CreatureTemplate";
 import type { CreatureEquipment } from "@/module/creature/EquipmentSlots";
 import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot";
 import { LIPObject } from "@/resource/LIPObject";
@@ -434,102 +435,7 @@ export class ModuleCreature extends ModuleObject {
         }
       }*/
 
-      if(!this.isDead() && (
-          this.animationState.index == ModuleCreatureAnimState.DEAD ||
-          this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
-        )
-      ){
-        this.deathAnimationPlayed = false;
-        this.setAnimationState(ModuleCreatureAnimState.GET_UP_DEAD);
-      }
-
-      if(!this.isDead()){
-
-        //Process DamageList
-        let elLen = this.damageList.length - 1;
-        for(let i = elLen; i >= 0; i--){
-          this.damageList[i].delay -= delta;
-          if(this.damageList[i].delay <= 0){
-            this.subtractHP(this.damageList[i].amount);
-
-            let painsound = THREE.MathUtils.randInt(0, 1);
-            switch(painsound){
-              case 1:
-                this.playSoundSet(SSFType.PAIN_2);
-              break;
-              default:
-                this.playSoundSet(SSFType.PAIN_1);
-              break;
-            }
-      
-            this.damageList.splice(i, 1);
-          }
-        }
-
-        this.deathStarted = false;
-        
-        if(!netReplica && this.animationState.index != ModuleCreatureAnimState.DEAD){
-          this.updateActionQueue(delta);
-        }
-
-        if(this.dialogAnimation && (GameState.Mode == EngineMode.DIALOG) && (!this.action || this.action.type != ActionType.ActionPlayAnimation)){
-          if(this.model){
-
-            if(!this.speed){
-                
-              let _animIsValid = (this.dialogAnimation.animation instanceof OdysseyModelAnimation);
-              if(_animIsValid){
-                let _animIsPlaying = (this.model.animationManager.currentAnimation == this.dialogAnimation.animation);
-                if(!_animIsPlaying && !this.dialogAnimation.started){
-                  let _newAnim = this.dialogAnimation.animation;
-                  if(_newAnim instanceof OdysseyModelAnimation){
-                    this.model.playAnimation( _newAnim, !!parseInt(this.dialogAnimation.data.looping) );
-                    this.dialogAnimation.started = true;
-                  }else{
-                    //Kill the dialogAnimation if the animation isn't valid
-                    this.dialogAnimation = null;
-                  }
-                }else if(!_animIsPlaying && this.dialogAnimation.started){
-                  //Kill the dialogAnimation if it has already played
-                  this.dialogAnimation = null;
-                }
-              }else{
-                //Kill the dialogAnimation if the animation isn't valid
-                this.dialogAnimation = null;
-              }
-
-            }
-  
-          }else{
-            //Kill the dialogAnimation if there is no model to animate?
-            this.dialogAnimation = null;
-          }
-        }else{
-          this.dialogAnimation = null;
-        }
-      }else{
-        this.damageList = [];
-        this.getUpAnimationPlayed = false;
-        if(
-          this.deathStarted && 
-          this.animationState.index != ModuleCreatureAnimState.DEAD && 
-          this.animationState.index != ModuleCreatureAnimState.DIE
-        ){
-          this.setAnimationState(ModuleCreatureAnimState.DEAD);
-          this.deathAnimationPlayed = true;
-        }
-        if(!this.deathStarted){
-          this.deathAnimationPlayed = false;
-          this.deathStarted = true;
-          this.clearAllActions();
-          if(!netReplica) this.onDeath();
-          this.playSoundSet(SSFType.DEAD);
-          this.resetOverlayAnimationState();
-          this.setAnimationState(ModuleCreatureAnimState.DIE);
-        }
-      }
+      this.updateLifeState(delta, netReplica);
 
       if(this.isDebilitated()){
         this.force = 0;
@@ -537,77 +443,7 @@ export class ModuleCreature extends ModuleObject {
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
       }
 
-      //-------------------------//
-      // BEGIN: Move Speed Logic //
-      //-------------------------//
-
-      if(
-        netMotion ||
-        this.isDead() ||
-        (
-          this.animationState.index == ModuleCreatureAnimState.DIE ||
-          this.animationState.index == ModuleCreatureAnimState.DIE1 ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1 
-        )
-      ){
-        this.force = 0;
-        this.speed = 0;
-        this.animSpeed = 1;
-        this.forceVector.set(0, 0, 0);
-      }
-
-      this.forceVector.z = 0;
-
-      this.speed += (this.getMovementSpeed() * 2.5) * this.force * delta;
-
-      if(this.speed > this.getMovementSpeed()){
-        this.speed = this.getMovementSpeed();
-      }
-      
-      let forceDelta = Math.max(this.force * delta, this.speed * delta);
-      let gravityDelta = -1 * delta;
-      
-      if(this.speed){
-        this.animSpeed = this.speed / this.getRunSpeed();
-      }else{
-        this.animSpeed = 1;
-      }
-        
-      if(!this.forceVector.length()){
-        this.forceVector.x = ( Math.cos(this.rotation.z + Math.PI/2) * forceDelta );
-        this.forceVector.y = ( Math.sin(this.rotation.z + Math.PI/2) * forceDelta );
-        if(this.forceVector.length()){
-          if(this.stealthMode){
-            this.setAnimationState(ModuleCreatureAnimState.WALK_STEALTH);
-          }else if(this.animSpeed > 0.75){
-            this.setAnimationState(ModuleCreatureAnimState.RUNNING);
-          }else{
-            this.setAnimationState(ModuleCreatureAnimState.WALKING);
-          }
-        }
-        //this.forceVector.z = gravityDelta;
-      }else{
-        this.forceVector.multiplyScalar(forceDelta);
-      }
-
-      if(this.force < 1){
-        this.speed -= (this.getMovementSpeed() * 2.5) * delta;
-      }
-
-      if(this.speed < 0){
-        this.speed = 0;
-      }
-
-      if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING || this.animationState.index == ModuleCreatureAnimState.WALK_STEALTH )){
-        this.setAnimationState(ModuleCreatureAnimState.IDLE);
-        this.speed = 0;
-        this.force = 0;
-      }
-
-      //-----------------------//
-      // END: Move Speed Logic //
-      //-----------------------//
+      this.updateMoveForce(delta, netMotion);
 
       if(netMotion){
         GameState.GMManager.updateNetMotion(this, delta);
@@ -625,47 +461,7 @@ export class ModuleCreature extends ModuleObject {
       this.updateAnimationState();
       this.updateItems(delta);
       
-      if(this.model instanceof OdysseyModel3D && this.model.bonesInitialized){
-
-        //BEGIN: Animation Optimization
-        this.model.animateFrame = true;
-        //If the object is further than 50 meters, animate every other frame
-        if(this.distanceToCamera > 50){
-          this.model.animateFrame = this.model.oddFrame;
-        }
-        
-        if(this.model.animateFrame){
-          //If we can animate and there is fog, make sure the distance isn't greater than the far point of the fog effect
-          if(GameState.PartyManager.party.indexOf(this) == -1 && this.context.scene.fog){
-            if(this.distanceToCamera >= this.context.scene.fog.far){
-              this.model.animateFrame = false;
-              //If the object is past the near point, and the near point is greater than zero, animate every other frame
-            }else if(this.context.scene.fog.near && this.distanceToCamera >= this.context.scene.fog.near){
-              this.model.animateFrame = this.model.oddFrame;
-            }
-          }
-        }
-        //END: Animation Optimization
-
-        if(GameState.Mode != EngineMode.DIALOG){
-          this.model.update( this.movementSpeed * delta );
-          if(this.lipObject instanceof LIPObject){
-            this.lipObject.update(delta, this.model);
-          }
-        }else{
-          this.model.update( delta );
-          if(this.lipObject instanceof LIPObject){
-            this.lipObject.update(delta, this.model);
-          }
-          if(this.cutsceneMode && this.model){
-            for(let i = 0, len = this.model.skins.length; i < len; i++){
-              this.model.skins[i].frustumCulled = false;
-            }
-          }
-        }
-
-        this.updateHeadTracking(delta);
-      }
+      this.updateModelAnimation(delta);
 
       if(this.collisionManager.blockingObject != this.collisionManager.lastBlockingObject){
         this.collisionManager.lastBlockingObject = this.collisionManager.blockingObject;
@@ -687,40 +483,7 @@ export class ModuleCreature extends ModuleObject {
         this.collisionTimer = 0;
       }
 
-      this.turning = 0;
-      if(this.facingAnim){
-        const current = Utility.NormalizeRadian(this.rotation.z);
-        const target = this.facing;
-        const remaining = Utility.NormalizeRadian(target - current);
-        const step = this.facingSpeed * delta;
-        if(Math.abs(remaining) <= step){
-          this.rotation.z = target;
-          this.wasFacing = target;
-          this.facingAnim = false;
-        }else{
-          this.rotation.z = Utility.NormalizeRadian(current + Math.sign(remaining) * step);
-          this.turning = Math.sign(remaining);
-        }
-      }
-
-      // Stationary turn animations (body turn when idle/pause/ready; not head look)
-      const stationaryTurnStates = [
-        ModuleCreatureAnimState.IDLE,
-        ModuleCreatureAnimState.PAUSE,
-        ModuleCreatureAnimState.READY,
-        ModuleCreatureAnimState.TURN_LEFT,
-        ModuleCreatureAnimState.TURN_RIGHT
-      ];
-      if(this.turning !== 0 && stationaryTurnStates.includes(this.animationState.index)){
-        const wantTurnLeft = this.turning < 0;
-        if(wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_LEFT){
-          this.setAnimationState(ModuleCreatureAnimState.TURN_LEFT);
-        }else if(!wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_RIGHT){
-          this.setAnimationState(ModuleCreatureAnimState.TURN_RIGHT);
-        }
-      }else if(this.turning === 0 && (this.animationState.index === ModuleCreatureAnimState.TURN_LEFT || this.animationState.index === ModuleCreatureAnimState.TURN_RIGHT)){
-        this.setAnimationState(this.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
-      }
+      this.updateTurning(delta);
 
       //Update equipment
       for(const key of EquipmentSlots.WORN){
@@ -756,6 +519,264 @@ export class ModuleCreature extends ModuleObject {
       this.collisionTimer = 0;
 
     this.force = 0;
+  }
+
+  /** Get up when revived, apply queued damage, and play the dialog or death animations */
+  private updateLifeState(delta: number, netReplica: boolean){
+    if(!this.isDead() && (
+        this.animationState.index == ModuleCreatureAnimState.DEAD ||
+        this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
+      )
+    ){
+      this.deathAnimationPlayed = false;
+      this.setAnimationState(ModuleCreatureAnimState.GET_UP_DEAD);
+    }
+
+    if(!this.isDead()){
+
+      //Process DamageList
+      let elLen = this.damageList.length - 1;
+      for(let i = elLen; i >= 0; i--){
+        this.damageList[i].delay -= delta;
+        if(this.damageList[i].delay <= 0){
+          this.subtractHP(this.damageList[i].amount);
+
+          let painsound = THREE.MathUtils.randInt(0, 1);
+          switch(painsound){
+            case 1:
+              this.playSoundSet(SSFType.PAIN_2);
+            break;
+            default:
+              this.playSoundSet(SSFType.PAIN_1);
+            break;
+          }
+    
+          this.damageList.splice(i, 1);
+        }
+      }
+
+      this.deathStarted = false;
+      
+      if(!netReplica && this.animationState.index != ModuleCreatureAnimState.DEAD){
+        this.updateActionQueue(delta);
+      }
+
+      if(this.dialogAnimation && (GameState.Mode == EngineMode.DIALOG) && (!this.action || this.action.type != ActionType.ActionPlayAnimation)){
+        if(this.model){
+
+          if(!this.speed){
+              
+            let _animIsValid = (this.dialogAnimation.animation instanceof OdysseyModelAnimation);
+            if(_animIsValid){
+              let _animIsPlaying = (this.model.animationManager.currentAnimation == this.dialogAnimation.animation);
+              if(!_animIsPlaying && !this.dialogAnimation.started){
+                let _newAnim = this.dialogAnimation.animation;
+                if(_newAnim instanceof OdysseyModelAnimation){
+                  this.model.playAnimation( _newAnim, !!parseInt(this.dialogAnimation.data.looping) );
+                  this.dialogAnimation.started = true;
+                }else{
+                  //Kill the dialogAnimation if the animation isn't valid
+                  this.dialogAnimation = null;
+                }
+              }else if(!_animIsPlaying && this.dialogAnimation.started){
+                //Kill the dialogAnimation if it has already played
+                this.dialogAnimation = null;
+              }
+            }else{
+              //Kill the dialogAnimation if the animation isn't valid
+              this.dialogAnimation = null;
+            }
+
+          }
+
+        }else{
+          //Kill the dialogAnimation if there is no model to animate?
+          this.dialogAnimation = null;
+        }
+      }else{
+        this.dialogAnimation = null;
+      }
+    }else{
+      this.damageList = [];
+      this.getUpAnimationPlayed = false;
+      if(
+        this.deathStarted && 
+        this.animationState.index != ModuleCreatureAnimState.DEAD && 
+        this.animationState.index != ModuleCreatureAnimState.DIE
+      ){
+        this.setAnimationState(ModuleCreatureAnimState.DEAD);
+        this.deathAnimationPlayed = true;
+      }
+      if(!this.deathStarted){
+        this.deathAnimationPlayed = false;
+        this.deathStarted = true;
+        this.clearAllActions();
+        if(!netReplica) this.onDeath();
+        this.playSoundSet(SSFType.DEAD);
+        this.resetOverlayAnimationState();
+        this.setAnimationState(ModuleCreatureAnimState.DIE);
+      }
+    }
+  }
+
+  /** Turn this frame's force into speed and a movement vector (no movement while dead, debilitated or driven by the network) */
+  private updateMoveForce(delta: number, netMotion: boolean){
+    //-------------------------//
+    // BEGIN: Move Speed Logic //
+    //-------------------------//
+
+    if(
+      netMotion ||
+      this.isDead() ||
+      (
+        this.animationState.index == ModuleCreatureAnimState.DIE ||
+        this.animationState.index == ModuleCreatureAnimState.DIE1 ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1 
+      )
+    ){
+      this.force = 0;
+      this.speed = 0;
+      this.animSpeed = 1;
+      this.forceVector.set(0, 0, 0);
+    }
+
+    this.forceVector.z = 0;
+
+    this.speed += (this.getMovementSpeed() * 2.5) * this.force * delta;
+
+    if(this.speed > this.getMovementSpeed()){
+      this.speed = this.getMovementSpeed();
+    }
+    
+    let forceDelta = Math.max(this.force * delta, this.speed * delta);
+    let gravityDelta = -1 * delta;
+    
+    if(this.speed){
+      this.animSpeed = this.speed / this.getRunSpeed();
+    }else{
+      this.animSpeed = 1;
+    }
+      
+    if(!this.forceVector.length()){
+      this.forceVector.x = ( Math.cos(this.rotation.z + Math.PI/2) * forceDelta );
+      this.forceVector.y = ( Math.sin(this.rotation.z + Math.PI/2) * forceDelta );
+      if(this.forceVector.length()){
+        if(this.stealthMode){
+          this.setAnimationState(ModuleCreatureAnimState.WALK_STEALTH);
+        }else if(this.animSpeed > 0.75){
+          this.setAnimationState(ModuleCreatureAnimState.RUNNING);
+        }else{
+          this.setAnimationState(ModuleCreatureAnimState.WALKING);
+        }
+      }
+      //this.forceVector.z = gravityDelta;
+    }else{
+      this.forceVector.multiplyScalar(forceDelta);
+    }
+
+    if(this.force < 1){
+      this.speed -= (this.getMovementSpeed() * 2.5) * delta;
+    }
+
+    if(this.speed < 0){
+      this.speed = 0;
+    }
+
+    if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING || this.animationState.index == ModuleCreatureAnimState.WALK_STEALTH )){
+      this.setAnimationState(ModuleCreatureAnimState.IDLE);
+      this.speed = 0;
+      this.force = 0;
+    }
+
+    //-----------------------//
+    // END: Move Speed Logic //
+    //-----------------------//
+  }
+
+  /** Advance the model's animation (every other frame when far from the camera) */
+  private updateModelAnimation(delta: number){
+    if(this.model instanceof OdysseyModel3D && this.model.bonesInitialized){
+
+      //BEGIN: Animation Optimization
+      this.model.animateFrame = true;
+      //If the object is further than 50 meters, animate every other frame
+      if(this.distanceToCamera > 50){
+        this.model.animateFrame = this.model.oddFrame;
+      }
+      
+      if(this.model.animateFrame){
+        //If we can animate and there is fog, make sure the distance isn't greater than the far point of the fog effect
+        if(GameState.PartyManager.party.indexOf(this) == -1 && this.context.scene.fog){
+          if(this.distanceToCamera >= this.context.scene.fog.far){
+            this.model.animateFrame = false;
+            //If the object is past the near point, and the near point is greater than zero, animate every other frame
+          }else if(this.context.scene.fog.near && this.distanceToCamera >= this.context.scene.fog.near){
+            this.model.animateFrame = this.model.oddFrame;
+          }
+        }
+      }
+      //END: Animation Optimization
+
+      if(GameState.Mode != EngineMode.DIALOG){
+        this.model.update( this.movementSpeed * delta );
+        if(this.lipObject instanceof LIPObject){
+          this.lipObject.update(delta, this.model);
+        }
+      }else{
+        this.model.update( delta );
+        if(this.lipObject instanceof LIPObject){
+          this.lipObject.update(delta, this.model);
+        }
+        if(this.cutsceneMode && this.model){
+          for(let i = 0, len = this.model.skins.length; i < len; i++){
+            this.model.skins[i].frustumCulled = false;
+          }
+        }
+      }
+
+      this.updateHeadTracking(delta);
+    }
+  }
+
+  /** Turn toward facing at facingSpeed, playing the turn animations while standing */
+  private updateTurning(delta: number){
+    this.turning = 0;
+    if(this.facingAnim){
+      const current = Utility.NormalizeRadian(this.rotation.z);
+      const target = this.facing;
+      const remaining = Utility.NormalizeRadian(target - current);
+      const step = this.facingSpeed * delta;
+      if(Math.abs(remaining) <= step){
+        this.rotation.z = target;
+        this.wasFacing = target;
+        this.facingAnim = false;
+      }else{
+        this.rotation.z = Utility.NormalizeRadian(current + Math.sign(remaining) * step);
+        this.turning = Math.sign(remaining);
+      }
+    }
+
+    // Stationary turn animations (body turn when idle/pause/ready; not head look)
+    const stationaryTurnStates = [
+      ModuleCreatureAnimState.IDLE,
+      ModuleCreatureAnimState.PAUSE,
+      ModuleCreatureAnimState.READY,
+      ModuleCreatureAnimState.TURN_LEFT,
+      ModuleCreatureAnimState.TURN_RIGHT
+    ];
+    if(this.turning !== 0 && stationaryTurnStates.includes(this.animationState.index)){
+      const wantTurnLeft = this.turning < 0;
+      if(wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_LEFT){
+        this.setAnimationState(ModuleCreatureAnimState.TURN_LEFT);
+      }else if(!wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_RIGHT){
+        this.setAnimationState(ModuleCreatureAnimState.TURN_RIGHT);
+      }
+    }else if(this.turning === 0 && (this.animationState.index === ModuleCreatureAnimState.TURN_LEFT || this.animationState.index === ModuleCreatureAnimState.TURN_RIGHT)){
+      this.setAnimationState(this.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
+    }
   }
 
   updateRegen(delta = 0){
@@ -1383,44 +1404,6 @@ export class ModuleCreature extends ModuleObject {
     return action;
   }
 
-  _oldUseTalent(talent: TalentObject, oTarget: ModuleObject): any {
-    let action: Action;
-    if(talent instanceof TalentObject){
-      const combatAction = new CombatRoundAction();
-      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)){
-        return this.getHasSpell(talent.id) ? true : false;
-      }
-      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)){
-        return this.getHasFeat(talent.id) ? true : false;
-      }
-      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)){
-        return this.getHasSkill(talent.id) ? true : false;
-      }
-      switch(talent.objectType){
-        case 1: //FEAT
-          combatAction.actionType = CombatActionType.ATTACK_USE_FEAT;
-          combatAction.target = oTarget;
-          combatAction.setFeat(talent as TalentFeat);
-          this.combatRound.addAction(combatAction);
-        break;
-        case 2: //SKILL
-          if(talent.id == 6){ //Security
-            action = new GameState.ActionFactory.ActionUnlockObject();
-            action.setParameter(0, ActionParameterType.DWORD, oTarget.id || ModuleObjectConstant.OBJECT_INVALID);
-            this.actionQueue.add(action);
-          }
-        break;
-        case 0: //SPELL
-          combatAction.actionType = CombatActionType.CAST_SPELL;
-          combatAction.setSpell(talent as TalentSpell);
-          combatAction.target = oTarget;
-          this.combatRound.addAction(combatAction);
-        break;
-      }
-    }
-    return action;
-  }
-
   /** The idle states whose stance depends on condition: standing, injured (HP at or below 20%) or sick */
   static readonly IDLE_STATES = new Set<number>([
     ModuleCreatureAnimState.PAUSE, ModuleCreatureAnimState.PAUSE_ALT, ModuleCreatureAnimState.PAUSE2,
@@ -1588,167 +1571,64 @@ export class ModuleCreature extends ModuleObject {
       this.setAnimationState(ModuleCreatureAnimState.PAUSE)
   }
 
-  getDamageAnimation( attackAnim: string ): ITwoDAAnimation {
-    
+  /**
+   * The animation this creature plays when an attack (attackAnim, an animations.2da name) reaches it: the
+   * damage reaction when hit, the dodge or parry one when missed. combatanimations.2da picks it for the
+   * attack and this creature's weapon; when the model lacks that animation, simple creatures play their
+   * generic reaction, a duel attack its matching reaction, and anything else the weapon's default.
+   */
+  getCombatReactionAnimation(attackAnim: string, reaction: 'damage' | 'dodge' | 'parry'): ITwoDAAnimation {
+    const weaponWield = this.getCombatAnimationWeaponType();
+    const anims = GameState.TwoDAManager.datatables.get('animations');
     let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
     for(let i = 0; i < anims.RowCount; i++){
       if(anims.rows[i].name == attackAnim){
         attackAnimIndex = i;
         break;
       }
     }
+    const modelHas = (row: any) => row && this.model.odysseyAnimationMap.get(row.name.toLowerCase().trim());
 
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    //console.log('getDamageAnimation', this.getName(), attackAnim, attackAnimIndex, combatAnimation, 'damage'+weaponWield);
+    const combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
     if(combatAnimation){
-      let damageAnimIndex = combatAnimation['damage'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('damage anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
+      // A single-hit attack on a creature holding a parrying weapon is parried rather than dodged
+      if(reaction === 'dodge' && combatAnimation.hits == 1 && [4, 2, 3].indexOf(weaponWield) >= 0){
+        const parry = anims.getByID(combatAnimation['parry'+weaponWield]);
+        if(modelHas(parry)){
+          return OdysseyModelAnimation.GetAnimation2DA(parry.name);
+        }
+      }
+      const row = anims.getByID(combatAnimation[reaction+weaponWield]);
+      if(modelHas(row)){
+        return OdysseyModelAnimation.GetAnimation2DA(row.name);
       }
     }
 
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdamages');
-    }
-    //console.log(attackAnim);
-    
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d5')
+    const modeltype = this.creatureAppearance.modeltype;
+    if(modeltype == 'S' || modeltype == 'L'){
+      return OdysseyModelAnimation.GetAnimation2DA(reaction === 'damage' ? 'cdamages' : 'cdodgeg');
     }
 
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'d1');
+    const duel = typeof attackAnim === 'string' ? attackAnim.match(/^c2a([1-5])$/) : null;
+    if(duel){
+      return OdysseyModelAnimation.GetAnimation2DA(`c2${reaction === 'parry' ? 'p' : 'd'}${duel[1]}`);
+    }
 
+    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+(reaction === 'damage' ? 'd1' : 'g1'));
+  }
+
+  getDamageAnimation( attackAnim: string ): ITwoDAAnimation {
+    return this.getCombatReactionAnimation(attackAnim, 'damage');
   }
 
   getDodgeAnimation( attackAnim: string ): ITwoDAAnimation {
-
-    let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
-    for(let i = 0; i < anims.RowCount; i++){
-      if(anims.rows[i].name == attackAnim){
-        attackAnimIndex = i;
-        break;
-      }
-    }
-
-    //console.log('getDodgeAnimation', this.getName(), attackAnim, attackAnimIndex);
-
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    if(combatAnimation){
-      if(combatAnimation.hits == 1 && [4, 2, 3].indexOf(weaponWield) >= 0){
-        let damageAnimIndex = combatAnimation['parry'+weaponWield];
-        let damageAnim = anims.getByID(damageAnimIndex);
-        if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-          //console.log('dodge/parry anim', this.getName(), damageAnim.name)
-          return damageAnim.name;
-        }
-      }
-      
-      let damageAnimIndex = combatAnimation['dodge'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('dodge anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
-      }
-    }
-
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdodgeg');
-    }
-    //console.log(attackAnim);
-    
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d5')
-    }
-
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'g1');
-
+    return this.getCombatReactionAnimation(attackAnim, 'dodge');
   }
 
   getParryAnimation( attackAnim: string ): ITwoDAAnimation {
-
-    let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
-    for(let i = 0; i < anims.RowCount; i++){
-      if(anims.rows[i].name == attackAnim){
-        attackAnimIndex = i;
-        break;
-      }
-    }
-
-    //console.log('getParryAnimation', this.getName(), attackAnim, attackAnimIndex);
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    if(combatAnimation){
-      let damageAnimIndex = combatAnimation['parry'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('parry anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
-      }
-    }
-
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdodgeg');
-    }
-    //console.log(attackAnim);
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p5')
-    }
-
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'g1');
-    
+    return this.getCombatReactionAnimation(attackAnim, 'parry');
   }
+
 
   getCombatAnimationAttackType(): string {
     let weapon = this.equipment.RIGHTHAND;
@@ -2752,10 +2632,6 @@ export class ModuleCreature extends ModuleObject {
     return bonus;
   }
 
-  _oldGetSpellSaveDC(){
-    return 10 + this.getSpellCasterLevel();
-  }
-
   getSpellCasterLevel(){
     let level = 0;
     for(let i = 0; i < this.classes.length; i++){
@@ -3669,306 +3545,9 @@ export class ModuleCreature extends ModuleObject {
   }
 
   initProperties(){
-    try{
-      this.classes = [];
-      this.feats = [];
-      this.skills = GameState.SWRuleSet.skills.slice(0).map((skill: TalentSkill) => {
-        return skill.clone();
-      });
-      
-      if(!this.initialized){
-        if(BitWise.InstanceOfObject(this, ModuleObjectType.ModulePlayer)){
-          this.id = GameState.ModuleObjectManager.GetNextPlayerId();
-        }else if(this.template.RootNode.hasField('ObjectId')){
-          this.id = this.template.getFieldByLabel('ObjectId').getValue();
-        }else if(this.template.RootNode.hasField('ID')){
-          this.id = this.template.getFieldByLabel('ID').getValue();
-        }
-        
-        GameState.ModuleObjectManager.AddObjectById(this);
-      }
-
-      if(this.template.RootNode.hasField('Appearance_Type')){
-        this.setAppearance(this.template.getFieldByLabel('Appearance_Type').getValue());
-      }
-
-      this.bodyBag = this.template.RootNode.get('BodyBag', this.bodyBag);
-
-      this.bodyVariation = this.template.RootNode.get('BodyVariation', this.bodyVariation);
-
-      this.challengeRating = this.template.RootNode.get('ChallengeRating', this.challengeRating);
-
-      if(this.template.RootNode.hasField('ClassList')){
-        let classes = this.template.RootNode.getFieldByLabel('ClassList').getChildStructs();
-        for(let i = 0; i < classes.length; i++){
-          this.classes.push(
-            CreatureClass.FromCreatureClassStruct(classes[i])
-          );
-        }
-      }
-
-      if(this.template.RootNode.hasField('Conversation')){
-        this.conversation = DLGObject.FromResRef(this.template.getFieldByLabel('Conversation').getValue());
-      }
-
-      this.currentForce = this.template.RootNode.get('CurrentForce', this.currentForce);
-
-      this.currentHitPoints = this.template.RootNode.get('CurrentHitPoints', this.currentHitPoints);
-
-      this.hitPoints = this.template.RootNode.get('HitPoints', this.hitPoints);
-
-      this.disarmable = this.template.RootNode.get('Disarmable', this.disarmable);
-    
-      this.experience = this.template.RootNode.get('Experience', this.experience);
-
-      if(this.template.RootNode.hasField('Listening')){
-        this.setListening(this.template.RootNode.getFieldByLabel('Listening').getValue());
-      }
-      if(this.template.RootNode.hasField('Commandable')){
-        this.setCommadable(this.template.RootNode.getFieldByLabel('Commandable').getValue());
-      }
-
-      if(this.template.RootNode.hasField('ExpressionList')){
-        let expressions = this.template.RootNode.getFieldByLabel('ExpressionList').getChildStructs();
-        for(let i = 0; i < expressions.length; i++){
-          this.setListeningPattern(
-            expressions[i].getFieldByLabel('ExpressionString').getValue(),
-            expressions[i].getFieldByLabel('ExpressionId').getValue()
-          );
-        }
-      }
-          
-      if(this.template.RootNode.hasField('FactionID')){
-        this.factionId = this.template.getFieldByLabel('FactionID').getValue();
-        if((this.factionId & 0xFFFFFFFF) == -1){
-          this.factionId = 0;
-        }
-      }
-      this.faction = GameState.FactionManager.factions.get(this.factionId);
-
-      if(this.template.RootNode.hasField('FeatList')){
-        let feats = this.template.RootNode.getFieldByLabel('FeatList').getChildStructs();
-        for(let i = 0; i < feats.length; i++){
-          this.feats.push(
-            new TalentFeat( feats[i].getFieldByLabel('Feat').getValue() )
-          );
-        }
-      }
-
-      this.firstName = this.template.RootNode.get('FirstName', this.firstName);
-      
-      this.forcePoints = this.template.RootNode.get('ForcePoints', this.forcePoints);
-          
-      this.gender = this.template.RootNode.get('Gender', this.gender);
-    
-      this.goodEvil = this.template.RootNode.get('GoodEvil', this.goodEvil);
-        
-      this.isHologram = this.template.RootNode.get('Hologram', this.isHologram);
-
-      this.interruptable = this.template.RootNode.get('Interruptable', this.interruptable);
-
-      this.isPC = this.template.RootNode.get('IsPC', this.isPC);
-
-      this.lastName = this.template.RootNode.get('LastName', this.lastName);
-
-      this.maxHitPoints = this.template.RootNode.get('MaxHitPoints', this.maxHitPoints);
-
-      this.maxForcePoints = this.template.RootNode.get('MaxForcePoints', this.maxForcePoints);
-
-      this.min1HP = this.template.RootNode.get('Min1HP', this.min1HP);
-
-      this.naturalAC = this.template.RootNode.get('NaturalAC', this.naturalAC);
-
-      this.noPermDeath = this.template.RootNode.get('NoPermDeath', this.noPermDeath);
-
-      this.notReorienting = this.template.RootNode.get('NotReorienting', this.notReorienting);
-
-      this.partyInteract = this.template.RootNode.get('PartyInteract', this.partyInteract);
-
-      if(this.template.RootNode.hasField('PerceptionRange')){
-        this.perceptionRange = GameState.SWRuleSet.ranges[this.template.getFieldByLabel('PerceptionRange').getValue()];
-      }else{
-        //https://forum.neverwintervault.org/t/perception-range/3191/9
-        //It appears that PerceptionRange isn't saved inside the GIT file.
-        //The original game appears to use PercepRngDefault when a creature is reloaded from a SaveGame
-        this.perceptionRange = GameState.SWRuleSet.ranges[11];
-      }
-
-      this.phenotype = this.template.RootNode.get('Phenotype', this.phenotype);
-
-      this.plot = this.template.RootNode.get('Plot', this.plot);
-
-      if(this.template.RootNode.hasField('PortraitId')){
-        this.portraitId = this.template.getFieldByLabel('PortraitId').getValue();
-        this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
-      }
-    
-      this.race = this.template.RootNode.get('Race', this.race);
-
-      if(this.template.RootNode.hasField('SkillList')){
-        let skills = this.template.RootNode.getFieldByLabel('SkillList').getChildStructs();
-        for(let i = 0; i < skills.length; i++){
-          this.skills[i].rank = skills[i].getFieldByLabel('Rank').getValue();
-        }
-      }
-
-      this.soundSetFile = this.template.RootNode.get('SoundSetFile', this.soundSetFile);
-    
-      this.subrace = this.template.RootNode.get('SubRace', this.subrace);
-
-      this.initCommonProperties();
-
-      this.textureVar = this.template.RootNode.get('TextureVar', this.textureVar);
-
-      this.walkRate = this.template.RootNode.get('WalkRate', this.walkRate);
-
-      this.str = this.template.RootNode.get('Str', this.str);
-    
-      this.dex = this.template.RootNode.get('Dex', this.dex);
-    
-      this.con = this.template.RootNode.get('Con', this.con);
-    
-      this.cha = this.template.RootNode.get('Cha', this.cha);
-    
-      this.wis = this.template.RootNode.get('Wis', this.wis);
-    
-      this.int = this.template.RootNode.get('Int', this.int);
-
-      this.fortitudeSaveThrow = this.template.RootNode.get('FortSaveThrow', this.fortitudeSaveThrow);
-
-      this.reflexSaveThrow = this.template.RootNode.get('RefSaveThrow', this.reflexSaveThrow);
-
-      this.willSaveThrow = this.template.RootNode.get('WillSaveThrow', this.willSaveThrow);
-
-        this.subraceIndex = this.template.RootNode.get('SubraceIndex', this.subraceIndex);
-
-      if(this.template.RootNode.hasField('SWVarTable')){
-        let localBools = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0].getFieldByLabel('BitArray').getChildStructs();
-        //console.log(localBools);
-        for(let i = 0; i < localBools.length; i++){
-          let data = localBools[i].getFieldByLabel('Variable').getValue();
-          for(let bit = 0; bit < 32; bit++){
-            this._locals.Booleans[bit + (i*32)] = ( (data>>bit) % 2 != 0);
-          }
-        }
-        let localNumbers = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0].getFieldByLabel('ByteArray').getChildStructs();
-        //console.log(localNumbers);
-        for(let i = 0; i < localNumbers.length; i++){
-          let data = localNumbers[i].getFieldByLabel('Variable').getValue();
-          this.setLocalNumber(i, data);
-        }
-      }
-
-      this.pm_Appearance = this.template.RootNode.get('PM_Appearance', this.pm_Appearance);
-
-      if(this.template.RootNode.hasField('PM_IsDisguised'))
-        this.pm_IsDisguised = !!this.template.RootNode.getFieldByLabel('PM_IsDisguised').getValue();
-
-      try{
-        if(this.template.RootNode.hasField('EffectList')){
-          let effects = this.template.RootNode.getFieldByLabel('EffectList').getChildStructs() || [];
-          for(let i = 0; i < effects.length; i++){
-            let effect = GameEffectFactory.EffectFromStruct(effects[i]);
-            if(effect){
-              effect.setAttachedObject(this);
-              effect.loadModel();
-              //console.log('attached');
-              this.effects.push(effect);
-              //this.addEffect(effect);
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      try{
-        if(this.template.RootNode.hasField('Equip_ItemList')){
-          let equipment = this.template.RootNode.getFieldByLabel('Equip_ItemList').getChildStructs() || [];
-          for(let i = 0; i < equipment.length; i++){
-            let strt = equipment[i];
-            let equipped_item = undefined;
-            let slot_type = strt.type;
-            if(strt.hasField('EquippedRes')){
-              equipped_item = new GameState.Module.ModuleArea.ModuleItem(strt.getFieldByLabel('EquippedRes').getValue());
-            }else{
-              equipped_item = new GameState.Module.ModuleArea.ModuleItem(GFFObject.FromStruct(strt));
-            }
-            
-            const slotKey = EquipmentSlots.keyOf(slot_type);
-            if(slotKey){
-              this.equipment[slotKey] = equipped_item;
-            }else{
-              console.warn('ModuleCreature.initProperties', 'Unhandled Equipment Slot', equipped_item);
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      this.parseEquipmentSlots();
-
-      if(this.template.RootNode.hasField('ItemList')){
-        const inventory = this.template.RootNode.getFieldByLabel('ItemList').getChildStructs();
-        for(let i = 0; i < inventory.length; i++){
-          this.loadItem(GFFObject.FromStruct(inventory[i]));
-        }
-      }
-      this.loadSoundSet();
-
-      //ActionList
-      try{
-        if(this.template.RootNode.hasField('ActionList')){
-          const actionStructs = this.template.RootNode.getFieldByLabel('ActionList').getChildStructs();
-          for(let i = 0, len = actionStructs.length; i < len; i++){
-            const action = GameState.ActionFactory.FromStruct(actionStructs[i]);
-            if(action){
-              this.actionQueue.add(action);
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      //PerceptionList
-      try{
-        if(this.template.RootNode.hasField('PerceptionList')){
-          let perceptionList = this.template.RootNode.getFieldByLabel('PerceptionList').getChildStructs();
-          if(perceptionList.length){
-            this.perceptionList = [];
-          }
-
-          for(let i = 0, len = perceptionList.length; i < len; i++){
-            const perception = perceptionList[i];
-
-            const objectId = perception.getFieldByLabel('ObjectId').getValue();
-            const data = perception.getFieldByLabel('PerceptionData').getValue() as PerceptionType;
-
-            this.perceptionList.push({
-              object: undefined,
-              objectId: objectId,
-              data: data
-            });
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-    }catch(e: any){
-      console.error(e);
-    }
-
-    if(this.template.RootNode.hasField('Animation')){
-      this.setAnimationState(
-        this.template.getFieldByLabel('Animation').getValue()
-      );
-    }
-
-    this.initialized = true;
-
+    CreatureTemplate.read(this);
   }
+
 
   async loadEquipmentModels(): Promise<void> {
     const array =  Object.keys(this.equipment);
@@ -4085,300 +3664,14 @@ export class ModuleCreature extends ModuleObject {
   }
 
   save(){
-
-    let gff = new GFFObject();
-    gff.FileType = 'UTC ';
-    
-    gff.RootNode.addDWord('ObjectId', this.id);
-    gff.RootNode.addCExoString('Mod_CommntyName', 'Bad StrRef');
-    if(this.playerCreated){
-      gff.RootNode.addByte('Mod_IsPrimaryPlr', 1);
-    }
-    
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_FirstName') )
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_LastName') )
-
-    gff.RootNode.addInt('AIState', 0);
-
-    gff.RootNode.addField( this.actionQueueToActionList() );
-
-    gff.RootNode.addInt('Age', 0);
-    gff.RootNode.addByte('AmbientAnimState', 0);
-    gff.RootNode.addInt('Animation', this.animationState.index);
-    //gff.RootNode.addByte('Appearance_Head', 1);
-    gff.RootNode.addWord('Appearance_Type', this.appearance);
-    //gff.RootNode.addDWord('AreaId', 1);
-    gff.RootNode.addShort('ArmorClass', this.getAC());
-    gff.RootNode.addByte('BodyBag', this.bodyBag);
-    gff.RootNode.addByte('Cha', this.cha);
-    gff.RootNode.addFloat('ChallengeRating', this.challengeRating);
-
-    //Classes
-    let classList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ClassList') );
-    for(let i = 0; i < this.classes.length; i++){
-      classList.addChildStruct( this.classes[i].save() );
-    }
-    
-    gff.RootNode.addByte('Color_Hair', 0);
-    gff.RootNode.addByte('Color_Skin', 0);
-    gff.RootNode.addByte('Color_Tattoo1', 0);
-    gff.RootNode.addByte('Color_Tattoo2', 0);
-
-    let combatInfoStruct = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'CombatInfo') );
-
-    //TODO: CombatInfo
-
-    let combatRoundDataStruct = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'CombatRoundData') );
-
-    //TODO: CombatRoundData
-
-    gff.RootNode.addByte('Commandable', this.getCommadable() ? 1 : 0);
-    gff.RootNode.addByte('Con', this.con);
-    gff.RootNode.addRESREF('Conversation', this.conversation ? this.conversation.resref : '');
-    gff.RootNode.addByte('CreatnScrptFird',  this.spawned ? 1 : 0 );
-    gff.RootNode.addInt('CreatureSize', 3);
-    gff.RootNode.addShort('CurrentForce', this.currentForce);
-    gff.RootNode.addShort('CurrentHitPoints', this.currentHitPoints);
-    gff.RootNode.addByte('DeadSelectable', 1);
-    gff.RootNode.addCExoString('Deity', '');
-    //gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') ).setValue();
-    gff.RootNode.addByte('DetectMode', 1);
-    gff.RootNode.addByte('Dex', this.dex);
-    gff.RootNode.addByte('Disarmable', 1);
-    gff.RootNode.addByte('DuplicatingHead', 255);
-    
-    //Effects
-    let effectList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'EffectList') );
-    for(let i = 0; i < this.effects.length; i++){
-      effectList.addChildStruct( this.effects[i].save() );
-    }
-
-    //Equipment
-    let equipItemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-    for(const key of EquipmentSlots.ALL){
-      const item = this.equipment[key];
-      if(!item){ continue; }
-      const equipItem = item.save();
-      equipItem.setType(EquipmentSlots.slotOf(key));
-      equipItemList.addChildStruct(equipItem);
-    }
-
-    gff.RootNode.addDWord('Experience', this.experience);
-    
-    let expressionList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ExpressionList') );
-    let expressions = Object.keys(this.listeningPatterns);
-    for(let i = 0; i < expressions.length; i++){
-      let expressionString = expressions[i];
-      let expressionId = this.listeningPatterns[expressionString];
-
-      let expressionStruct = new GFFStruct();
-      expressionStruct.addInt('ExpressionId',  expressionId );
-      expressionStruct.addCExoString('ExpressionString',  expressionString );
-      expressionList.addChildStruct(expressionStruct);
-    }
-
-    gff.RootNode.addWord('FactionID', this.faction ? this.faction.id : this.factionId);
-
-    //Feats
-    let featList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'FeatList') );
-    for(let i = 0; i < this.feats.length; i++){
-      featList.addChildStruct( this.feats[i].save() );
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName') ).setValue( this.template.RootNode.getFieldByLabel('FirstName')?.getCExoLocString() );
-    gff.RootNode.addShort('ForcePoints', this.forcePoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'FortSaveThrow') ).setValue(this.fortitudeSaveThrow);
-    gff.RootNode.addByte('Gender', this.gender);
-    gff.RootNode.addDWord('Gold', 0);
-    gff.RootNode.addByte('GoodEvil', this.goodEvil);
-    gff.RootNode.addShort('HitPoints', this.hitPoints);
-    gff.RootNode.addByte('Int', this.int);
-    gff.RootNode.addByte('Interruptable', this.interruptable ? 1 : 0);
-    gff.RootNode.addByte('IsDestroyable', 1);
-    gff.RootNode.addByte('IsPC',  this.playerCreated ? 1 : 0);
-    gff.RootNode.addByte('IsRaiseable', 1);
-    if(this.playerCreated){
-      gff.RootNode.addInt('PlayerCreated', 1);
-    }
-
-    //Creature Inventory
-    let itemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ItemList') );
-    for(let i = 0; i < this.inventory.length; i++){
-      let itemStruct = this.inventory[i].save();
-      itemList.addChildStruct(itemStruct);
-    }
-
-    gff.RootNode.addInt('JoiningXP',  this.joiningXP ? this.joiningXP : 0 );
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName') ).setValue( this.template.RootNode.getFieldByLabel('LastName')?.getCExoLocString() );
-    gff.RootNode.addByte('Listening',  this.isListening );
-
-    gff.RootNode.addShort('MaxForcePoints', this.maxForcePoints);
-    gff.RootNode.addShort('MaxHitPoints', this.maxHitPoints);
-    gff.RootNode.addByte('Min1HP', this.min1HP);
-    gff.RootNode.addByte('MovementRate', 0);
-    gff.RootNode.addByte('NaturalAC', this.naturalAC);
-    gff.RootNode.addByte('NotReorienting', this.notReorienting);
-
-    gff.RootNode.addByte('PM_IsDisguised',  this.hasEffect(GameEffectType.EffectDisguise) ? 1 : 0 );
-    if( this.hasEffect(GameEffectType.EffectDisguise) ){
-      gff.RootNode.addWord('PM_Appearance',  this.appearance );
-    }
-
-    gff.RootNode.addByte('PartyInteract', this.partyInteract);
-
-    //Save PerceptionLists
-    let perceptionList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'PerceptionList') );
-    for(let i = 0; i < this.perceptionList.length; i++){
-      let percept = this.perceptionList[i];
-
-      let perceptionStruct = new GFFStruct();
-      perceptionStruct.addDWord('ObjectId',  percept.objectId );
-      perceptionStruct.addByte('PerceptionData',  (percept.data & 0xFF) );
-      perceptionList.addChildStruct(perceptionStruct);
-    }
-
-    gff.RootNode.addByte('PerceptionRange', this.perceptionRange?.id || 0);
-
-    gff.RootNode.addInt('Phenotype', this.phenotype);
-    gff.RootNode.addByte('Plot', 0);
-    gff.RootNode.addWord('PortraitId', this.portraitId);
-    gff.RootNode.addShort('PregameCurrent', 28);
-    gff.RootNode.addByte('Race', this.race);
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'RefSaveThrow') ).setValue(this.reflexSaveThrow);
-
-    let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
-    swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
-
-    //Scripts
-    this.saveScripts(gff.RootNode);
-
-    //Skills
-    let skillList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'SkillList') );
-    for(let i = 0; i < 8; i++){
-      skillList.addChildStruct( this.skills[i].save() );
-    }
-
-    gff.RootNode.addWord('SkillPoints',  this.skillPoints ? this.skillPoints : 0);
-    gff.RootNode.addWord('SoundSetFile', this.soundSetFile);
-    gff.RootNode.addByte('StartingPackage', 0);
-    gff.RootNode.addByte('StealthMode', 0);
-    gff.RootNode.addByte('Str', this.str);
-    gff.RootNode.addCExoString('Subrace', '');
-    gff.RootNode.addByte('SubraceIndex', this.subrace);
-    gff.RootNode.addCExoString('Tag', this.tag);
-    gff.RootNode.addByte('Tail', 0);
-    gff.RootNode.addByte('UseBackupHead', 0);
-    let varTable = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'WillSaveThrow') ).setValue(this.willSaveThrow);
-    gff.RootNode.addByte('Wings', 0);
-    gff.RootNode.addByte('Wis', this.wis);
-
-    gff.RootNode.addFloat('XPosition',  this.position.x );
-    gff.RootNode.addFloat('YPosition',  this.position.y );
-    gff.RootNode.addFloat('ZPosition',  this.position.z );
-
-    let theta = this.rotation.z * Math.PI;
-
-    gff.RootNode.addFloat('XOrientation',  1 * Math.cos(theta) );
-    gff.RootNode.addFloat('YOrientation',  1 * Math.sin(theta) );
-    gff.RootNode.addFloat('ZOrientation',  0 );
-
-    gff.RootNode.addShort('fortbonus', this.fortbonus);
-    gff.RootNode.addShort('refbonus', this.refbonus);
-    gff.RootNode.addShort('refbonus', this.refbonus);
-
-    this.template = gff;
-
-    if(this.npcId >= 0){
-      GameState.PartyManager.NPCS[this.npcId].template = this.template;
-    }
-
-    return gff;
-
+    return CreatureTemplate.write(this);
   }
 
-  static GenerateTemplate(){
-    let template = new GFFObject();
-    template.FileType = 'UTC ';
 
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'Appearance_Type') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyVariation') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Cha') );
-    template.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ChallengeRating') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'ClassList') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Comment') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Con') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Conversation') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentForce') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentHitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Deity') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Dex') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Disarmable') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'FactionID') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'FeatList') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'ForcePoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Gender') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GoodEvil') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'HitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Int') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Interruptable') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsPC') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'LawfulChaotic') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'MaxHitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Min1HP') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NaturalAC') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NoPermDeath') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NotReorienting') );
-    template.RootNode.addByte('PalletID', 4);
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PartyInteract') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PerceptionRange') );
-    template.RootNode.addField( new GFFField(GFFDataType.INT, 'Phenotype') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Race') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptAttacked') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDamaged') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDeath') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDialogue') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDisturbed') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndDialogu') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndRound') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnNotice') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptRested') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpawn') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpellAt') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptUserDefine') );
-    let skillList = template.RootNode.addField( new GFFField(GFFDataType.LIST, 'SkillList') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'SoundSetFile') )
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'SpecAbilityList') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Str') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Subrace') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'SubraceIndex') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'TemplateList') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'TemplateResRef') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TextureVar') );
-    template.RootNode.addField( new GFFField(GFFDataType.INT, 'WalkRate') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Wis') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'fortbonus') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'refbonus') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'willbonus') );
-
-    for(let i = 0; i < 8; i++){
-      let _skill = new GFFStruct();
-      _skill.addByte('Rank', 0);
-      skillList.addChildStruct(_skill);
-    }
-
-    return template;
+  static GenerateTemplate(): GFFObject {
+    return CreatureTemplate.generate();
   }
+
 
 }
 
