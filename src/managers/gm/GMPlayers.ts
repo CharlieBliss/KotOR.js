@@ -22,6 +22,10 @@ import {
   GMLootItem,
   GMPlayerSheet,
   GMDmPrompt,
+  GMIntentKind,
+  GMPacketMap,
+  GMPeerInfo,
+  GM_INTENTS,
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -202,13 +206,7 @@ export class GMPlayers {
     const peerId = user?.gmOwnerPeerId;
     const containerNetId = container?.gmNetId;
     if (!peerId || !containerNetId) return false;
-    GMNetworkManager.sendPacket({
-      type: 'container.open',
-      senderId: GMNetworkManager.peerId,
-      targetPeerId: peerId,
-      timestamp: Date.now(),
-      payload: { containerNetId, items: this.toLootItems((container as any).inventory) }
-    });
+    GMNetworkManager.send('container.open', { containerNetId, items: this.toLootItems((container as any).inventory) }, peerId);
     return true;
   }
 
@@ -222,13 +220,7 @@ export class GMPlayers {
     if (actor.position.distanceTo(container.position) > this.LOOT_RANGE) return;
     const taken = inventory.splice(0, inventory.length);
     this.addToPlayerInventory(actor, this.toLootItems(taken));
-    GMNetworkManager.sendPacket({
-      type: 'container.loot',
-      senderId: GMNetworkManager.peerId,
-      targetPeerId: peerId,
-      timestamp: Date.now(),
-      payload: { containerNetId, items: this.toLootItems(taken) }
-    });
+    GMNetworkManager.send('container.loot', { containerNetId, items: this.toLootItems(taken) }, peerId);
     GMManager.notifyChange();
   }
 
@@ -390,13 +382,7 @@ export class GMPlayers {
       if (actor.gmLastSheetJson === json && actor.gmLastSheetSession === session) continue;
       actor.gmLastSheetJson = json;
       actor.gmLastSheetSession = session;
-      GMNetworkManager.sendPacket({
-        type: 'player.sheet',
-        senderId: GMNetworkManager.peerId,
-        targetPeerId: peer.peerId,
-        timestamp: Date.now(),
-        payload: sheet
-      });
+      GMNetworkManager.send('player.sheet', sheet, peer.peerId);
     }
   }
 
@@ -520,6 +506,80 @@ export class GMPlayers {
    * Execute a client's interaction request on the host using the engine's normal actions,
    * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
    */
+  /**
+   * Host: a player connected (or reconnected). A reconnecting player, same peer id, takes back the character
+   * they left behind; a new one gets a character from the build they picked. Either way they get the scene.
+   */
+  static async onPeerJoin(peerId: string, payload: GMPacketMap['peer.join']) {
+    const { name, preset } = payload || {};
+    const net = GMNetworkManager;
+    const assign = (netId: string) => net.send('actor.assign', { netId, ownerPeerId: peerId }, peerId);
+    // A repeated join from a peer we already spawned must not create a second character
+    const existingPeer = net.peers.get(peerId);
+    if (existingPeer) {
+      // Still spawning: the in-flight join will send the snapshot and assignment
+      if (!existingPeer.controlledNetId) return;
+      net.sendWorldSnapshot(peerId);
+      assign(existingPeer.controlledNetId);
+      return;
+    }
+    const peerInfo: GMPeerInfo = { peerId, name: name || 'Player', role: 'client', joinedAt: Date.now() };
+    net.peers.set(peerId, peerInfo);
+
+    const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
+    net.appendChat('System', rejoinNetId ? `${peerInfo.name} rejoined the game.` : `${peerInfo.name} joined the game!`);
+    const spawnedNetId = rejoinNetId || await this.spawnPlayerFromNetworkPreset(peerId, peerInfo.name, preset);
+    peerInfo.controlledNetId = spawnedNetId;
+    net.sendWorldSnapshot(peerId);
+    if (spawnedNetId) assign(spawnedNetId);
+    net.notifyChange();
+  }
+
+  /**
+   * Host: what each request a player sends does (GM_INTENTS says which take over the character's position and
+   * which interrupt it). An interrupting request returns whether the host now drives the character.
+   */
+  static INTENT_HANDLERS: Record<GMIntentKind, (actor: ModuleCreature, intent: GMClientIntent, peerId: string) => void | boolean | Promise<boolean>> = {
+    loot: (actor, intent, peerId) => GMPlayers.grantLootOnHost(peerId, actor, intent.targetNetId),
+    equip: (actor, intent) => {
+      GMPlayers.equipOnHost(actor, intent.slot, intent.resRef).catch((e) => console.warn('[GMPlayers] equip failed', e));
+    },
+    unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
+    stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
+    cancel: () => false,
+    mine: (actor, intent) => {
+      actor.gmNetTarget = undefined;
+      return GMMines.useMineOnHost(actor, intent).then((ok) => {
+        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
+        return ok;
+      });
+    },
+    ability: (actor, intent) => {
+      actor.gmNetTarget = undefined;
+      return GMPlayers.useAbilityOnHost(actor, intent).then((ok) => {
+        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
+        return ok;
+      });
+    },
+    open: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
+    attack: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
+    use: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
+  };
+
+  /** Open a door, attack a creature or use an object: the host walks the character there and does it */
+  static actOnTarget(actor: ModuleCreature, intent: GMClientIntent): boolean {
+    const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : null;
+    if (!target || target === actor) return false;
+    // The host now owns this actor's position; drop any half-applied client movement
+    actor.gmNetTarget = undefined;
+    if (intent.kind === 'open' && !GMObjectKind.isDoor(target)) return false;
+    if (intent.kind === 'attack' && !GMObjectKind.isCreature(target)) return false;
+    if (intent.kind === 'open') actor.actionOpenDoor(target);
+    else if (intent.kind === 'attack') actor.attackCreature(target, undefined);
+    else actor.actionUseObject(target);
+    return true;
+  }
+
   static applyClientIntentOnHost(peerId: string, intent: GMClientIntent) {
     if (!intent) return;
     const actor = GMReplication.getOwnedActor(peerId, intent.netId);
@@ -527,67 +587,18 @@ export class GMPlayers {
     actor.gmIntentSeq = intent.seq;
     // A watching player can't act (a late request from before the freeze is dropped too)
     if (GMManager.playersFrozen && intent.kind !== 'cancel') return;
+    const meta = GM_INTENTS[intent.kind];
+    const handler = this.INTENT_HANDLERS[intent.kind];
+    if (!meta || !handler) return;
 
-    // Taking items and changing equipment don't interrupt anything the actor is doing
-    if (intent.kind === 'loot') {
-      this.grantLootOnHost(peerId, actor, intent.targetNetId);
-      return;
-    }
-    if (intent.kind === 'equip') {
-      this.equipOnHost(actor, intent.slot, intent.resRef).catch((e) => console.warn('[GMManager] equip failed', e));
-      return;
-    }
-    if (intent.kind === 'unequip') {
-      this.unequipOnHost(actor, intent.slot);
-      return;
-    }
-
-    if (intent.kind === 'stealth') {
-      (actor as ModuleCreature).setStealthMode(!(actor as ModuleCreature).stealthMode);
-      return;
-    }
-
-    actor.clearAllActions();
-    if (intent.kind === 'cancel') {
-      actor.gmHostDriven = false;
-      return;
-    }
-    if (intent.kind === 'mine') {
-      actor.gmNetTarget = undefined;
-      GMMines.useMineOnHost(actor as ModuleCreature, intent).then((ok) => {
-        actor.gmHostDriven = ok;
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
-      }).catch((e) => console.warn('[GMManager] mine failed', e));
-      return;
-    }
-    if (intent.kind === 'ability') {
-      actor.gmNetTarget = undefined;
-      this.useAbilityOnHost(actor as ModuleCreature, intent).then((ok) => {
-        actor.gmHostDriven = ok;
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
-      }).catch((e) => console.warn('[GMManager] ability failed', e));
-      return;
-    }
-
-    const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : null;
-    if (!target || target === actor) {
-      actor.gmHostDriven = false;
-      return;
-    }
-
-    // The host now owns this actor's position; drop any half-applied client movement
-    actor.gmNetTarget = undefined;
-    if (intent.kind === 'open' && GMObjectKind.isDoor(target)) {
-      actor.actionOpenDoor(target);
-    } else if (intent.kind === 'attack' && GMObjectKind.isCreature(target)) {
-      actor.attackCreature(target, undefined);
-    } else if (intent.kind === 'use') {
-      actor.actionUseObject(target);
+    if (meta.interrupts) actor.clearAllActions();
+    const result = handler(actor, intent, peerId);
+    if (!meta.interrupts) return;
+    if (result instanceof Promise) {
+      result.then((ok) => { actor.gmHostDriven = ok; }).catch((e) => console.warn(`[GMPlayers] ${intent.kind} failed`, e));
     } else {
-      actor.gmHostDriven = false;
-      return;
+      actor.gmHostDriven = !!result;
     }
-    actor.gmHostDriven = true;
   }
 
   /**
@@ -775,3 +786,22 @@ export class GMPlayers {
     return spawned ? (spawned.gmNetId || null) : null;
   }
 }
+
+// Players' requests (host) and what the host sends each player about their character (client)
+GMNetworkManager.on('peer.join', 'host', (packet) => GMPlayers.onPeerJoin(packet.senderId, packet.payload));
+GMNetworkManager.on('client.intent', 'host', (packet) => {
+  if (packet.payload) GMPlayers.applyClientIntentOnHost(packet.senderId, packet.payload);
+});
+GMNetworkManager.on('player.respawn', 'host', (packet) => GMPlayers.onRespawnRequest(packet.senderId));
+GMNetworkManager.on('dm.reply', 'host', (packet) => {
+  if (packet.payload) GMPlayers.onDmReply(packet.senderId, packet.payload);
+});
+GMNetworkManager.on('container.open', 'client', async (packet) => {
+  if (packet.payload) await GMPlayers.openNetworkContainer(packet.payload.containerNetId, packet.payload.items || []);
+}, 'to-me');
+GMNetworkManager.on('player.sheet', 'client', async (packet) => {
+  if (packet.payload) await GMPlayers.applyPlayerSheetOnClient(packet.payload);
+}, 'to-me');
+GMNetworkManager.on('container.loot', 'client', async (packet) => {
+  if (packet.payload) await GMPlayers.receiveNetworkLoot(packet.payload.items || []);
+}, 'to-me');

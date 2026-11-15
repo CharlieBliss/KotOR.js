@@ -6,8 +6,6 @@ import { DLGObject } from "@/resource/DLGObject";
 import { DLGNode } from "@/resource/DLGNode";
 import { DLGNodeType } from "@/enums/dialog/DLGNodeType";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
-import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
-import { BitWise } from "@/utility/BitWise";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
@@ -198,13 +196,7 @@ export class GMConversationManager {
   }
 
   static sendLine(line: GMConversationLine, peerId: string) {
-    GMNetworkManager.sendPacket({
-      type: 'talk.line',
-      senderId: GMNetworkManager.peerId,
-      targetPeerId: peerId,
-      timestamp: Date.now(),
-      payload: line,
-    });
+    GMNetworkManager.send('talk.line', line, peerId);
   }
 
   /**
@@ -250,13 +242,7 @@ export class GMConversationManager {
     const conv = this.conversations.get(convId);
     if (!conv) return;
     for (const peerId of conv.peers) {
-      GMNetworkManager.sendPacket({
-        type: 'talk.end',
-        senderId: GMNetworkManager.peerId,
-        targetPeerId: peerId,
-        timestamp: Date.now(),
-        payload: { convId },
-      });
+      GMNetworkManager.send('talk.end', { convId }, peerId);
     }
     this.conversations.delete(convId);
     this.notifyChange();
@@ -317,12 +303,7 @@ export class GMConversationManager {
     const stopped = !pc.actionQueue.length || pending.stuckFor >= this.TALK_STUCK_SECONDS;
     if (distance <= this.TALK_RANGE || (stopped && distance <= this.TALK_STUCK_RANGE)) {
       pc.clearAllActions();
-      GMNetworkManager.sendPacket({
-        type: 'talk.request',
-        senderId: GMNetworkManager.peerId,
-        timestamp: Date.now(),
-        payload: { npcNetId: this.pendingTalk.npcNetId },
-      });
+      GMNetworkManager.send('talk.request', { npcNetId: this.pendingTalk.npcNetId });
       this.pendingTalk = null;
     } else if (stopped) {
       // The player walked off instead, or can't get there
@@ -416,12 +397,7 @@ export class GMConversationManager {
       GameState.CutsceneManager.endConversation();
       return;
     }
-    GMNetworkManager.sendPacket({
-      type: 'talk.reply',
-      senderId: GMNetworkManager.peerId,
-      timestamp: Date.now(),
-      payload: { convId, lineId: (reply as any).gmLineId, choice },
-    });
+    GMNetworkManager.send('talk.reply', { convId, lineId: (reply as any).gmLineId, choice });
   }
 
   /** Client: our conversation screen closed (we left, pressed Esc, or the GM ended it) */
@@ -429,12 +405,7 @@ export class GMConversationManager {
     const endedByHost = !!this.current?.endedByHost;
     if (this.current?.convId === convId) this.current = null;
     if (!endedByHost && GMNetworkManager.role === 'client') {
-      GMNetworkManager.sendPacket({
-        type: 'talk.leave',
-        senderId: GMNetworkManager.peerId,
-        timestamp: Date.now(),
-        payload: { convId },
-      });
+      GMNetworkManager.send('talk.leave', { convId });
     }
     this.notifyChange();
   }
@@ -447,3 +418,11 @@ export class GMConversationManager {
   }
 
 }
+
+// Players talk to NPCs (host); the GM's lines reach them (client)
+GMNetworkManager.on('talk.request', 'host', (packet) => GMConversationManager.onTalkRequest(packet.senderId, packet.payload));
+GMNetworkManager.on('talk.reply', 'host', (packet) => GMConversationManager.onTalkReply(packet.senderId, packet.payload));
+GMNetworkManager.on('talk.leave', 'host', (packet) => GMConversationManager.onTalkLeave(packet.senderId, packet.payload));
+GMNetworkManager.on('peer.leave', 'host', (packet) => GMConversationManager.onPeerLeft(packet.senderId));
+GMNetworkManager.on('talk.line', 'client', (packet) => GMConversationManager.onLine(packet.payload), 'to-me-or-all');
+GMNetworkManager.on('talk.end', 'client', (packet) => GMConversationManager.onEnd(packet.payload), 'to-me-or-all');

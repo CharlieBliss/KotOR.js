@@ -59,7 +59,7 @@ export class GMMines {
   /** Host: a mine was laid or spotted */
   static onMineChanged(mine: ModuleTrigger) {
     if (GMNetworkManager.role !== 'host') return;
-    GMNetworkManager.sendPacket({ type: 'mine.state', senderId: GMNetworkManager.peerId, timestamp: Date.now(), payload: this.serializeMine(mine) });
+    GMNetworkManager.send('mine.state', this.serializeMine(mine));
   }
 
   /** Host: a mine went off, was disarmed or recovered */
@@ -68,7 +68,7 @@ export class GMMines {
     if (!netId) return;
     GMManager.netIdMap.delete(netId);
     if (GMNetworkManager.role === 'host') {
-      GMNetworkManager.sendPacket({ type: 'mine.remove', senderId: GMNetworkManager.peerId, timestamp: Date.now(), payload: { netId } });
+      GMNetworkManager.send('mine.remove', { netId });
     }
   }
 
@@ -162,3 +162,11 @@ export class GMMines {
     else GMNetworkManager.appendChat('Check', text);
   }
 }
+
+// Mines are the host's: players are told where they are
+GMNetworkManager.on('mine.state', 'client', (packet) => {
+  if (packet.payload) GMMines.applyMineOnClient(packet.payload);
+});
+GMNetworkManager.on('mine.remove', 'client', (packet) => {
+  if (packet.payload?.netId) GMMines.removeMineOnClient(packet.payload.netId);
+});

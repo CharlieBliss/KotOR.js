@@ -243,7 +243,6 @@ describe("GM multiplayer host authority", () => {
 
   describe("session robustness", () => {
     beforeEach(() => {
-      GMNetworkManager.gmManager = GMManager;
       GMNetworkManager.peers.clear();
       jest.spyOn(GMNetworkManager, "sendWorldSnapshot").mockImplementation(() => {});
     });
@@ -658,7 +657,6 @@ describe("GM multiplayer host authority", () => {
 
   describe("DM tools", () => {
     beforeEach(() => {
-      GMNetworkManager.gmManager = GMManager;
       GMNetworkManager.peers.clear();
       GMPlayers.dmPrompts.clear();
     });
@@ -1267,7 +1265,7 @@ describe("GM multiplayer host authority", () => {
     });
 
     test("is playing once the GM hands over a character", async () => {
-      GMNetworkManager.gmManager = { netIdMap: new Map(), possessCharacter: jest.fn() };
+      GMManager.netIdMap.clear();
       await GMNetworkManager.onPacketReceived({ type: "actor.assign", senderId: "gm", targetPeerId: GMNetworkManager.peerId, timestamp: 0, payload: { netId: "pc_1" } });
       expect(GMNetworkManager.joinState).toBe("playing");
     });

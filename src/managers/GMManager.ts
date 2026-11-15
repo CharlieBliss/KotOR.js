@@ -219,7 +219,7 @@ export class GMManager {
   static LOOT_ITEM_OPTIONS: { resRef: string; label: string }[] = LOOT_ITEM_OPTIONS;
 
   static init() {
-    GMNetworkManager.Init(GMManager);
+    GMNetworkManager.Init();
     TextSprite3D.onCreateOnObject = (object, text, style, timer) => GMReplication.onHostTextSprite(object, text, style, timer);
     GMViewport.init3DIndicators();
     GMViewport.attachViewportListeners();
@@ -689,13 +689,7 @@ export class GMManager {
       const seq = (obj.gmTeleportSeq || 0) + 1;
       obj.gmTeleportSeq = seq;
       obj.gmHostDriven = false;
-      GMNetworkManager.sendPacket({
-        type: 'actor.teleport',
-        senderId: GMNetworkManager.peerId,
-        targetPeerId: ownerPeerId,
-        timestamp: Date.now(),
-        payload: { netId: obj.gmNetId, x: pos.x, y: pos.y, z: pos.z, seq }
-      });
+      GMNetworkManager.send('actor.teleport', { netId: obj.gmNetId, x: pos.x, y: pos.y, z: pos.z, seq }, ownerPeerId);
     }
 
     if (GMNetworkManager.role !== 'offline') {
@@ -1162,60 +1156,16 @@ export class GMManager {
   }
 
   // -------------------------------------------------------------------------
-  // Engine hooks: what the engine (GameState.GMManager) and GMNetworkManager call, kept here so they
-  // need not know which GM class does it
+  // Engine hooks: what the engine calls through GameState.GMManager, kept here so engine code need not
+  // know which GM class does it
   // -------------------------------------------------------------------------
 
   static announceSkillRoll(...args: Parameters<typeof GMMines.announceSkillRoll>): ReturnType<typeof GMMines.announceSkillRoll> {
     return GMMines.announceSkillRoll(...args);
   }
 
-  static applyClientInputOnHost(...args: Parameters<typeof GMReplication.applyClientInputOnHost>): ReturnType<typeof GMReplication.applyClientInputOnHost> {
-    return GMReplication.applyClientInputOnHost(...args);
-  }
-
-  static applyClientIntentOnHost(...args: Parameters<typeof GMPlayers.applyClientIntentOnHost>): ReturnType<typeof GMPlayers.applyClientIntentOnHost> {
-    return GMPlayers.applyClientIntentOnHost(...args);
-  }
-
-  static applyDoorStateOnClient(...args: Parameters<typeof GMReplication.applyDoorStateOnClient>): ReturnType<typeof GMReplication.applyDoorStateOnClient> {
-    return GMReplication.applyDoorStateOnClient(...args);
-  }
-
-  static applyFxEventOnClient(...args: Parameters<typeof GMReplication.applyFxEventOnClient>): ReturnType<typeof GMReplication.applyFxEventOnClient> {
-    return GMReplication.applyFxEventOnClient(...args);
-  }
-
-  static applyMineOnClient(...args: Parameters<typeof GMMines.applyMineOnClient>): ReturnType<typeof GMMines.applyMineOnClient> {
-    return GMMines.applyMineOnClient(...args);
-  }
-
-  static applyPlayerSheetOnClient(...args: Parameters<typeof GMPlayers.applyPlayerSheetOnClient>): ReturnType<typeof GMPlayers.applyPlayerSheetOnClient> {
-    return GMPlayers.applyPlayerSheetOnClient(...args);
-  }
-
-  static applyTeleportOnClient(...args: Parameters<typeof GMReplication.applyTeleportOnClient>): ReturnType<typeof GMReplication.applyTeleportOnClient> {
-    return GMReplication.applyTeleportOnClient(...args);
-  }
-
-  static applyWorldSnapshotOnClient(...args: Parameters<typeof GMReplication.applyWorldSnapshotOnClient>): ReturnType<typeof GMReplication.applyWorldSnapshotOnClient> {
-    return GMReplication.applyWorldSnapshotOnClient(...args);
-  }
-
-  static applyWorldTickOnClient(...args: Parameters<typeof GMReplication.applyWorldTickOnClient>): ReturnType<typeof GMReplication.applyWorldTickOnClient> {
-    return GMReplication.applyWorldTickOnClient(...args);
-  }
-
-  static buildWorldSnapshot(...args: Parameters<typeof GMReplication.buildWorldSnapshot>): ReturnType<typeof GMReplication.buildWorldSnapshot> {
-    return GMReplication.buildWorldSnapshot(...args);
-  }
-
   static consumePlayerItem(...args: Parameters<typeof GMPlayers.consumePlayerItem>): ReturnType<typeof GMPlayers.consumePlayerItem> {
     return GMPlayers.consumePlayerItem(...args);
-  }
-
-  static findActorOwnedBy(...args: Parameters<typeof GMReplication.findActorOwnedBy>): ReturnType<typeof GMReplication.findActorOwnedBy> {
-    return GMReplication.findActorOwnedBy(...args);
   }
 
   static giveRecoveredMine(...args: Parameters<typeof GMMines.giveRecoveredMine>): ReturnType<typeof GMMines.giveRecoveredMine> {
@@ -1246,14 +1196,6 @@ export class GMManager {
     return GMPlayers.isNetworkContainer(...args);
   }
 
-  static loadSceneFromNetwork(...args: Parameters<typeof GMReplication.loadSceneFromNetwork>): ReturnType<typeof GMReplication.loadSceneFromNetwork> {
-    return GMReplication.loadSceneFromNetwork(...args);
-  }
-
-  static onDmReply(...args: Parameters<typeof GMPlayers.onDmReply>): ReturnType<typeof GMPlayers.onDmReply> {
-    return GMPlayers.onDmReply(...args);
-  }
-
   static onHostProjectile(...args: Parameters<typeof GMReplication.onHostProjectile>): ReturnType<typeof GMReplication.onHostProjectile> {
     return GMReplication.onHostProjectile(...args);
   }
@@ -1278,30 +1220,6 @@ export class GMManager {
     return GMMines.onMineRemoved(...args);
   }
 
-  static onRespawnRequest(...args: Parameters<typeof GMPlayers.onRespawnRequest>): ReturnType<typeof GMPlayers.onRespawnRequest> {
-    return GMPlayers.onRespawnRequest(...args);
-  }
-
-  static openNetworkContainer(...args: Parameters<typeof GMPlayers.openNetworkContainer>): ReturnType<typeof GMPlayers.openNetworkContainer> {
-    return GMPlayers.openNetworkContainer(...args);
-  }
-
-  static receiveNetworkLoot(...args: Parameters<typeof GMPlayers.receiveNetworkLoot>): ReturnType<typeof GMPlayers.receiveNetworkLoot> {
-    return GMPlayers.receiveNetworkLoot(...args);
-  }
-
-  static releaseActor(...args: Parameters<typeof GMReplication.releaseActor>): ReturnType<typeof GMReplication.releaseActor> {
-    return GMReplication.releaseActor(...args);
-  }
-
-  static removeActorByNetId(...args: Parameters<typeof GMReplication.removeActorByNetId>): ReturnType<typeof GMReplication.removeActorByNetId> {
-    return GMReplication.removeActorByNetId(...args);
-  }
-
-  static removeMineOnClient(...args: Parameters<typeof GMMines.removeMineOnClient>): ReturnType<typeof GMMines.removeMineOnClient> {
-    return GMMines.removeMineOnClient(...args);
-  }
-
   static requestNetworkEquip(...args: Parameters<typeof GMPlayers.requestNetworkEquip>): ReturnType<typeof GMPlayers.requestNetworkEquip> {
     return GMPlayers.requestNetworkEquip(...args);
   }
@@ -1318,23 +1236,17 @@ export class GMManager {
     return GMPlayers.routeContainerOpen(...args);
   }
 
-  static serializeActorsForTick(...args: Parameters<typeof GMReplication.serializeActorsForTick>): ReturnType<typeof GMReplication.serializeActorsForTick> {
-    return GMReplication.serializeActorsForTick(...args);
-  }
-
   static skillGatePasses(...args: Parameters<typeof GMChecks.skillGatePasses>): ReturnType<typeof GMChecks.skillGatePasses> {
     return GMChecks.skillGatePasses(...args);
-  }
-
-  static spawnOrUpdateFromSerialized(...args: Parameters<typeof GMReplication.spawnOrUpdateFromSerialized>): ReturnType<typeof GMReplication.spawnOrUpdateFromSerialized> {
-    return GMReplication.spawnOrUpdateFromSerialized(...args);
-  }
-
-  static spawnPlayerFromNetworkPreset(...args: Parameters<typeof GMPlayers.spawnPlayerFromNetworkPreset>): ReturnType<typeof GMPlayers.spawnPlayerFromNetworkPreset> {
-    return GMPlayers.spawnPlayerFromNetworkPreset(...args);
   }
 
   static updateNetMotion(...args: Parameters<typeof GMReplication.updateNetMotion>): ReturnType<typeof GMReplication.updateNetMotion> {
     return GMReplication.updateNetMotion(...args);
   }
 }
+
+// A player's game takes control of the character the GM hands it
+GMNetworkManager.on('actor.assign', 'client', (packet) => {
+  const obj = packet.payload?.netId ? GMManager.netIdMap.get(packet.payload.netId) : undefined;
+  if (obj) GMManager.possessCharacter(obj as ModuleCreature);
+}, 'to-me-or-all');

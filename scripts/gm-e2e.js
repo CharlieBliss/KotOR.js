@@ -276,14 +276,14 @@ async function diagnose(windows) {
           assigned: N.assignedActorNetId,
           playing: me ? me.gmNetId || '(no net id)' : null,
           playerChars: [...G.netIdMap.keys()].filter((k) => k.startsWith('pc_')),
-          pendingSpawns: [...G.pendingNetSpawns],
+          pendingSpawns: [...KotOR.GMReplication.pendingNetSpawns],
           framesPerSecond: frames,
           engineMode: GS.Mode,
           engineState: GS.State,
           ticksReceived: window.__gmE2eTicks,
           packetsSent: window.__gmE2eSent,
           peers: N.role === 'host' ? [...N.peers.values()].map((p) => p.controlledNetId) : undefined,
-          actorsInNextTick: N.role === 'host' ? (() => { try { return G.serializeActorsForTick().length; } catch (e) { return 'threw: ' + e.message; } })() : undefined,
+          actorsInNextTick: N.role === 'host' ? (() => { try { return KotOR.GMReplication.serializeActorsForTick().length; } catch (e) { return 'threw: ' + e.message; } })() : undefined,
         };
       });
       log(`  ${w.label}: ${JSON.stringify(state)}`);
@@ -351,7 +351,7 @@ async function run() {
         ];
         for (let i = 0; i < configs.length; i++) {
           const p = spot(KotOR, 3, -2 + i * 2);
-          const plc = await G.spawnPlaceable(configs[i], new window.THREE.Vector3(p.x, p.y, p.z), 0);
+          const plc = await KotOR.GMSpawner.spawnPlaceable(configs[i], new window.THREE.Vector3(p.x, p.y, p.z), 0);
           if (plc) out.push(plc.gmNetId);
         }
         return out;
@@ -438,7 +438,7 @@ async function run() {
           const p = i === 0 ? spot(KotOR, -3, -2) : spot(KotOR, 6, 6);
           // The looted NPC is tough enough that both players reach it and fight before it falls
           const config = { ...G.CREATURE_PRESETS[0], name: `E2E Guard ${i + 1}`, factionId: faction, barkText: '', customized: i === 0, hp: i === 0 ? 200 : G.CREATURE_PRESETS[0].hp, lootResRefs: i === 0 ? loot : [] };
-          const cre = await G.spawnCreature(config, new window.THREE.Vector3(p.x, p.y, p.z), 0);
+          const cre = await KotOR.GMSpawner.spawnCreature(config, new window.THREE.Vector3(p.x, p.y, p.z), 0);
           if (cre) out.push(cre.gmNetId);
         }
         return out;
@@ -485,7 +485,7 @@ async function run() {
         const pc = G.netIdMap.get(pcId);
         const toward = npc.position.clone().sub(pc.position).setZ(0).normalize().multiplyScalar(2);
         const spot = pc.position.clone().add(toward);
-        spot.z = G.getGroundZAt(spot.x, spot.y, pc.position.z);
+        spot.z = KotOR.GMViewport.getGroundZAt(spot.x, spot.y, pc.position.z);
         G.teleportObject(npc, spot);
       }, placed.npcs[0], playerNetIds[0]);
       try {
@@ -530,8 +530,8 @@ async function run() {
         await p.eval((KotOR) => {
           const G = KotOR.GMManager;
           window.__gmE2eFx = [];
-          const original = G.applyFxEventOnClient.bind(G);
-          G.applyFxEventOnClient = (event) => { window.__gmE2eFx.push(event); return original(event); };
+          const original = KotOR.GMReplication.applyFxEventOnClient.bind(KotOR.GMReplication);
+          KotOR.GMReplication.applyFxEventOnClient = (event) => { window.__gmE2eFx.push(event); return original(event); };
         });
       }
 
@@ -554,7 +554,7 @@ async function run() {
             const G = KotOR.GMManager;
             const cre = G.netIdMap.get(id);
             if (cre && !cre.isDead() && !KotOR.GMNetworkManager.awaitingHost) {
-              G.interceptInteraction(KotOR.GameState.getCurrentPlayer(), cre);
+              KotOR.GMPlayers.interceptInteraction(KotOR.GameState.getCurrentPlayer(), cre);
             }
           }, target);
         }
@@ -764,8 +764,8 @@ async function run() {
         await p.eval((KotOR) => {
           const G = KotOR.GMManager;
           window.__gmE2eTicks = { total: 0, withActors: 0, lastActorIds: [] };
-          const original = G.applyWorldTickOnClient.bind(G);
-          G.applyWorldTickOnClient = (actors) => {
+          const original = KotOR.GMReplication.applyWorldTickOnClient.bind(KotOR.GMReplication);
+          KotOR.GMReplication.applyWorldTickOnClient = (actors) => {
             window.__gmE2eTicks.total++;
             if (actors && actors.length) {
               window.__gmE2eTicks.withActors++;
@@ -804,7 +804,7 @@ async function run() {
         return {
           playersInArea: ids.map((id) => !!G.netIdMap.get(id) && area.creatures.includes(G.netIdMap.get(id))),
           peers: [...KotOR.GMNetworkManager.peers.values()].map((p) => p.controlledNetId),
-          inventories: ids.map((id) => G.netIdMap.get(id) ? G.getPlayerInventory(G.netIdMap.get(id)).length : -1),
+          inventories: ids.map((id) => G.netIdMap.get(id) ? KotOR.GMPlayers.getPlayerInventory(G.netIdMap.get(id)).length : -1),
           oldObjectsLeft: oldIds.filter((id) => G.netIdMap.has(id)),
         };
       }, playerNetIds, [...placed.items, ...placed.npcs]);

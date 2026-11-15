@@ -667,3 +667,47 @@ export class GMReplication {
     }
   }
 }
+
+// What players' games need from the GM's world, and the world packets each side handles
+GMNetworkManager.world = {
+  buildWorldSnapshot: () => GMReplication.buildWorldSnapshot(),
+  serializeActorsForTick: () => GMReplication.serializeActorsForTick(),
+  getNetObject: (netId) => GMManager.netIdMap.get(netId),
+};
+GMNetworkManager.on('scene.load', 'client', async (packet) => {
+  const { moduleResRef, keepDefaultCreatures, keepDefaultTriggers, keepDefaultPlaceables } = packet.payload || ({} as any);
+  if (!moduleResRef) return;
+  if (GMNetworkManager.joinState !== 'playing') GMNetworkManager.clearJoinTimer();
+  GMNetworkManager.appendChat('GM', `Loading scene: ${moduleResRef}...`);
+  await GMReplication.loadSceneFromNetwork(moduleResRef, !!keepDefaultCreatures, !!keepDefaultTriggers, keepDefaultPlaceables !== false);
+}, 'to-me-or-all');
+GMNetworkManager.on('world.snapshot', 'client', async (packet) => {
+  if (packet.payload) await GMReplication.applyWorldSnapshotOnClient(packet.payload);
+}, 'to-me-or-all');
+GMNetworkManager.on('world.tick', 'client', (packet) => GMReplication.applyWorldTickOnClient(packet.payload?.actors || []));
+GMNetworkManager.on('actor.spawn', 'client', async (packet) => {
+  if (packet.payload?.actor) await GMReplication.spawnOrUpdateFromSerialized(packet.payload.actor);
+});
+GMNetworkManager.on('actor.update', 'client', async (packet) => {
+  if (packet.payload?.actor) await GMReplication.spawnOrUpdateFromSerialized(packet.payload.actor);
+});
+GMNetworkManager.on('actor.teleport', 'client', (packet) => {
+  if (packet.payload?.netId) GMReplication.applyTeleportOnClient(packet.payload);
+});
+GMNetworkManager.on('actor.remove', 'client', (packet) => {
+  if (packet.payload?.netId) GMReplication.removeActorByNetId(packet.payload.netId);
+});
+GMNetworkManager.on('door.state', 'client', (packet) => {
+  if (packet.payload) GMReplication.applyDoorStateOnClient(packet.payload);
+});
+GMNetworkManager.on('fx.event', 'client', (packet) => {
+  if (packet.payload) GMReplication.applyFxEventOnClient(packet.payload);
+});
+GMNetworkManager.on('client.input', 'host', (packet) => {
+  if (packet.payload) GMReplication.applyClientInputOnHost(packet.senderId, packet.payload);
+});
+// A player who left keeps their character, standing still until they rejoin
+GMNetworkManager.on('peer.leave', 'host', (packet) => {
+  const netId = GMReplication.findActorOwnedBy(packet.senderId);
+  if (netId) GMReplication.releaseActor(netId);
+});
