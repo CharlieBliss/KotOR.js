@@ -422,6 +422,46 @@ async function run() {
       return playerNetIds.join(', ');
     })) return false;
 
+    await must('GM opens every panel tab', async () => {
+      // Each drawer tab renders, and what the GM typed in one survives switching to another
+      const result = await gm.eval(async () => {
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const tabButton = (label) => [...document.querySelectorAll('.gm-topbar .gm-btn')].find((b) => b.textContent.trim().startsWith(label));
+        const shown = () => [...document.querySelectorAll('.gm-drawer-body > div')].find((d) => d.style.display !== 'none');
+        const setInput = (input, value) => {
+          Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+        };
+        const seen = {};
+        for (const label of ['Scene', 'Place', 'Players', 'Inspect', 'Session']) {
+          const button = tabButton(label);
+          if (!button) return { error: `no ${label} tab button` };
+          button.click();
+          await wait(400);
+          seen[label] = (shown()?.textContent || '').length;
+          if (label === 'Scene') {
+            const search = shown()?.querySelector('input.gm-input');
+            if (!search) return { error: 'no scene search field' };
+            setInput(search, 'e2e-kept');
+            await wait(100);
+          }
+        }
+        tabButton('Scene').click();
+        await wait(400);
+        const kept = shown()?.querySelector('input.gm-input')?.value;
+        tabButton('Scene').click(); // close the drawer again
+        await wait(100);
+        const search = [...document.querySelectorAll('.gm-drawer-body input.gm-input')].find((i) => i.value === 'e2e-kept');
+        if (search) setInput(search, '');
+        return { seen, kept, drawerClosed: document.querySelector('.gm-drawer')?.style.display === 'none' };
+      });
+      expect(!result.error, result.error);
+      for (const [label, length] of Object.entries(result.seen)) expect(length > 20, `the ${label} tab rendered nothing (${length} characters)`);
+      expect(result.kept === 'e2e-kept', `the Scene tab's search was lost when switching tabs (${JSON.stringify(result.kept)})`);
+      expect(result.drawerClosed, 'the drawer did not close');
+      return `tabs: ${Object.keys(result.seen).join(', ')}`;
+    });
+
     await must('Players see the placed items', async () => {
       for (const p of players) {
         await p.waitFor('the placed items', (KotOR, ids) => ids.every((id) => KotOR.GMManager.netIdMap.has(id)), SYNC_TIMEOUT, placed.items);
