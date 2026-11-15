@@ -256,8 +256,8 @@ export class MenuEquipment extends GameMenu {
       this.LB_ITEMS.mutate(tx => {
         tx.clear();
         tx.add(new GUIItemNone());
-        if(currentPC.GetItemInSlot(slot)){
-          tx.add(new GUIItemEquipped(currentPC.GetItemInSlot(slot)));
+        if(currentPC.getItemInSlot(slot)){
+          tx.add(new GUIItemEquipped(currentPC.getItemInSlot(slot)));
         }
         for (let i = 0; i < inv.length; i++) {
           tx.add(inv[i]);
@@ -335,8 +335,8 @@ export class MenuEquipment extends GameMenu {
       this.LB_ITEMS.mutate(tx => {
         tx.clear();
         tx.add(new GUIItemNone());
-        if(currentPC.GetItemInSlot(this.slot)){
-          tx.add(new GUIItemEquipped(currentPC.GetItemInSlot(this.slot)));
+        if(currentPC.getItemInSlot(this.slot)){
+          tx.add(new GUIItemEquipped(currentPC.getItemInSlot(this.slot)));
         }
         for (let i = 0; i < inv.length; i++) {
           tx.add(inv[i]);
@@ -369,7 +369,7 @@ export class MenuEquipment extends GameMenu {
     if(!currentPC) return;
 
     if (currentPC.getRace() == 6) {
-      let implant = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.IMPLANT);
+      let implant = currentPC.getItemInSlot(ModuleCreatureArmorSlot.IMPLANT);
       if (implant) {
         let icon = 'i' + implant.baseItem.itemClass + '_' + ('000' + implant.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_IMPLANT.getFillTextureName() != icon) {
@@ -379,7 +379,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_IMPLANT.getFillTextureName() != 'iimplant') {
         this.LBL_INV_IMPLANT.setFillTextureName('iimplant');
       }
-      let head = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.HEAD);
+      let head = currentPC.getItemInSlot(ModuleCreatureArmorSlot.HEAD);
       if (head) {
         let icon = 'i' + head.baseItem.itemClass + '_' + ('000' + head.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_HEAD.getFillTextureName() != icon) {
@@ -388,7 +388,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_HEAD.getFillTextureName() != 'ihead') {
         this.LBL_INV_HEAD.setFillTextureName('ihead');
       }
-      let hands = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.ARMS);
+      let hands = currentPC.getItemInSlot(ModuleCreatureArmorSlot.ARMS);
       if (hands) {
         let icon = 'i' + hands.baseItem.itemClass + '_' + ('000' + hands.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_HANDS.getFillTextureName() != icon) {
@@ -397,7 +397,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_HANDS.getFillTextureName() != 'ihands') {
         this.LBL_INV_HANDS.setFillTextureName('ihands');
       }
-      let l_arm = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.LEFTARMBAND);
+      let l_arm = currentPC.getItemInSlot(ModuleCreatureArmorSlot.LEFTARMBAND);
       if (l_arm) {
         let icon = 'i' + l_arm.baseItem.itemClass + '_' + ('000' + l_arm.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_ARM_L.getFillTextureName() != icon) {
@@ -406,7 +406,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_ARM_L.getFillTextureName() != 'iforearm_l') {
         this.LBL_INV_ARM_L.setFillTextureName('iforearm_l');
       }
-      let armor = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.ARMOR);
+      let armor = currentPC.getItemInSlot(ModuleCreatureArmorSlot.ARMOR);
       if (armor) {
         let icon = 'i' + armor.baseItem.itemClass + '_' + ('000' + armor.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_BODY.getFillTextureName() != icon) {
@@ -415,7 +415,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_BODY.getFillTextureName() != 'iarmor') {
         this.LBL_INV_BODY.setFillTextureName('iarmor');
       }
-      let r_arm = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.RIGHTARMBAND);
+      let r_arm = currentPC.getItemInSlot(ModuleCreatureArmorSlot.RIGHTARMBAND);
       if (r_arm) {
         let icon = 'i' + r_arm.baseItem.itemClass + '_' + ('000' + r_arm.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_ARM_R.getFillTextureName() != icon) {
@@ -424,7 +424,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_ARM_R.getFillTextureName() != 'iforearm_r') {
         this.LBL_INV_ARM_R.setFillTextureName('iforearm_r');
       }
-      let l_weap = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.LEFTHAND);
+      let l_weap = currentPC.getItemInSlot(ModuleCreatureArmorSlot.LEFTHAND);
       if (l_weap) {
         let icon = 'i' + l_weap.baseItem.itemClass + '_' + ('000' + l_weap.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_WEAP_L.getFillTextureName() != icon) {
@@ -433,7 +433,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_WEAP_L.getFillTextureName() != 'iweap_l') {
         this.LBL_INV_WEAP_L.setFillTextureName('iweap_l');
       }
-      let belt = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.BELT);
+      let belt = currentPC.getItemInSlot(ModuleCreatureArmorSlot.BELT);
       if (belt) {
         let icon = 'i' + belt.baseItem.itemClass + '_' + ('000' + belt.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_BELT.getFillTextureName() != icon) {
@@ -442,7 +442,7 @@ export class MenuEquipment extends GameMenu {
       } else if (force || this.LBL_INV_BELT.getFillTextureName() != 'ibelt') {
         this.LBL_INV_BELT.setFillTextureName('ibelt');
       }
-      let r_weap = currentPC.GetItemInSlot(ModuleCreatureArmorSlot.RIGHTHAND);
+      let r_weap = currentPC.getItemInSlot(ModuleCreatureArmorSlot.RIGHTHAND);
       if (r_weap) {
         let icon = 'i' + r_weap.baseItem.itemClass + '_' + ('000' + r_weap.getModelVariation()).slice(-3);
         if (force || this.LBL_INV_WEAP_R.getFillTextureName() != icon) {

@@ -108,7 +108,7 @@ describe("skills", () => {
 
   test("skill bonuses on worn items count toward the total (a stealth unit's +Stealth)", () => {
     const cre = creature({ dex: 10, skills: [, , { rank: 2, keyAbility: "DEX" }] });
-    cre.equipment.BELT = { getDEXBonus: () => 0, properties: [skillProperty(ModuleItemProperty.Skill, 2, 4), skillProperty(ModuleItemProperty.DecreasedSkill, 2, 1)] };
+    cre.equipment.BELT = { getAbilityBonus: () => 0, properties: [skillProperty(ModuleItemProperty.Skill, 2, 4), skillProperty(ModuleItemProperty.DecreasedSkill, 2, 1)] };
     expect(cre.getSkillLevel(2)).toBe(5);
   });
 

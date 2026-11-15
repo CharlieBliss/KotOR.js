@@ -85,7 +85,7 @@ describe("passive feats", () => {
 });
 
 describe("Jedi Defense", () => {
-  const saber = { baseItemId: 8, isRangedWeapon: () => false, getSTRBonus: () => 0 };
+  const saber = { baseItemId: 8, isRangedWeapon: () => false, getAbilityBonus: () => 0 };
   const blaster = { isRangedWeapon: () => true, getBaseDamage: () => 6, getDamageBonus: () => 0, getBaseDamageType: () => 0 };
 
   function jedi(feats: number[]) {

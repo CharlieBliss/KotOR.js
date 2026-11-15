@@ -25,6 +25,8 @@ import { TalentSkill } from "@/talents/TalentSkill";
 import { TalentSpell } from "@/talents/TalentSpell";
 import { OdysseyModel3D, OdysseyObject3D } from "@/three/odyssey";
 import { OdysseyModel, OdysseyModelAnimation } from "@/odyssey";
+import { EquipmentSlots } from "@/module/creature/EquipmentSlots";
+import type { CreatureEquipment } from "@/module/creature/EquipmentSlots";
 import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot";
 import { LIPObject } from "@/resource/LIPObject";
 import { Utility } from "@/utility/Utility";
@@ -153,23 +155,7 @@ export class ModuleCreature extends ModuleObject {
   animationState: ICreatureAnimationState;
   overlayAnimationState: IOverlayAnimationState;
   
-  equipment: { 
-    HEAD: ModuleItem; 
-    ARMOR: ModuleItem; 
-    ARMS: ModuleItem; 
-    RIGHTHAND: ModuleItem; 
-    RIGHTHAND2: ModuleItem; 
-    LEFTHAND: ModuleItem; 
-    LEFTHAND2: ModuleItem; 
-    LEFTARMBAND: ModuleItem; 
-    RIGHTARMBAND: ModuleItem; 
-    IMPLANT: ModuleItem; 
-    BELT: ModuleItem; 
-    CLAW1: ModuleItem; 
-    CLAW2: ModuleItem; 
-    CLAW3: ModuleItem; 
-    HIDE: ModuleItem; 
-  };
+  equipment: CreatureEquipment;
   regenTimer: number;
   regenTimerMax: number;
   excitedDuration: number;
@@ -282,24 +268,7 @@ export class ModuleCreature extends ModuleObject {
     this.resetAnimationState();
     this.resetOverlayAnimationState();
 
-    this.equipment = {
-      HEAD: undefined,
-      ARMOR: undefined,
-      ARMS: undefined,
-      RIGHTHAND: undefined,
-      RIGHTHAND2: undefined,
-      LEFTHAND: undefined,
-      LEFTHAND2: undefined,
-      LEFTARMBAND: undefined,
-      RIGHTARMBAND: undefined,
-      IMPLANT: undefined,
-      BELT: undefined,
-    
-      CLAW1: undefined,
-      CLAW2: undefined,
-      CLAW3: undefined,
-      HIDE:  undefined,
-    };
+    this.equipment = EquipmentSlots.empty();
 
     this.experience = 0;
     this.feats = [];
@@ -712,7 +681,6 @@ export class ModuleCreature extends ModuleObject {
         this.updateListeningPatterns();
       }
 
-
       //If a non controlled party member is stuck, warp them to their follow position
       if(!netMotion && this.npcId != undefined && this != (GameState.getCurrentPlayer() as any) && this.collisionTimer >= 1){
         this.setPosition(GameState.PartyManager.GetFollowPosition(this));
@@ -755,47 +723,8 @@ export class ModuleCreature extends ModuleObject {
       }
 
       //Update equipment
-      if(this.equipment.HEAD){
-        this.equipment.HEAD.update(delta);
-      }
-      if(this.equipment.ARMS){
-        this.equipment.ARMS.update(delta);
-      }
-
-      if(this.equipment.RIGHTARMBAND){
-        this.equipment.RIGHTARMBAND.update(delta);
-      }
-
-      if(this.equipment.LEFTARMBAND){
-        this.equipment.LEFTARMBAND.update(delta);
-      }
-
-      if(this.equipment.RIGHTHAND){
-        this.equipment.RIGHTHAND.update(delta);
-      }
-
-      if(this.equipment.LEFTHAND){
-        this.equipment.LEFTHAND.update(delta);
-      }
-
-      if(this.equipment.ARMOR){
-        this.equipment.ARMOR.update(delta);
-      }
-      
-      if(this.equipment.BELT){
-        this.equipment.BELT.update(delta);
-      }
-
-      if(this.equipment.CLAW1){
-        this.equipment.CLAW1.update(delta);
-      }
-
-      if(this.equipment.CLAW2){
-        this.equipment.CLAW2.update(delta);
-      }
-
-      if(this.equipment.CLAW3){
-        this.equipment.CLAW3.update(delta);
+      for(const key of EquipmentSlots.WORN){
+        this.equipment[key]?.update(delta);
       }
 
       //Loop through and update the effects
@@ -1928,57 +1857,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getEquippedWeaponType(){
-    let lWeapon = this.equipment.LEFTHAND;
-    let rWeapon = this.equipment.RIGHTHAND;
-    let claw1 = this.equipment.CLAW1;
-    let claw2 = this.equipment.CLAW2;
-    let claw3 = this.equipment.CLAW3;
-
-    if(rWeapon){
-      return (rWeapon.getWeaponType());
-    }
-
-    if(lWeapon){
-      return (lWeapon.getWeaponType());
-    }
-
-    if(claw1){
-      return (claw1.getWeaponType());
-    }
-
-    if(claw2){
-      return (claw2.getWeaponType());
-    }
-
-    if(claw3){
-      return (claw3.getWeaponType());
-    }
-
-    return 0;
+    return this.getWeapon()?.getWeaponType() || 0;
   }
 
   isRangedEquipped(){
-    if(this.equipment.RIGHTHAND){
-      return this.equipment.RIGHTHAND.isRangedWeapon();
-    }
-
-    if(this.equipment.LEFTHAND){
-      return this.equipment.LEFTHAND.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW1){
-      return this.equipment.CLAW1.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW2){
-      return this.equipment.CLAW2.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW3){
-      return this.equipment.CLAW3.isRangedWeapon();
-    }
-
-    return false;
+    return this.getWeapon()?.isRangedWeapon() || false;
   }
 
   updateItems(delta = 0){
@@ -2083,13 +1966,16 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
+  /** The weapon in use: in the right hand, else the left, else a natural weapon (undefined when unarmed) */
+  getWeapon(): ModuleItem | undefined {
+    for(const key of EquipmentSlots.WEAPONS){
+      if(this.equipment[key]){ return this.equipment[key]; }
+    }
+    return undefined;
+  }
+
   hasWeapons(){
-    let lWeapon = this.equipment.LEFTHAND;
-    let rWeapon = this.equipment.RIGHTHAND;
-    let cWeapon1 = this.equipment.CLAW1;
-    let cWeapon2 = this.equipment.CLAW2;
-    let cWeapon3 = this.equipment.CLAW3;
-    return (lWeapon) || (rWeapon) || (cWeapon1) || (cWeapon2) || (cWeapon3);
+    return !!this.getWeapon();
   }
 
   flourish(){
@@ -2487,48 +2373,10 @@ export class ModuleCreature extends ModuleObject {
     return this.isCommandable;
   }
 
-  getItemInSlot(slot = 0){
-    switch(slot){
-      case ModuleCreatureArmorSlot.IMPLANT:
-        return this.equipment.IMPLANT;
-      break;
-      case ModuleCreatureArmorSlot.HEAD:
-        return this.equipment.HEAD;
-      break;
-      case ModuleCreatureArmorSlot.ARMS:
-        return this.equipment.ARMS;
-      break;
-      case ModuleCreatureArmorSlot.LEFTARMBAND:
-        return this.equipment.LEFTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.ARMOR:
-        return this.equipment.ARMOR;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTARMBAND:
-        return this.equipment.RIGHTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        return this.equipment.LEFTHAND;
-      break;
-      case ModuleCreatureArmorSlot.BELT:
-        return this.equipment.BELT;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        return this.equipment.RIGHTHAND;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        return this.equipment.CLAW1;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        return this.equipment.CLAW2;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        return this.equipment.CLAW3;
-      break;
-      default:
-        return null;
-      break;
-    }
+  /** The item in a slot (a ModuleCreatureArmorSlot value); null when the value isn't a slot */
+  getItemInSlot(slot = 0): ModuleItem | null | undefined {
+    const key = EquipmentSlots.keyOf(slot);
+    return key ? this.equipment[key] : null;
   }
 
   getInventory(): ModuleItem[] {
@@ -2809,130 +2657,44 @@ export class ModuleCreature extends ModuleObject {
     return baseac + classBonus + armorAC + dexBonus;
   }
 
-  getSTR(calculateBonuses = true){
+  /**
+   * An ability score (0 STR, 1 DEX, 2 CON, 3 INT, 4 WIS, 5 CHA), with the bonuses from worn items and
+   * effects unless calculateBonuses is false
+   */
+  getAbility(ability: number, calculateBonuses = true): number {
+    const base = [this.str, this.dex, this.con, this.int, this.wis, this.cha][ability];
     if(!calculateBonuses){
-      return this.str;
-    }else{
-      return this.str +
-      (this.equipment.HEAD?.getSTRBonus() || 0) +
-      (this.equipment.ARMOR?.getSTRBonus() || 0) +
-      (this.equipment.ARMS?.getSTRBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getSTRBonus() || 0) +
-      (this.equipment.LEFTHAND?.getSTRBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getSTRBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getSTRBonus() || 0) +
-      (this.equipment.IMPLANT?.getSTRBonus() || 0) +
-      (this.equipment.BELT?.getSTRBonus() || 0) +
-      (this.equipment.CLAW1?.getSTRBonus() || 0) +
-      (this.equipment.CLAW2?.getSTRBonus() || 0) +
-      (this.equipment.HIDE?.getSTRBonus() || 0) +
-      this.getAbilityEffectBonus(0);
+      return base;
     }
+    let bonus = 0;
+    for(const key of EquipmentSlots.WORN){
+      bonus += this.equipment[key]?.getAbilityBonus(ability) || 0;
+    }
+    return base + bonus + this.getAbilityEffectBonus(ability);
+  }
+
+  getSTR(calculateBonuses = true){
+    return this.getAbility(0, calculateBonuses);
   }
 
   getDEX(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.dex;
-    }else{
-      return this.dex +
-      (this.equipment.HEAD?.getDEXBonus() || 0) +
-      (this.equipment.ARMOR?.getDEXBonus() || 0) +
-      (this.equipment.ARMS?.getDEXBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getDEXBonus() || 0) +
-      (this.equipment.LEFTHAND?.getDEXBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getDEXBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getDEXBonus() || 0) +
-      (this.equipment.IMPLANT?.getDEXBonus() || 0) +
-      (this.equipment.BELT?.getDEXBonus() || 0) +
-      (this.equipment.CLAW1?.getDEXBonus() || 0) +
-      (this.equipment.CLAW2?.getDEXBonus() || 0) +
-      (this.equipment.HIDE?.getDEXBonus() || 0) +
-      this.getAbilityEffectBonus(1);
-    }
+    return this.getAbility(1, calculateBonuses);
   }
 
   getCON(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.con;
-    }else{
-      return this.con +
-      (this.equipment.HEAD?.getCONBonus() || 0) +
-      (this.equipment.ARMOR?.getCONBonus() || 0) +
-      (this.equipment.ARMS?.getCONBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getCONBonus() || 0) +
-      (this.equipment.LEFTHAND?.getCONBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getCONBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getCONBonus() || 0) +
-      (this.equipment.IMPLANT?.getCONBonus() || 0) +
-      (this.equipment.BELT?.getCONBonus() || 0) +
-      (this.equipment.CLAW1?.getCONBonus() || 0) +
-      (this.equipment.CLAW2?.getCONBonus() || 0) +
-      (this.equipment.HIDE?.getCONBonus() || 0) +
-      this.getAbilityEffectBonus(2);
-    }
-  }
-
-  getCHA(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.cha;
-    }else{
-      return this.cha +
-      (this.equipment.HEAD?.getCHABonus() || 0) +
-      (this.equipment.ARMOR?.getCHABonus() || 0) +
-      (this.equipment.ARMS?.getCHABonus() || 0) +
-      (this.equipment.RIGHTHAND?.getCHABonus() || 0) +
-      (this.equipment.LEFTHAND?.getCHABonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getCHABonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getCHABonus() || 0) +
-      (this.equipment.IMPLANT?.getCHABonus() || 0) +
-      (this.equipment.BELT?.getCHABonus() || 0) +
-      (this.equipment.CLAW1?.getCHABonus() || 0) +
-      (this.equipment.CLAW2?.getCHABonus() || 0) +
-      (this.equipment.HIDE?.getCHABonus() || 0) +
-      this.getAbilityEffectBonus(5);
-    }
-  }
-
-  getWIS(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.wis;
-    }else{
-      return this.wis +
-      (this.equipment.HEAD?.getWISBonus() || 0) +
-      (this.equipment.ARMOR?.getWISBonus() || 0) +
-      (this.equipment.ARMS?.getWISBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getWISBonus() || 0) +
-      (this.equipment.LEFTHAND?.getWISBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getWISBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getWISBonus() || 0) +
-      (this.equipment.IMPLANT?.getWISBonus() || 0) +
-      (this.equipment.BELT?.getWISBonus() || 0) +
-      (this.equipment.CLAW1?.getWISBonus() || 0) +
-      (this.equipment.CLAW2?.getWISBonus() || 0) +
-      (this.equipment.HIDE?.getWISBonus() || 0) +
-      this.getAbilityEffectBonus(4);
-    }
+    return this.getAbility(2, calculateBonuses);
   }
 
   getINT(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.int;
-    }else{
-      return this.int +
-      (this.equipment.HEAD?.getINTBonus() || 0) +
-      (this.equipment.ARMOR?.getINTBonus() || 0) +
-      (this.equipment.ARMS?.getINTBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getINTBonus() || 0) +
-      (this.equipment.LEFTHAND?.getINTBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getINTBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getINTBonus() || 0) +
-      (this.equipment.IMPLANT?.getINTBonus() || 0) +
-      (this.equipment.BELT?.getINTBonus() || 0) +
-      (this.equipment.CLAW1?.getINTBonus() || 0) +
-      (this.equipment.CLAW2?.getINTBonus() || 0) +
-      (this.equipment.HIDE?.getINTBonus() || 0) +
-      this.getAbilityEffectBonus(3);
-    }
+    return this.getAbility(3, calculateBonuses);
+  }
+
+  getWIS(calculateBonuses = true){
+    return this.getAbility(4, calculateBonuses);
+  }
+
+  getCHA(calculateBonuses = true){
+    return this.getAbility(5, calculateBonuses);
   }
 
   getSpellSaveDC(){
@@ -3845,204 +3607,42 @@ export class ModuleCreature extends ModuleObject {
     this.unequipSlot(slot);
     item.onEquip(this);
     await item.loadModel();
-    switch(slot){
-      case ModuleCreatureArmorSlot.ARMOR:
-        this.equipment.ARMOR = item;
-        await this.loadModel();
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        this.equipment.RIGHTHAND = item;
-        await item.loadModel();
-        if(item.model instanceof OdysseyModel3D)
-          this.model?.rhand?.add(item.model);
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        this.equipment.LEFTHAND = item;
-        await item.loadModel();
-        if(item.model instanceof OdysseyModel3D)
-          this.model?.lhand?.add(item.model);
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND2:
-        this.equipment.RIGHTHAND2 = item;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND2:
-        this.equipment.LEFTHAND2 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        this.equipment.CLAW1 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        this.equipment.CLAW2 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        this.equipment.CLAW3 = item;
-      break;
-      // Headgear shows on the model; gloves, belts, implants and armbands only change the character
-      case ModuleCreatureArmorSlot.HEAD:
-        this.equipment.HEAD = item;
-        await this.loadModel();
-      break;
-      case ModuleCreatureArmorSlot.ARMS:
-        this.equipment.ARMS = item;
-      break;
-      case ModuleCreatureArmorSlot.BELT:
-        this.equipment.BELT = item;
-      break;
-      case ModuleCreatureArmorSlot.IMPLANT:
-        this.equipment.IMPLANT = item;
-      break;
-      case ModuleCreatureArmorSlot.LEFTARMBAND:
-        this.equipment.LEFTARMBAND = item;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTARMBAND:
-        this.equipment.RIGHTARMBAND = item;
-      break;
+    const key = EquipmentSlots.keyOf(slot);
+    if(!key){ return; }
+    this.equipment[key] = item;
+    // Armour and headgear show on the creature's own model; weapons are held in its hands; the rest
+    // only change the character
+    if(EquipmentSlots.MODEL.includes(key)){
+      await this.loadModel();
+    }else if(key === 'RIGHTHAND' || key === 'LEFTHAND'){
+      if(item.model instanceof OdysseyModel3D){
+        (key === 'RIGHTHAND' ? this.model?.rhand : this.model?.lhand)?.add(item.model);
+      }
     }
   }
 
   unequipSlot(slot = 0x1){
     if(GameState.gmMode && GameState.GMManager.requestNetworkUnequip(this, slot)) return;
+    const key = EquipmentSlots.keyOf(slot);
+    if(!key){ return; }
+    const item = this.equipment[key];
     try{
-      switch(slot){
-        case ModuleCreatureArmorSlot.IMPLANT:
-          try{
-            if(this.equipment.IMPLANT){
-              this.equipment.IMPLANT.onUnEquip(this);
-              this.equipment.IMPLANT.destroy();
-              this.equipment.IMPLANT = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.HEAD:
-
-          if(this.equipment.HEAD){
-            this.equipment.HEAD.onUnEquip(this);
-          }
-
-          try{
-            this.equipment.HEAD.model.parent.remove(this.equipment.HEAD.model);
-          }catch(e){}
-
-          this.equipment.HEAD = undefined;
-          this.loadModel();
-        break;
-        case ModuleCreatureArmorSlot.ARMS:
-          try{
-            if(this.equipment.ARMS){
-              this.equipment.ARMS.onUnEquip(this);
-              this.equipment.ARMS.destroy();
-              this.equipment.ARMS = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTARMBAND:
-          try{
-            if(this.equipment.RIGHTARMBAND){
-              this.equipment.RIGHTARMBAND.onUnEquip(this);
-              this.equipment.RIGHTARMBAND.destroy();
-              this.equipment.RIGHTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTARMBAND:
-          try{
-            if(this.equipment.LEFTARMBAND){
-              this.equipment.LEFTARMBAND.onUnEquip(this);
-              this.equipment.LEFTARMBAND.destroy();
-              this.equipment.LEFTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.ARMOR:
-
-          if(this.equipment.ARMOR){
-            this.equipment.ARMOR.onUnEquip(this);
-          }
-
-          this.equipment.ARMOR = undefined;
-          this.loadModel();
-        break;
-        case ModuleCreatureArmorSlot.RIGHTARMBAND:
-          try{
-            if(this.equipment.RIGHTARMBAND){
-              this.equipment.RIGHTARMBAND.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.RIGHTARMBAND.model);
-              this.equipment.RIGHTARMBAND.destroy();
-              this.equipment.RIGHTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTHAND:
-          try{
-            if(this.equipment.RIGHTHAND){
-              this.equipment.RIGHTHAND.onUnEquip(this);
-              this.model?.rhand?.remove(this.equipment.RIGHTHAND.model);
-              this.equipment.RIGHTHAND.destroy();
-              this.equipment.RIGHTHAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTHAND2:
-          try{
-            if(this.equipment.RIGHTHAND2){
-              this.equipment.RIGHTHAND2.onUnEquip(this);
-              // this.model.rhand.remove(this.equipment.RIGHTHAND2.model);
-              this.equipment.RIGHTHAND2.destroy();
-              this.equipment.RIGHTHAND2 = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.BELT:
-          try{
-            if(this.equipment.BELT){
-              this.equipment.BELT.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.BELT.model);
-              this.equipment.BELT.destroy();
-              this.equipment.BELT = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTHAND:
-          try{
-            if(this.equipment.LEFTHAND){
-              this.equipment.LEFTHAND.onUnEquip(this);
-              this.model?.lhand?.remove(this.equipment.LEFTHAND.model);
-              this.equipment.LEFTHAND.destroy();
-              this.equipment.LEFTHAND = null;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTHAND2:
-          try{
-            if(this.equipment.LEFTHAND2){
-              this.equipment.LEFTHAND2.onUnEquip(this);
-              // this.model.lhand.remove(this.equipment.LEFTHAND2.model);
-              this.equipment.LEFTHAND2.destroy();
-              this.equipment.LEFTHAND2 = null;
-            }
-          }catch(e){
-            
-          }
-        break;
+      if(EquipmentSlots.MODEL.includes(key)){
+        // The item stays alive (it may go back to the inventory); the creature's model is rebuilt without it
+        item?.onUnEquip(this);
+        if(key === 'HEAD'){
+          try{ item?.model?.parent?.remove(item.model); }catch(e){}
+        }
+        this.equipment[key] = undefined;
+        this.loadModel();
+        return;
       }
+      if(!item){ return; }
+      item.onUnEquip(this);
+      if(key === 'RIGHTHAND'){ this.model?.rhand?.remove(item.model); }
+      if(key === 'LEFTHAND'){ this.model?.lhand?.remove(item.model); }
+      item.destroy();
+      this.equipment[key] = undefined;
     }catch(e){
       console.error('unequipItem', e);
     }
@@ -4056,61 +3656,6 @@ export class ModuleCreature extends ModuleObject {
 
   UnequipHeadItem(){
     this.unequipSlot(ModuleCreatureArmorSlot.HEAD);
-  }
-
-  GetItemInSlot(slot = 0){
-
-    switch(slot){
-      case ModuleCreatureArmorSlot.IMPLANT:
-        return this.equipment.IMPLANT;
-      break;
-      case ModuleCreatureArmorSlot.HEAD:
-        return this.equipment.HEAD;
-      break;
-      case ModuleCreatureArmorSlot.ARMS:
-        return this.equipment.ARMS;
-      break;
-      case ModuleCreatureArmorSlot.LEFTARMBAND:
-        return this.equipment.LEFTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.ARMOR:
-        return this.equipment.ARMOR;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTARMBAND:
-        return this.equipment.RIGHTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        return this.equipment.LEFTHAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND2:
-        return this.equipment.LEFTHAND2;
-      break;
-      case ModuleCreatureArmorSlot.BELT:
-        return this.equipment.BELT;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        return this.equipment.RIGHTHAND;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND2:
-        return this.equipment.RIGHTHAND2;
-      break;
-      case ModuleCreatureArmorSlot.HIDE:
-        return this.equipment.HIDE;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        return this.equipment.CLAW1;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        return this.equipment.CLAW2;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        return this.equipment.CLAW3;
-      break;
-      default:
-        return null;
-      break;
-    }
-
   }
 
   setAppearance(appearance: number){
@@ -4350,57 +3895,11 @@ export class ModuleCreature extends ModuleObject {
               equipped_item = new GameState.Module.ModuleArea.ModuleItem(GFFObject.FromStruct(strt));
             }
             
-            switch(slot_type){
-              case ModuleCreatureArmorSlot.HEAD:
-                this.equipment.HEAD = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.ARMS:
-                this.equipment.ARMS = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.ARMOR:
-                this.equipment.ARMOR = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTHAND:
-                this.equipment.LEFTHAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTHAND2:
-                this.equipment.LEFTHAND2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTHAND:
-                this.equipment.RIGHTHAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTHAND2:
-                this.equipment.RIGHTHAND2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTARMBAND:
-                this.equipment.LEFTARMBAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTARMBAND:
-                this.equipment.RIGHTARMBAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.IMPLANT:
-              this.equipment.IMPLANT = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.BELT:
-                this.equipment.BELT = equipped_item;
-              break;
-
-              //Simple Creature Slots
-              case ModuleCreatureArmorSlot.HIDE:
-                this.equipment.HIDE = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW1:
-                this.equipment.CLAW1 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW2:
-                this.equipment.CLAW2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW3:
-                this.equipment.CLAW3 = equipped_item;
-              break;
-              default:
-                console.warn('ModuleCreature.initProperties', 'Unhandled Equipment Slot', equipped_item);
-              break;
+            const slotKey = EquipmentSlots.keyOf(slot_type);
+            if(slotKey){
+              this.equipment[slotKey] = equipped_item;
+            }else{
+              console.warn('ModuleCreature.initProperties', 'Unhandled Equipment Slot', equipped_item);
             }
           }
         }
@@ -4565,79 +4064,9 @@ export class ModuleCreature extends ModuleObject {
       this.head = undefined;
     }
 
-    if(this.equipment.ARMOR){
-      this.equipment.ARMOR.destroy();
-      this.equipment.ARMOR = undefined;
-    }
-
-    if(this.equipment.ARMS){
-      this.equipment.ARMS.destroy();
-      this.equipment.ARMS = undefined;
-    }
-
-    if(this.equipment.BELT){
-      this.equipment.BELT.destroy();
-      this.equipment.BELT = undefined;
-    }
-
-    if(this.equipment.CLAW1){
-      this.equipment.CLAW1.destroy();
-      this.equipment.CLAW1 = undefined;
-    }
-
-    if(this.equipment.CLAW2){
-      this.equipment.CLAW2.destroy();
-      this.equipment.CLAW2 = undefined;
-    }
-
-    if(this.equipment.CLAW3){
-      this.equipment.CLAW3.destroy();
-      this.equipment.CLAW3 = undefined;
-    }
-
-    if(this.equipment.HEAD){
-      this.equipment.HEAD.destroy();
-      this.equipment.HEAD = undefined;
-    }
-
-    if(this.equipment.HIDE){
-      this.equipment.HIDE.destroy();
-      this.equipment.HIDE = undefined;
-    }
-
-    if(this.equipment.IMPLANT){
-      this.equipment.IMPLANT.destroy();
-      this.equipment.IMPLANT = undefined;
-    }
-
-    if(this.equipment.LEFTARMBAND){
-      this.equipment.LEFTARMBAND.destroy();
-      this.equipment.LEFTARMBAND = undefined;
-    }
-
-    if(this.equipment.LEFTHAND){
-      this.equipment.LEFTHAND.destroy();
-      this.equipment.LEFTHAND = undefined;
-    }
-
-    if(this.equipment.LEFTHAND2){
-      this.equipment.LEFTHAND2.destroy();
-      this.equipment.LEFTHAND2 = undefined;
-    }
-
-    if(this.equipment.RIGHTARMBAND){
-      this.equipment.RIGHTARMBAND.destroy();
-      this.equipment.RIGHTARMBAND = undefined;
-    }
-
-    if(this.equipment.RIGHTHAND){
-      this.equipment.RIGHTHAND.destroy();
-      this.equipment.RIGHTHAND = undefined;
-    }
-
-    if(this.equipment.RIGHTHAND2){
-      this.equipment.RIGHTHAND2.destroy();
-      this.equipment.RIGHTHAND2 = undefined;
+    for(const key of EquipmentSlots.ALL){
+      this.equipment[key]?.destroy();
+      this.equipment[key] = undefined;
     }
 
     while(this.inventory.length){
@@ -4726,83 +4155,12 @@ export class ModuleCreature extends ModuleObject {
 
     //Equipment
     let equipItemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-
-    if(this.equipment.ARMOR){
-      let equipItem = this.equipment.ARMOR.save();
-      equipItem.setType(ModuleCreatureArmorSlot.ARMOR);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.ARMS){
-      let equipItem = this.equipment.ARMS.save();
-      equipItem.setType(ModuleCreatureArmorSlot.ARMS);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.BELT){
-      let equipItem = this.equipment.BELT.save();
-      equipItem.setType(ModuleCreatureArmorSlot.BELT);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW1){
-      let equipItem = this.equipment.CLAW1.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW1);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW2){
-      let equipItem = this.equipment.CLAW2.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW2);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW3){
-      let equipItem = this.equipment.CLAW3.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW3);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.HEAD){
-      let equipItem = this.equipment.HEAD.save();
-      equipItem.setType(ModuleCreatureArmorSlot.HEAD);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.HIDE){
-      let equipItem = this.equipment.HIDE.save();
-      equipItem.setType(ModuleCreatureArmorSlot.HIDE);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.IMPLANT){
-      let equipItem = this.equipment.IMPLANT.save();
-      equipItem.setType(ModuleCreatureArmorSlot.IMPLANT);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.LEFTARMBAND){
-      let equipItem = this.equipment.LEFTARMBAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.LEFTARMBAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.LEFTHAND){
-      let equipItem = this.equipment.LEFTHAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.LEFTHAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.RIGHTARMBAND){
-      let equipItem = this.equipment.RIGHTARMBAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.RIGHTARMBAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.RIGHTHAND){
-      let equipItem = this.equipment.RIGHTHAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.RIGHTHAND);
-      equipItemList.addChildStruct(equipItem)
+    for(const key of EquipmentSlots.ALL){
+      const item = this.equipment[key];
+      if(!item){ continue; }
+      const equipItem = item.save();
+      equipItem.setType(EquipmentSlots.slotOf(key));
+      equipItemList.addChildStruct(equipItem);
     }
 
     gff.RootNode.addDWord('Experience', this.experience);

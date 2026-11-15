@@ -371,65 +371,17 @@ export class ModuleItem extends ModuleObject {
     return 20;
   }
 
-  getSTRBonus(){
+  /** The bonus this item gives to an ability (0 STR, 1 DEX, 2 CON, 3 INT, 4 WIS, 5 CHA) */
+  getAbilityBonus(ability: number){
     for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 0)){
+      const property = this.properties[i];
+      if(property.isUseable() && property.is(ModuleItemProperty.Ability, ability)){
         return property.getValue();
       }
     }
     return 0;
   }
 
-  getDEXBonus(){
-    for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 1)){
-        return property.getValue();
-      }
-    }
-    return 0;
-  }
-
-  getCONBonus(){
-    for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 2)){
-        return property.getValue();
-      }
-    }
-    return 0;
-  }
-
-  getINTBonus(){
-    for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 3)){
-        return property.getValue();
-      }
-    }
-    return 0;
-  }
-
-  getWISBonus(){
-    for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 4)){
-        return property.getValue();
-      }
-    }
-    return 0;
-  }
-
-  getCHABonus(){
-    for(let i = 0, len = this.properties.length; i < len; i++){
-      let property = this.properties[i];
-      if(property.isUseable() && property.is(ModuleItemProperty.Ability, 5)){
-        return property.getValue();
-      }
-    }
-    return 0;
-  }
 
   isUpgradable(){
     for(let i = 0, len = this.properties.length; i < len; i++){
