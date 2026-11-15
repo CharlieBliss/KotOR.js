@@ -106,6 +106,8 @@ const installHelpers = (KotOR) => {
           alive: alive(o),
           model: !!(o.model && (o.model.children?.length || o.model.isObject3D)),
           order: KotOR.GMNpcOrders?.getOrder ? (KotOR.GMNpcOrders.getOrder(o)?.kind || null) : null,
+          path: (o.getComputedPath?.()?.points || []).slice(0, 5).map((p) => [Math.round(p.vector.x), Math.round(p.vector.y)]),
+          queue: (o.actionQueue?.list || o.actionQueue || []).map?.((x) => x.type) || [],
           stance: KotOR.GMManager.stanceOf && o.objectType !== undefined && o.getHP ? (KotOR.GMManager.stanceOf(o) || null) : null,
         }));
       }
@@ -282,13 +284,14 @@ async function run() {
     const runner = await K.GMScenePlan.import(p);
     return { log: runner ? [...runner.log] : ['import returned nothing'], start: runner?.playerStart ? [runner.playerStart.x, runner.playerStart.y, runner.playerStart.z] : null };
   }, plan);
+  // Where the importer put everything, before anyone with an order has moved
+  await evalIn(win, installHelpers);
+  const placed = await evalIn(win, () => window.__sceneCheck.objects());
   await waitFor(win, 'the scene to settle', (K) => !!(K.GameState.module && K.GameState.module.readyToProcessEvents && !K.GameState.loadingTextures), SCENE_TIMEOUT);
   await sleep(2000);
-  await evalIn(win, installHelpers);
 
   // --- What the importer did --------------------------------------------------------------------
   for (const line of imported.log) findings.push(`Importer: ${line}`);
-  const placed = await evalIn(win, () => window.__sceneCheck.objects());
   const lines = ['## Where everything stands', '', '| id | copy | x, y | room | hidden | model | stance | offline (x, y) | off by |', '|---|---|---|---|---|---|---|---|---|'];
   const groups = [...(plan.props || []).map((p) => ({ ...p, kind: 'prop' })), ...(plan.actors || []).map((a) => ({ ...a, kind: 'actor' }))];
   for (const g of groups) {
@@ -378,6 +381,7 @@ async function run() {
   // --- The beats --------------------------------------------------------------------------------
   if (RUN_BEATS) {
     const beatLines = ['## The beats, run one at a time', ''];
+    let fightStarted = (plan.actors || []).some((a) => !a.hidden && a.order?.kind === 'attack');
     for (let b = 0; b < (plan.beats || []).length; b++) {
       const beat = plan.beats[b];
       const before = await evalIn(win, () => window.__sceneCheck.objects());
@@ -395,6 +399,7 @@ async function run() {
       }
       await sleep(BEAT_SECONDS * 1000);
       const after = await evalIn(win, () => window.__sceneCheck.objects());
+      if (process.env.SCENE_CHECK_DEBUG) for (const [id, objs] of Object.entries(after)) log(`  ${id}: ` + objs.map((o) => `${o.x},${o.y} q[${o.queue}] path ${JSON.stringify(o.path)}`).join(' | '));
       const newNotes = await evalIn(win, (K, n) => K.GMScenePlan.active.log.slice(n), logBefore);
       for (const n of newNotes) findings.push(`Beat ${b + 1}: importer: ${n}`);
       for (const e of errors.slice(errorsBefore)) findings.push(`Beat ${b + 1}: error in the game: ${e}`);
@@ -411,8 +416,10 @@ async function run() {
       }
       // Deaths in a beat that sets no fight going: someone fought on their own (often NPCs noticing hidden actors)
       const startsFight = (beat.actions || []).some((x) => (x.do === 'order' && x.order?.kind === 'attack') || (x.do === 'reveal' && (x.ids || []).some((id) => (plan.actors || []).find((a) => a.id === id)?.order?.kind === 'attack')) || x.do === 'faction');
-      const fought = !startsFight ? (plan.actors || []).filter((g) => (after[g.id] || []).filter((o) => o.alive).length < (before[g.id] || []).filter((o) => o.alive).length) : [];
-      if (fought.length) findings.push(`Beat ${b + 1} "${beat.title || ''}" orders no attack, yet ${fought.map((g) => g.id).join(', ')} lost someone: a fight broke out on its own (NPCs that notice each other fight, hidden actors included).`);
+      // Once a fight has been set going, later deaths are that fight playing out
+      if (startsFight) fightStarted = true;
+      const fought = !fightStarted ? (plan.actors || []).filter((g) => (after[g.id] || []).filter((o) => o.alive).length < (before[g.id] || []).filter((o) => o.alive).length) : [];
+      if (fought.length) findings.push(`Beat ${b + 1} "${beat.title || ''}" sets no fight going (and none was before), yet ${fought.map((g) => g.id).join(', ')} lost someone: a fight broke out on its own (NPCs that notice each other fight, hidden actors included).`);
       // Did this beat's orders play out?
       for (const action of beat.actions || []) {
         if (action.do !== 'order' && action.do !== 'reveal') continue;

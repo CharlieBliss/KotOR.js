@@ -105,6 +105,11 @@ export class PathPoint {
       if(obj == owner)
         continue;
 
+      // Creatures right at either end don't block the way: the mover's neighbours (a group setting off
+      // together, who'll be moving too; creature avoidance sorts out the jostling) or what it is walking up to
+      if(Utility.Distance2D(obj.position, this.vector) < 2 || Utility.Distance2D(obj.position, point_b.vector) < 2)
+        continue;
+
       if(obj.checkLineIntersectsObject(path_line))
         return false;
     }

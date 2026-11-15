@@ -7,6 +7,7 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 
 import * as THREE from "three";
 import { GMManager } from "@/managers/GMManager";
+import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import { GMNetworkManager, GMPacket } from "@/managers/GMNetworkManager";
 import { GMTemplates } from "@/managers/gm/GMTemplates";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
@@ -922,6 +923,28 @@ describe("GM multiplayer host authority", () => {
       trooper.combatRound.action = { target: b };
       GMManager.updateNpcCombat();
       expect(trooper.actionQueue).toHaveLength(0);
+    });
+
+    test("waits for a melee attacker coming for it instead of walking to meet it", () => {
+      // Two creatures heading for each other round something in between can circle it without meeting
+      const knight = npc("cre_1", 10, { hostile: true, isRangedEquipped: () => false });
+      const raider = npc("cre_0", 0, { hostile: true, isRangedEquipped: () => false });
+      (GameState as any).module.area.creatures = [knight, raider];
+      (GameState as any).GMManager = GMManager;
+      GMManager.netIdMap.set("cre_1", knight);
+      GMNpcOrders.setOrder(raider, { kind: "attack", targetNetId: "cre_1" });
+
+      GMManager.updateNpcCombat();
+      expect(knight.actionQueue).toHaveLength(0);
+      expect(raider.actionQueue).toEqual([{ type: "attack", target: knight }]);
+
+      // Within reach it fights back
+      knight.position.set(2, 0, 0);
+      knight.combatData.lastAttacker = raider;
+      GMManager.updateNpcCombat();
+      expect(knight.actionQueue).toEqual([{ type: "attack", target: raider }]);
+      GMNpcOrders.setOrder(raider, undefined);
+      GMManager.netIdMap.delete("cre_1");
     });
 
     test("leaves alone the character the GM is playing and the players' characters", () => {

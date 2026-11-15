@@ -1031,12 +1031,53 @@ export class GMManager {
         continue;
       }
       if (!ownJudgement) continue;
+      // A melee enemy is on its way: wait for it here instead of walking to meet it. Two creatures heading
+      // for each other round something in between (a planter, a pillar) can circle it without ever meeting.
+      const incoming = this.approachingMelee(cre, everyone);
+      if (incoming) {
+        const current = this.attackTargetOf(cre);
+        const engaged = !!current && !current.isDead?.() && cre.position.distanceTo(current.position) <= this.MELEE_REACH;
+        if (!engaged) {
+          GMNpcOrders.stopFighting(cre);
+          continue;
+        }
+      }
       // Already swinging, or with attacks queued: let the combat round play out
       if (cre.combatRound.action || cre.combatRound.scheduledActionList.length) continue;
 
       const target = this.chooseNpcTarget(cre, everyone);
       if (target) cre.attackCreature(target, undefined);
     }
+  }
+
+  /** How close a melee attacker has to be to swing (ActionPhysicalAttacks uses 2 m), with a little slack */
+  static MELEE_REACH: number = 2.5;
+
+  /** Who a creature is attacking or about to attack, if anyone */
+  static attackTargetOf(cre: ModuleCreature): ModuleCreature | undefined {
+    return (cre.combatRound?.action?.target || cre.combatRound?.scheduledActionList?.[0]?.target || cre.combatData?.lastAttackTarget) as ModuleCreature | undefined;
+  }
+
+  /**
+   * A melee enemy coming for cre that cre should wait for rather than go to meet: one with an attack order
+   * on cre, or an NPC acting on its own judgement that is already going for cre. Between two of those, the one
+   * with the lower id moves and the other waits, so they don't both stand still. Ranged creatures don't wait:
+   * they shoot.
+   */
+  static approachingMelee(cre: ModuleCreature, everyone: ModuleCreature[]): ModuleCreature | null {
+    if (cre.isRangedEquipped?.()) return null;
+    for (const other of everyone) {
+      if (!other || other === cre || other.isDead() || !cre.isHostile(other) || other.isRangedEquipped?.()) continue;
+      if (this.isUntargetable(other)) continue;
+      const order = GMNpcOrders.getOrder(other);
+      const coming = order
+        ? order.kind === 'attack' && order.targetNetId === cre.gmNetId
+        : this.isAutonomousNpc(other) && this.attackTargetOf(other) === cre && other.id < cre.id;
+      if (!coming) continue;
+      const distance = cre.position.distanceTo(other.position);
+      if (distance > this.MELEE_REACH && distance <= this.NPC_AI_RETALIATE_RANGE) return other;
+    }
+    return null;
   }
 
   /** NPCs the GM isn't controlling and no player owns */
