@@ -38,6 +38,7 @@ export const GMPanel: React.FC = () => {
   const [joinUrl, setJoinUrl] = useState<string>(`ws://${defaultWsHost}:7878`);
   const [joinPlayerName, setJoinPlayerName] = useState<string>('Padawan Player');
   const [joinPresetIdx, setJoinPresetIdx] = useState<number>(0);
+  const [joinCharacterId, setJoinCharacterId] = useState<string>('');
 
   // The main menu's join card shows the join's progress, so keep redrawing while it's up
   useEffect(() => {
@@ -87,9 +88,18 @@ export const GMPanel: React.FC = () => {
 
   const startJoin = () => {
     const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
+    // A character the player made goes along whole; the host holds it to the session's rules
+    const made = joinCharacterId ? KotOR.GMCharacters.get(joinCharacterId) : undefined;
     KotOR.GameState.gmMode = true;
     GMManager.active = true;
-    GMNetworkManager.joinSession(joinUrl, joinPlayerName, {
+    GMNetworkManager.joinSession(joinUrl, joinPlayerName, made ? {
+      name: joinPlayerName,
+      appearanceId: KotOR.GMCharacters.resolveAppearance(made),
+      classId: made.classId,
+      rightHandResRef: made.gear?.rightHand,
+      armorResRef: made.gear?.armor,
+      character: { ...made, name: joinPlayerName || made.name },
+    } : {
       name: joinPlayerName,
       appearanceId: p.appearanceId,
       classId: p.classId,
@@ -98,7 +108,7 @@ export const GMPanel: React.FC = () => {
     });
     setShowQuickJoinOnMenu(false);
   };
-  const join: GMJoinForm = { joinUrl, setJoinUrl, joinPlayerName, setJoinPlayerName, joinPresetIdx, setJoinPresetIdx, startJoin };
+  const join: GMJoinForm = { joinUrl, setJoinUrl, joinPlayerName, setJoinPlayerName, joinPresetIdx, setJoinPresetIdx, joinCharacterId, setJoinCharacterId, startJoin };
 
   /** Stop joining (or give up after a failed join) and go back to the main menu */
   const leaveJoin = () => {

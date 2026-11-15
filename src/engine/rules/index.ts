@@ -27,4 +27,5 @@ export * from "@/engine/rules/SWCreatureAppearance";
 export * from "@/engine/rules/SWDoorAppearance";
 export * from "@/engine/rules/SWPlaceableAppearance";
 export * from "@/engine/rules/CharacterBuilder";
+export * from "@/engine/rules/CharacterRules";
 export * from "@/engine/rules/AbilityChains";

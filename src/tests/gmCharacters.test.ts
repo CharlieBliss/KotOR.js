@@ -121,9 +121,9 @@ describe("joining with a made character", () => {
   beforeEach(() => {
     const tables = new Map<string, any>([
       ["classes", table([
-        { label: "Soldier", playerclass: "1", featstable: "SOL", skillstable: "SOL", featgain: "SOL", spellgaintable: "****", hitdie: "10", forcedie: "0", skillpointbase: "2" },
-        { label: "Droid", playerclass: "0", featstable: "DRO", skillstable: "DRO", featgain: "DRO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "1" },
-        { label: "Scout", playerclass: "1", featstable: "SCO", skillstable: "SCO", featgain: "SCO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "4" },
+        { label: "Soldier", name: "134", playerclass: "1", featstable: "SOL", skillstable: "SOL", featgain: "SOL", spellgaintable: "****", hitdie: "10", forcedie: "0", skillpointbase: "2" },
+        { label: "Droid", name: "356", playerclass: "0", featstable: "DRO", skillstable: "DRO", featgain: "DRO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "1" },
+        { label: "Scout", name: "133", playerclass: "1", featstable: "SCO", skillstable: "SCO", featgain: "SCO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "4" },
       ])],
       ["featgain", table([{ sol_reg: "1", sco_reg: "1" }])],
       ["feat", table([

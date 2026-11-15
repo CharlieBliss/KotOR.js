@@ -147,7 +147,8 @@ export class CharacterRules {
   static classes(): IRuleOption[] {
     const rows = GameState.TwoDAManager.datatables.get('classes')?.rows || {};
     return Object.entries(rows)
-      .filter(([, row]: [string, any]) => num(row.playerclass, 0) === 1)
+      // Player classes with a name in the game's text (KotOR II keeps a cut, unnamed one)
+      .filter(([, row]: [string, any]) => num(row.playerclass, 0) === 1 && valid(row.name))
       .map(([id, row]: [string, any]) => ({ id: Number(id), label: String(row.label || ''), name: this.text(row.name, String(row.label || '')) }));
   }
 
@@ -179,6 +180,25 @@ export class CharacterRules {
       maxHp: Math.max(level, level * (hitDie + mod(attributes.con))),
       maxFp: forceDie > 0 ? Math.max(0, level * (forceDie + mod(attributes.wis))) : 0,
     };
+  }
+
+  /** A class's row of a per-level table it names (classes.2da attackbonustable, savingthrowtable), for this level */
+  static classLevelRow(classId: number, column: string, level: number): any {
+    const name = String(this.classRow(classId)?.[column] || '').toLowerCase();
+    if (!valid(name)) return undefined;
+    const rows = this.table(name);
+    return rows[Math.max(0, Math.min(rows.length - 1, level - 1))];
+  }
+
+  /** Base attack bonus at this level */
+  static baseAttack(classId: number, level: number): number {
+    return num(this.classLevelRow(classId, 'attackbonustable', level)?.bab, 0);
+  }
+
+  /** Base saving throws at this level */
+  static saves(classId: number, level: number): { fortitude: number, reflex: number, will: number } {
+    const row = this.classLevelRow(classId, 'savingthrowtable', level) || {};
+    return { fortitude: num(row.fortsave, 0), reflex: num(row.refsave, 0), will: num(row.willsave, 0) };
   }
 
   // --- Feats -------------------------------------------------------------------------------------

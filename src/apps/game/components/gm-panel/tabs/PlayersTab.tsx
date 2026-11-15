@@ -7,6 +7,7 @@ import {
   GMManager, GMNetworkManager, GMChecks, GMPlayers, GMSpawner, useGMStore,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import type { DrawerTab } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { CharacterCreator } from "@/apps/game/components/gm-panel/creator/CharacterCreator";
 
 /** Players tab: the player characters, calling checks, rewards, and adding characters */
 export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab) => void }> = React.memo(({ active, onOpenTab }) => {
@@ -14,6 +15,7 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
   const setDrawerTab = onOpenTab;
   // Players tab states
   const [playerCfg, setPlayerCfg] = useState<GMPlayerSpawnConfig>({ ...GMManager.pendingPlayerConfig });
+  const [creatorOpen, setCreatorOpen] = useState(false);
   // A check the GM calls for: who (a player net id, 'all' or 'selected'), what, how hard, and whether players see it
   const [checkWho, setCheckWho] = useState<string>('all');
   const [checkWhat, setCheckWhat] = useState<string>('skill:4');
@@ -238,6 +240,20 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
 
       <details className="gm-section" open={KotOR.GameState.PartyManager.party.length === 0}>
         <summary>Add a character <span className="gm-summary-note">quick build, your own, or from a save</span></summary>
+      <div className="gm-row">
+        <button className="gm-btn small success" onClick={() => setCreatorOpen(true)}>Make a character…</button>
+        <span className="gm-hint">Saved characters, and the full character creator</span>
+      </div>
+      {creatorOpen && (
+        <CharacterCreator
+          onClose={() => setCreatorOpen(false)}
+          useLabel="Add & play"
+          onUse={async (c) => {
+            setCreatorOpen(false);
+            await GMSpawner.spawnPlayerCharacter({ ...KotOR.GMCharacters.toSpawnConfig(c), possessImmediately: true });
+          }}
+        />
+      )}
       <div className="gm-section">
         <div className="gm-section-title">Quick builds</div>
         <div className="gm-list" style={{ maxHeight: 155 }}>

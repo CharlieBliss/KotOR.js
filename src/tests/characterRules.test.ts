@@ -21,9 +21,11 @@ beforeEach(() => {
   (GameState as any).TLKManager = { GetStringById: (): any => undefined };
 
   tables.set('classes', table([
-    { label: 'Soldier', playerclass: '1', featstable: 'SOL', skillstable: 'SOL', spellgaintable: '****', featgain: 'SOL', forcedie: '0', skillpointbase: '2', hitdie: '10' },
-    { label: 'JediGuardian', playerclass: '1', featstable: 'JGD', skillstable: 'JGD', spellgaintable: 'JGD', featgain: 'JGD', forcedie: '4', skillpointbase: '2', hitdie: '10' },
-    { label: 'Droid', playerclass: '0', featstable: 'DRO', skillstable: 'DRO', spellgaintable: '****', featgain: 'DRO', forcedie: '0', skillpointbase: '1', hitdie: '8' },
+    { label: 'Soldier', name: '134', playerclass: '1', featstable: 'SOL', skillstable: 'SOL', spellgaintable: '****', featgain: 'SOL', forcedie: '0', skillpointbase: '2', hitdie: '10' },
+    { label: 'JediGuardian', name: '353', playerclass: '1', featstable: 'JGD', skillstable: 'JGD', spellgaintable: 'JGD', featgain: 'JGD', forcedie: '4', skillpointbase: '2', hitdie: '10' },
+    { label: 'Droid', name: '356', playerclass: '0', featstable: 'DRO', skillstable: 'DRO', spellgaintable: '****', featgain: 'DRO', forcedie: '0', skillpointbase: '1', hitdie: '8' },
+    // A cut class KotOR II still marks as a player's, with no name
+    { label: 'BountyHunter(CUT!!!)', name: '****', playerclass: '1', featstable: 'SOL', skillstable: 'SOL', spellgaintable: '****', featgain: 'SOL', forcedie: '0', skillpointbase: '2', hitdie: '10' },
   ]));
   tables.set('featgain', table([
     { sol_reg: '1', jgd_reg: '1' },
@@ -71,7 +73,7 @@ describe('ability point-buy', () => {
 });
 
 describe('classes and levels', () => {
-  test('only player classes can be taken', () => {
+  test('only named player classes can be taken', () => {
     expect(CharacterRules.classes().map((c) => c.label)).toEqual(['Soldier', 'JediGuardian']);
     expect(CharacterRules.validate({ classId: 2, level: 1, attributes: base }).join()).toMatch(/isn't one a player can take/);
   });

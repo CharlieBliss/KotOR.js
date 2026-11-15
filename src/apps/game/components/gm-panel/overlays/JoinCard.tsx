@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { GMManager, GMNetworkManager } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { CharacterCreator } from "@/apps/game/components/gm-panel/creator/CharacterCreator";
 
 /** The join form a player fills in, kept by the panel (the Session tab shows it too) */
 export interface GMJoinForm {
@@ -10,12 +11,17 @@ export interface GMJoinForm {
   setJoinPlayerName: (name: string) => void;
   joinPresetIdx: number;
   setJoinPresetIdx: (index: number) => void;
+  /** A character the player made (GMCharacters id); '' joins with the quick build instead */
+  joinCharacterId: string;
+  setJoinCharacterId: (id: string) => void;
   startJoin: () => void;
 }
 
 /** Joining a GM's game: the form, then the join's progress */
 export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = ({ join, leaveJoin }) => {
-  const { joinUrl, setJoinUrl, joinPlayerName, setJoinPlayerName, joinPresetIdx, setJoinPresetIdx, startJoin } = join;
+  const { joinUrl, setJoinUrl, joinPlayerName, setJoinPlayerName, joinPresetIdx, setJoinPresetIdx, joinCharacterId, setJoinCharacterId, startJoin } = join;
+  const [creatorOpen, setCreatorOpen] = useState(false);
+  const characters = KotOR.GMCharacters.list();
   const joinState = GMNetworkManager.joinState;
   const joinInProgress = GMNetworkManager.role === 'client' && joinState !== 'playing' && joinState !== 'idle';
   const joinStatusText: Record<string, [string, string]> = {
@@ -58,14 +64,47 @@ export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = (
               <input id="gm-join-name" className="gm-input" value={joinPlayerName} onChange={e => setJoinPlayerName(e.target.value)} />
             </div>
             <div className="gm-field">
-              <label htmlFor="gm-join-build">Build</label>
-              <select id="gm-join-build" className="gm-select" value={joinPresetIdx} onChange={e => setJoinPresetIdx(Number(e.target.value))}>
-                {GMManager.PLAYER_PRESETS.map((p, i) => (
-                  <option key={i} value={i}>{p.name} (Lv.{p.level})</option>
-                ))}
+              <label htmlFor="gm-join-build">Character</label>
+              <select
+                id="gm-join-build"
+                className="gm-select"
+                value={joinCharacterId ? `chr:${joinCharacterId}` : `preset:${joinPresetIdx}`}
+                onChange={e => {
+                  const [kind, value] = e.target.value.split(':');
+                  if (kind === 'chr') {
+                    setJoinCharacterId(value);
+                    const c = characters.find((x) => x.id === value);
+                    if (c) setJoinPlayerName(c.name);
+                  } else {
+                    setJoinCharacterId('');
+                    setJoinPresetIdx(Number(value));
+                  }
+                }}
+              >
+                {characters.length > 0 && (
+                  <optgroup label="Your characters">
+                    {characters.map((c) => <option key={c.id} value={`chr:${c.id}`}>{c.name} (Lv.{c.level})</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="Quick builds">
+                  {GMManager.PLAYER_PRESETS.map((p, i) => (
+                    <option key={i} value={`preset:${i}`}>{p.name} (Lv.{p.level})</option>
+                  ))}
+                </optgroup>
               </select>
             </div>
           </div>
+          <div className="gm-row" style={{ justifyContent: 'flex-start' }}>
+            <button className="gm-btn" onClick={() => setCreatorOpen(true)}>Make or edit characters…</button>
+          </div>
+          {creatorOpen && (
+            <CharacterCreator
+              onClose={() => setCreatorOpen(false)}
+              useLabel="Choose"
+              onUse={(c) => { setJoinCharacterId(c.id); setJoinPlayerName(c.name); setCreatorOpen(false); }}
+              startEditing={characters.length === 0}
+            />
+          )}
           <div className="gm-row" style={{ justifyContent: 'flex-end' }}>
             <button className="gm-btn" onClick={leaveJoin}>{joinState === 'failed' ? 'Back to menu' : 'Cancel'}</button>
             <button className="gm-btn success" onClick={startJoin} disabled={!joinUrl.trim() || !joinPlayerName.trim()}>

@@ -163,6 +163,7 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </select>
           <div className="gm-hint">You can always revive them from the Players tab.</div>
         </div>
+        <CreationLimits />
         <details className="gm-section" open={GMSessions.getSavedSessions().length > 0}>
           <summary>Saved sessions <span className="gm-summary-note">{GMSessions.getSavedSessions().length} saved</span></summary>
           <div className="gm-row">
@@ -247,3 +248,39 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
     </>
   );
 });
+
+/**
+ * How far players' own characters may go beyond the game's rules (CharacterRules), sent to players with the
+ * session rules; the host holds joining characters to them
+ */
+const CreationLimits: React.FC = () => {
+  const limits = GMPlayers.creationLimits || {};
+  const set = (patch: Record<string, any>) => GMPlayers.setCreationLimits({ ...limits, ...patch });
+  const range = Array.isArray(limits.level) ? limits.level : typeof limits.level === 'number' ? [limits.level, limits.level] : null;
+  return (
+    <details className="gm-section">
+      <summary>Players&apos; own characters <span className="gm-summary-note">{range ? `level ${range[0]}${range[1] !== range[0] ? `–${range[1]}` : ''}` : 'game rules'}</span></summary>
+      <div className="gm-grid-2">
+        <div className="gm-field">
+          <label>Lowest level</label>
+          <input className="gm-input" type="number" min={1} max={20} value={range ? range[0] : 1}
+            onChange={(e) => { const lo = Math.max(1, Math.min(20, Number(e.target.value) || 1)); set({ level: [lo, Math.max(lo, range ? range[1] : 20)] }); }} />
+        </div>
+        <div className="gm-field">
+          <label>Highest level</label>
+          <input className="gm-input" type="number" min={1} max={20} value={range ? range[1] : 20}
+            onChange={(e) => { const hi = Math.max(1, Math.min(20, Number(e.target.value) || 20)); set({ level: [Math.min(hi, range ? range[0] : 1), hi] }); }} />
+        </div>
+        <div className="gm-field">
+          <label>Extra ability points</label>
+          <input className="gm-input" type="number" min={0} max={40} value={limits.extraPoints || 0}
+            onChange={(e) => set({ extraPoints: Math.max(0, Number(e.target.value) || 0) })} />
+        </div>
+      </div>
+      <label className="gm-checkbox"><input type="checkbox" checked={limits.anyModel !== false} onChange={(e) => set({ anyModel: e.target.checked })} /> Any model (not just the player bodies)</label>
+      <label className="gm-checkbox"><input type="checkbox" checked={!!limits.freeFeats} onChange={(e) => set({ freeFeats: e.target.checked })} /> Free feat picks (any feat, not just the class&apos;s)</label>
+      <label className="gm-checkbox"><input type="checkbox" checked={limits.gear !== false} onChange={(e) => set({ gear: e.target.checked })} /> Players choose their starting equipment</label>
+      <div className="gm-hint">Characters that don&apos;t fit are adjusted when they join, and you&apos;re told what changed.</div>
+    </details>
+  );
+};
