@@ -673,11 +673,7 @@ export class ModuleArea extends ModuleObject {
    */
   skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean {
     if(this.isBorrowedScene()) return true;
-    if(!GameState.gmMode) return false;
-    const gm = GameState.GMManager;
-    if(kind === 'placeables') return gm?.keepDefaultPlaceables === false;
-    if(kind === 'creatures') return !gm?.keepDefaultCreatures;
-    return !gm?.keepDefaultTriggers;
+    return GameState.hooks.skipsModuleObjects(kind);
   }
 
   /** Tables that areas index into by row (music, ambience): the other game's, for a borrowed area */

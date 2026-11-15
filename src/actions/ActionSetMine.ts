@@ -86,23 +86,20 @@ export class ActionSetMine extends Action {
         const roll = 1 + Math.floor(Math.random() * 20);
         const skill = (this.owner as any).getSkillLevel?.(1) || 0;
         const success = roll + skill >= dc;
-        GameState.GMManager?.announceSkillRoll?.(this.owner, 'Set mine', roll, skill, dc, success);
+        GameState.hooks.announceSkillRoll(this.owner, 'Set mine', roll, skill, dc, success);
         if(!success){ return ActionStatus.COMPLETE; }
         const facing = (this.owner as any).getFacing?.() ?? 0;
         const spot = this.owner.position.clone();
         spot.x += -Math.sin(facing) * 1.5;
         spot.y += Math.cos(facing) * 1.5;
         GameState.Module.ModuleArea.ModuleTrigger.CreateMine(this.owner.area || GameState.module.area, spot, property.subType, this.owner);
-        if(!GameState.GMManager?.consumePlayerItem?.(this.owner, this.oItem)){
-          if(GameState.GMManager?.consumePlayerItem?.(this.owner, this.oItem)){
-          // A GM session player's mine came out of their inventory on the GM's machine
-        }else if(this.oItem.charges > 1){
-          this.oItem.charges -= 1;
-        }
-        else
-        {
-          this.owner.removeItem(this.oItem, 1);
-        }
+        // A GM session player's mine comes out of their inventory on the GM's machine
+        if(!GameState.hooks.consumePlayerItem(this.owner, this.oItem)){
+          if(this.oItem.charges > 1){
+            this.oItem.charges -= 1;
+          }else{
+            this.owner.removeItem(this.oItem, 1);
+          }
         }
         return ActionStatus.COMPLETE;
       }

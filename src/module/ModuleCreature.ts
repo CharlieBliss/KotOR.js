@@ -392,8 +392,8 @@ export class ModuleCreature extends ModuleObject {
     }
 
     // GM multiplayer: replicas are simulated by the host; motion-driven creatures follow streamed positions
-    const netReplica = GameState.gmMode && GameState.GMManager.isNetReplica(this);
-    const netMotion = GameState.gmMode && GameState.GMManager.isNetMotionDriven(this);
+    const netReplica = GameState.hooks.isNetReplica(this);
+    const netMotion = GameState.hooks.isNetMotionDriven(this);
 
     if(this.audioEmitter){
       this.audioEmitter.setPosition(this.position.x, this.position.y, this.position.z + 1.0);
@@ -446,7 +446,7 @@ export class ModuleCreature extends ModuleObject {
       this.updateMoveForce(delta, netMotion);
 
       if(netMotion){
-        GameState.GMManager.updateNetMotion(this, delta);
+        GameState.hooks.updateNetMotion(this, delta);
       }
 
       if(this.combatData.combatState && this.animationState.index == ModuleCreatureAnimState.PAUSE){
@@ -1133,7 +1133,7 @@ export class ModuleCreature extends ModuleObject {
 
   canMove(){
     // A GM can freeze players to watch a scene
-    if(GameState.gmMode && GameState.GMManager?.isPlayerFrozen(this)) return false;
+    if(GameState.hooks.isPlayerFrozen(this)) return false;
     return !this.isParalyzed() && !this.isStunned() && (
       this.animationState.index != ModuleCreatureAnimState.DEAD && 
       this.animationState.index != ModuleCreatureAnimState.DEAD1 && 
@@ -1499,7 +1499,7 @@ export class ModuleCreature extends ModuleObject {
         started: false,
         speed: 1,
       }
-      if(GameState.gmMode) GameState.GMManager.onHostTwoDAAnimation(this, animation);
+      GameState.hooks.onHostTwoDAAnimation(this, animation);
     }
   }
 
@@ -2166,9 +2166,9 @@ export class ModuleCreature extends ModuleObject {
 
   use(object: ModuleObject){
     // A fallen player character in a GM session is knocked out, not a body to loot
-    if(GameState.gmMode && GameState.GMManager?.isPlayerCharacter(this)) return;
+    if(GameState.hooks.isPlayerCharacter(this)) return;
     if(this.hasInventory()){
-      if(GameState.gmMode && GameState.GMManager.routeContainerOpen(this, object)) return;
+      if(GameState.hooks.routeContainerOpen(this, object)) return;
       GameState.MenuManager.MenuContainer.AttachContainer(this);
       GameState.MenuManager.MenuContainer.open();
     }
@@ -2179,7 +2179,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   retrieveInventory(){
-    if(GameState.gmMode && GameState.GMManager.requestNetworkLoot(this)) return;
+    if(GameState.hooks.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       GameState.InventoryManager.addItem(this.inventory.pop())
     }
@@ -3006,7 +3006,7 @@ export class ModuleCreature extends ModuleObject {
   static MINE_DETECT_RANGE = 10;
 
   canSpotMines(): boolean {
-    if(GameState.gmMode && GameState.GMManager?.isMineReplica?.(undefined)) return false;
+    if(GameState.hooks.isMineReplica()) return false;
     return GameState.PartyManager?.party?.includes(this) || !!this.gmOwnerPeerId;
   }
 
@@ -3478,7 +3478,7 @@ export class ModuleCreature extends ModuleObject {
       return;
     }
     // GM multiplayer: a player's own equipment is changed by the host
-    if(GameState.gmMode && GameState.GMManager.requestNetworkEquip(this, slot, item)) return;
+    if(GameState.hooks.requestNetworkEquip(this, slot, item)) return;
 
     this.unequipSlot(slot);
     item.onEquip(this);
@@ -3498,7 +3498,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   unequipSlot(slot = 0x1){
-    if(GameState.gmMode && GameState.GMManager.requestNetworkUnequip(this, slot)) return;
+    if(GameState.hooks.requestNetworkUnequip(this, slot)) return;
     const key = EquipmentSlots.keyOf(slot);
     if(!key){ return; }
     const item = this.equipment[key];

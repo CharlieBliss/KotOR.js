@@ -365,7 +365,7 @@ export class IngameControls {
                 const distanceThreshold = 20;
 
                 if(GameState.CursorManager.selectedObject == moduleObject && distance <= distanceThreshold){
-                  if(GameState.gmMode && GameState.GMManager.interceptInteraction(GameState.getCurrentPlayer(), moduleObject)){
+                  if(GameState.hooks.interceptInteraction(GameState.getCurrentPlayer(), moduleObject)){
                     // GM multiplayer client: the host performs this interaction for us
                   }else if(typeof moduleObject.onClick === 'function'){
                     GameState.getCurrentPlayer().clearAllActions();
@@ -469,7 +469,7 @@ export class IngameControls {
       if(!followee) return;
       if(!followee.canMove()) return;
 
-      if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
+      GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing + Math.PI/2), false, TURN_SPEED_FAST);
@@ -489,7 +489,7 @@ export class IngameControls {
       if(!followee) return;
       if(!followee.canMove()) return;
       
-      if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
+      GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing - Math.PI/2), false, TURN_SPEED_FAST);
@@ -958,7 +958,7 @@ export class IngameControls {
         if(followee){
           if(followee.canMove()){
             if( this.gamePad.stick_l_x.value || this.gamePad.stick_l_y.value ){
-              if(GameState.gmMode) GameState.GMNetworkManager.notifyLocalMovement();
+              GameState.hooks.notifyLocalMovement();
               followee.clearAllActions(true);
               followee.force = 1;
               followee.setFacing( Utility.NormalizeRadian( Math.atan2(-this.gamePad.stick_l_x.value, -this.gamePad.stick_l_y.value) + FollowerCamera.facing + Math.PI/2 ) , false, TURN_SPEED_FAST);

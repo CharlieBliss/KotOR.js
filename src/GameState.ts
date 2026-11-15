@@ -65,6 +65,8 @@ import { DebuggerState } from "@/enums/server/DebuggerState";
 import type { IPCMessage } from "@/server/ipc/IPCMessage";
 import { IPCMessageType } from "@/enums/server/ipc/IPCMessageType";
 import { IPCMessageTypeDebug } from "@/enums/server/ipc/IPCMessageTypeDebug";
+import { DEFAULT_ENGINE_HOOKS } from "@/engine/EngineHooks";
+import type { EngineHooks } from "@/engine/EngineHooks";
 import { PerformanceMonitor } from "@/utility/PerformanceMonitor";
 
 export interface GameStateInitializeOptions {
@@ -169,6 +171,11 @@ export class GameState implements EngineContext {
   static SOLOMODE = false;
   static isLoadingSave = false;
   static gmMode = false;
+
+  /** Where the engine lets the active game mode step in (see EngineHooks): GM mode's while it's on */
+  static get hooks(): EngineHooks {
+    return GameState.gmMode ? GameState.GMManager.engineHooks : DEFAULT_ENGINE_HOOKS;
+  }
   
   static Flags = {
     EnableAreaVIS: false,
@@ -1454,7 +1461,7 @@ export class GameState implements EngineContext {
 
     GameState.MenuManager.Update(delta);
     GameState.GMManager.update(delta);
-    if(GameState.State != EngineState.PAUSED && !GameState.GMManager?.worldPaused) GameState.ProjectileManager.Update(delta);
+    if(GameState.State != EngineState.PAUSED && !GameState.hooks.isWorldPaused()) GameState.ProjectileManager.Update(delta);
     if(GameState.MenuManager.InGameAreaTransition)
       GameState.MenuManager.InGameAreaTransition.hide();
 
@@ -1554,7 +1561,7 @@ export class GameState implements EngineContext {
     GameState.currentCameraPosition.set(0, 0, 0);
     GameState.currentCameraPosition.applyMatrix4(FollowerCamera.camera.matrix);
     if(GameState.Mode == EngineMode.FREELOOK && GameState.module){
-      if(!GameState.GMManager?.worldPaused) GameState.module.tick(delta);
+      if(!GameState.hooks.isWorldPaused()) GameState.module.tick(delta);
       if(GameState.MenuManager.InGameBark?.bVisible) GameState.MenuManager.InGameBark.update(delta);
     } else if(GameState.module?.area){
       FollowerCamera.update(delta, GameState.module.area);
@@ -1621,7 +1628,7 @@ export class GameState implements EngineContext {
     GameState.updateTime(delta);
     GameState.FadeOverlayManager.Update(delta);
     if(GameState.Mode == EngineMode.FREELOOK && GameState.module){
-      if(!GameState.GMManager?.worldPaused) GameState.module.tick(delta);
+      if(!GameState.hooks.isWorldPaused()) GameState.module.tick(delta);
       if(GameState.MenuManager.InGameBark?.bVisible) GameState.MenuManager.InGameBark.update(delta);
     } else if(GameState.module?.area){
       FollowerCamera.update(delta, GameState.module.area);
@@ -1665,7 +1672,7 @@ export class GameState implements EngineContext {
     GameState.updateTime(delta);
     GameState.FadeOverlayManager.Update(delta);
     if(GameState.Mode == EngineMode.FREELOOK && GameState.module){
-      if(!GameState.GMManager?.worldPaused) GameState.module.tick(delta);
+      if(!GameState.hooks.isWorldPaused()) GameState.module.tick(delta);
       if(GameState.MenuManager.InGameBark?.bVisible) GameState.MenuManager.InGameBark.update(delta);
     } else if(GameState.module?.area){
       FollowerCamera.update(delta, GameState.module.area);

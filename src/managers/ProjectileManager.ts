@@ -95,7 +95,7 @@ export class ProjectileManager {
     if(ammunitionIndex < 1 || !caster || !target) return false;
     if(!this.Launch(caster, target, ammunitionIndex, hit, delay)) return false;
     // GM sessions: players draw the same bolt
-    if(GameState.gmMode) GameState.GMManager?.onHostProjectile(caster, target, ammunitionIndex, hit, delay);
+    GameState.hooks.onHostProjectile(caster, target, ammunitionIndex, hit, delay);
     return true;
   }
 

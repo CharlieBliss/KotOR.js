@@ -860,7 +860,7 @@ export class PartyManager {
    * A player in a GM session controls only their own character: Tab and the party portraits can't switch it
    */
   static isLeaderLocked(): boolean {
-    return !!GameState.gmMode && !!GameState.GMManager && !GameState.GMManager.isGMUser();
+    return GameState.hooks.isLeaderLocked();
   }
 
   static ShiftLeader(){

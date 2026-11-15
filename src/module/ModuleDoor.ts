@@ -375,11 +375,7 @@ export class ModuleDoor extends ModuleLockable {
     }
 
     this.playObjectSound(ModulePlaceableObjectSound.OPENED);
-    if(GameState.gmMode && object !== this && GameState.GMNetworkManager?.role !== 'offline'){
-      setTimeout(() => {
-        GameState.GMNetworkManager.broadcastDoorState({ netId: this.gmNetId || `door_${this.id}`, tag: this.getTag(), x: this.position.x, y: this.position.y, locked: this.isLocked(), openState: this.openState });
-      }, 0);
-    }
+    GameState.hooks.onDoorOpened(this, object);
 
     // if(GameState.selectedObject == this){
     //   GameState.selectedObject = GameState.selected = undefined;

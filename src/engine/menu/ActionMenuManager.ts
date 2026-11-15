@@ -378,7 +378,7 @@ export class ActionMenuManager {
     const pc = ActionMenuManager.oPC;
     if(!pc || !action) return;
     // In a GM session a player's character acts on the GM's machine
-    if(GameState.gmMode && GameState.GMManager?.interceptMenuAction?.(pc, action, target)) return;
+    if(GameState.hooks.interceptMenuAction(pc, action, target)) return;
     if(action.item){
       action.item.useItemOnObject(pc, target);
     }else if(action.action?.type === ActionMenuManager.STEALTH_ACTION){

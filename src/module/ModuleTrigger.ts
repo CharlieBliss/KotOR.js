@@ -131,7 +131,7 @@ export class ModuleTrigger extends ModuleObject {
     }
     area.attachObject(trigger);
     trigger.load();
-    if(GameState.gmMode) GameState.GMManager?.onMineChanged?.(trigger);
+    GameState.hooks.onMineChanged(trigger);
     return trigger;
   }
 
@@ -287,7 +287,7 @@ export class ModuleTrigger extends ModuleObject {
   detectTrap(){
     if(this.trapDetected){ return; }
     this.trapDetected = true;
-    if(GameState.gmMode) GameState.GMManager?.onMineChanged?.(this);
+    GameState.hooks.onMineChanged(this);
 
     if(this.trapDetected){
       this.trapModel?.playAnimation('detect', false);
@@ -485,7 +485,7 @@ export class ModuleTrigger extends ModuleObject {
     if(!object){ return; }
     console.log('ModuleTrigger.onEnter', this.type,  this.getTag());
     if(this.type == ModuleTriggerType.TRAP && !this.trapTriggered){
-      if(GameState.gmMode && GameState.GMManager?.isMineReplica?.(this)){ return; }
+      if(GameState.hooks.isMineReplica(this)){ return; }
       if(object.isHostile(this)){
         this.trapTriggered = true;
         console.log('ModuleTrigger.onEnter', 'Trap Triggered')
@@ -653,7 +653,7 @@ export class ModuleTrigger extends ModuleObject {
   }
 
   destroy(): void {
-    if(GameState.gmMode) GameState.GMManager?.onMineRemoved?.(this);
+    GameState.hooks.onMineRemoved(this);
     super.destroy();
 
     if(this.trapModel){

@@ -42,6 +42,7 @@ import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMChecks } from "@/managers/gm/GMChecks";
+import type { EngineHooks } from "@/engine/EngineHooks";
 
 export * from "@/managers/gm/GMTypes";
 export * from "@/managers/gm/GMObjectKind";
@@ -1156,93 +1157,49 @@ export class GMManager {
   }
 
   // -------------------------------------------------------------------------
-  // Engine hooks: what the engine calls through GameState.GMManager, kept here so engine code need not
-  // know which GM class does it
+  // Engine hooks: GM mode's answers to the engine's EngineHooks (GameState.hooks while GM mode is on)
   // -------------------------------------------------------------------------
 
-  static announceSkillRoll(...args: Parameters<typeof GMMines.announceSkillRoll>): ReturnType<typeof GMMines.announceSkillRoll> {
-    return GMMines.announceSkillRoll(...args);
-  }
-
-  static consumePlayerItem(...args: Parameters<typeof GMPlayers.consumePlayerItem>): ReturnType<typeof GMPlayers.consumePlayerItem> {
-    return GMPlayers.consumePlayerItem(...args);
-  }
-
-  static giveRecoveredMine(...args: Parameters<typeof GMMines.giveRecoveredMine>): ReturnType<typeof GMMines.giveRecoveredMine> {
-    return GMMines.giveRecoveredMine(...args);
-  }
-
-  static interceptInteraction(...args: Parameters<typeof GMPlayers.interceptInteraction>): ReturnType<typeof GMPlayers.interceptInteraction> {
-    return GMPlayers.interceptInteraction(...args);
-  }
-
-  static interceptMenuAction(...args: Parameters<typeof GMPlayers.interceptMenuAction>): ReturnType<typeof GMPlayers.interceptMenuAction> {
-    return GMPlayers.interceptMenuAction(...args);
-  }
-
-  static isMineReplica(...args: Parameters<typeof GMMines.isMineReplica>): ReturnType<typeof GMMines.isMineReplica> {
-    return GMMines.isMineReplica(...args);
-  }
-
-  static isNetMotionDriven(...args: Parameters<typeof GMReplication.isNetMotionDriven>): ReturnType<typeof GMReplication.isNetMotionDriven> {
-    return GMReplication.isNetMotionDriven(...args);
-  }
-
-  static isNetReplica(...args: Parameters<typeof GMReplication.isNetReplica>): ReturnType<typeof GMReplication.isNetReplica> {
-    return GMReplication.isNetReplica(...args);
-  }
-
-  static isNetworkContainer(...args: Parameters<typeof GMPlayers.isNetworkContainer>): ReturnType<typeof GMPlayers.isNetworkContainer> {
-    return GMPlayers.isNetworkContainer(...args);
-  }
-
-  static onHostProjectile(...args: Parameters<typeof GMReplication.onHostProjectile>): ReturnType<typeof GMReplication.onHostProjectile> {
-    return GMReplication.onHostProjectile(...args);
-  }
-
-  static onHostTwoDAAnimation(...args: Parameters<typeof GMReplication.onHostTwoDAAnimation>): ReturnType<typeof GMReplication.onHostTwoDAAnimation> {
-    return GMReplication.onHostTwoDAAnimation(...args);
-  }
-
-  static onHostVisualEffectApplied(...args: Parameters<typeof GMReplication.onHostVisualEffectApplied>): ReturnType<typeof GMReplication.onHostVisualEffectApplied> {
-    return GMReplication.onHostVisualEffectApplied(...args);
-  }
-
-  static onHostVisualEffectRemoved(...args: Parameters<typeof GMReplication.onHostVisualEffectRemoved>): ReturnType<typeof GMReplication.onHostVisualEffectRemoved> {
-    return GMReplication.onHostVisualEffectRemoved(...args);
-  }
-
-  static onMineChanged(...args: Parameters<typeof GMMines.onMineChanged>): ReturnType<typeof GMMines.onMineChanged> {
-    return GMMines.onMineChanged(...args);
-  }
-
-  static onMineRemoved(...args: Parameters<typeof GMMines.onMineRemoved>): ReturnType<typeof GMMines.onMineRemoved> {
-    return GMMines.onMineRemoved(...args);
-  }
-
-  static requestNetworkEquip(...args: Parameters<typeof GMPlayers.requestNetworkEquip>): ReturnType<typeof GMPlayers.requestNetworkEquip> {
-    return GMPlayers.requestNetworkEquip(...args);
-  }
-
-  static requestNetworkLoot(...args: Parameters<typeof GMPlayers.requestNetworkLoot>): ReturnType<typeof GMPlayers.requestNetworkLoot> {
-    return GMPlayers.requestNetworkLoot(...args);
-  }
-
-  static requestNetworkUnequip(...args: Parameters<typeof GMPlayers.requestNetworkUnequip>): ReturnType<typeof GMPlayers.requestNetworkUnequip> {
-    return GMPlayers.requestNetworkUnequip(...args);
-  }
-
-  static routeContainerOpen(...args: Parameters<typeof GMPlayers.routeContainerOpen>): ReturnType<typeof GMPlayers.routeContainerOpen> {
-    return GMPlayers.routeContainerOpen(...args);
-  }
-
-  static skillGatePasses(...args: Parameters<typeof GMChecks.skillGatePasses>): ReturnType<typeof GMChecks.skillGatePasses> {
-    return GMChecks.skillGatePasses(...args);
-  }
-
-  static updateNetMotion(...args: Parameters<typeof GMReplication.updateNetMotion>): ReturnType<typeof GMReplication.updateNetMotion> {
-    return GMReplication.updateNetMotion(...args);
-  }
+  static readonly engineHooks: EngineHooks = {
+    isNetReplica: (creature) => GMReplication.isNetReplica(creature),
+    isNetMotionDriven: (creature) => GMReplication.isNetMotionDriven(creature),
+    updateNetMotion: (creature, delta) => GMReplication.updateNetMotion(creature, delta),
+    isMineReplica: (mine) => GMMines.isMineReplica(mine),
+    interceptInteraction: (pc, target) => GMPlayers.interceptInteraction(pc, target),
+    interceptMenuAction: (pc, entry, target) => GMPlayers.interceptMenuAction(pc, entry, target),
+    requestNetworkEquip: (creature, slot, item) => GMPlayers.requestNetworkEquip(creature, slot, item),
+    requestNetworkUnequip: (creature, slot) => GMPlayers.requestNetworkUnequip(creature, slot),
+    requestNetworkLoot: (container) => GMPlayers.requestNetworkLoot(container),
+    routeContainerOpen: (container, user) => GMPlayers.routeContainerOpen(container, user),
+    consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
+    giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
+    isWorldPaused: () => !!GMManager.worldPaused,
+    isPlayerFrozen: (creature) => GMManager.isPlayerFrozen(creature),
+    isPlayerCharacter: (obj) => GMManager.isPlayerCharacter(obj),
+    isNetworkContainer: (container) => GMPlayers.isNetworkContainer(container),
+    skillGatePasses: (obj, user) => GMChecks.skillGatePasses(obj, user),
+    isLeaderLocked: () => !GMManager.isGMUser(),
+    skipsModuleObjects: (kind) => {
+      if(kind === 'placeables') return GMManager.keepDefaultPlaceables === false;
+      if(kind === 'creatures') return !GMManager.keepDefaultCreatures;
+      return !GMManager.keepDefaultTriggers;
+    },
+    onHostTwoDAAnimation: (creature, animation) => GMReplication.onHostTwoDAAnimation(creature, animation),
+    onHostVisualEffectApplied: (effect) => GMReplication.onHostVisualEffectApplied(effect),
+    onHostVisualEffectRemoved: (effect) => GMReplication.onHostVisualEffectRemoved(effect),
+    onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),
+    onDoorOpened: (door, by) => {
+      // Tell everyone, once this frame's state has settled, when a door opened for someone in a session
+      if(by === door || GMNetworkManager.role === 'offline') return;
+      setTimeout(() => {
+        GMNetworkManager.broadcastDoorState({ netId: door.gmNetId || `door_${door.id}`, tag: door.getTag(), x: door.position.x, y: door.position.y, locked: door.isLocked(), openState: door.openState });
+      }, 0);
+    },
+    onMineChanged: (mine) => GMMines.onMineChanged(mine),
+    onMineRemoved: (mine) => GMMines.onMineRemoved(mine),
+    announceSkillRoll: (owner, label, roll, bonus, dc, success) => GMMines.announceSkillRoll(owner, label, roll, bonus, dc, success),
+    notifyLocalMovement: () => GMNetworkManager.notifyLocalMovement(),
+  };
 }
 
 // A player's game takes control of the character the GM hands it

@@ -71,7 +71,7 @@ export class ActionRecoverMine extends Action {
         const roll = 1 + Math.floor(Math.random() * 20);
         const skill = (this.owner as any).getSkillLevel?.(1) || 0;
         const success = roll + skill >= trap.getRecoverDC();
-        GameState.GMManager?.announceSkillRoll?.(this.owner, 'Recover mine', roll, skill, trap.getRecoverDC(), success);
+        GameState.hooks.announceSkillRoll(this.owner, 'Recover mine', roll, skill, trap.getRecoverDC(), success);
         if(!success){
           return ActionStatus.COMPLETE;
         }
@@ -80,7 +80,7 @@ export class ActionRecoverMine extends Action {
         const resRef = String(trap.trapResRef || trap.getTrapRow()?.resref || '');
         trap.destroy();
         if(resRef && resRef !== '****'){
-          if(GameState.GMManager?.giveRecoveredMine?.(this.owner, resRef)) return ActionStatus.COMPLETE;
+          if(GameState.hooks.giveRecoveredMine(this.owner, resRef)) return ActionStatus.COMPLETE;
           ResourceLoader.loadResource(ResourceTypes['uti'], resRef).then((buffer) => {
             if(!buffer) return;
             const item = new GameState.Module.ModuleArea.ModuleItem(new GFFObject(buffer));

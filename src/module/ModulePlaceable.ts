@@ -344,7 +344,7 @@ export class ModulePlaceable extends ModuleLockable {
   }
 
   retrieveInventory(){
-    if(GameState.gmMode && GameState.GMManager.requestNetworkLoot(this)) return;
+    if(GameState.hooks.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       const item = this.inventory.pop();
       const stackSize = item.getStackSize();
@@ -381,7 +381,7 @@ export class ModulePlaceable extends ModuleLockable {
       break;
       case ModulePlaceableEvent.OPEN_END:
         if(this.hasInventory){
-          if(!(GameState.gmMode && GameState.GMManager.routeContainerOpen(this, this.lastUsedBy))){
+          if(!GameState.hooks.routeContainerOpen(this, this.lastUsedBy)){
             GameState.MenuManager.MenuContainer.AttachContainer(this);
             GameState.MenuManager.MenuContainer.open();
           }
@@ -402,7 +402,7 @@ export class ModulePlaceable extends ModuleLockable {
   use(object: ModuleObject){
 
     // A GM can put a skill check in front of an object (Computer Use for a terminal, Repair for a panel...)
-    if(GameState.gmMode && GameState.GMManager?.skillGatePasses(this, object) === false){
+    if(!GameState.hooks.skillGatePasses(this, object)){
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
       return;
     }

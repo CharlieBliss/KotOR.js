@@ -147,7 +147,7 @@ export class EffectVisualEffect extends GameEffect {
       return;
 
     super.onApply();
-    if(GameState.gmMode) GameState.GMManager.onHostVisualEffectApplied(this);
+    GameState.hooks.onHostVisualEffectApplied(this);
 
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
 
@@ -394,7 +394,7 @@ export class EffectVisualEffect extends GameEffect {
   }
 
   onRemove(){
-    if(GameState.gmMode) GameState.GMManager.onHostVisualEffectRemoved(this);
+    GameState.hooks.onHostVisualEffectRemoved(this);
     if(this.model instanceof OdysseyModel3D){
       this.model.dispose();
     }
