@@ -456,6 +456,129 @@ export class GameState implements EngineContext {
    * Initialize the GameState
    */
   static async Init(){
+    GameState.initDebuggerListeners();
+
+    GameState.lightManager = new GameState.LightManager();
+    GameState.windManager = new GameState.WindManager();
+    WindManager.setInstance(GameState.windManager);
+    GameState.processEventListener('init');
+
+    GameState.currentCamera = GameState.camera;
+    GameState.VideoEffectManager.SetVideoEffect(-1);
+    GameState.onScreenShot = undefined;
+
+    GameState.time = 0;
+    GameState.deltaTime = 0;
+    GameState.deltaTimeFixed = 0;
+
+    GameState.initRenderer();
+
+    GameState.initScene();
+
+    GameState.initPostProcessing();
+
+    /**
+     * Initialize the game controls
+     */
+    GameState.controls = new IngameControls(GameState.currentCamera, GameState.canvas);
+
+    /**
+     * Initialize the FadeOverlayManager
+     */
+    GameState.FadeOverlayManager.Initialize();
+
+    window.addEventListener('resize', () => {
+      GameState.EventOnResize();
+    });
+
+
+    try{
+      //init shaders
+      PerformanceMonitor.start('ShaderManager.Init');
+      GameState.ShaderManager.Init();
+      PerformanceMonitor.stop('ShaderManager.Init');
+
+      GameState.TutorialWindowTracker = [];
+
+      GameState.initAudio();
+
+      /**
+       * Initialize the LightManager
+       */
+      GameState.lightManager.init(GameState);
+      GameState.windManager.init(GameState);
+      GameState.lightManager.setLightHelpersVisible(ConfigClient.get('GameState.debug.light_helpers') ? true : false);
+
+      //AudioEngine.Unmute()
+      GameState.SetEngineMode(EngineMode.GUI);
+      GameState.State = EngineState.RUNNING;
+      GameState.inMenu = false;
+
+      /**
+       * Initialize the CursorManager
+       */
+      GameState.CursorManager.MenuManager = GameState.MenuManager;
+      GameState.CursorManager.selected = undefined;
+      GameState.CursorManager.hovered = undefined;
+      await GameState.CursorManager.init();
+
+      GameState.scene_cursor_holder.add( GameState.CursorManager.cursor );
+      GameState.scene.add( GameState.CursorManager.reticle );
+      GameState.scene.add( GameState.CursorManager.reticle2 );
+      GameState.scene_gui.add( GameState.CursorManager.arrow );
+      GameState.scene.add( GameState.CursorManager.testPoints );
+      console.log('CursorManager: Complete');
+
+      PerformanceMonitor.start('PartyManager.Initialize');
+      GameState.PartyManager.Initialize();
+      GameState.GMManager.init();
+      PerformanceMonitor.stop('PartyManager.Initialize');
+
+      /**
+       * Initialize the MenuManager
+       */
+      PerformanceMonitor.start('MenuManager.Init');
+      GameState.MenuManager.Init();
+      PerformanceMonitor.stop('MenuManager.Init');
+
+      PerformanceMonitor.start('MenuManager.LoadMainGameMenus');
+      await GameState.MenuManager.LoadMainGameMenus();
+      PerformanceMonitor.stop('MenuManager.LoadMainGameMenus');
+
+      /**
+       * Preload the legal screen texture
+       */
+      if(GameState.GameKey == GameEngineType.TSL){
+        await GameState.LegalScreenManager.Initialize();
+      }
+
+      /**
+       * Preload fx textures
+       */
+      TextureLoader.enQueue(GameState.preloadTextures,
+        undefined,
+        TextureType.TEXTURE
+      );
+
+      if(GameState.GameKey == GameEngineType.KOTOR){
+        // GameState.VideoManager.queueMovie('leclogo', true);
+        // GameState.VideoManager.queueMovie('biologo', true);
+        // GameState.VideoManager.queueMovie('legal', true);
+      }else if(GameState.GameKey == GameEngineType.TSL){
+        // GameState.VideoManager.queueMovie('leclogo', true);
+        // GameState.VideoManager.queueMovie('ObsidianEnt', true);
+        // GameState.VideoManager.queueMovie('Legal', true);
+      }
+
+      GameState.Ready = true;
+      GameState.Start();
+      console.log(PerformanceMonitor.toString());
+    }catch(e){
+      console.error(e);
+    }
+  }
+  /** Listen for the script debugger: breakpoints, stepping, continuing and debug toggles */
+  private static initDebuggerListeners(){
     GameState.Debugger.addEventListener('open', () => {
       console.log('Debugger: Open');
       GameState.debugMode = true;
@@ -504,20 +627,10 @@ export class GameState implements EngineContext {
         GameState.ToggleDebugState(type as EngineDebugType);
       }
     });
+  }
 
-    GameState.lightManager = new GameState.LightManager();
-    GameState.windManager = new GameState.WindManager();
-    WindManager.setInstance(GameState.windManager);
-    GameState.processEventListener('init');
-
-    GameState.currentCamera = GameState.camera;
-    GameState.VideoEffectManager.SetVideoEffect(-1);
-    GameState.onScreenShot = undefined;
-
-    GameState.time = 0;
-    GameState.deltaTime = 0;
-    GameState.deltaTimeFixed = 0;
-
+  /** Create the canvas, the WebGL renderer, the depth target and the frame clock */
+  private static initRenderer(){
     GameState.canvas = document.createElement( 'canvas' );
     //GameState.canvas = GameState.renderer.domElement;
 
@@ -562,7 +675,10 @@ export class GameState implements EngineContext {
     GameState.stats.showPanel(undefined);
 
     GameState.visible = true;
+  }
 
+  /** Create the scenes, cameras, lights and object groups */
+  private static initScene(){
     /**
      * Initialize the scene graph
      */
@@ -685,7 +801,10 @@ export class GameState implements EngineContext {
 
     GameState.scene_cursor_holder = new THREE.Group();
     GameState.scene_gui.add(GameState.scene_cursor_holder);
+  }
 
+  /** Set up the post-processing passes */
+  private static initPostProcessing(){
     //BEGIN: PostProcessing
     GameState.composer = new EffectComposer(GameState.renderer);
     GameState.renderPass = new RenderPass(GameState.scene, GameState.currentCamera);
@@ -735,127 +854,33 @@ export class GameState implements EngineContext {
     GameState.renderPassGUI.clear = false;
     GameState.renderPass.needsSwap = false;
     GameState.renderPassGUI.needsSwap = false;
-
-    /**
-     * Initialize the game controls
-     */
-    GameState.controls = new IngameControls(GameState.currentCamera, GameState.canvas);
-
-    /**
-     * Initialize the FadeOverlayManager
-     */
-    GameState.FadeOverlayManager.Initialize();
-
-    window.addEventListener('resize', () => {
-      GameState.EventOnResize();
-    });
-
-
-    try{
-      //init shaders
-      PerformanceMonitor.start('ShaderManager.Init');
-      GameState.ShaderManager.Init();
-      PerformanceMonitor.stop('ShaderManager.Init');
-
-      GameState.TutorialWindowTracker = [];
-
-      /**
-       * Initialize Audio for the GUI
-       */
-      const audioEngine = AudioEngine.GetAudioEngine();
-      AudioEngine.GAIN_MUSIC = parseInt(GameState.iniConfig.getProperty('Sound Options.Music Volume')) || 0
-      AudioEngine.GAIN_VO = parseInt(GameState.iniConfig.getProperty('Sound Options.Voiceover Volume')) || 0
-      AudioEngine.GAIN_SFX = parseInt(GameState.iniConfig.getProperty('Sound Options.Sound Effects Volume')) || 0
-      AudioEngine.GAIN_GUI = parseInt(GameState.iniConfig.getProperty('Sound Options.Sound Effects Volume')) || 0
-      AudioEngine.GAIN_MOVIE = parseInt(GameState.iniConfig.getProperty('Sound Options.Movie Volume')) || 0
-
-      GameState.guiAudioEmitter = new AudioEmitter(audioEngine, AudioEngineChannel.GUI);
-      GameState.guiAudioEmitter.maxDistance = 100;
-      GameState.guiAudioEmitter.volume = 127;
-      GameState.guiAudioEmitter.setPriorityGroupId(AudioPriorityGroup.GUI);
-      GameState.guiAudioEmitter.load();
-    
-      GameState.audioEmitter = new AudioEmitter(audioEngine);
-      GameState.audioEmitter.maxDistance = 50;
-      GameState.audioEmitter.type = AudioEmitterType.GLOBAL;
-      GameState.audioEmitter.setPriorityGroupId(AudioPriorityGroup.SCRIPTED_PLAYSOUND);
-      GameState.audioEmitter.load();
-
-      /**
-       * Initialize the LightManager
-       */
-      GameState.lightManager.init(GameState);
-      GameState.windManager.init(GameState);
-      GameState.lightManager.setLightHelpersVisible(ConfigClient.get('GameState.debug.light_helpers') ? true : false);
-
-      //AudioEngine.Unmute()
-      GameState.SetEngineMode(EngineMode.GUI);
-      GameState.State = EngineState.RUNNING;
-      GameState.inMenu = false;
-
-      /**
-       * Initialize the CursorManager
-       */
-      GameState.CursorManager.MenuManager = GameState.MenuManager;
-      GameState.CursorManager.selected = undefined;
-      GameState.CursorManager.hovered = undefined;
-      await GameState.CursorManager.init();
-
-      GameState.scene_cursor_holder.add( GameState.CursorManager.cursor );
-      GameState.scene.add( GameState.CursorManager.reticle );
-      GameState.scene.add( GameState.CursorManager.reticle2 );
-      GameState.scene_gui.add( GameState.CursorManager.arrow );
-      GameState.scene.add( GameState.CursorManager.testPoints );
-      console.log('CursorManager: Complete');
-
-      PerformanceMonitor.start('PartyManager.Initialize');
-      GameState.PartyManager.Initialize();
-      GameState.GMManager.init();
-      PerformanceMonitor.stop('PartyManager.Initialize');
-
-      /**
-       * Initialize the MenuManager
-       */
-      PerformanceMonitor.start('MenuManager.Init');
-      GameState.MenuManager.Init();
-      PerformanceMonitor.stop('MenuManager.Init');
-
-      PerformanceMonitor.start('MenuManager.LoadMainGameMenus');
-      await GameState.MenuManager.LoadMainGameMenus();
-      PerformanceMonitor.stop('MenuManager.LoadMainGameMenus');
-
-      /**
-       * Preload the legal screen texture
-       */
-      if(GameState.GameKey == GameEngineType.TSL){
-        await GameState.LegalScreenManager.Initialize();
-      }
-
-      /**
-       * Preload fx textures
-       */
-      TextureLoader.enQueue(GameState.preloadTextures,
-        undefined,
-        TextureType.TEXTURE
-      );
-
-      if(GameState.GameKey == GameEngineType.KOTOR){
-        // GameState.VideoManager.queueMovie('leclogo', true);
-        // GameState.VideoManager.queueMovie('biologo', true);
-        // GameState.VideoManager.queueMovie('legal', true);
-      }else if(GameState.GameKey == GameEngineType.TSL){
-        // GameState.VideoManager.queueMovie('leclogo', true);
-        // GameState.VideoManager.queueMovie('ObsidianEnt', true);
-        // GameState.VideoManager.queueMovie('Legal', true);
-      }
-
-      GameState.Ready = true;
-      GameState.Start();
-      console.log(PerformanceMonitor.toString());
-    }catch(e){
-      console.error(e);
-    }
   }
+
+  /** Apply the configured volumes and create the GUI and global audio emitters */
+  private static initAudio(){
+    /**
+     * Initialize Audio for the GUI
+     */
+    const audioEngine = AudioEngine.GetAudioEngine();
+    AudioEngine.GAIN_MUSIC = parseInt(GameState.iniConfig.getProperty('Sound Options.Music Volume')) || 0
+    AudioEngine.GAIN_VO = parseInt(GameState.iniConfig.getProperty('Sound Options.Voiceover Volume')) || 0
+    AudioEngine.GAIN_SFX = parseInt(GameState.iniConfig.getProperty('Sound Options.Sound Effects Volume')) || 0
+    AudioEngine.GAIN_GUI = parseInt(GameState.iniConfig.getProperty('Sound Options.Sound Effects Volume')) || 0
+    AudioEngine.GAIN_MOVIE = parseInt(GameState.iniConfig.getProperty('Sound Options.Movie Volume')) || 0
+
+    GameState.guiAudioEmitter = new AudioEmitter(audioEngine, AudioEngineChannel.GUI);
+    GameState.guiAudioEmitter.maxDistance = 100;
+    GameState.guiAudioEmitter.volume = 127;
+    GameState.guiAudioEmitter.setPriorityGroupId(AudioPriorityGroup.GUI);
+    GameState.guiAudioEmitter.load();
+  
+    GameState.audioEmitter = new AudioEmitter(audioEngine);
+    GameState.audioEmitter.maxDistance = 50;
+    GameState.audioEmitter.type = AudioEmitterType.GLOBAL;
+    GameState.audioEmitter.setPriorityGroupId(AudioPriorityGroup.SCRIPTED_PLAYSOUND);
+    GameState.audioEmitter.load();
+  }
+
 
   static Start(){
 
@@ -1011,11 +1036,15 @@ export class GameState implements EngineContext {
     GameState.GMManager.loadScene(moduleName);
   }
 
+  /**
+   * Load a module from the game's files and enter it, playing up to six movies first. The current module
+   * is saved and unloaded.
+   */
   static async LoadModule(name = '', waypoint: string = null, sMovie1 = '', sMovie2 = '', sMovie3 = '', sMovie4 = '', sMovie5 = '', sMovie6 = ''){
+    if(GameState.loadingModule){
+      return;
+    }
     try{
-      if(GameState.loadingModule){
-        return;
-      }
       EventManager.FireEvent('module.load', {
         name: name,
         waypoint: waypoint?.toString(),
@@ -1026,116 +1055,26 @@ export class GameState implements EngineContext {
         sMovie5: sMovie5,
         sMovie6: sMovie6
       });
-      GameState.loadingModule = true;
-      await GameState.MenuManager.LoadScreen.setLoadBackground('load_'+name);
-      GameState.FadeOverlayManager.FadeOut(0, 0, 0, 0);
-      /**
-       * Set the game mode to loading
-       */
-      GameState.SetEngineMode(EngineMode.LOADING);
-      GameState.MenuManager.ClearMenus();
-
-      GameState.UnloadModule();
-
-      GameState.MenuManager.LoadScreen.setProgress(0);
-      GameState.MenuManager.LoadScreen.showRandomHint();
-      GameState.MenuManager.LoadScreen.open();
-
-      await GameState.MenuManager.LoadInGameMenus();
-      
-      GameState.currentCamera = GameState.camera;
-    GameState.VideoEffectManager.SetVideoEffect(-1);
-      GameState.ModuleObjectManager.playerSelectableObjects = [];
-      GameState.VideoManager.queueMovie(sMovie1, true);
-      GameState.VideoManager.queueMovie(sMovie2, true);
-      GameState.VideoManager.queueMovie(sMovie3, true);
-      GameState.VideoManager.queueMovie(sMovie4, true);
-      GameState.VideoManager.queueMovie(sMovie5, true);
-      GameState.VideoManager.queueMovie(sMovie6, true);
-      GameState.SetEngineMode(EngineMode.LOADING);
-      
-      if(GameState.module){
-        try{ await GameState.module.save(); }catch(e){
-          console.error(e);
-        }
-        try{ GameState.module.dispose(); }catch(e){
-          console.error(e);
-        }
+      await GameState.beginModuleLoad(name, true);
+      for(const movie of [sMovie1, sMovie2, sMovie3, sMovie4, sMovie5, sMovie6]){
+        GameState.VideoManager.queueMovie(movie, true);
       }
-
-      //Remove all cached scripts and kill all running instances
-      GameState.NWScript.Reload();
-
-      //Resets all keys to their default state
-      GameState.controls.initKeys();
-
-      await GameState.FactionManager.Load();
+      await GameState.unloadCurrentModule(true);
 
       const module = await GameState.Module.Load(name, waypoint);
-      GameState.module = module;
-      GameState.scene.visible = false;
+      await GameState.buildModuleScene(module);
 
-      console.log('Module.loadScene');
-      await module.loadScene();
-
-      await TextureLoader.LoadQueue( (ref: ITextureLoaderQueuedRef) => {
-        const material = ref.material as any;
-        if(material?.map){
-          GameState.renderer.initTexture(material.map);
-        }
-      });
-
-      module.initEventQueue();
-
-      console.log('Module.initScripts');
-      if(!GameState.gmMode) await module.initScripts();
-
-      //GameState.scene_gui.background = null;
-      GameState.scene.visible = true;
-      
-      AudioEngine.Unmute();
       VideoManager.playMovieQueue( async () => {
         const runSpawnScripts = !GameState.isLoadingSave;
-        GameState.isLoadingSave = false;
-
-        GameState.ResetModuleAudio();
-
-        GameState.MenuManager.InGameOverlay.recalculatePosition();
-        if(!GameState.gmMode){
-          GameState.MenuManager.InGameOverlay.recalculatePosition();
-          GameState.MenuManager.InGameOverlay.open();
-        }
-
-        GameState.renderer.compile(GameState.scene, GameState.currentCamera);
-        GameState.renderer.setClearColor( new THREE.Color(GameState.module.area.sun.fogColor) );
-        
-        console.log('ModuleArea.initAreaObjects');
-        GameState.SetEngineMode(GameState.gmMode ? EngineMode.FREELOOK : (GameState.module.area.miniGame ? EngineMode.MINIGAME : EngineMode.INGAME));
-        await GameState.module.area.initAreaObjects(!GameState.gmMode && runSpawnScripts);
-        if(GameState.gmMode){ GameState.GMManager.onSceneLoaded(); }
-        console.log('ModuleArea: ready to play');
-        GameState.module.readyToProcessEvents = true;
-
-        if(GameState.Mode == EngineMode.INGAME){
-          const anyCanLevel = GameState.PartyManager.party.some((p) => p.canLevelUp());
-          if(anyCanLevel){
-            GameState.audioEmitter.playSound('gui_level');
-          }
-        }
-
-        //Reveal the area
-        GameState.MenuManager.LoadScreen.close();
-        if(!GameState.holdWorldFadeInForDialog){
-          GameState.FadeOverlayManager.FadeIn(2.5, 0, 0, 0, 1);
-        }
-        GameState.module.area.musicBackgroundPlay();
-        GameState.loadingModule = false;
+        await GameState.revealModule(runSpawnScripts, 2.5);
       });
     }catch(e){
+      GameState.loadingModule = false;
       console.error(e);
       throw e;
     }
   }
+
 
   /**
    * Initialize GameState for Forge module preview (no MainMenu / legal movies).
@@ -1214,59 +1153,21 @@ export class GameState implements EngineContext {
   }
 
   /**
-   * Load a module from in-memory archives (Forge playable preview).
-   * Skips intro movies and does not write a save on dispose of prior module.
+   * Load a module from in-memory archives (Forge's module preview) and enter it straight away. The current
+   * module is unloaded without saving.
    */
   static async LoadModuleFromArchives(archives: any[], waypoint: string = null, modName = 'preview'){
+    if(GameState.loadingModule){
+      return;
+    }
     try{
-      if(GameState.loadingModule){
-        return;
-      }
       EventManager.FireEvent('module.load', {
         name: modName,
         waypoint: waypoint?.toString(),
         preview: true,
       });
-      GameState.loadingModule = true;
-      try{
-        await GameState.MenuManager.LoadScreen.setLoadBackground('load_'+modName);
-      }catch(e){
-        console.warn('LoadModuleFromArchives: load background', e);
-      }
-      GameState.FadeOverlayManager.FadeOut(0, 0, 0, 0);
-      GameState.SetEngineMode(EngineMode.LOADING);
-      GameState.MenuManager.ClearMenus();
-
-      GameState.UnloadModule();
-
-      try{
-        GameState.MenuManager.LoadScreen.setProgress(0);
-        GameState.MenuManager.LoadScreen.open();
-      }catch(e){
-        console.warn('LoadModuleFromArchives: load screen', e);
-      }
-
-      try{
-        await GameState.MenuManager.LoadInGameMenus();
-      }catch(e){
-        console.warn('LoadModuleFromArchives: LoadInGameMenus', e);
-      }
-
-      GameState.currentCamera = GameState.camera;
-    GameState.VideoEffectManager.SetVideoEffect(-1);
-      GameState.ModuleObjectManager.playerSelectableObjects = [];
-      GameState.SetEngineMode(EngineMode.LOADING);
-
-      if(GameState.module){
-        try{ GameState.module.dispose(); }catch(e){
-          console.error(e);
-        }
-        GameState.module = undefined as any;
-      }
-
-      GameState.NWScript.Reload();
-      GameState.controls.initKeys();
-      await GameState.FactionManager.Load();
+      await GameState.beginModuleLoad(modName, false);
+      await GameState.unloadCurrentModule(false);
 
       if(!GameState.PartyManager.PlayerTemplate){
         GameState.PartyManager.PlayerTemplate = GameState.PartyManager.GeneratePlayerTemplate();
@@ -1277,51 +1178,8 @@ export class GameState implements EngineContext {
       if(!module?.area){
         throw new Error('Failed to load module from archives');
       }
-      GameState.module = module;
-      GameState.scene.visible = false;
-
-      await module.loadScene();
-
-      await TextureLoader.LoadQueue( (ref: ITextureLoaderQueuedRef) => {
-        const material = ref.material as any;
-        if(material?.map){
-          GameState.renderer.initTexture(material.map);
-        }
-      });
-
-      module.initEventQueue();
-      if(!GameState.gmMode) await module.initScripts();
-
-      GameState.scene.visible = true;
-      AudioEngine.Unmute();
-
-      const runSpawnScripts = true;
-      GameState.isLoadingSave = false;
-      GameState.ResetModuleAudio();
-
-      try{
-        GameState.MenuManager.InGameOverlay.recalculatePosition();
-        if(!GameState.gmMode){
-          GameState.MenuManager.InGameOverlay.recalculatePosition();
-          GameState.MenuManager.InGameOverlay.open();
-        }
-      }catch(e){
-        console.warn('LoadModuleFromArchives: overlay', e);
-      }
-
-      GameState.renderer.compile(GameState.scene, GameState.currentCamera);
-      GameState.renderer.setClearColor( new THREE.Color(GameState.module.area.sun.fogColor) );
-
-      GameState.SetEngineMode(GameState.module.area.miniGame ? EngineMode.MINIGAME : EngineMode.INGAME);
-      await GameState.module.area.initAreaObjects(runSpawnScripts);
-      GameState.module.readyToProcessEvents = true;
-
-      try{ GameState.MenuManager.LoadScreen.close(); }catch(e){}
-      if(!GameState.holdWorldFadeInForDialog){
-        GameState.FadeOverlayManager.FadeIn(1.0, 0, 0, 0, 1);
-      }
-      GameState.module.area.musicBackgroundPlay();
-      GameState.loadingModule = false;
+      await GameState.buildModuleScene(module);
+      await GameState.revealModule(true, 1.0);
       GameState.canvas?.focus();
     }catch(e){
       GameState.loadingModule = false;
@@ -1329,6 +1187,130 @@ export class GameState implements EngineContext {
       throw e;
     }
   }
+
+  /**
+   * The first step of loading a module: put up the loading screen (with a random hint when showHint) and
+   * clear the current menus and module. A load screen that fails to show is logged, not fatal.
+   */
+  private static async beginModuleLoad(name: string, showHint: boolean){
+    GameState.loadingModule = true;
+    try{
+      await GameState.MenuManager.LoadScreen.setLoadBackground('load_'+name);
+    }catch(e){
+      console.warn('beginModuleLoad: load background', e);
+    }
+    GameState.FadeOverlayManager.FadeOut(0, 0, 0, 0);
+    GameState.SetEngineMode(EngineMode.LOADING);
+    GameState.MenuManager.ClearMenus();
+
+    GameState.UnloadModule();
+
+    try{
+      GameState.MenuManager.LoadScreen.setProgress(0);
+      if(showHint){ GameState.MenuManager.LoadScreen.showRandomHint(); }
+      GameState.MenuManager.LoadScreen.open();
+    }catch(e){
+      console.warn('beginModuleLoad: load screen', e);
+    }
+
+    try{
+      await GameState.MenuManager.LoadInGameMenus();
+    }catch(e){
+      console.warn('beginModuleLoad: LoadInGameMenus', e);
+    }
+
+    GameState.currentCamera = GameState.camera;
+    GameState.VideoEffectManager.SetVideoEffect(-1);
+    GameState.ModuleObjectManager.playerSelectableObjects = [];
+    GameState.SetEngineMode(EngineMode.LOADING);
+  }
+
+  /** Dispose of the current module (saving it first when save), drop running scripts, and reset keys and factions */
+  private static async unloadCurrentModule(save: boolean){
+    if(GameState.module){
+      if(save){
+        try{ await GameState.module.save(); }catch(e){
+          console.error(e);
+        }
+      }
+      try{ GameState.module.dispose(); }catch(e){
+        console.error(e);
+      }
+      if(!save){ GameState.module = undefined as any; }
+    }
+
+    //Remove all cached scripts and kill all running instances
+    GameState.NWScript.Reload();
+
+    //Resets all keys to their default state
+    GameState.controls.initKeys();
+
+    await GameState.FactionManager.Load();
+  }
+
+  /** Make module current and build its scene, textures, event queue and (outside GM mode) scripts, hidden */
+  private static async buildModuleScene(module: Module){
+    GameState.module = module;
+    GameState.scene.visible = false;
+
+    await module.loadScene();
+
+    await TextureLoader.LoadQueue( (ref: ITextureLoaderQueuedRef) => {
+      const material = ref.material as any;
+      if(material?.map){
+        GameState.renderer.initTexture(material.map);
+      }
+    });
+
+    module.initEventQueue();
+
+    if(!GameState.gmMode) await module.initScripts();
+
+    GameState.scene.visible = true;
+    AudioEngine.Unmute();
+  }
+
+  /**
+   * The last step of loading a module: open the in-game overlay, start the area's objects (running their
+   * spawn scripts when runSpawnScripts, never in GM mode), and fade in over fadeIn seconds.
+   */
+  private static async revealModule(runSpawnScripts: boolean, fadeIn: number){
+    GameState.isLoadingSave = false;
+    GameState.ResetModuleAudio();
+
+    try{
+      GameState.MenuManager.InGameOverlay.recalculatePosition();
+      if(!GameState.gmMode){
+        GameState.MenuManager.InGameOverlay.open();
+      }
+    }catch(e){
+      console.warn('revealModule: overlay', e);
+    }
+
+    GameState.renderer.compile(GameState.scene, GameState.currentCamera);
+    GameState.renderer.setClearColor( new THREE.Color(GameState.module.area.sun.fogColor) );
+
+    GameState.SetEngineMode(GameState.gmMode ? EngineMode.FREELOOK : (GameState.module.area.miniGame ? EngineMode.MINIGAME : EngineMode.INGAME));
+    await GameState.module.area.initAreaObjects(!GameState.gmMode && runSpawnScripts);
+    if(GameState.gmMode){ GameState.GMManager.onSceneLoaded(); }
+    GameState.module.readyToProcessEvents = true;
+
+    if(GameState.Mode == EngineMode.INGAME){
+      const anyCanLevel = GameState.PartyManager.party.some((p) => p.canLevelUp());
+      if(anyCanLevel){
+        GameState.audioEmitter.playSound('gui_level');
+      }
+    }
+
+    //Reveal the area
+    try{ GameState.MenuManager.LoadScreen.close(); }catch(e){}
+    if(!GameState.holdWorldFadeInForDialog){
+      GameState.FadeOverlayManager.FadeIn(fadeIn, 0, 0, 0, 1);
+    }
+    GameState.module.area.musicBackgroundPlay();
+    GameState.loadingModule = false;
+  }
+
 
   static RestoreEnginePlayMode(): void {
     if(GameState.module){
