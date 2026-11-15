@@ -1,3 +1,4 @@
+import type { GMCreatureSpawnConfig } from "@/managers/gm/GMTypes";
 import { GFFObject } from "@/resource/GFFObject";
 import * as THREE from "three";
 import { ModuleObject } from "@/module/ModuleObject";
@@ -863,7 +864,7 @@ export class ModuleCreature extends ModuleObject {
       if(
         !this.combatData.combatState &&
         this.isPartyMember() &&
-        !(this as any).gmOwnerPeerId &&
+        !this.gmOwnerPeerId &&
         currentPlayer &&
         this != currentPlayer &&
         !this.facingAnim
@@ -2299,14 +2300,14 @@ export class ModuleCreature extends ModuleObject {
     }else if(!this.isDead()){
       this.clearAllActions();
       if(true){
-      if(this.getConversation() && this.getConversation().resref && !(this as any).gmBarkText){
+      if(this.getConversation() && this.getConversation().resref && !this.gmBarkText){
         GameState.getCurrentPlayer().actionDialogObject(this, this.getConversation().resref, false, undefined, undefined, true);
       }else{
         this.setFacingObject(callee);
         (callee as any)?.setFacingObject?.(this);
         this.playSoundSet(SSFType.SELECT_1);
         this.setAnimationState(ModuleCreatureAnimState.GREETING);
-        const barkText = (this as any).gmBarkText || `${this.getName() || 'Actor'}: Greetings.`;
+        const barkText = this.gmBarkText || `${this.getName() || 'Actor'}: Greetings.`;
         GameState.MenuManager.InGameBark?.barkFromString(barkText);
       }
       }
@@ -3368,7 +3369,7 @@ export class ModuleCreature extends ModuleObject {
 
   canSpotMines(): boolean {
     if(GameState.gmMode && GameState.GMManager?.isMineReplica?.(undefined)) return false;
-    return GameState.PartyManager?.party?.includes(this) || !!(this as any).gmOwnerPeerId;
+    return GameState.PartyManager?.party?.includes(this) || !!this.gmOwnerPeerId;
   }
 
   getSkillRanks(value: number){
@@ -5139,4 +5140,8 @@ export class ModuleCreature extends ModuleObject {
     return template;
   }
 
+}
+
+export interface ModuleCreature {
+  gmSpawnConfig?: GMCreatureSpawnConfig;
 }

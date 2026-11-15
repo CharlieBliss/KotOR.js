@@ -1,3 +1,4 @@
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import * as THREE from "three";
 import { GameState } from "@/GameState";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
@@ -62,7 +63,7 @@ export class GMNpcOrders {
   static FLEE_DISTANCE = 12;
 
   static getOrder(cre: ModuleObject): GMNpcOrder | undefined {
-    return (cre as any)?.gmOrder;
+    return cre?.gmOrder;
   }
 
   /** Give an NPC an order (or undefined to hand it back to its own judgement) */
@@ -70,8 +71,8 @@ export class GMNpcOrders {
     if (!cre) return;
     cre.clearAllActions();
     if (order && ['move', 'flee', 'standDown', 'follow'].includes(order.kind)) this.stopFighting(cre);
-    if (order) (cre as any).gmOrder = order;
-    else delete (cre as any).gmOrder;
+    if (order) cre.gmOrder = order;
+    else delete cre.gmOrder;
   }
 
   static describe(order: GMNpcOrder | undefined): string {
@@ -142,7 +143,7 @@ export class GMNpcOrders {
 
       case 'move': {
         if (this.distance2D(cre.position, order.point) <= this.ARRIVE_DISTANCE) {
-          (cre as any).gmOrder = { kind: 'guard', point: order.point, radius: this.GUARD_RADIUS };
+          cre.gmOrder = { kind: 'guard', point: order.point, radius: this.GUARD_RADIUS };
           return;
         }
         if (!this.isMoving(cre)) this.moveTo(cre, this.vector(order.point), true);
@@ -185,7 +186,7 @@ export class GMNpcOrders {
 
   static creature(netId: string): ModuleCreature | null {
     const obj = GameState.GMManager?.netIdMap.get(netId);
-    return obj && BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature) ? obj as ModuleCreature : null;
+    return obj && GMObjectKind.isCreature(obj) ? obj as ModuleCreature : null;
   }
 
   /** Whoever last attacked it, if still alive, hostile and nearby */

@@ -1,3 +1,4 @@
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import { GameState } from "@/GameState";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager, GMEventEmitter } from "@/managers/GMNetworkManager";
@@ -98,9 +99,9 @@ export class GMConversationManager {
 
   /** A creature the GM can speak for: alive, not hostile to the player, not a player's character */
   static canTalkTo(npc: ModuleObject | undefined, pc?: ModuleObject | null): npc is ModuleCreature {
-    if (!npc || !BitWise.InstanceOf(npc.objectType, ModuleObjectType.ModuleCreature)) return false;
+    if (!npc || !GMObjectKind.isCreature(npc)) return false;
     const cre = npc as ModuleCreature;
-    if (cre.isDead() || (cre as any).gmOwnerPeerId || (cre as any).gmPlayerConfig) return false;
+    if (cre.isDead() || cre.gmOwnerPeerId || cre.gmPlayerConfig) return false;
     if (pc && cre.isHostile(pc)) return false;
     return true;
   }
@@ -122,7 +123,7 @@ export class GMConversationManager {
    * Host: start talking as an NPC with the given players, or bring them into its conversation
    */
   static join(npc: ModuleCreature, peerIds: string[]): GMConversation | null {
-    const npcNetId = (npc as any).gmNetId as string | undefined;
+    const npcNetId = npc.gmNetId as string | undefined;
     if (!npcNetId || !peerIds.length) return null;
     let conv = this.getConversationForNpc(npcNetId);
     if (!conv) {
@@ -151,7 +152,7 @@ export class GMConversationManager {
 
     // Newcomers hear what the NPC last said; a new conversation opens on its greeting
     if (!conv.lastLine) {
-      const greeting = String((npc as any).gmBarkText || '').trim() || '...';
+      const greeting = String(npc.gmBarkText || '').trim() || '...';
       this.say(conv.id, greeting, []);
     } else {
       for (const peerId of newcomers) this.sendLine(conv.lastLine, peerId);
@@ -274,7 +275,7 @@ export class GMConversationManager {
    */
   static requestTalk(npc: ModuleObject): boolean {
     const pc = GameState.getCurrentPlayer();
-    const npcNetId = (npc as any)?.gmNetId as string | undefined;
+    const npcNetId = npc?.gmNetId as string | undefined;
     if (!pc || !npcNetId || !this.canTalkTo(npc, pc)) return false;
     this.pendingTalk = { npcNetId, closest: Infinity, stuckFor: 0 };
     if (pc.position.distanceTo(npc.position) > this.TALK_RANGE) {

@@ -1,3 +1,4 @@
+import { GMFaction, GM_SKILL_NAMES } from "@/managers/gm/GMVocab";
 import * as THREE from "three";
 import { GameState } from "@/GameState";
 import { GMManager } from "@/managers/GMManager";
@@ -149,8 +150,8 @@ export interface GMPlanProblem {
 export class GMScenePlan {
 
   static FORMAT = 'kotorjs-gm-scene';
-  static SKILLS = ['computer use', 'demolitions', 'stealth', 'awareness', 'persuade', 'repair', 'security', 'treat injury'];
-  static FACTIONS: Record<GMPlanFaction, number> = { hostile: 1, friendly: 2, neutral: 5 };
+  static SKILLS = GM_SKILL_NAMES.map((name) => name.toLowerCase());
+  static FACTIONS: Record<GMPlanFaction, number> = { hostile: GMFaction.HOSTILE, friendly: GMFaction.FRIENDLY, neutral: GMFaction.NEUTRAL };
 
   /** The plan running now, the objects each of its ids became, and the beats already run */
   static active: GMScenePlan | null = null;
@@ -520,7 +521,7 @@ export class GMScenePlan {
         ? GMManager.getPlayerCharacters().filter((c) => !c.isDead())
         : (this.objects.get(target) || []).filter((o) => !o.destroyed && !(o as ModuleCreature).isDead?.());
       const chosen = candidates[index % Math.max(1, candidates.length)];
-      return (chosen as any)?.gmNetId as string | undefined;
+      return chosen?.gmNetId as string | undefined;
     };
     switch (order.kind) {
       case 'attack':

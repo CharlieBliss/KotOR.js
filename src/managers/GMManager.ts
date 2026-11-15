@@ -1,3 +1,5 @@
+import { GMFaction, GM_SKILL_NAMES, gmItemResRef } from "@/managers/gm/GMVocab";
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import * as THREE from "three";
 import { GameState } from "@/GameState";
 import { EngineMode } from "@/enums/engine/EngineMode";
@@ -87,6 +89,8 @@ import { WEAPON_OPTIONS, ARMOR_OPTIONS, LOOT_ITEM_OPTIONS } from "@/managers/gm/
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 
 export * from "@/managers/gm/GMTypes";
+export * from "@/managers/gm/GMObjectKind";
+export * from "@/managers/gm/GMVocab";
 
 export class GMManager {
   static events: GMEventEmitter = new GMEventEmitter();
@@ -176,7 +180,7 @@ export class GMManager {
       // Anyone fighting a player stops; players stop what they were doing
       for (const pc of this.getPlayerCharacters()) {
         pc.clearAllActions();
-        (pc as any).gmHostDriven = false;
+        pc.gmHostDriven = false;
       }
       for (const cre of GameState.module?.area?.creatures || []) {
         const target = (cre as ModuleCreature).combatData?.lastAttackTarget as ModuleObject | undefined;
@@ -191,14 +195,14 @@ export class GMManager {
   static isPlayerFrozen(cre: ModuleObject): boolean {
     if (!GameState.gmMode || !cre) return false;
     if (GMNetworkManager.role === 'client') {
-      return !!GMNetworkManager.sessionRules?.frozen && (cre as any).gmNetId === GMNetworkManager.assignedActorNetId;
+      return !!GMNetworkManager.sessionRules?.frozen && cre.gmNetId === GMNetworkManager.assignedActorNetId;
     }
     return this.playersFrozen && this.isPlayerCharacter(cre);
   }
 
   /** NPCs don't go after frozen players, or anything the GM has hidden (actors waiting for their cue) */
   static isUntargetable(cre: ModuleObject): boolean {
-    return !!(cre as any)?.gmHidden || (this.playersFrozen && this.isPlayerCharacter(cre));
+    return !!cre?.gmHidden || (this.playersFrozen && this.isPlayerCharacter(cre));
   }
   /** KotOR rule: a fallen player gets up once no living enemy is this close (metres)... */
   static RECOVER_ENEMY_RANGE = 20;
@@ -239,7 +243,7 @@ export class GMManager {
     templateResRef: 'g_sithtroop01',
     appearanceId: 28,
     appearanceLabel: 'Sith_Soldier_01',
-    factionId: 1, // Hostile
+    factionId: GMFaction.HOSTILE,
     hp: 25,
     level: 3,
     classId: 8,
@@ -835,7 +839,7 @@ export class GMManager {
   }
 
   static registerNetObject(netId: string, obj: ModuleObject) {
-    (obj as any).gmNetId = netId;
+    obj.gmNetId = netId;
     this.netIdMap.set(netId, obj);
   }
 
@@ -932,8 +936,8 @@ export class GMManager {
     const wasPossessing = this.controlMode === 'POSSESS';
     if (this.preservePartyOnWarp && this.spawnedPlayers.length > 0) {
       for (const p of this.spawnedPlayers) {
-        if ((p as any).gmPlayerConfig && !(p as any).gmOwnerPeerId) {
-          savedPlayerConfigs.push({ ...(p as any).gmPlayerConfig, possessImmediately: false });
+        if (p.gmPlayerConfig && !p.gmOwnerPeerId) {
+          savedPlayerConfigs.push({ ...p.gmPlayerConfig, possessImmediately: false });
         }
       }
     }
@@ -943,10 +947,10 @@ export class GMManager {
     const savedNetworkPlayers: { netId: string; config: GMPlayerSpawnConfig; sheet: GMPlayerSheet }[] = [];
     if (GMNetworkManager.role === 'host') {
       for (const [netId, obj] of this.netIdMap.entries()) {
-        if (!(obj as any).gmOwnerPeerId || obj.destroyed || !(obj as any).gmPlayerConfig) continue;
+        if (!obj.gmOwnerPeerId || obj.destroyed || !obj.gmPlayerConfig) continue;
         savedNetworkPlayers.push({
           netId,
-          config: { ...(obj as any).gmPlayerConfig, ownerPeerId: (obj as any).gmOwnerPeerId, possessImmediately: false },
+          config: { ...obj.gmPlayerConfig, ownerPeerId: obj.gmOwnerPeerId, possessImmediately: false },
           sheet: this.buildPlayerSheet(obj as ModuleCreature),
         });
       }
@@ -990,7 +994,7 @@ export class GMManager {
               saved.netId
             );
             if (!pc) continue;
-            (pc as any).gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
+            pc.gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
             await this.syncEquipmentTo(pc, saved.sheet.equipment);
             this.setCreatureHP(pc, saved.sheet.hp, saved.sheet.maxHp);
           }
@@ -1030,12 +1034,12 @@ export class GMManager {
       this.registerNetObject(netId, d);
     });
     mod.area.placeables.forEach((p, idx) => {
-      if (!(p as any).gmNetId) {
+      if (!p.gmNetId) {
         this.registerNetObject(`plc_area_${idx}_${p.getTag() || p.id}`, p);
       }
     });
     mod.area.creatures.forEach((c, idx) => {
-      if (!(c as any).gmNetId) {
+      if (!c.gmNetId) {
         this.registerNetObject(`cre_area_${idx}_${c.getTag() || c.id}`, c);
       }
     });
@@ -1245,7 +1249,7 @@ export class GMManager {
       setOrAdd(GFFDataType.WORD, 'Appearance_Type', this.resolveCreatureAppearance(config));
     }
     const targetHp = config.hp || 50;
-    setOrAdd(GFFDataType.WORD, 'FactionID', config.factionId ?? 1);
+    setOrAdd(GFFDataType.WORD, 'FactionID', config.factionId ?? GMFaction.HOSTILE);
     if (useConfig) {
       setOrAdd(GFFDataType.WORD, 'HitPoints', targetHp);
       setOrAdd(GFFDataType.WORD, 'CurrentHitPoints', targetHp);
@@ -1290,7 +1294,7 @@ export class GMManager {
         classId: config.classId ?? 0,
         level: config.level || 4,
         attributes: { str: 14, dex: 14, con: 14, int: 12, wis: 14, cha: 12 },
-        alignment: config.factionId === 1 ? 'dark' : 'light',
+        alignment: config.factionId === GMFaction.HOSTILE ? 'dark' : 'light',
       });
       const classList = root.addField(new GFFField(GFFDataType.LIST, 'ClassList'));
       const classStruct = new GFFStruct();
@@ -1339,10 +1343,10 @@ export class GMManager {
     // give it a second id (players would get a frozen duplicate)
     const netId = existingNetId || this.getNextNetId('cre');
     this.registerNetObject(netId, creature);
-    (creature as any).gmSpawning = true;
-    (creature as any).gmSpawnConfig = { ...config };
+    creature.gmSpawning = true;
+    creature.gmSpawnConfig = { ...config };
     if (config.barkText) {
-      (creature as any).gmBarkText = config.barkText;
+      creature.gmBarkText = config.barkText;
     }
     if (config.stance) creature.setHeldStance(config.stance);
 
@@ -1356,7 +1360,7 @@ export class GMManager {
       const full = Math.max(creature.getHP() || 0, creature.getMaxHP() || 0);
       if (full > 0) this.setCreatureHP(creature, full, full);
     }
-    this.assignFaction(creature, config.factionId ?? 1);
+    this.assignFaction(creature, config.factionId ?? GMFaction.HOSTILE);
     if (Array.isArray(config.lootResRefs)) {
       for (const resRef of config.lootResRefs) {
         if (resRef) creature.inventory.push(await this.createItemFromResRefAsync(resRef));
@@ -1375,7 +1379,7 @@ export class GMManager {
     creature.getCurrentRoom();
     creature.computeBoundingBox(true);
     this.markSpawned(creature);
-    delete (creature as any).gmSpawning;
+    delete creature.gmSpawning;
 
     if (!existingNetId && GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(creature));
@@ -1465,14 +1469,14 @@ export class GMManager {
     const plc = new ModulePlaceable(gff);
     const netId = existingNetId || this.getNextNetId('plc');
     this.registerNetObject(netId, plc);
-    (plc as any).gmSpawning = true;
+    plc.gmSpawning = true;
     if (config.barkText) {
-      (plc as any).gmBarkText = config.barkText;
+      plc.gmBarkText = config.barkText;
     }
     const scale = typeof config.scale === 'number' && config.scale > 0 ? config.scale : 1.0;
-    (plc as any).gmScale = scale;
-    if (config.skillGate) (plc as any).gmSkillGate = { ...config.skillGate };
-    (plc as any).gmSpawnConfig = {
+    plc.gmScale = scale;
+    if (config.skillGate) plc.gmSkillGate = { ...config.skillGate };
+    plc.gmSpawnConfig = {
       ...config,
       appearanceId: resolvedAppearanceId,
       scale,
@@ -1522,7 +1526,7 @@ export class GMManager {
     plc.getCurrentRoom();
     plc.computeBoundingBox(true);
     this.markSpawned(plc);
-    delete (plc as any).gmSpawning;
+    delete plc.gmSpawning;
 
     if (!existingNetId && GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(plc));
@@ -1666,9 +1670,9 @@ export class GMManager {
     }
 
     const player = new ModulePlayer(template);
-    (player as any).gmPlayerConfig = { ...config };
+    player.gmPlayerConfig = { ...config };
     if (config.ownerPeerId) {
-      (player as any).gmOwnerPeerId = config.ownerPeerId;
+      player.gmOwnerPeerId = config.ownerPeerId;
     }
     player.npcId = -1;
     player.load();
@@ -1831,7 +1835,7 @@ export class GMManager {
       if (customName) {
         player.firstName = customName;
       }
-      this.assignFaction(player, 0);
+      this.assignFaction(player, GMFaction.PARTY);
 
       const model = await player.loadModel();
       if (model) {
@@ -1955,7 +1959,7 @@ export class GMManager {
    * Inspector Actions on Selected World Objects
    */
   static setObjectFaction(obj: ModuleObject, factionId: number) {
-    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return;
+    if (!obj || !GMObjectKind.isCreature(obj)) return;
     const cre = obj as ModuleCreature;
     this.assignFaction(cre, factionId);
     cre.clearAllActions();
@@ -1996,7 +2000,7 @@ export class GMManager {
 
   static healObject(obj: ModuleObject) {
     if (!obj) return;
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+    if (GMObjectKind.isCreature(obj)) {
       const cre = obj as ModuleCreature;
       const max = cre.getMaxHP() || 100;
       this.setCreatureHP(cre, max, max);
@@ -2013,7 +2017,7 @@ export class GMManager {
 
   static killObject(obj: ModuleObject) {
     if (!obj) return;
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+    if (GMObjectKind.isCreature(obj)) {
       const cre = obj as ModuleCreature;
       cre.min1HP = false;
       this.setCreatureHP(cre, 0);
@@ -2033,17 +2037,17 @@ export class GMManager {
 
     // A player's character goes where its player says: move it on their machine too, and ignore their
     // position reports from before the teleport (some are already on their way)
-    const ownerPeerId = (obj as any).gmOwnerPeerId;
-    if (GMNetworkManager.role === 'host' && ownerPeerId && (obj as any).gmNetId) {
-      const seq = ((obj as any).gmTeleportSeq || 0) + 1;
-      (obj as any).gmTeleportSeq = seq;
-      (obj as any).gmHostDriven = false;
+    const ownerPeerId = obj.gmOwnerPeerId;
+    if (GMNetworkManager.role === 'host' && ownerPeerId && obj.gmNetId) {
+      const seq = (obj.gmTeleportSeq || 0) + 1;
+      obj.gmTeleportSeq = seq;
+      obj.gmHostDriven = false;
       GMNetworkManager.sendPacket({
         type: 'actor.teleport',
         senderId: GMNetworkManager.peerId,
         targetPeerId: ownerPeerId,
         timestamp: Date.now(),
-        payload: { netId: (obj as any).gmNetId, x: pos.x, y: pos.y, z: pos.z, seq }
+        payload: { netId: obj.gmNetId, x: pos.x, y: pos.y, z: pos.z, seq }
       });
     }
 
@@ -2058,7 +2062,7 @@ export class GMManager {
    * the new spot back to where it was heading) and stops following any older synced position.
    */
   static placeAt(obj: ModuleObject, pos: THREE.Vector3) {
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+    if (GMObjectKind.isCreature(obj)) {
       const cre = obj as ModuleCreature;
       cre.clearAllActions();
       cre.force = 0;
@@ -2069,7 +2073,7 @@ export class GMManager {
     if (obj.container) {
       obj.container.position.copy(pos);
     }
-    const netTarget = (obj as any).gmNetTarget as THREE.Vector3 | undefined;
+    const netTarget = obj.gmNetTarget as THREE.Vector3 | undefined;
     if (netTarget) netTarget.copy(pos);
     obj.getCurrentRoom();
     obj.computeBoundingBox(true);
@@ -2092,7 +2096,7 @@ export class GMManager {
 
   static rotateObject(obj: ModuleObject, deltaRadians: number) {
     if (!obj) return;
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+    if (GMObjectKind.isCreature(obj)) {
       const cre = obj as ModuleCreature;
       cre.setFacing(Utility.NormalizeRadian(cre.getFacing() + deltaRadians), true);
     } else {
@@ -2152,7 +2156,7 @@ export class GMManager {
    * Takes a stance id, its label or an animations.2da name.
    */
   static setCreatureStance(obj: ModuleObject, stance: string): boolean {
-    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
+    if (!obj || !GMObjectKind.isCreature(obj)) return false;
     const cre = obj as ModuleCreature;
     let anim = '';
     if (stance) {
@@ -2161,7 +2165,7 @@ export class GMManager {
       if (!anim) return false;
     }
     cre.setHeldStance(anim);
-    if ((cre as any).gmSpawnConfig) (cre as any).gmSpawnConfig.stance = anim || undefined;
+    if (cre.gmSpawnConfig) cre.gmSpawnConfig.stance = anim || undefined;
     if (GMNetworkManager.role === 'host') {
       GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(cre));
     }
@@ -2171,7 +2175,7 @@ export class GMManager {
 
   /** Play a gesture once (an id, label or animations.2da name). Players see it too. */
   static playGesture(obj: ModuleObject, gesture: string): boolean {
-    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
+    if (!obj || !GMObjectKind.isCreature(obj)) return false;
     const cre = obj as ModuleCreature;
     if (cre.isDead()) return false;
     const choice = this.findAnimationChoice('gesture', gesture) || { id: gesture, label: gesture, group: '', anims: [String(gesture).toLowerCase()] };
@@ -2186,7 +2190,7 @@ export class GMManager {
 
   static setObjectBark(obj: ModuleObject, barkText: string) {
     if (!obj) return;
-    (obj as any).gmBarkText = barkText;
+    obj.gmBarkText = barkText;
     if (GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(obj));
     }
@@ -2194,7 +2198,7 @@ export class GMManager {
   }
 
   static triggerBarkNow(obj: ModuleObject, text?: string) {
-    const msg = text || (obj as any)?.gmBarkText || `${obj?.getName() || 'Actor'}: Greetings!`;
+    const msg = text || obj?.gmBarkText || `${obj?.getName() || 'Actor'}: Greetings!`;
     GameState.MenuManager.InGameBark?.barkFromString(msg);
     if (GMNetworkManager.role !== 'offline') {
       GMNetworkManager.sendChat(obj?.getName() || 'GM', msg);
@@ -2203,7 +2207,7 @@ export class GMManager {
 
   static toggleDoorOrPlaceableOpen(obj: ModuleObject) {
     if (!obj) return;
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleDoor)) {
+    if (GMObjectKind.isDoor(obj)) {
       const door = obj as ModuleDoor;
       if (door.isOpen()) {
         door.closeDoor(door);
@@ -2215,7 +2219,7 @@ export class GMManager {
       }
       if (GMNetworkManager.role !== 'offline') {
         GMNetworkManager.broadcastDoorState({
-          netId: (door as any).gmNetId || `door_${door.id}`,
+          netId: door.gmNetId || `door_${door.id}`,
           tag: door.getTag(),
           x: door.position.x,
           y: door.position.y,
@@ -2223,7 +2227,7 @@ export class GMManager {
           openState: door.openState
         });
       }
-    } else if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable)) {
+    } else if (GMObjectKind.isPlaceable(obj)) {
       const plc = obj as ModulePlaceable;
       if (plc.isOpen()) {
         plc.close(plc);
@@ -2240,12 +2244,12 @@ export class GMManager {
 
   static toggleDoorOrPlaceableLock(obj: ModuleObject) {
     if (!obj) return;
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleDoor)) {
+    if (GMObjectKind.isDoor(obj)) {
       const door = obj as ModuleDoor;
       door.setLocked(!door.isLocked());
       if (GMNetworkManager.role !== 'offline') {
         GMNetworkManager.broadcastDoorState({
-          netId: (door as any).gmNetId || `door_${door.id}`,
+          netId: door.gmNetId || `door_${door.id}`,
           tag: door.getTag(),
           x: door.position.x,
           y: door.position.y,
@@ -2253,7 +2257,7 @@ export class GMManager {
           openState: door.openState
         });
       }
-    } else if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable)) {
+    } else if (GMObjectKind.isPlaceable(obj)) {
       const plc = obj as ModulePlaceable;
       plc.setLocked(!plc.isLocked());
       if (GMNetworkManager.role !== 'offline') {
@@ -2294,12 +2298,12 @@ export class GMManager {
     if (!obj || !itemResRef) return null;
     try {
       const item = await this.createItemFromResRefAsync(itemResRef);
-      if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable)) {
+      if (GMObjectKind.isPlaceable(obj)) {
         const plc = obj as ModulePlaceable;
         plc.hasInventory = true;
         plc.useable = true;
         plc.inventory.push(item);
-      } else if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+      } else if (GMObjectKind.isCreature(obj)) {
         GameState.InventoryManager.addItem(item);
       }
       this.notifyChange();
@@ -2332,12 +2336,12 @@ export class GMManager {
       } else {
         item.initProperties();
       }
-      if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable)) {
+      if (GMObjectKind.isPlaceable(obj)) {
         const plc = obj as ModulePlaceable;
         plc.hasInventory = true;
         plc.useable = true;
         plc.inventory.push(item);
-      } else if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+      } else if (GMObjectKind.isCreature(obj)) {
         GameState.InventoryManager.addItem(item);
       }
       this.notifyChange();
@@ -2368,7 +2372,7 @@ export class GMManager {
 
   static deleteObject(obj: ModuleObject) {
     if (!obj) return;
-    const netId = (obj as any).gmNetId;
+    const netId = obj.gmNetId;
     if (this.selectedObject === obj) {
       this.selectedObject = null;
     }
@@ -2410,18 +2414,18 @@ export class GMManager {
       obj.position.z
     );
 
-    if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable)) {
+    if (GMObjectKind.isPlaceable(obj)) {
       const plc = obj as ModulePlaceable;
-      const savedCfg: GMPlaceableSpawnConfig = (plc as any).gmSpawnConfig || {
+      const savedCfg: GMPlaceableSpawnConfig = plc.gmSpawnConfig || {
         name: plc.getName() || 'Cloned Object',
         appearanceId: plc.appearance || 52,
-        scale: (plc as any).gmScale || 1.0,
+        scale: plc.gmScale || 1.0,
         useable: plc.useable,
         hasInventory: plc.hasInventory,
         locked: plc.isLocked(),
         openLockDC: plc.openLockDC || 15,
-        lootResRefs: (plc.inventory || []).map(i => i.getEquippedRes() || i.getInventoryRes()).filter(Boolean),
-        barkText: (plc as any).gmBarkText || ''
+        lootResRefs: (plc.inventory || []).map(i => gmItemResRef(i)).filter(Boolean),
+        barkText: plc.gmBarkText || ''
       };
       const cloned = await this.spawnPlaceable(
         { ...savedCfg, zOffset: 0 },
@@ -2430,7 +2434,7 @@ export class GMManager {
       );
       if (cloned) this.selectObject(cloned);
       return cloned;
-    } else if (BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) {
+    } else if (GMObjectKind.isCreature(obj)) {
       const cre = obj as ModuleCreature;
       const eq = cre.equipment;
       const cloned = await this.spawnCreature(
@@ -2444,7 +2448,7 @@ export class GMManager {
           rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
           leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
           armorResRef: eq?.ARMOR?.getEquippedRes() || '',
-          barkText: (cre as any).gmBarkText || ''
+          barkText: cre.gmBarkText || ''
         },
         offsetPos,
         cre.getFacing()
@@ -2461,9 +2465,9 @@ export class GMManager {
   static setObjectScale(obj: ModuleObject, scale: number) {
     if (!obj || !obj.container) return;
     const clamped = Math.max(0.25, Math.min(4.0, scale));
-    (obj as any).gmScale = clamped;
-    if ((obj as any).gmSpawnConfig) {
-      (obj as any).gmSpawnConfig.scale = clamped;
+    obj.gmScale = clamped;
+    if (obj.gmSpawnConfig) {
+      (obj.gmSpawnConfig as GMPlaceableSpawnConfig).scale = clamped;
     }
     obj.container.scale.setScalar(clamped);
     obj.computeBoundingBox(true);
@@ -2493,7 +2497,7 @@ export class GMManager {
     const area = GameState.module?.area;
     if (!area) return;
     const toRemove = area.placeables.filter(
-      plc => !(plc as any).gmNetId || String((plc as any).gmNetId).startsWith('plc_area_')
+      plc => !plc.gmNetId || String(plc.gmNetId).startsWith('plc_area_')
     );
     for (const plc of toRemove) {
       this.deleteObject(plc);
@@ -2508,7 +2512,7 @@ export class GMManager {
     const area = GameState.module?.area;
     if (!area) return;
     const toRemove = area.placeables.filter(
-      plc => (plc as any).gmNetId && !String((plc as any).gmNetId).startsWith('plc_area_')
+      plc => plc.gmNetId && !String(plc.gmNetId).startsWith('plc_area_')
     );
     for (const plc of toRemove) {
       this.deleteObject(plc);
@@ -2654,16 +2658,16 @@ export class GMManager {
     for (const plc of mod.area.placeables) {
       if (!plc) continue;
       // Include all remaining placeables in the scene
-      const savedCfg: GMPlaceableSpawnConfig = (plc as any).gmSpawnConfig || {
+      const savedCfg: GMPlaceableSpawnConfig = plc.gmSpawnConfig || {
         name: plc.getName() || 'Placeable',
         appearanceId: plc.appearance || 52,
-        scale: (plc as any).gmScale || 1.0,
+        scale: plc.gmScale || 1.0,
         useable: plc.useable,
         hasInventory: plc.hasInventory,
         locked: plc.isLocked(),
         openLockDC: plc.openLockDC || 15,
-        lootResRefs: (plc.inventory || []).map(i => i.getEquippedRes() || i.getInventoryRes()).filter(Boolean),
-        barkText: (plc as any).gmBarkText || ''
+        lootResRefs: (plc.inventory || []).map(i => gmItemResRef(i)).filter(Boolean),
+        barkText: plc.gmBarkText || ''
       };
       items.push({
         dx: Number((plc.position.x - originX).toFixed(2)),
@@ -2693,7 +2697,7 @@ export class GMManager {
           rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
           leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
           armorResRef: eq?.ARMOR?.getEquippedRes() || '',
-          barkText: (cre as any).gmBarkText || ''
+          barkText: cre.gmBarkText || ''
         }
       });
     }
@@ -2773,8 +2777,8 @@ export class GMManager {
 
   /** A character a player plays: a connected player's, or one the GM spawned as a player character */
   static isPlayerCharacter(obj: ModuleObject | undefined): boolean {
-    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
-    return !!((obj as any).gmOwnerPeerId || (obj as any).gmPlayerConfig);
+    if (!obj || !GMObjectKind.isCreature(obj)) return false;
+    return !!(obj.gmOwnerPeerId || obj.gmPlayerConfig);
   }
 
   static getPlayerCharacters(): ModuleCreature[] {
@@ -2789,7 +2793,7 @@ export class GMManager {
   // =========================================================================
 
   /** skills.2da order (SKILL_*) */
-  static SKILL_NAMES = ['Computer Use', 'Demolitions', 'Stealth', 'Awareness', 'Persuade', 'Repair', 'Security', 'Treat Injury'];
+  static SKILL_NAMES = GM_SKILL_NAMES;
 
   static checkLabel(check: GMCheck): string {
     if (check.kind === 'skill') return this.SKILL_NAMES[check.skill] || `Skill ${check.skill}`;
@@ -2839,10 +2843,10 @@ export class GMManager {
   /** Give an object a skill check to pass before it can be used, or undefined to remove it */
   static setSkillGate(obj: ModuleObject, gate: GMSkillGate | undefined) {
     if (!obj) return;
-    if (gate) (obj as any).gmSkillGate = { skill: gate.skill, dc: gate.dc };
-    else delete (obj as any).gmSkillGate;
-    delete (obj as any).gmSkillGateSolved;
-    const config = (obj as any).gmSpawnConfig;
+    if (gate) obj.gmSkillGate = { skill: gate.skill, dc: gate.dc };
+    else delete obj.gmSkillGate;
+    delete obj.gmSkillGateSolved;
+    const config = obj.gmSpawnConfig as GMPlaceableSpawnConfig | undefined;
     if (config) config.skillGate = gate ? { ...gate } : undefined;
     this.notifyChange();
   }
@@ -2852,12 +2856,12 @@ export class GMManager {
    * where objects are used). Passing opens it for good; failing blocks this use, and they can try again.
    */
   static skillGatePasses(obj: ModuleObject, user: ModuleObject): boolean {
-    const gate = (obj as any)?.gmSkillGate as GMSkillGate | undefined;
-    if (!gate || (obj as any).gmSkillGateSolved) return true;
-    if (!user || !BitWise.InstanceOf(user.objectType, ModuleObjectType.ModuleCreature)) return true;
+    const gate = obj?.gmSkillGate as GMSkillGate | undefined;
+    if (!gate || obj.gmSkillGateSolved) return true;
+    if (!user || !GMObjectKind.isCreature(user)) return true;
     const result = this.callCheck([user as ModuleCreature], { kind: 'skill', skill: gate.skill }, gate.dc)[0];
     if (!result) return false;
-    if (result.success) (obj as any).gmSkillGateSolved = true;
+    if (result.success) obj.gmSkillGateSolved = true;
     return result.success;
   }
 
@@ -2873,13 +2877,13 @@ export class GMManager {
     const pcs = this.getPlayerCharacters();
     const now = Date.now();
     for (const pc of pcs) {
-      const state = (pc as any).gmDowned as { since: number; clearFor: number } | undefined;
+      const state = pc.gmDowned as { since: number; clearFor: number } | undefined;
       if (!pc.isDead()) {
-        if (state) delete (pc as any).gmDowned;
+        if (state) delete pc.gmDowned;
         continue;
       }
       if (!state) {
-        (pc as any).gmDowned = { since: now, clearFor: 0 };
+        pc.gmDowned = { since: now, clearFor: 0 };
         GMNetworkManager.appendChat('System', `${pc.getName() || 'A player'} is down.`);
         this.notifyChange();
         continue;
@@ -2919,11 +2923,11 @@ export class GMManager {
     if (!pc) return;
     const max = pc.getMaxHP() || 1;
     this.setCreatureHP(pc, Math.max(1, Math.min(max, hp ?? max)), max);
-    delete (pc as any).gmDowned;
+    delete pc.gmDowned;
     pc.clearAllActions();
     pc.combatRound?.clearActions?.();
     if (pc.combatData) pc.combatData.combatState = false;
-    if (GMNetworkManager.role === 'host' && (pc as any).gmNetId) {
+    if (GMNetworkManager.role === 'host' && pc.gmNetId) {
       GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(pc));
     }
     this.notifyChange();
@@ -2956,7 +2960,7 @@ export class GMManager {
   static onRespawnRequest(peerId: string) {
     if (this.deathRule !== 'respawn') return;
     const pc = this.getPeerActor(peerId);
-    const state = (pc as any)?.gmDowned as { since: number } | undefined;
+    const state = pc?.gmDowned as { since: number } | undefined;
     if (!pc || !pc.isDead() || !state) return;
     if (Date.now() - state.since < this.RESPAWN_DELAY_SECONDS * 1000) return;
     this.respawnPlayer(pc);
@@ -2972,7 +2976,7 @@ export class GMManager {
 
   /** An NPC the GM can order: a creature no player plays and the GM isn't playing */
   static canOrder(obj: ModuleObject | null | undefined): obj is ModuleCreature {
-    return !!obj && BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature) &&
+    return !!obj && GMObjectKind.isCreature(obj) &&
       !this.isPlayerCharacter(obj) && !GameState.PartyManager.party.includes(obj as ModuleCreature) && !(obj as ModuleCreature).isDead();
   }
 
@@ -3017,8 +3021,8 @@ export class GMManager {
       return;
     }
     const picked = this.pickObjectAtCursor();
-    if (!picked || picked === cre || !BitWise.InstanceOf(picked.objectType, ModuleObjectType.ModuleCreature)) return;
-    const netId = (picked as any).gmNetId as string | undefined;
+    if (!picked || picked === cre || !GMObjectKind.isCreature(picked)) return;
+    const netId = picked.gmNetId as string | undefined;
     if (!netId) return;
     this.giveOrder(cre, tool === 'order_attack' ? { kind: 'attack', targetNetId: netId } : { kind: 'follow', targetNetId: netId });
     this.setToolMode('select');
@@ -3056,13 +3060,13 @@ export class GMManager {
   static isAutonomousNpc(cre: ModuleCreature): boolean {
     if (!cre || !cre.isReady || cre.isDead() || cre.destroyed) return false;
     if (GameState.PartyManager.party.includes(cre)) return false;
-    if ((cre as any).gmOwnerPeerId || (cre as any).gmPlayerConfig || (cre as any).gmHostDriven) return false;
+    if (cre.gmOwnerPeerId || cre.gmPlayerConfig || cre.gmHostDriven) return false;
     return true;
   }
 
   static chooseNpcTarget(cre: ModuleCreature, everyone: ModuleCreature[]): ModuleCreature | null {
     const usable = (c: ModuleObject | undefined, range: number): c is ModuleCreature =>
-      !!c && c !== cre && BitWise.InstanceOf(c.objectType, ModuleObjectType.ModuleCreature) &&
+      !!c && c !== cre && GMObjectKind.isCreature(c) &&
       !c.isDead() && everyone.includes(c as ModuleCreature) &&
       cre.position.distanceTo(c.position) <= range && cre.isHostile(c) && cre.canDetect?.(c as ModuleCreature) !== false &&
       !this.isUntargetable(c);
@@ -3102,10 +3106,10 @@ export class GMManager {
           this.selectedObject.position.z + 0.08
         );
         const mat = this.selectionRing.material as THREE.MeshBasicMaterial;
-        if (BitWise.InstanceOf(this.selectedObject.objectType, ModuleObjectType.ModuleCreature)) {
+        if (GMObjectKind.isCreature(this.selectedObject)) {
           const cre = this.selectedObject as ModuleCreature;
-          if (cre.factionId === 1) mat.color.setHex(0xff3333);
-          else if (cre.factionId === 0 || GameState.PartyManager.party.includes(cre)) mat.color.setHex(0x00ff88);
+          if (cre.factionId === GMFaction.HOSTILE) mat.color.setHex(0xff3333);
+          else if (cre.factionId === GMFaction.PARTY || GameState.PartyManager.party.includes(cre)) mat.color.setHex(0x00ff88);
           else mat.color.setHex(0xffcc00);
         } else {
           mat.color.setHex(0x00e5ff);
@@ -3151,13 +3155,13 @@ export class GMManager {
   // =========================================================================
 
   static serializeSingleActor(obj: ModuleObject): GMSerializedActor {
-    const netId = (obj as any).gmNetId || this.getNextNetId('obj');
-    if (!(obj as any).gmNetId) {
+    const netId = obj.gmNetId || this.getNextNetId('obj');
+    if (!obj.gmNetId) {
       this.registerNetObject(netId, obj);
     }
 
-    const isPlayer = BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlayer) || GameState.PartyManager.party.includes(obj as ModuleCreature);
-    const isPlaceable = BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModulePlaceable);
+    const isPlayer = GMObjectKind.isPlayer(obj) || GameState.PartyManager.party.includes(obj as ModuleCreature);
+    const isPlaceable = GMObjectKind.isPlaceable(obj);
     const kind: 'creature' | 'player' | 'placeable' = isPlaceable ? 'placeable' : (isPlayer ? 'player' : 'creature');
 
     let rightHandResRef = '';
@@ -3173,34 +3177,34 @@ export class GMManager {
     return {
       netId,
       kind,
-      ownerPeerId: (obj as any).gmOwnerPeerId,
-      templateResRef: (obj as any).gmSpawnConfig?.templateResRef || obj.getTemplateResRef() || '',
+      ownerPeerId: obj.gmOwnerPeerId,
+      templateResRef: obj.gmSpawnConfig?.templateResRef || obj.getTemplateResRef() || '',
       appearanceId: obj.appearance || 0,
       name: obj.getName() || (obj as ModuleCreature).firstName || 'Actor',
       tag: obj.getTag() || '',
-      factionId: obj.factionId ?? 2,
+      factionId: obj.factionId ?? GMFaction.FRIENDLY,
       hp: obj.getHP() ?? 50,
       maxHp: obj.getMaxHP() ?? 50,
       x: obj.position.x,
       y: obj.position.y,
       z: obj.position.z,
       facing: isPlaceable ? (obj.bearing || 0) : (obj as ModuleCreature).getFacing(),
-      scale: (obj as any).gmScale || 1.0,
+      scale: obj.gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
-      hidden: !!(obj as any).gmHidden,
+      hidden: !!obj.gmHidden,
       stealth: !!(obj as any).stealthMode,
-      hostDriven: !!(obj as any).gmHostDriven,
-      intentSeq: (obj as any).gmIntentSeq || 0,
+      hostDriven: !!obj.gmHostDriven,
+      intentSeq: obj.gmIntentSeq || 0,
       rightHandResRef,
       leftHandResRef,
       armorResRef,
-      barkText: (obj as any).gmBarkText || '',
+      barkText: obj.gmBarkText || '',
       stance: isPlaceable ? undefined : ((obj as ModuleCreature).heldStance || ''),
       hasInventory: isPlaceable ? (obj as ModulePlaceable).hasInventory : false,
       locked: isPlaceable ? (obj as ModulePlaceable).isLocked() : false,
       openState: isPlaceable ? (obj as ModulePlaceable).state : 0,
       lootResRefs: isPlaceable
-        ? ((obj as ModulePlaceable).inventory || []).map(i => i.getEquippedRes() || i.getInventoryRes()).filter(Boolean)
+        ? ((obj as ModulePlaceable).inventory || []).map(i => gmItemResRef(i)).filter(Boolean)
         : []
     };
   }
@@ -3218,12 +3222,12 @@ export class GMManager {
     }
     // Objects still loading are sent once, complete, when their spawn finishes
     for (const c of area.creatures) {
-      if (c && !GameState.PartyManager.party.includes(c) && !(c as any).gmSpawning) {
+      if (c && !GameState.PartyManager.party.includes(c) && !c.gmSpawning) {
         list.push(this.serializeSingleActor(c));
       }
     }
     for (const plc of area.placeables) {
-      if (plc && (plc as any).gmNetId && !(plc as any).gmSpawning && !String((plc as any).gmNetId).startsWith('plc_area_')) {
+      if (plc && plc.gmNetId && !plc.gmSpawning && !String(plc.gmNetId).startsWith('plc_area_')) {
         list.push(this.serializeSingleActor(plc));
       }
     }
@@ -3233,7 +3237,7 @@ export class GMManager {
   static buildWorldSnapshot(): GMWorldSnapshot {
     const area = GameState.module?.area;
     const doors: GMSerializedDoorState[] = (area?.doors || []).map((d, idx) => ({
-      netId: (d as any).gmNetId || `door_${idx}_${d.getTag() || d.id}`,
+      netId: d.gmNetId || `door_${idx}_${d.getTag() || d.id}`,
       tag: d.getTag(),
       x: d.position.x,
       y: d.position.y,
@@ -3334,7 +3338,7 @@ export class GMManager {
         // Otherwise keep our local position and only take the host's HP
         const localObj = this.netIdMap.get(actor.netId);
         if (localObj) {
-          if (BitWise.InstanceOf(localObj.objectType, ModuleObjectType.ModuleCreature)) {
+          if (GMObjectKind.isCreature(localObj)) {
             this.setCreatureHP(localObj as ModuleCreature, actor.hp, actor.maxHp);
             const own = localObj as ModuleCreature;
             if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
@@ -3357,22 +3361,22 @@ export class GMManager {
         existing.position.set(actor.x, actor.y, actor.z);
       } else {
         this.setNetTarget(existing, actor.x, actor.y, actor.z);
-        (existing as any).gmNetAnim = actor.animState;
+        existing.gmNetAnim = actor.animState;
       }
       if (existing.container) {
         if (typeof actor.scale === 'number' && actor.scale > 0) {
           existing.container.scale.setScalar(actor.scale);
-          (existing as any).gmScale = actor.scale;
+          existing.gmScale = actor.scale;
         }
       }
-      if (BitWise.InstanceOf(existing.objectType, ModuleObjectType.ModuleCreature)) {
+      if (GMObjectKind.isCreature(existing)) {
         this.setCreatureHP(existing as ModuleCreature, actor.hp, actor.maxHp);
       } else {
         existing.setMaxHP(actor.maxHp);
         existing.currentHP = actor.hp;
       }
       if (actor.barkText !== undefined) {
-        (existing as any).gmBarkText = actor.barkText;
+        existing.gmBarkText = actor.barkText;
       }
       if (actor.kind === 'placeable') {
         const plc = existing as ModulePlaceable;
@@ -3515,7 +3519,7 @@ export class GMManager {
    */
   static findActorOwnedBy(peerId: string): string | null {
     for (const [netId, obj] of this.netIdMap.entries()) {
-      if ((obj as any).gmOwnerPeerId === peerId && !obj.destroyed) return netId;
+      if (obj.gmOwnerPeerId === peerId && !obj.destroyed) return netId;
     }
     return null;
   }
@@ -3527,14 +3531,14 @@ export class GMManager {
     const actor = this.netIdMap.get(netId);
     if (!actor) return;
     actor.clearAllActions();
-    (actor as any).gmHostDriven = false;
-    (actor as any).gmNetTarget = undefined;
+    actor.gmHostDriven = false;
+    actor.gmNetTarget = undefined;
   }
 
   static getOwnedActor(peerId: string, netId: string): ModuleCreature | null {
     const actor = this.netIdMap.get(netId);
-    if (!actor || !BitWise.InstanceOf(actor.objectType, ModuleObjectType.ModuleCreature)) return null;
-    if ((actor as any).gmOwnerPeerId !== peerId) return null;
+    if (!actor || !GMObjectKind.isCreature(actor)) return null;
+    if (actor.gmOwnerPeerId !== peerId) return null;
     return actor as ModuleCreature;
   }
 
@@ -3545,9 +3549,9 @@ export class GMManager {
   static applyClientInputOnHost(peerId: string, payload: any) {
     if (!payload) return;
     const actor = this.getOwnedActor(peerId, payload.netId);
-    if (!actor || (actor as any).gmHostDriven) return;
+    if (!actor || actor.gmHostDriven) return;
     // Sent before the player's game had moved their character to where the GM teleported it
-    if ((payload.teleportSeq ?? 0) < ((actor as any).gmTeleportSeq || 0)) return;
+    if ((payload.teleportSeq ?? 0) < (actor.gmTeleportSeq || 0)) return;
     if (typeof payload.x === 'number' && typeof payload.y === 'number') {
       this.setNetTarget(actor, payload.x, payload.y, payload.z);
       if (typeof payload.facing === 'number') {
@@ -3562,8 +3566,8 @@ export class GMManager {
 
   /** Host only, and only for objects clients know about */
   static getHostFxNetId(obj: ModuleObject | undefined): string | null {
-    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !obj || (obj as any).gmHidden) return null;
-    return (obj as any).gmNetId || null;
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !obj || obj.gmHidden) return null;
+    return obj.gmNetId || null;
   }
 
   /**
@@ -3625,13 +3629,13 @@ export class GMManager {
     if (!obj) return;
     switch (event.kind) {
       case 'anim': {
-        if (!BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return;
+        if (!GMObjectKind.isCreature(obj)) return;
         const cre = obj as ModuleCreature;
         const animation = OdysseyModelAnimation.GetAnimation2DA(event.anim);
         if (!animation || cre.isDead()) return;
         cre.playTwoDAAnimation(animation);
         cre.animationState.index = event.index;
-        (cre as any).gmFxAnimation = cre.animationState.animation;
+        cre.gmFxAnimation = cre.animationState.animation;
         break;
       }
       case 'text':
@@ -3686,8 +3690,8 @@ export class GMManager {
    */
   static routeContainerOpen(container: ModuleObject, user: ModuleObject | undefined): boolean {
     if (!GameState.gmMode || GMNetworkManager.role !== 'host') return false;
-    const peerId = (user as any)?.gmOwnerPeerId;
-    const containerNetId = (container as any)?.gmNetId;
+    const peerId = user?.gmOwnerPeerId;
+    const containerNetId = container?.gmNetId;
     if (!peerId || !containerNetId) return false;
     GMNetworkManager.sendPacket({
       type: 'container.open',
@@ -3737,13 +3741,13 @@ export class GMManager {
   static requestNetworkLoot(container: ModuleObject): boolean {
     if (!this.isNetworkContainer(container)) return false;
     (container as any).inventory = [];
-    GMNetworkManager.sendIntent('loot', (container as any).gmNetId);
+    GMNetworkManager.sendIntent('loot', container.gmNetId);
     return true;
   }
 
   /** Client: a container whose contents the host owns */
   static isNetworkContainer(container: ModuleObject): boolean {
-    return GameState.gmMode && GMNetworkManager.role === 'client' && !!(container as any)?.gmNetId;
+    return GameState.gmMode && GMNetworkManager.role === 'client' && !!container?.gmNetId;
   }
 
   /** Client: the items themselves arrive with our next character sheet; this just tells the player */
@@ -3761,7 +3765,7 @@ export class GMManager {
   static getPeerActor(peerId: string): ModuleCreature | null {
     const netId = GMNetworkManager.peers.get(peerId)?.controlledNetId;
     const actor = netId ? this.netIdMap.get(netId) : null;
-    return actor && BitWise.InstanceOf(actor.objectType, ModuleObjectType.ModuleCreature) ? actor as ModuleCreature : null;
+    return actor && GMObjectKind.isCreature(actor) ? actor as ModuleCreature : null;
   }
 
   /**
@@ -3827,9 +3831,9 @@ export class GMManager {
    */
   static setObjectHidden(obj: ModuleObject, hidden: boolean): boolean {
     // A connected player's character can't be hidden: it would vanish from their own game
-    if (!obj || (obj as any).gmOwnerPeerId) return false;
-    (obj as any).gmHidden = !!hidden;
-    const netId = (obj as any).gmNetId;
+    if (!obj || obj.gmOwnerPeerId) return false;
+    obj.gmHidden = !!hidden;
+    const netId = obj.gmNetId;
     if (netId && GMNetworkManager.role === 'host') {
       if (hidden) {
         GMNetworkManager.broadcastActorRemove(netId);
@@ -3842,7 +3846,7 @@ export class GMManager {
   }
 
   static isHiddenFromPlayers(obj: ModuleObject | null | undefined): boolean {
-    return !!(obj as any)?.gmHidden;
+    return !!obj?.gmHidden;
   }
 
   /**
@@ -3866,7 +3870,7 @@ export class GMManager {
         pos,
         facing
       );
-      if (cre) netIds.push((cre as any).gmNetId);
+      if (cre) netIds.push(cre.gmNetId);
     }
     this.notifyChange();
     return netIds;
@@ -3889,20 +3893,20 @@ export class GMManager {
       if (!obj || seen.has(obj) || obj.destroyed) continue;
       seen.add(obj);
       const cre = obj as ModuleCreature;
-      const playerConfig: GMPlayerSpawnConfig | undefined = (cre as any).gmPlayerConfig;
+      const playerConfig: GMPlayerSpawnConfig | undefined = cre.gmPlayerConfig;
       if (playerConfig) {
         players.push({
           name: playerConfig.name || cre.getName() || 'Player',
-          local: !(cre as any).gmOwnerPeerId,
+          local: !cre.gmOwnerPeerId,
           config: { ...playerConfig, ownerPeerId: undefined, possessImmediately: false },
           sheet: this.buildPlayerSheet(cre),
           x: cre.position.x, y: cre.position.y, z: cre.position.z,
           facing: cre.getFacing(),
-          hidden: !!(cre as any).gmHidden,
+          hidden: !!cre.gmHidden,
         });
         continue;
       }
-      const config: GMCreatureSpawnConfig | undefined = (cre as any).gmSpawnConfig;
+      const config: GMCreatureSpawnConfig | undefined = cre.gmSpawnConfig;
       if (!config) continue; // part of the module itself; reloaded with the scene
       objects.push({
         kind: 'creature',
@@ -3912,15 +3916,15 @@ export class GMManager {
         factionId: cre.factionId,
         hp: cre.getHP(),
         maxHp: cre.getMaxHP(),
-        hidden: !!(cre as any).gmHidden,
+        hidden: !!cre.gmHidden,
         loot: this.toLootItems(cre.inventory).map((e) => e.resRef),
-        barkText: (cre as any).gmBarkText || '',
+        barkText: cre.gmBarkText || '',
         stance: cre.heldStance || undefined,
       });
     }
 
     for (const plc of area.placeables) {
-      const config: GMPlaceableSpawnConfig | undefined = (plc as any)?.gmSpawnConfig;
+      const config: GMPlaceableSpawnConfig | undefined = plc?.gmSpawnConfig;
       if (!plc || !config || plc.destroyed) continue;
       objects.push({
         kind: 'placeable',
@@ -3928,15 +3932,15 @@ export class GMManager {
         x: plc.position.x, y: plc.position.y, z: plc.position.z,
         facing: plc.bearing || 0,
         locked: plc.isLocked(),
-        hidden: !!(plc as any).gmHidden,
+        hidden: !!plc.gmHidden,
         loot: this.toLootItems(plc.inventory).map((e) => e.resRef),
-        barkText: (plc as any).gmBarkText || '',
+        barkText: plc.gmBarkText || '',
       });
     }
 
     const doors = area.doors
-      .filter((d) => (d as any).gmNetId)
-      .map((d) => ({ netId: (d as any).gmNetId, openState: d.openState, locked: !!d.isLocked() }));
+      .filter((d) => d.gmNetId)
+      .map((d) => ({ netId: d.gmNetId, openState: d.openState, locked: !!d.isLocked() }));
 
     return {
       version: 1,
@@ -4027,7 +4031,7 @@ export class GMManager {
     );
     if (!pc) return null;
     await this.applySheetToCharacter(pc, saved.sheet);
-    if (ownerPeerId) (pc as any).gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
+    if (ownerPeerId) pc.gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
     if (saved.hidden) this.setObjectHidden(pc, true);
     return pc;
   }
@@ -4059,7 +4063,7 @@ export class GMManager {
 
     for (const door of save.doors || []) {
       const obj = this.netIdMap.get(door.netId) as ModuleDoor;
-      if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleDoor)) continue;
+      if (!obj || !GMObjectKind.isDoor(obj)) continue;
       obj.setLocked(door.locked);
       const shouldBeOpen = door.openState === ModuleDoorOpenState.OPEN1 || door.openState === ModuleDoorOpenState.OPEN2;
       if (shouldBeOpen && !obj.isOpen()) obj.openDoor(obj);
@@ -4100,7 +4104,7 @@ export class GMManager {
       if (!reserved || !actor) continue;
       this.reservedPlayers.delete(reserved.name.trim().toLowerCase());
       await this.applySheetToCharacter(actor, reserved.sheet);
-      (actor as any).gmInventory = reserved.sheet.inventory.map((e) => ({ ...e }));
+      actor.gmInventory = reserved.sheet.inventory.map((e) => ({ ...e }));
       this.teleportObject(actor, new THREE.Vector3(reserved.x, reserved.y, reserved.z));
       actor.setFacing(reserved.facing, true);
       if (reserved.hidden) this.setObjectHidden(actor, true);
@@ -4117,8 +4121,8 @@ export class GMManager {
 
   /** Host: a network player's inventory, kept as resrefs so it can't drift from what the host grants */
   static getPlayerInventory(actor: ModuleObject): GMLootItem[] {
-    if (!Array.isArray((actor as any).gmInventory)) (actor as any).gmInventory = [];
-    return (actor as any).gmInventory;
+    if (!Array.isArray(actor.gmInventory)) actor.gmInventory = [];
+    return actor.gmInventory;
   }
 
   static addToPlayerInventory(actor: ModuleObject, items: GMLootItem[]) {
@@ -4143,11 +4147,11 @@ export class GMManager {
     const equipment: Record<string, string> = {};
     for (const slot of this.PLAYER_EQUIP_SLOTS) {
       const item: ModuleItem | undefined = (cre.equipment as any)[slot];
-      const resRef = item?.getEquippedRes() || item?.getInventoryRes();
+      const resRef = gmItemResRef(item);
       if (resRef) equipment[slot] = resRef;
     }
     return {
-      netId: (cre as any).gmNetId,
+      netId: cre.gmNetId,
       classes: (cre.classes || []).map((c) => ({ id: c.id, level: c.level, spells: (c.spells || []).map((s) => s.id) })),
       attributes: { str: cre.str, dex: cre.dex, con: cre.con, int: cre.int, wis: cre.wis, cha: cre.cha },
       feats: (cre.feats || []).map((f) => f.id),
@@ -4167,14 +4171,14 @@ export class GMManager {
   static updatePlayerSheets() {
     for (const peer of GMNetworkManager.peers.values()) {
       const actor = peer.controlledNetId ? this.netIdMap.get(peer.controlledNetId) : null;
-      if (!actor || !BitWise.InstanceOf(actor.objectType, ModuleObjectType.ModuleCreature)) continue;
+      if (!actor || !GMObjectKind.isCreature(actor)) continue;
       const sheet = this.buildPlayerSheet(actor as ModuleCreature);
       const json = JSON.stringify(sheet);
       // A rejoining player keeps their id but starts with an empty sheet, so track each join separately
       const session = `${peer.peerId}:${peer.joinedAt}`;
-      if ((actor as any).gmLastSheetJson === json && (actor as any).gmLastSheetSession === session) continue;
-      (actor as any).gmLastSheetJson = json;
-      (actor as any).gmLastSheetSession = session;
+      if (actor.gmLastSheetJson === json && actor.gmLastSheetSession === session) continue;
+      actor.gmLastSheetJson = json;
+      actor.gmLastSheetSession = session;
       GMNetworkManager.sendPacket({
         type: 'player.sheet',
         senderId: GMNetworkManager.peerId,
@@ -4197,7 +4201,7 @@ export class GMManager {
     }
     if (!this.removeFromPlayerInventory(actor, resRef)) return;
     const current: ModuleItem | undefined = (actor.equipment as any)[slotName];
-    const currentResRef = current?.getEquippedRes() || current?.getInventoryRes();
+    const currentResRef = gmItemResRef(current);
     if (currentResRef) this.addToPlayerInventory(actor, [{ resRef: currentResRef, stack: 1 }]);
     const item = wanted || await this.createItemFromResRefAsync(resRef);
     await actor.equipItem(slot, item);
@@ -4208,7 +4212,7 @@ export class GMManager {
     const slotName = ModuleCreatureArmorSlot[slot];
     if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName)) return;
     const current: ModuleItem | undefined = (actor.equipment as any)[slotName];
-    const currentResRef = current?.getEquippedRes() || current?.getInventoryRes();
+    const currentResRef = gmItemResRef(current);
     if (!currentResRef) return;
     this.addToPlayerInventory(actor, [{ resRef: currentResRef, stack: 1 }]);
     actor.unequipSlot(slot);
@@ -4217,7 +4221,7 @@ export class GMManager {
   /** Client: equipping our own character becomes a request to the host. Returns true when handled. */
   static requestNetworkEquip(cre: ModuleObject, slot: number, item: ModuleItem): boolean {
     if (!this.isOwnNetworkCharacter(cre)) return false;
-    const resRef = item?.getEquippedRes() || item?.getInventoryRes();
+    const resRef = gmItemResRef(item);
     if (!resRef) return true;
     GMNetworkManager.sendIntent('equip', undefined, { slot, resRef });
     return true;
@@ -4234,8 +4238,8 @@ export class GMManager {
     return GameState.gmMode &&
       GMNetworkManager.role === 'client' &&
       !this.applyingHostSheet &&
-      !!(cre as any)?.gmNetId &&
-      (cre as any).gmNetId === GMNetworkManager.assignedActorNetId;
+      !!cre?.gmNetId &&
+      cre.gmNetId === GMNetworkManager.assignedActorNetId;
   }
 
   /**
@@ -4290,7 +4294,7 @@ export class GMManager {
     for (const slotName of this.PLAYER_EQUIP_SLOTS) {
       const want = equipment[slotName] || '';
       const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
-      const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
+      const have = gmItemResRef(current);
       if (want === have) continue;
       const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
       if (want) {
@@ -4310,11 +4314,11 @@ export class GMManager {
       ['LEFTHAND', actor.leftHandResRef],
       ['ARMOR', actor.armorResRef],
     ];
-    const loading: Record<string, boolean> = (cre as any).gmEquipLoading || ((cre as any).gmEquipLoading = {});
+    const loading: Record<string, boolean> = cre.gmEquipLoading || (cre.gmEquipLoading = {});
     for (const [slotName, resRef] of wanted) {
       if (resRef === undefined || loading[slotName]) continue;
       const current: ModuleItem | undefined = (cre.equipment as any)[slotName];
-      const have = current?.getEquippedRes() || current?.getInventoryRes() || '';
+      const have = gmItemResRef(current);
       if (have === resRef) continue;
       const slot = (ModuleCreatureArmorSlot as any)[slotName] as number;
       if (!resRef) {
@@ -4337,7 +4341,7 @@ export class GMManager {
     if (!intent) return;
     const actor = this.getOwnedActor(peerId, intent.netId);
     if (!actor) return;
-    (actor as any).gmIntentSeq = intent.seq;
+    actor.gmIntentSeq = intent.seq;
     // A watching player can't act (a late request from before the freeze is dropped too)
     if (this.playersFrozen && intent.kind !== 'cancel') return;
 
@@ -4362,21 +4366,21 @@ export class GMManager {
 
     actor.clearAllActions();
     if (intent.kind === 'cancel') {
-      (actor as any).gmHostDriven = false;
+      actor.gmHostDriven = false;
       return;
     }
     if (intent.kind === 'mine') {
-      (actor as any).gmNetTarget = undefined;
+      actor.gmNetTarget = undefined;
       this.useMineOnHost(actor as ModuleCreature, intent).then((ok) => {
-        (actor as any).gmHostDriven = ok;
+        actor.gmHostDriven = ok;
         if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
       }).catch((e) => console.warn('[GMManager] mine failed', e));
       return;
     }
     if (intent.kind === 'ability') {
-      (actor as any).gmNetTarget = undefined;
+      actor.gmNetTarget = undefined;
       this.useAbilityOnHost(actor as ModuleCreature, intent).then((ok) => {
-        (actor as any).gmHostDriven = ok;
+        actor.gmHostDriven = ok;
         if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
       }).catch((e) => console.warn('[GMManager] ability failed', e));
       return;
@@ -4384,23 +4388,23 @@ export class GMManager {
 
     const target = intent.targetNetId ? this.netIdMap.get(intent.targetNetId) : null;
     if (!target || target === actor) {
-      (actor as any).gmHostDriven = false;
+      actor.gmHostDriven = false;
       return;
     }
 
     // The host now owns this actor's position; drop any half-applied client movement
-    (actor as any).gmNetTarget = undefined;
-    if (intent.kind === 'open' && BitWise.InstanceOf(target.objectType, ModuleObjectType.ModuleDoor)) {
+    actor.gmNetTarget = undefined;
+    if (intent.kind === 'open' && GMObjectKind.isDoor(target)) {
       actor.actionOpenDoor(target);
-    } else if (intent.kind === 'attack' && BitWise.InstanceOf(target.objectType, ModuleObjectType.ModuleCreature)) {
+    } else if (intent.kind === 'attack' && GMObjectKind.isCreature(target)) {
       actor.attackCreature(target, undefined);
     } else if (intent.kind === 'use') {
       actor.actionUseObject(target);
     } else {
-      (actor as any).gmHostDriven = false;
+      actor.gmHostDriven = false;
       return;
     }
-    (actor as any).gmHostDriven = true;
+    actor.gmHostDriven = true;
   }
 
   /**
@@ -4411,7 +4415,7 @@ export class GMManager {
   static async useAbilityOnHost(actor: ModuleCreature, intent: GMClientIntent): Promise<boolean> {
     if (!actor || actor.isDead()) return false;
     const target = intent.targetNetId ? this.netIdMap.get(intent.targetNetId) : actor;
-    if (!target || (target as any).gmHidden) return false;
+    if (!target || target.gmHidden) return false;
     const id = Number(intent.abilityId);
 
     switch (intent.ability) {
@@ -4478,9 +4482,9 @@ export class GMManager {
    */
   static interceptMenuAction(pc: ModuleObject, entry: any, target: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client') return false;
-    if (!pc || (pc as any).gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    if (!pc || pc.gmNetId !== GMNetworkManager.assignedActorNetId) return false;
     if (this.isPlayerFrozen(pc)) return true;
-    const targetNetId = target && target !== pc ? ((target as any).gmNetId as string | undefined) : undefined;
+    const targetNetId = target && target !== pc ? (target.gmNetId as string | undefined) : undefined;
     const send = (ability: 'spell' | 'feat' | 'skill' | 'item', abilityId: number, resRef?: string) => {
       GMNetworkManager.sendIntent('ability', targetNetId, { ability, abilityId, resRef });
       return true;
@@ -4528,7 +4532,7 @@ export class GMManager {
   static pendingMineType: number = 4;
 
   static isMine(obj: ModuleObject | undefined): obj is ModuleTrigger {
-    return !!obj && BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleTrigger) && (obj as ModuleTrigger).type === ModuleTriggerType.TRAP;
+    return !!obj && GMObjectKind.isTrigger(obj) && (obj as ModuleTrigger).type === ModuleTriggerType.TRAP;
   }
 
   static getMines(): ModuleTrigger[] {
@@ -4541,13 +4545,13 @@ export class GMManager {
    */
   static mineNetId(mine: ModuleTrigger | undefined): string {
     if (!mine) return '';
-    if (!(mine as any).gmNetId) {
+    if (!mine.gmNetId) {
       const p = mine.position;
       const id = `trap_${Math.round(p.x * 10)}_${Math.round(p.y * 10)}_${mine.trapType}`;
-      (mine as any).gmNetId = GMNetworkManager.role === 'client' ? id : (this.netIdMap.has(id) ? this.getNextNetId('mine') : id);
-      this.registerNetObject((mine as any).gmNetId, mine);
+      mine.gmNetId = GMNetworkManager.role === 'client' ? id : (this.netIdMap.has(id) ? this.getNextNetId('mine') : id);
+      this.registerNetObject(mine.gmNetId, mine);
     }
-    return (mine as any).gmNetId;
+    return mine.gmNetId;
   }
 
   static serializeMine(mine: ModuleTrigger): GMSerializedMine {
@@ -4573,7 +4577,7 @@ export class GMManager {
 
   /** Host: a mine went off, was disarmed or recovered */
   static onMineRemoved(mine: ModuleTrigger) {
-    const netId = (mine as any).gmNetId;
+    const netId = mine.gmNetId;
     if (!netId) return;
     this.netIdMap.delete(netId);
     if (GMNetworkManager.role === 'host') {
@@ -4590,7 +4594,7 @@ export class GMManager {
     if (!mine) {
       mine = GameState.Module.ModuleArea.ModuleTrigger.CreateMine(area, new THREE.Vector3(state.x, state.y, state.z), state.trapType, undefined, state.factionId);
       if (!mine) return;
-      (mine as any).gmNetId = state.netId;
+      mine.gmNetId = state.netId;
       this.registerNetObject(state.netId, mine);
     }
     if (state.detected) mine.trapDetected = true;
@@ -4658,14 +4662,14 @@ export class GMManager {
 
   /** Host: a player's mine came out of their inventory (true when it was a GM session player's) */
   static consumePlayerItem(owner: ModuleObject, item: ModuleItem): boolean {
-    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !(owner as any)?.gmOwnerPeerId) return false;
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !owner?.gmOwnerPeerId) return false;
     this.removeFromPlayerInventory(owner, item.getItemResRef());
     return true;
   }
 
   /** Host: a recovered mine goes into a GM session player's inventory (true when it did) */
   static giveRecoveredMine(owner: ModuleObject, resRef: string): boolean {
-    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !(owner as any)?.gmOwnerPeerId) return false;
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host' || !owner?.gmOwnerPeerId) return false;
     this.addToPlayerInventory(owner, [{ resRef, stack: 1 }]);
     return true;
   }
@@ -4683,10 +4687,10 @@ export class GMManager {
    */
   static updateHostDrivenActors() {
     for (const obj of this.netIdMap.values()) {
-      if (!(obj as any).gmHostDriven) continue;
+      if (!obj.gmHostDriven) continue;
       const cre = obj as ModuleCreature;
       if (!cre.actionQueue?.length || cre.isDead()) {
-        (cre as any).gmHostDriven = false;
+        cre.gmHostDriven = false;
       }
     }
   }
@@ -4696,8 +4700,8 @@ export class GMManager {
    */
   static isNetReplica(cre: ModuleCreature): boolean {
     if (GMNetworkManager.role !== 'client') return false;
-    if (!(cre as any).gmNetId) return false;
-    if ((cre as any).gmNetId !== GMNetworkManager.assignedActorNetId) return true;
+    if (!cre.gmNetId) return false;
+    if (cre.gmNetId !== GMNetworkManager.assignedActorNetId) return true;
     return GMNetworkManager.awaitingHost;
   }
 
@@ -4706,14 +4710,14 @@ export class GMManager {
    */
   static isNetMotionDriven(cre: ModuleCreature): boolean {
     if (this.isNetReplica(cre)) return true;
-    return GMNetworkManager.role === 'host' && !!(cre as any).gmOwnerPeerId && !(cre as any).gmHostDriven;
+    return GMNetworkManager.role === 'host' && !!cre.gmOwnerPeerId && !cre.gmHostDriven;
   }
 
   static setNetTarget(obj: ModuleObject, x: number, y: number, z: number) {
-    let target = (obj as any).gmNetTarget as THREE.Vector3 | undefined;
+    let target = obj.gmNetTarget as THREE.Vector3 | undefined;
     if (!target) {
       target = new THREE.Vector3();
-      (obj as any).gmNetTarget = target;
+      obj.gmNetTarget = target;
     }
     target.set(x, y, z);
     // Snap on first sync or teleports instead of sliding across the map
@@ -4727,7 +4731,7 @@ export class GMManager {
    * Smooth a network-driven creature toward its latest synced position and pick a locomotion animation from its speed
    */
   static updateNetMotion(cre: ModuleCreature, delta: number) {
-    const target = (cre as any).gmNetTarget as THREE.Vector3 | undefined;
+    const target = cre.gmNetTarget as THREE.Vector3 | undefined;
     let speed = 0;
     if (target && delta > 0) {
       const alpha = 1 - Math.exp(-delta * this.NET_SMOOTHING);
@@ -4751,11 +4755,11 @@ export class GMManager {
     } else if (speed > 0.4) {
       if (anim !== ModuleCreatureAnimState.WALKING) cre.setAnimationState(ModuleCreatureAnimState.WALKING);
     } else {
-      const hostAnim = (cre as any).gmNetAnim as number | undefined;
+      const hostAnim = cre.gmNetAnim as number | undefined;
       const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
       const hostIsFxDriven = this.FX_DRIVEN_ANIM_STATES.includes(hostAnim);
       // Let a replayed attack/reaction animation finish before applying the tick's state
-      const fxPlaying = !!(cre as any).gmFxAnimation && cre.animationState.animation === (cre as any).gmFxAnimation;
+      const fxPlaying = !!cre.gmFxAnimation && cre.animationState.animation === cre.gmFxAnimation;
       if (hostAnim && !hostIsLocomotion && !hostIsFxDriven && !fxPlaying && hostAnim !== anim) {
         cre.setAnimationState(hostAnim);
       } else if (isLocomotion) {
@@ -4770,20 +4774,20 @@ export class GMManager {
    */
   static interceptInteraction(pc: ModuleObject, target: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client' || !target) return false;
-    if (!pc || (pc as any).gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    if (!pc || pc.gmNetId !== GMNetworkManager.assignedActorNetId) return false;
     if (this.isPlayerFrozen(pc)) return true;
-    const targetNetId = (target as any).gmNetId as string | undefined;
+    const targetNetId = target.gmNetId as string | undefined;
     if (!targetNetId) return false;
 
-    if (BitWise.InstanceOf(target.objectType, ModuleObjectType.ModuleDoor)) {
+    if (GMObjectKind.isDoor(target)) {
       GMNetworkManager.sendIntent('open', targetNetId);
       return true;
     }
-    if (BitWise.InstanceOf(target.objectType, ModuleObjectType.ModulePlaceable)) {
+    if (GMObjectKind.isPlaceable(target)) {
       GMNetworkManager.sendIntent('use', targetNetId);
       return true;
     }
-    if (BitWise.InstanceOf(target.objectType, ModuleObjectType.ModuleCreature)) {
+    if (GMObjectKind.isCreature(target)) {
       const cre = target as ModuleCreature;
       if (cre.isHostile(pc) && !cre.isDead()) {
         GMNetworkManager.sendIntent('attack', targetNetId);
@@ -4806,7 +4810,7 @@ export class GMManager {
       this.reservedPlayers.delete(reserved.name.trim().toLowerCase());
       const pc = await this.spawnSavedPlayer(reserved, peerId);
       if (pc) GMNetworkManager.appendChat('System', `${reserved.name} picked up their saved character.`);
-      return pc ? ((pc as any).gmNetId || null) : null;
+      return pc ? (pc.gmNetId || null) : null;
     }
     const basePreset = this.PLAYER_PRESETS.find(p => p.classId === preset?.classId) || this.PLAYER_PRESETS[0];
     const spawned = await this.spawnPlayerCharacter(
@@ -4822,6 +4826,6 @@ export class GMManager {
       },
       this.sceneStartPoint ? this.sceneStartPoint.clone() : undefined
     );
-    return spawned ? ((spawned as any).gmNetId || null) : null;
+    return spawned ? (spawned.gmNetId || null) : null;
   }
 }

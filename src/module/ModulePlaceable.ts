@@ -1,3 +1,4 @@
+import type { GMPlaceableSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ModuleRoom } from "@/module/ModuleRoom";
 import { AudioEmitter } from "@/audio/AudioEmitter";
 import { BinaryReader } from "@/utility/binary/BinaryReader";
@@ -486,9 +487,9 @@ export class ModulePlaceable extends ModuleObject {
     }
   
     const instance = this.scripts[ModuleObjectScript.PlaceableOnUsed];
-    if((this as any).gmBarkText || (GameState.gmMode && !this.hasInventory && !this.isLocked() && !instance)){
+    if(this.gmBarkText || (GameState.gmMode && !this.hasInventory && !this.isLocked() && !instance)){
       this.playObjectSound(ModulePlaceableObjectSound.USED);
-      GameState.MenuManager.InGameBark?.barkFromString((this as any).gmBarkText || `Used ${this.getName() || 'Object'}.`);
+      GameState.MenuManager.InGameBark?.barkFromString(this.gmBarkText || `Used ${this.getName() || 'Object'}.`);
     }
     if(!instance){ return; }
     instance.run(this);
@@ -1160,4 +1161,8 @@ export class ModulePlaceable extends ModuleObject {
     return placeable;
   }
 
+}
+
+export interface ModulePlaceable {
+  gmSpawnConfig?: GMPlaceableSpawnConfig;
 }

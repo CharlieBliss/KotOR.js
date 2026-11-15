@@ -117,7 +117,7 @@ export const GMPanel: React.FC = () => {
   useEffect(() => {
     const onGMChange = () => {
       if (GMManager.selectedObject) {
-        setInspectorBarkInput((GMManager.selectedObject as any).gmBarkText || '');
+        setInspectorBarkInput(GMManager.selectedObject.gmBarkText || '');
       }
       forceUpdate();
     };
@@ -153,7 +153,7 @@ export const GMPanel: React.FC = () => {
           GMManager.enterFreeCamera(true);
         } else {
           const target =
-            (GMManager.selectedObject && BitWise.InstanceOf(GMManager.selectedObject.objectType, KotOR.ModuleObjectType.ModuleCreature)
+            (GMManager.selectedObject && KotOR.GMObjectKind.isCreature(GMManager.selectedObject)
               ? (GMManager.selectedObject as KotOR.ModuleCreature)
               : null) ||
             KotOR.GameState.getCurrentPlayer() ||
@@ -229,7 +229,7 @@ export const GMPanel: React.FC = () => {
     } : { appearanceId: GMManager.resolveCreatureAppearance(creatureCfg), appearanceLabel: undefined });
   };
 
-  const factionName = (id: number) => id === 1 ? 'Hostile' : id === 2 ? 'Friendly' : id === 0 ? 'Party' : 'Neutral';
+  const factionName = KotOR.gmFactionName;
 
   // Only the Customize section edits the object; everything it changes marks it customized
   const updatePlaceableCfg = (patch: Partial<GMPlaceableSpawnConfig>) => {
@@ -392,7 +392,7 @@ export const GMPanel: React.FC = () => {
   }
 
   // Who "Play as" (and F2) would take control of
-  const selectedCreature = selectedObj && BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModuleCreature)
+  const selectedCreature = selectedObj && KotOR.GMObjectKind.isCreature(selectedObj)
     ? (selectedObj as KotOR.ModuleCreature)
     : null;
   const possessCandidate = selectedCreature || currentLeader || GMManager.spawnedPlayers[0] || null;
@@ -518,7 +518,7 @@ export const GMPanel: React.FC = () => {
     if (inspectorFilter === 'all' || inspectorFilter === 'creatures') {
       for (const c of currentArea.creatures) {
         if (c && !KotOR.GameState.PartyManager.party.includes(c)) {
-          const fac = c.factionId === 1 ? 'Hostile' : c.factionId === 2 ? 'Friendly' : 'Neutral';
+          const fac = factionName(c.factionId === KotOR.GMFaction.PARTY ? KotOR.GMFaction.NEUTRAL : c.factionId);
           worldObjects.push({ obj: c, kind: `Creature (${fac})`, badge: `HP ${c.getHP()}/${c.getMaxHP()}` });
         }
       }
@@ -1765,10 +1765,10 @@ export const GMPanel: React.FC = () => {
                     </div>
                     <div className="gm-list">
                       {fallenPlayers.map((pc) => (
-                        <div key={(pc as any).gmNetId || pc.id} className="gm-card">
+                        <div key={pc.gmNetId || pc.id} className="gm-card">
                           <div className="gm-card-info">
                             <div className="gm-card-title">{pc.getName()}</div>
-                            <div className="gm-card-sub">Down for {Math.round((Date.now() - ((pc as any).gmDowned?.since || Date.now())) / 1000)}s</div>
+                            <div className="gm-card-sub">Down for {Math.round((Date.now() - (pc.gmDowned?.since || Date.now())) / 1000)}s</div>
                           </div>
                           <div className="gm-row">
                             <button className="gm-btn small success" onClick={() => GMManager.revivePlayer(pc)} title="Back on their feet with full vitality">Revive</button>
@@ -1909,7 +1909,7 @@ export const GMPanel: React.FC = () => {
                             <option value="all">Every player ({players.length})</option>
                             {selectedCreature && <option value="selected">Selected: {selectedCreature.getName()}</option>}
                             {players.map((pc) => (
-                              <option key={(pc as any).gmNetId} value={(pc as any).gmNetId}>{pc.getName()}</option>
+                              <option key={pc.gmNetId} value={pc.gmNetId}>{pc.getName()}</option>
                             ))}
                           </select>
                         </div>
@@ -2192,7 +2192,7 @@ export const GMPanel: React.FC = () => {
                       </div>
 
                       {/* Creature / Player Specific Controls */}
-                      {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModuleCreature) && (
+                      {KotOR.GMObjectKind.isCreature(selectedObj) && (
                         <>
                           <div className="gm-row">
                             <button
@@ -2214,32 +2214,32 @@ export const GMPanel: React.FC = () => {
                           <div className="gm-row" title="Who it fights">
                             <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Side</span>
                               <button
-                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 1 ? 'danger' : ''}`}
-                                onClick={() => GMManager.setObjectFaction(selectedObj, 1)}
+                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.HOSTILE ? 'danger' : ''}`}
+                                onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.HOSTILE)}
                               >
                                 Hostile
                               </button>
                               <button
-                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 2 ? 'success' : ''}`}
-                                onClick={() => GMManager.setObjectFaction(selectedObj, 2)}
+                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.FRIENDLY ? 'success' : ''}`}
+                                onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.FRIENDLY)}
                               >
                                 Friendly
                               </button>
                               <button
-                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 5 ? 'active' : ''}`}
-                                onClick={() => GMManager.setObjectFaction(selectedObj, 5)}
+                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.NEUTRAL ? 'active' : ''}`}
+                                onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.NEUTRAL)}
                               >
                                 Neutral
                               </button>
                               <button
-                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 0 ? 'active' : ''}`}
-                                onClick={() => GMManager.setObjectFaction(selectedObj, 0)}
+                                className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.PARTY ? 'active' : ''}`}
+                                onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.PARTY)}
                               >
                                 Party
                               </button>
                           </div>
 
-                          {!(selectedObj as any).gmOwnerPeerId && (() => {
+                          {!selectedObj.gmOwnerPeerId && (() => {
                             const cre = selectedObj as KotOR.ModuleCreature;
                             const stances = GMManager.availableAnimations(cre, 'stance');
                             const gestures = GMManager.availableAnimations(cre, 'gesture');
@@ -2320,8 +2320,8 @@ export const GMPanel: React.FC = () => {
                       )}
 
                       {/* Door & Placeable Specific Controls */}
-                      {(BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModuleDoor) ||
-                        BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable)) && (
+                      {(KotOR.GMObjectKind.isDoor(selectedObj) ||
+                        KotOR.GMObjectKind.isPlaceable(selectedObj)) && (
                         <>
                           <div className="gm-row">
                             <button
@@ -2340,8 +2340,8 @@ export const GMPanel: React.FC = () => {
                             </button>
                           </div>
 
-                          {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable) && (() => {
-                            const gate = (selectedObj as any).gmSkillGate as { skill: number; dc: number } | undefined;
+                          {KotOR.GMObjectKind.isPlaceable(selectedObj) && (() => {
+                            const gate = selectedObj.gmSkillGate as { skill: number; dc: number } | undefined;
                             return (
                               <div className="gm-row" title="Using it takes a skill check first; passing once opens it for good">
                                 <label className="gm-checkbox" style={{ flex: 1 }}>
@@ -2369,12 +2369,12 @@ export const GMPanel: React.FC = () => {
                                     />
                                   </label>
                                 )}
-                                {(selectedObj as any).gmSkillGateSolved && <span className="gm-badge">passed</span>}
+                                {selectedObj.gmSkillGateSolved && <span className="gm-badge">passed</span>}
                               </div>
                             );
                           })()}
 
-                          {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable) && (
+                          {KotOR.GMObjectKind.isPlaceable(selectedObj) && (
                             <div className="gm-field">
                               <label>
                                 Contents ({(selectedObj as KotOR.ModulePlaceable).inventory?.length || 0} items)
@@ -2402,7 +2402,7 @@ export const GMPanel: React.FC = () => {
                         </>
                       )}
 
-                      {!(selectedObj as any).gmOwnerPeerId && (
+                      {!selectedObj.gmOwnerPeerId && (
                         <label className="gm-checkbox" title="Hidden objects stay visible to you but are removed from players' games until revealed">
                           <input
                             type="checkbox"
@@ -2414,7 +2414,7 @@ export const GMPanel: React.FC = () => {
                       )}
 
                       <details className="gm-section">
-                        <summary>Position and size <span className="gm-summary-note">{((selectedObj as any).gmScale || 1.0).toFixed(2)}x</span></summary>
+                        <summary>Position and size <span className="gm-summary-note">{(selectedObj.gmScale || 1.0).toFixed(2)}x</span></summary>
                       <div className="gm-row">
                         <button
                           className="gm-btn small success"
@@ -2462,7 +2462,7 @@ export const GMPanel: React.FC = () => {
                           {([0.75, 1.0, 1.25, 1.5, 2.0] as const).map(sc => (
                             <button
                               key={sc}
-                              className={`gm-btn small ${Math.abs(((selectedObj as any).gmScale || 1.0) - sc) < 0.05 ? 'active' : ''}`}
+                              className={`gm-btn small ${Math.abs((selectedObj.gmScale || 1.0) - sc) < 0.05 ? 'active' : ''}`}
                               onClick={() => GMManager.setObjectScale(selectedObj, sc)}
                             >
                               {sc}x
@@ -2521,7 +2521,7 @@ export const GMPanel: React.FC = () => {
                               >
                                 <option value="">Follow a player…</option>
                                 {players.map((pc) => (
-                                  <option key={(pc as any).gmNetId} value={(pc as any).gmNetId}>{pc.getName()}</option>
+                                  <option key={pc.gmNetId} value={pc.gmNetId}>{pc.getName()}</option>
                                 ))}
                               </select>
                             )}
@@ -2603,7 +2603,7 @@ export const GMPanel: React.FC = () => {
                         className={`gm-card ${selectedObj === entry.obj ? 'selected' : ''}`}
                         onClick={() => {
                           GMManager.selectObject(entry.obj);
-                          setInspectorBarkInput((entry.obj as any).gmBarkText || '');
+                          setInspectorBarkInput(entry.obj.gmBarkText || '');
                         }}
                       >
                         <div className="gm-card-info">

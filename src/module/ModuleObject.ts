@@ -1,3 +1,4 @@
+import type { GMObjectState } from "@/managers/gm/GMObjectState";
 import * as THREE from "three";
 import type { Action } from "@/actions/Action";
 import { ActionQueue } from "@/actions/ActionQueue";
@@ -3946,3 +3947,6 @@ export class ModuleObject {
   }
 
 }
+
+// GM mode's per-object state (GMObjectState): typed fields, unset outside GM sessions
+export interface ModuleObject extends GMObjectState {}
