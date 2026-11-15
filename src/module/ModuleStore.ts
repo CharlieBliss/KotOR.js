@@ -57,33 +57,16 @@ export class ModuleStore extends ModuleObject {
   }
 
   load(){
-    if(this.getResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utm'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-      }else{
-        console.error('Failed to load ModuleStore template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-    }
+    // A placed store names its template in ResRef (it has no TemplateResRef)
+    this.mergeTemplate(ResourceTypes['utm'], this.getResRef());
+    this.initProperties();
   }
 
   initProperties(){
     
     if(!this.initialized){
-      if(this.template.RootNode.hasField('ObjectId')){
-        this.id = this.template.getFieldByLabel('ObjectId').getValue();
-      }else if(this.template.RootNode.hasField('ID')){
-        this.id = this.template.getFieldByLabel('ID').getValue();
-      }
+      // A store template's ID is the store's number, not an object id
+      this.id = this.template.RootNode.get('ObjectId', this.id);
       
       GameState.ModuleObjectManager.AddObjectById(this);
     }

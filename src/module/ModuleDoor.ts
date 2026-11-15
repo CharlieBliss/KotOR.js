@@ -889,27 +889,9 @@ export class ModuleDoor extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utd'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        //console.log(this.template, gff, this)
-        this.initProperties();
-        this.loadScripts();
-      }else{
-        console.error(`Failed to load ${ModuleDoor.name} template`);
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts();
-    }
+    this.mergeTemplate(ResourceTypes['utd']);
+    this.initProperties();
+    this.loadScripts();
   }
 
   loadModel(): Promise<OdysseyModel3D> {
@@ -972,38 +954,23 @@ export class ModuleDoor extends ModuleObject {
     });
   }
 
-  loadScripts(){
-    const scriptKeys = [
-      ModuleObjectScript.DoorOnClick,
-      ModuleObjectScript.DoorOnClosed,
-      ModuleObjectScript.DoorOnDamaged,
-      ModuleObjectScript.DoorOnDeath,
-      ModuleObjectScript.DoorOnDisarm,
-      ModuleObjectScript.DoorOnFailToOpen,
-      ModuleObjectScript.DoorOnHeartbeat,
-      ModuleObjectScript.DoorOnInvDisturbed,
-      ModuleObjectScript.DoorOnLock,
-      ModuleObjectScript.DoorOnMeleeAttacked,
-      ModuleObjectScript.DoorOnOpen,
-      ModuleObjectScript.DoorOnSpellCastAt,
-      ModuleObjectScript.DoorOnTrapTriggered,
-      ModuleObjectScript.DoorOnUnlock,
-      ModuleObjectScript.DoorOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ continue; }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.DoorOnClick,
+    ModuleObjectScript.DoorOnClosed,
+    ModuleObjectScript.DoorOnDamaged,
+    ModuleObjectScript.DoorOnDeath,
+    ModuleObjectScript.DoorOnDisarm,
+    ModuleObjectScript.DoorOnFailToOpen,
+    ModuleObjectScript.DoorOnHeartbeat,
+    ModuleObjectScript.DoorOnInvDisturbed,
+    ModuleObjectScript.DoorOnLock,
+    ModuleObjectScript.DoorOnMeleeAttacked,
+    ModuleObjectScript.DoorOnOpen,
+    ModuleObjectScript.DoorOnSpellCastAt,
+    ModuleObjectScript.DoorOnTrapTriggered,
+    ModuleObjectScript.DoorOnUnlock,
+    ModuleObjectScript.DoorOnUserDefined,
+  ];
 
   async loadWalkmesh(resRef = ''): Promise<OdysseyWalkMesh> {
     try{
@@ -1228,20 +1195,7 @@ export class ModuleDoor extends ModuleObject {
     gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnClick, this.scripts[ModuleObjectScript.DoorOnClick]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnClosed, this.scripts[ModuleObjectScript.DoorOnClosed]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnDamaged, this.scripts[ModuleObjectScript.DoorOnDamaged]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnDeath, this.scripts[ModuleObjectScript.DoorOnDeath]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnDisarm, this.scripts[ModuleObjectScript.DoorOnDisarm]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnFailToOpen, this.scripts[ModuleObjectScript.DoorOnFailToOpen]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnHeartbeat, this.scripts[ModuleObjectScript.DoorOnHeartbeat]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnLock, this.scripts[ModuleObjectScript.DoorOnLock]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnMeleeAttacked, this.scripts[ModuleObjectScript.DoorOnMeleeAttacked]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnOpen, this.scripts[ModuleObjectScript.DoorOnOpen]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnSpellCastAt, this.scripts[ModuleObjectScript.DoorOnSpellCastAt]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnTrapTriggered, this.scripts[ModuleObjectScript.DoorOnTrapTriggered]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnUnlock, this.scripts[ModuleObjectScript.DoorOnUnlock]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.DoorOnUserDefined, this.scripts[ModuleObjectScript.DoorOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
     
     gff.RootNode.addByte('OpenLockDC', this.openLockDC);
     gff.RootNode.addByte('OpenState', this.openState);

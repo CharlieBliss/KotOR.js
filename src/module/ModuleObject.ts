@@ -23,6 +23,7 @@ import { OdysseyModel, OdysseyModelAnimation, OdysseyWalkMesh } from "@/odyssey"
 import { CExoLocString } from "@/resource/CExoLocString";
 import { GFFField } from "@/resource/GFFField";
 import { GFFObject } from "@/resource/GFFObject";
+import { ResourceLoader } from "@/loaders";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { LIPObject } from "@/resource/LIPObject";
 import { OdysseyModel3D, OdysseyObject3D } from "@/three/odyssey";
@@ -377,6 +378,47 @@ export class ModuleObject {
     this.reflexSaveThrow = 0;
     this.willSaveThrow = 0;
 
+  }
+
+  /** The template fields naming this object type's event scripts; loadScripts() and saveScripts() use them */
+  static SCRIPT_KEYS: ModuleObjectScript[] = [];
+
+  /**
+   * Merge this object's template (its blueprint in the game files) under the data it was placed with.
+   * Returns false when the object names a template that can't be found; with no resref there is nothing to merge.
+   */
+  mergeTemplate(resType: number, resRef: string = this.getTemplateResRef()): boolean {
+    if(!resRef){ return true; }
+    const buffer = ResourceLoader.loadCachedResource(resType, resRef);
+    if(!buffer){
+      console.error(`Failed to load ${this.constructor.name} template ${resRef}`);
+      return false;
+    }
+    this.template.merge(new GFFObject(buffer));
+    return true;
+  }
+
+  /** Load the scripts named in scriptsNode (by default the template's root) for this type's SCRIPT_KEYS */
+  loadScripts(scriptsNode: GFFStruct | undefined = this.template?.RootNode){
+    if(!scriptsNode){ return; }
+    for(const scriptKey of (this.constructor as typeof ModuleObject).SCRIPT_KEYS){
+      const resRef = scriptsNode.get(scriptKey, '');
+      if(!resRef){ continue; }
+      const nwscript = GameState.NWScript.Load(resRef);
+      if(!nwscript){
+        console.warn(`${this.constructor.name}.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
+        continue;
+      }
+      nwscript.caller = this;
+      this.scripts[scriptKey] = nwscript;
+    }
+  }
+
+  /** Write this type's SCRIPT_KEYS fields: each script's resref, or '' */
+  saveScripts(root: GFFStruct){
+    for(const scriptKey of (this.constructor as typeof ModuleObject).SCRIPT_KEYS){
+      root.addRESREF(scriptKey, this.scripts[scriptKey]?.name || '');
+    }
   }
 
   getScriptInstance(scriptKey: ModuleObjectScript): NWScriptInstance | undefined {

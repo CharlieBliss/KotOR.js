@@ -55,6 +55,9 @@ const SYNC_TIMEOUT = 20000;
 // Fights have taken 30-100s: players can be held up getting around each other to reach the target
 const COMBAT_TIMEOUT = 180000;
 
+// Its own browser profile, so a run is not blocked by other game windows holding the default one
+app.setPath('userData', path.join(require('os').tmpdir(), 'kotor-gm-e2e'));
+
 // Keep game windows simulating at full speed even when hidden or unfocused
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');

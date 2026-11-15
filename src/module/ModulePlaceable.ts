@@ -566,29 +566,10 @@ export class ModulePlaceable extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utp'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadInventory();
-        this.loadScripts();
-      }else{
-        console.error('Failed to load ModulePlaceable template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadInventory();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadInventory();
-      this.loadScripts();
-    }
+    this.mergeTemplate(ResourceTypes['utp']);
+    this.initProperties();
+    this.loadInventory();
+    this.loadScripts();
   }
 
   async loadModel(): Promise<OdysseyModel3D> {
@@ -624,42 +605,23 @@ export class ModulePlaceable extends ModuleObject {
     return this.model;
   }
 
-  loadScripts (){
-    const scriptKeys = [
-      ModuleObjectScript.PlaceableOnClosed,
-      ModuleObjectScript.PlaceableOnDamaged,
-      ModuleObjectScript.PlaceableOnDeath,
-      ModuleObjectScript.PlaceableOnDisarm,
-      ModuleObjectScript.PlaceableOnEndDialogue,
-      ModuleObjectScript.PlaceableOnHeartbeat,
-      ModuleObjectScript.PlaceableOnInvDisturbed,
-      ModuleObjectScript.PlaceableOnLock,
-      ModuleObjectScript.PlaceableOnMeleeAttacked,
-      ModuleObjectScript.PlaceableOnOpen,
-      ModuleObjectScript.PlaceableOnSpellCastAt,
-      ModuleObjectScript.PlaceableOnTrapTriggered,
-      ModuleObjectScript.PlaceableOnUnlock,
-      ModuleObjectScript.PlaceableOnUsed,
-      ModuleObjectScript.PlaceableOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ 
-          console.warn(`ModulePlaceable.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-          continue; 
-        }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.PlaceableOnClosed,
+    ModuleObjectScript.PlaceableOnDamaged,
+    ModuleObjectScript.PlaceableOnDeath,
+    ModuleObjectScript.PlaceableOnDisarm,
+    ModuleObjectScript.PlaceableOnEndDialogue,
+    ModuleObjectScript.PlaceableOnHeartbeat,
+    ModuleObjectScript.PlaceableOnInvDisturbed,
+    ModuleObjectScript.PlaceableOnLock,
+    ModuleObjectScript.PlaceableOnMeleeAttacked,
+    ModuleObjectScript.PlaceableOnOpen,
+    ModuleObjectScript.PlaceableOnSpellCastAt,
+    ModuleObjectScript.PlaceableOnTrapTriggered,
+    ModuleObjectScript.PlaceableOnUnlock,
+    ModuleObjectScript.PlaceableOnUsed,
+    ModuleObjectScript.PlaceableOnUserDefined,
+  ];
 
   loadInventory(){
     let inventory = this.getItemList();
@@ -952,21 +914,7 @@ export class ModulePlaceable extends ModuleObject {
     gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnClosed, this.scripts[ModuleObjectScript.PlaceableOnClosed]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnDamaged, this.scripts[ModuleObjectScript.PlaceableOnDamaged]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnDeath, this.scripts[ModuleObjectScript.PlaceableOnDeath]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnDisarm, this.scripts[ModuleObjectScript.PlaceableOnDisarm]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnEndDialogue, this.scripts[ModuleObjectScript.PlaceableOnEndDialogue]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnHeartbeat, this.scripts[ModuleObjectScript.PlaceableOnHeartbeat]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnInvDisturbed, this.scripts[ModuleObjectScript.PlaceableOnInvDisturbed]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnLock, this.scripts[ModuleObjectScript.PlaceableOnLock]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnMeleeAttacked, this.scripts[ModuleObjectScript.PlaceableOnMeleeAttacked]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnOpen, this.scripts[ModuleObjectScript.PlaceableOnOpen]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnSpellCastAt, this.scripts[ModuleObjectScript.PlaceableOnSpellCastAt]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnTrapTriggered, this.scripts[ModuleObjectScript.PlaceableOnTrapTriggered]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnUnlock, this.scripts[ModuleObjectScript.PlaceableOnUnlock]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnUsed, this.scripts[ModuleObjectScript.PlaceableOnUsed]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.PlaceableOnUserDefined, this.scripts[ModuleObjectScript.PlaceableOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
     
     gff.RootNode.addByte('Open', this.isOpen() ? 1 : 0);
     gff.RootNode.addByte('OpenLockDC', this.openLockDC);

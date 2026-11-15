@@ -819,40 +819,27 @@ export class ModuleMGPlayer extends ModuleObject {
     instance.run(this, 0);
   }
 
-  loadScripts (){
-    const scriptResRefs = [
-      ModuleObjectScript.MGPlayerOnAccelerate,
-      ModuleObjectScript.MGPlayerOnAnimEvent,
-      ModuleObjectScript.MGPlayerOnBrake,
-      ModuleObjectScript.MGPlayerOnCreate,
-      ModuleObjectScript.MGPlayerOnDamage,
-      ModuleObjectScript.MGPlayerOnDeath,
-      ModuleObjectScript.MGPlayerOnFire,
-      ModuleObjectScript.MGPlayerOnHeartbeat,
-      ModuleObjectScript.MGPlayerOnHitBullet,
-      ModuleObjectScript.MGPlayerOnHitFollower,
-      ModuleObjectScript.MGPlayerOnHitObstacle,
-      ModuleObjectScript.MGPlayerOnHitWorld,
-      ModuleObjectScript.MGPlayerOnTrackLoop,
-    ];
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.MGPlayerOnAccelerate,
+    ModuleObjectScript.MGPlayerOnAnimEvent,
+    ModuleObjectScript.MGPlayerOnBrake,
+    ModuleObjectScript.MGPlayerOnCreate,
+    ModuleObjectScript.MGPlayerOnDamage,
+    ModuleObjectScript.MGPlayerOnDeath,
+    ModuleObjectScript.MGPlayerOnFire,
+    ModuleObjectScript.MGPlayerOnHeartbeat,
+    ModuleObjectScript.MGPlayerOnHitBullet,
+    ModuleObjectScript.MGPlayerOnHitFollower,
+    ModuleObjectScript.MGPlayerOnHitObstacle,
+    ModuleObjectScript.MGPlayerOnHitWorld,
+    ModuleObjectScript.MGPlayerOnTrackLoop,
+  ];
 
-    const scriptsNode = this.template.getFieldByLabel('Scripts')?.getFieldStruct();
-    if(scriptsNode){
-      for(const scriptKey of scriptResRefs){
-        if(scriptsNode.hasField(scriptKey)){
-          const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-          if(!resRef){ continue; }
-          const nwscript = GameState.NWScript.Load(resRef);
-          if(!nwscript){ 
-            console.warn(`ModuleMGPlayer.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-            continue; 
-          }
-          nwscript.caller = this;
-          this.scripts[scriptKey] = nwscript;
-        }
-      }
-    }
+  /** A minigame object's scripts are in its template's Scripts struct */
+  loadScripts(){
+    super.loadScripts(this.template.getFieldByLabel('Scripts')?.getFieldStruct());
   }
+
 
   initProperties(){
     this.accel_secs = this.template.RootNode.get('Accel_Secs', this.accel_secs);

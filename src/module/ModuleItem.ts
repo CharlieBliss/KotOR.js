@@ -583,42 +583,11 @@ export class ModuleItem extends ModuleObject {
   }
 
   load(){
-    if(!this.loaded && this.getEquippedRes()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['uti'], this.getEquippedRes());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        return true;
-      }else{
-        console.error('Failed to load ModuleItem template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-        return false;
-      }
-    }else if(!this.loaded && this.getInventoryRes()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['uti'], this.getInventoryRes());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        return true;
-      }else{
-        console.error('Failed to load ModuleItem template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-        return false;
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      // this.loadScripts();
-      return true;
-    }
+    // Once loaded (or from a save game) the template is already complete
+    const resRef = this.loaded ? '' : (this.getEquippedRes() || this.getInventoryRes());
+    const merged = this.mergeTemplate(ResourceTypes['uti'], resRef);
+    this.initProperties();
+    return merged;
   }
 
   async loadModel(): Promise<OdysseyModel3D> {

@@ -69,23 +69,8 @@ export class ModuleWaypoint extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utw'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-      }else{
-        console.error('Failed to load ModuleWaypoint template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-    }
+    this.mergeTemplate(ResourceTypes['utw']);
+    this.initProperties();
   }
 
   save(){

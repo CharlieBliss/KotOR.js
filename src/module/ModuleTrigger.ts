@@ -216,37 +216,13 @@ export class ModuleTrigger extends ModuleObject {
     return trigGeom;
   }
 
-  load( onLoad?: Function ){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utt'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadScripts()
-        this.buildGeometry();
-        this.initObjectsInside();
-        this.loadTrap();
-      }else{
-        console.error('Failed to load ModuleTrigger template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-          this.buildGeometry();
-          this.initObjectsInside();
-          this.loadTrap();
-        }
-      }
-
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts()
-      this.buildGeometry();
-      this.initObjectsInside();
-      this.loadTrap();
-    }
+  load(){
+    this.mergeTemplate(ResourceTypes['utt']);
+    this.initProperties();
+    this.loadScripts();
+    this.buildGeometry();
+    this.initObjectsInside();
+    this.loadTrap();
   }
 
   loadTrap(){
@@ -554,31 +530,15 @@ export class ModuleTrigger extends ModuleObject {
     GameState.module.addEvent(event);
   }
 
-  loadScripts(){
-    const scriptKeys = [
-      ModuleObjectScript.TriggerOnClick,
-      ModuleObjectScript.TriggerOnDisarm,
-      ModuleObjectScript.TriggerOnTrapTriggered,
-      ModuleObjectScript.TriggerOnHeartbeat,
-      ModuleObjectScript.TriggerOnEnter,
-      ModuleObjectScript.TriggerOnExit,
-      ModuleObjectScript.TriggerOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ continue; }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.TriggerOnClick,
+    ModuleObjectScript.TriggerOnDisarm,
+    ModuleObjectScript.TriggerOnTrapTriggered,
+    ModuleObjectScript.TriggerOnHeartbeat,
+    ModuleObjectScript.TriggerOnEnter,
+    ModuleObjectScript.TriggerOnExit,
+    ModuleObjectScript.TriggerOnUserDefined,
+  ];
 
   initProperties(){
     
@@ -734,9 +694,7 @@ export class ModuleTrigger extends ModuleObject {
     gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnClick, this.scripts[ModuleObjectScript.TriggerOnClick]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnDisarm, this.scripts[ModuleObjectScript.TriggerOnDisarm]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnTrapTriggered, this.scripts[ModuleObjectScript.TriggerOnTrapTriggered]?.name || '');
+    this.saveScripts(gff.RootNode);
     
     gff.RootNode.addWord('PortraitId', this.portraitId);
 
@@ -744,11 +702,6 @@ export class ModuleTrigger extends ModuleObject {
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
-    //Scripts
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnHeartbeat, this.scripts[ModuleObjectScript.TriggerOnHeartbeat]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnEnter, this.scripts[ModuleObjectScript.TriggerOnEnter]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnExit, this.scripts[ModuleObjectScript.TriggerOnExit]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.TriggerOnUserDefined, this.scripts[ModuleObjectScript.TriggerOnUserDefined]?.name || '');
 
     gff.RootNode.addByte('SetByPartyPlayer', this.setByPlayerParty);
     gff.RootNode.addCExoString('Tag', this.tag);

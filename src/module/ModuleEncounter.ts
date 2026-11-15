@@ -189,30 +189,10 @@ export class ModuleEncounter extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['ute'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadScripts();
-        try{ this.buildGeometry(); }catch(e){console.error(e)}
-        //this.initObjectsInside();
-      }else{
-        console.error('Failed to load ModuleTrigger template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-          try{ this.buildGeometry(); }catch(e){console.error(e)}
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts();
-      try{ this.buildGeometry(); }catch(e){console.error(e)}
-    }
+    this.mergeTemplate(ResourceTypes['ute']);
+    this.initProperties();
+    this.loadScripts();
+    try{ this.buildGeometry(); }catch(e){console.error(e)}
   }
 
   buildGeometry(){
@@ -259,31 +239,13 @@ export class ModuleEncounter extends ModuleObject {
     return trigGeom;
   }
 
-  loadScripts(){
-    const scriptKeys = [
-      ModuleObjectScript.EncounterOnEntered,
-      ModuleObjectScript.EncounterOnExhausted,
-      ModuleObjectScript.EncounterOnExit,
-      ModuleObjectScript.EncounterOnHeartbeat,
-      ModuleObjectScript.EncounterOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ 
-          console.warn(`ModuleEncounter.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-          continue; 
-        }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.EncounterOnEntered,
+    ModuleObjectScript.EncounterOnExhausted,
+    ModuleObjectScript.EncounterOnExit,
+    ModuleObjectScript.EncounterOnHeartbeat,
+    ModuleObjectScript.EncounterOnUserDefined,
+  ];
 
   initProperties(){
     
@@ -502,11 +464,7 @@ export class ModuleEncounter extends ModuleObject {
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
     //Scripts
-    gff.RootNode.addRESREF(ModuleObjectScript.EncounterOnEntered, this.scripts[ModuleObjectScript.EncounterOnEntered]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.EncounterOnExit, this.scripts[ModuleObjectScript.EncounterOnExit]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.EncounterOnExhausted, this.scripts[ModuleObjectScript.EncounterOnExhausted]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.EncounterOnHeartbeat, this.scripts[ModuleObjectScript.EncounterOnHeartbeat]?.name || '');
-    gff.RootNode.addRESREF(ModuleObjectScript.EncounterOnUserDefined, this.scripts[ModuleObjectScript.EncounterOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
 
     gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
     gff.RootNode.addFloat('XPosition', this.position.x);

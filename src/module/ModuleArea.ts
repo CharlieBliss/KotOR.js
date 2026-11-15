@@ -1713,15 +1713,44 @@ export class ModuleArea extends ModuleObject {
   }
 
   /**
+   * Run load for each object in an area list, one at a time. An object that fails to load is logged and skipped.
+   */
+  private async loadEach<T>(label: string, objects: T[], load: (object: T) => void | Promise<void>): Promise<void> {
+    console.log(`Loading ${label}`);
+    for(const object of objects){
+      try{
+        await load(object);
+      }catch(e){
+        console.error(e);
+      }
+    }
+  }
+
+  /** The room whose bounds contain point, the one with its centre nearest when several do; null outside every room */
+  roomContaining(point: THREE.Vector3): OdysseyModel3D | null {
+    let nearest: OdysseyModel3D | null = null;
+    let nearestDistance = Infinity;
+    const roomCenter = new THREE.Vector3();
+    for(const room of GameState.group.rooms.children){
+      if(!(room instanceof OdysseyModel3D) || !room.box.containsPoint(point)){ continue; }
+      room.box.getCenter(roomCenter);
+      const distance = point.distanceTo(roomCenter);
+      if(distance < nearestDistance){
+        nearestDistance = distance;
+        nearest = room;
+      }
+    }
+    return nearest;
+  }
+
+  /**
    * Load the area's static cameras
    */
   async loadCameras(){
-    console.log('Loading Cameras');
-    for(let i = 0; i < this.cameras.length; i++){
-      const camera = this.cameras[i];
+    await this.loadEach('Cameras', this.cameras, (camera) => {
       camera.load();
       GameState.staticCameras.push(camera.perspectiveCamera);
-    }
+    });
   }
 
   /**
@@ -1795,60 +1824,52 @@ export class ModuleArea extends ModuleObject {
    * Load the area's doors
    */
   async loadDoors(): Promise<void> {
-    console.log('Loading Doors');
-    for(let i = 0; i < this.doors.length; i++){
-      const door = this.doors[i];
+    await this.loadEach('Doors', this.doors, async (door) => {
+      door.load();
+      // door.position.x = door.getX();
+      // door.position.y = door.getY();
+      // door.position.z = door.getZ();
+      door.rotation.set(0, 0, door.getBearing());
+      const model = await door.loadModel();
+      door.computeBoundingBox();
+      const dwk = await door.loadWalkmesh(model.name);
+
       try{
-        door.load();
-        // door.position.x = door.getX();
-        // door.position.y = door.getY();
-        // door.position.z = door.getZ();
-        door.rotation.set(0, 0, door.getBearing());
-        const model = await door.loadModel();
-        door.computeBoundingBox();
-        const dwk = await door.loadWalkmesh(model.name);
+        model.userData.walkmesh = dwk;
+        door.collisionManager.setWalkmesh(dwk);
+        GameState.walkmeshList.push( dwk.mesh );
 
-        try{
-          model.userData.walkmesh = dwk;
-          door.collisionManager.setWalkmesh(dwk);
-          GameState.walkmeshList.push( dwk.mesh );
-
-          if(dwk.mesh instanceof THREE.Object3D){
-            dwk.mat4.makeRotationFromEuler(door.rotation);
-            dwk.mat4.setPosition( door.position.x, door.position.y, door.position.z);
-            dwk.mesh.geometry.applyMatrix4(dwk.mat4);
-            dwk.updateMatrix();
-            //dwk.mesh.position.copy(door.position);
-            // if(!door.isOpen()){
-            //   GameState.group.room_walkmeshes.add( dwk.mesh );
-            // }
-          }
-        }catch(e){
-          console.error('Failed to add dwk', model.name, dwk, e);
+        if(dwk.mesh instanceof THREE.Object3D){
+          dwk.mat4.makeRotationFromEuler(door.rotation);
+          dwk.mat4.setPosition( door.position.x, door.position.y, door.position.z);
+          dwk.mesh.geometry.applyMatrix4(dwk.mat4);
+          dwk.updateMatrix();
+          //dwk.mesh.position.copy(door.position);
+          // if(!door.isOpen()){
+          //   GameState.group.room_walkmeshes.add( dwk.mesh );
+          // }
         }
-
-        if(door.model instanceof OdysseyModel3D){
-          door.box.setFromObject(door.model);
-        }
-
-        if(door.openState){
-          door.model.playAnimation('opened1', true);
-        }
-        door.getCurrentRoom();
-        GameState.group.doors.add( door.container );
       }catch(e){
-        console.error(e);
+        console.error('Failed to add dwk', model.name, dwk, e);
       }
-    }
+
+      if(door.model instanceof OdysseyModel3D){
+        door.box.setFromObject(door.model);
+      }
+
+      if(door.openState){
+        door.model.playAnimation('opened1', true);
+      }
+      door.getCurrentRoom();
+      GameState.group.doors.add( door.container );
+    });
   }
 
   /**
    * Load the area's placeables
    */
   async loadPlaceables(): Promise<void> {
-    console.log('Loading Placeables');
-    for(let i = 0; i < this.placeables.length; i++){
-      const plc = this.placeables[i];
+    await this.loadEach('Placeables', this.placeables, async (plc) => {
       plc.load();
       plc.position.set(plc.getX(), plc.getY(), plc.getZ());
       plc.rotation.set(0, 0, plc.getBearing());
@@ -1871,16 +1892,14 @@ export class ModuleArea extends ModuleObject {
       plc.getCurrentRoom();
       plc.position.set(plc.getX(), plc.getY(), plc.getZ());
       plc.computeBoundingBox();
-    }
+    });
   }
 
   /**
    * Load the area's waypoints
    */
   async loadWaypoints(): Promise<void> {
-    console.log('Loading Waypoints');
-    for(let i = 0; i < this.waypoints.length; i++){
-      const waypnt = this.waypoints[i];
+    await this.loadEach('Waypoints', this.waypoints, (waypnt) => {
       waypnt.load();
       const wpObj = new THREE.Object3D();
       wpObj.name = waypnt.getTag();
@@ -1888,166 +1907,79 @@ export class ModuleArea extends ModuleObject {
       wpObj.quaternion.setFromAxisAngle(new THREE.Vector3(0,0,1), Math.atan2(-waypnt.getYOrientation(), -waypnt.getXOrientation()));
       waypnt.rotation.z = Math.atan2(-waypnt.getYOrientation(), -waypnt.getXOrientation()) + Math.PI/2;
       GameState.group.waypoints.add(wpObj);
-
-      let _distance = 1000000000;
-      let _currentRoom = null;
-      let roomCenter = new THREE.Vector3();
-      for(let i = 0; i < GameState.group.rooms.children.length; i++){
-        let room = GameState.group.rooms.children[i];
-        if(room instanceof OdysseyModel3D){
-          if(room.box.containsPoint(wpObj.position)){
-            room.box.getCenter(roomCenter);
-            let distance = wpObj.position.distanceTo(roomCenter);
-            if(distance < _distance){
-              _distance = distance;
-              _currentRoom = room;
-            }
-          }
-        }
-      }
-      wpObj.userData.area = _currentRoom;
+      wpObj.userData.area = this.roomContaining(wpObj.position);
       this.areaMap.addMapNote(waypnt);
-    }
+    });
   }
 
   /**
    * Load the area's encounters
    */
   async loadEncounters(): Promise<void> {
-    console.log('Loading Encounters');
-    for(let i = 0; i < this.encounters.length; i++){
-      const encounter = this.encounters[i];
-      try{
-        encounter.load();
-        let _distance = 1000000000;
-        let _currentRoom = null;
-        let roomCenter = new THREE.Vector3();
-        for(let i = 0; i < GameState.group.rooms.children.length; i++){
-          let room = GameState.group.rooms.children[i];
-          if(room instanceof OdysseyModel3D){
-            if(room.box.containsPoint(encounter.mesh.position)){
-              room.box.getCenter(roomCenter);
-              let distance = encounter.mesh.position.distanceTo(roomCenter);
-              if(distance < _distance){
-                _distance = distance;
-                _currentRoom = room;
-              }
-            }
-          }
-        }
-        encounter.mesh.userData.area = _currentRoom;
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Encounters', this.encounters, (encounter) => {
+      encounter.load();
+      encounter.mesh.userData.area = this.roomContaining(encounter.mesh.position);
+    });
   }
 
   /**
    * Load the area's Area of Effects
    */
   async loadAreaEffects(): Promise<void> {
-    console.log('Loading AreaEffects');
-    for(let i = 0; i < this.areaOfEffects.length; i++){
-      try{
-        const aoe = this.areaOfEffects[i];
-        aoe.load();
-        GameState.group.effects.add( aoe.container );
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('AreaEffects', this.areaOfEffects, (aoe) => {
+      aoe.load();
+      GameState.group.effects.add( aoe.container );
+    });
   }
 
   /**
    * Load the area's triggers
    */
   async loadTriggers(): Promise<void> {
-    console.log('Loading Triggers');
-    for(let i = 0; i < this.triggers.length; i++){
-      try{
-        const trig = this.triggers[i];
-        trig.load();
-        let _distance = 1000000000;
-        let _currentRoom = null;
-        let roomCenter = new THREE.Vector3();
-        for(let i = 0; i < GameState.group.rooms.children.length; i++){
-          let room = GameState.group.rooms.children[i];
-          if(room instanceof OdysseyModel3D){
-            if(room.box.containsPoint(trig.mesh.position)){
-              room.box.getCenter(roomCenter);
-              let distance = trig.mesh.position.distanceTo(roomCenter);
-              if(distance < _distance){
-                _distance = distance;
-                _currentRoom = room;
-              }
-            }
-          }
-        }
-        trig.mesh.userData.area = _currentRoom;
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Triggers', this.triggers, (trig) => {
+      trig.load();
+      trig.mesh.userData.area = this.roomContaining(trig.mesh.position);
+    });
   }
 
   /**
    * Load the area's creatures
    */
   async loadCreatures(): Promise<void> {
-    console.log('Loading Creatures');
-    for(let i = 0; i < this.creatures.length; i++){
-      try{
-        const creature = this.creatures[i];
-        creature.load();
-        const model = await creature.loadModel();
-        creature.model.userData.moduleObject = creature;
-        
-        //creature.setFacing(Math.atan2(creature.getXOrientation(), creature.getYOrientation()) + Math.PI/2, true);
-        creature.setFacing(-Math.atan2(creature.getXOrientation(), creature.getYOrientation()), true);
+    await this.loadEach('Creatures', this.creatures, async (creature) => {
+      creature.load();
+      const model = await creature.loadModel();
+      creature.model.userData.moduleObject = creature;
+      
+      //creature.setFacing(Math.atan2(creature.getXOrientation(), creature.getYOrientation()) + Math.PI/2, true);
+      creature.setFacing(-Math.atan2(creature.getXOrientation(), creature.getYOrientation()), true);
 
-        model.hasCollision = true;
-        model.name = creature.getTag();
-        GameState.group.creatures.add( creature.container );
+      model.hasCollision = true;
+      model.name = creature.getTag();
+      GameState.group.creatures.add( creature.container );
 
-        creature.getCurrentRoom();
-        creature.updateCollision(0.0000000000000000000001);
-        creature.update(0.0000000000000000000001);
-        creature.computeBoundingBox();
-      }catch(e){
-        console.error(e);
-      }
-    }
+      creature.getCurrentRoom();
+      creature.updateCollision(0.0000000000000000000001);
+      creature.update(0.0000000000000000000001);
+      creature.computeBoundingBox();
+    });
   }
 
   /**
    * Load the area's stores
    */
   async loadStores(): Promise<void> {
-    console.log('Loading Stores');
-    for(let i = 0; i < this.stores.length; i++){
-      try{
-        const store = this.stores[i];
-        store.load();
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Stores', this.stores, (store) => store.load());
   }
 
   /**
    * Load the area's sounds
    */
   async loadsounds(): Promise<void> {
-    console.log('Loading Sound Emitter');
-    for(let i = 0; i < this.sounds.length; i++){
-      try{
-        const sound = this.sounds[i];
-        sound.load();
-        await sound.loadSound();
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Sound Emitter', this.sounds, async (sound) => {
+      sound.load();
+      await sound.loadSound();
+    });
   }
 
   /**

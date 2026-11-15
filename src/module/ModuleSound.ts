@@ -144,23 +144,8 @@ export class ModuleSound extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['uts'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-      }else{
-        console.error('Failed to load ModuleSound template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-    }
+    this.mergeTemplate(ResourceTypes['uts']);
+    this.initProperties();
   }
 
   getPreviewModelResRef(): string {

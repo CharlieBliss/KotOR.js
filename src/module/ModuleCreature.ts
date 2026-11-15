@@ -3668,29 +3668,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utc'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadScripts();
-        GameState.FactionManager.AddCreatureToFaction(this);
-      }else{
-        console.error('Failed to load character template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts();
-      GameState.FactionManager.AddCreatureToFaction(this);
-    }
-    
+    const merged = this.mergeTemplate(ResourceTypes['utc']);
+    this.initProperties();
+    this.loadScripts();
+    if(merged){ GameState.FactionManager.AddCreatureToFaction(this); }
+
     if(!this.debugLabel){
       this.debugLabel = new TextSprite3D(`${this.getName()} | ${this.getTag()}`);
       this.debugLabel.setColor(this.helperColor);
@@ -3699,43 +3681,22 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
-  loadScripts (){
-
-    const scriptKeys = [
-      ModuleObjectScript.CreatureOnAttacked,
-      ModuleObjectScript.CreatureOnDamaged,
-      ModuleObjectScript.CreatureOnDeath,
-      ModuleObjectScript.CreatureOnDialog,
-      ModuleObjectScript.CreatureOnDisturbed,
-      ModuleObjectScript.CreatureOnEndDialog,
-      ModuleObjectScript.CreatureOnEndRound,
-      ModuleObjectScript.CreatureOnHeartbeat,
-      ModuleObjectScript.CreatureOnBlocked,
-      ModuleObjectScript.CreatureOnNotice,
-      ModuleObjectScript.CreatureOnRested,
-      ModuleObjectScript.CreatureOnSpawn,
-      ModuleObjectScript.CreatureOnSpellAt,
-      ModuleObjectScript.CreatureOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ 
-          console.warn(`ModuleCreature.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-          continue; 
-        }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.CreatureOnAttacked,
+    ModuleObjectScript.CreatureOnDamaged,
+    ModuleObjectScript.CreatureOnDeath,
+    ModuleObjectScript.CreatureOnDialog,
+    ModuleObjectScript.CreatureOnDisturbed,
+    ModuleObjectScript.CreatureOnEndDialog,
+    ModuleObjectScript.CreatureOnEndRound,
+    ModuleObjectScript.CreatureOnHeartbeat,
+    ModuleObjectScript.CreatureOnBlocked,
+    ModuleObjectScript.CreatureOnNotice,
+    ModuleObjectScript.CreatureOnRested,
+    ModuleObjectScript.CreatureOnSpawn,
+    ModuleObjectScript.CreatureOnSpellAt,
+    ModuleObjectScript.CreatureOnUserDefined,
+  ];
 
   async loadModel (): Promise<OdysseyModel3D> {
     this.isReady = false;
@@ -4931,20 +4892,7 @@ export class ModuleCreature extends ModuleObject {
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
     //Scripts
-    gff.RootNode.addRESREF('ScriptAttacked', this.scripts[ModuleObjectScript.CreatureOnAttacked]?.name || '');
-    gff.RootNode.addRESREF('ScriptDamaged', this.scripts[ModuleObjectScript.CreatureOnDamaged]?.name || '');
-    gff.RootNode.addRESREF('ScriptDeath', this.scripts[ModuleObjectScript.CreatureOnDeath]?.name || '');
-    gff.RootNode.addRESREF('ScriptDialogue', this.scripts[ModuleObjectScript.CreatureOnDialog]?.name || '');
-    gff.RootNode.addRESREF('ScriptDisturbed', this.scripts[ModuleObjectScript.CreatureOnDisturbed]?.name || '');
-    gff.RootNode.addRESREF('ScriptEndDialogu', this.scripts[ModuleObjectScript.CreatureOnEndDialog]?.name || '');
-    gff.RootNode.addRESREF('ScriptEndRound', this.scripts[ModuleObjectScript.CreatureOnEndRound]?.name || '');
-    gff.RootNode.addRESREF('ScriptHeartbeat', this.scripts[ModuleObjectScript.CreatureOnHeartbeat]?.name || '');
-    gff.RootNode.addRESREF('ScriptOnBlocked', this.scripts[ModuleObjectScript.CreatureOnBlocked]?.name || '');
-    gff.RootNode.addRESREF('ScriptOnNotice', this.scripts[ModuleObjectScript.CreatureOnNotice]?.name || '');
-    gff.RootNode.addRESREF('ScriptRested', this.scripts[ModuleObjectScript.CreatureOnRested]?.name || '');
-    gff.RootNode.addRESREF('ScriptSpawn', this.scripts[ModuleObjectScript.CreatureOnSpawn]?.name || '');
-    gff.RootNode.addRESREF('ScriptSpellAt', this.scripts[ModuleObjectScript.CreatureOnSpellAt]?.name || '');
-    gff.RootNode.addRESREF('ScriptUserDefine', this.scripts[ModuleObjectScript.CreatureOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
 
     //Skills
     let skillList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'SkillList') );
