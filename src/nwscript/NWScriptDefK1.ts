@@ -2891,6 +2891,10 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.VOID,
     args: [NWScriptDataType.INTEGER, NWScriptDataType.EFFECT, NWScriptDataType.LOCATION, NWScriptDataType.FLOAT],
     action: function(this: NWScriptInstance, args: [number, GameEffect, EngineLocation, number]){
+      if(typeof (args[1] as any)?.setDurationType !== 'function'){
+        console.error(`ApplyEffectAtLocation: expected an effect from ${this.name || 'a script'}, got`, args[1]);
+        return;
+      }
       args[1].setDurationType(args[0]);
       args[1].setDuration(args[3]);
       GameState.module.addEffect(args[1], args[2]);
@@ -2930,7 +2934,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.INTEGER, NWScriptDataType.EFFECT, NWScriptDataType.OBJECT, NWScriptDataType.FLOAT],
     action: function(this: NWScriptInstance, args: [number, GameEffect, ModuleObject, number]){
       if(BitWise.InstanceOfObject(args[2], ModuleObjectType.ModuleObject)){
-        if(args[1]){
+        if(typeof (args[1] as any)?.setDurationType === 'function'){
           args[1].setDurationType(args[0]);
           args[1].setDuration(args[3]);
           if(args[0] == GameEffectDurationType.TEMPORARY){
@@ -2941,7 +2945,7 @@ NWScriptDefK1.Actions = {
           // console.log('ApplyEffectToObject', args[2], args[1], args[0], args[3]);
           args[2].addEffect(args[1], args[0], args[3]);
         }else{
-          console.error('ApplyEffectToObject', 'Expected a GameEffect', args);
+          console.error(`ApplyEffectToObject: expected an effect from ${this.name || 'a script'}, got`, args[1]);
         }
       }else{
         console.error('ApplyEffectToObject', 'GameEffects must be applied to ModuleObjects');
