@@ -275,3 +275,26 @@ describe("levelling up a player's character", () => {
     expect(level).toBe(3);
   });
 });
+
+describe("players rolling their own skills", () => {
+  test("the host rolls d20 + the skill, tells everyone, and holds back a second roll within a second", () => {
+    const { GMChecks } = jest.requireActual("@/managers/gm/GMChecks") as any;
+    jest.spyOn(Math, "random").mockReturnValue(0.5); // d20 = 11
+    const pc = mockCreature("pc_a", 0, { name: "Talker", getSkillLevel: (skill: number) => (skill === 4 ? 5 : 0) });
+
+    const result = GMChecks.rollForPlayer(pc, 4);
+    expect(result).toMatchObject({ name: "Talker", label: "Persuade", roll: 11, bonus: 5, total: 16 });
+    expect(sent.filter((p) => p.type === "roll.result").map((p) => [p.targetPeerId, p.payload.total])).toEqual([[undefined, 16]]);
+    expect(GMChecks.shownRolls().map((r: any) => r.total)).toContain(16);
+
+    expect(GMChecks.rollForPlayer(pc, 4)).toBeNull();
+  });
+
+  test("only real skills can be rolled", () => {
+    const { GMChecks } = jest.requireActual("@/managers/gm/GMChecks") as any;
+    const pc = mockCreature("pc_b", 0, { getSkillLevel: () => 0 });
+    expect(GMChecks.rollForPlayer(pc, 99)).toBeNull();
+    expect(GMChecks.rollForPlayer(pc, -1)).toBeNull();
+    expect(GMChecks.rollForPlayer(pc, Number.NaN)).toBeNull();
+  });
+});

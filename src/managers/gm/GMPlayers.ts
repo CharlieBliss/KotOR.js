@@ -37,6 +37,7 @@ import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSessions } from "@/managers/gm/GMSessions";
 import { GMLog } from "@/managers/gm/GMLog";
+import { GMChecks } from "@/managers/gm/GMChecks";
 
 /** Players in a GM session: their characters' sheets and inventories (kept by the host), what they ask the host to do, looting, rewards, questions from the GM, and what happens when they fall. */
 export class GMPlayers {
@@ -563,6 +564,7 @@ export class GMPlayers {
     unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
     levelup: (actor) => GMPlayers.levelUpOnHost(actor),
+    roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, Number(intent.abilityId)),
     cancel: () => false,
     mine: (actor, intent) => {
       actor.gmNetTarget = undefined;

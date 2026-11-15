@@ -319,6 +319,90 @@
     }
   }
 
+  // A player's skills, as buttons that roll them
+  .gm-skills {
+    position: fixed;
+    top: 52px;
+    left: 12px;
+    width: min(300px, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.95);
+    border: 1px solid rgba(107, 197, 255, 0.45);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    pointer-events: auto;
+
+    .gm-skills-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #d7e9f7;
+      font-weight: 600;
+    }
+
+    .gm-skills-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .gm-skill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    .gm-skill-bonus {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #ffe082;
+    }
+  }
+
+  // Players' rolls, on everyone's screen for a few seconds
+  .gm-roll-feed {
+    position: fixed;
+    top: 52px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(240px, calc(100vw - 24px));
+    pointer-events: none;
+  }
+
+  .gm-roll {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "who total" "detail total";
+    align-items: center;
+    column-gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.92);
+    border: 1px solid rgba(255, 215, 64, 0.5);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+    animation: gm-roll-in 0.2s ease-out;
+
+    .gm-roll-who { grid-area: who; color: #d7e9f7; font-size: 12px; }
+    .gm-roll-detail { grid-area: detail; color: #8cb0d0; font-size: 11px; }
+    .gm-roll-total { grid-area: total; color: #ffd740; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    &.natural-20 { border-color: #69f0ae; .gm-roll-total { color: #69f0ae; } }
+    &.natural-1 { border-color: #ff5252; .gm-roll-total { color: #ff8a80; } }
+  }
+
+  @keyframes gm-roll-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+  }
+
   // The GM speaking for NPCs players are talking to
   .gm-conversations {
     position: fixed;

@@ -54,6 +54,20 @@ export interface GMCreatureSpawnConfig {
 /** A check the GM calls for: a skill (SKILL_*) or a saving throw */
 export type GMCheck = { kind: 'skill'; skill: number } | { kind: 'save'; save: 'fortitude' | 'reflex' | 'will' };
 
+/** A roll a player made themselves (no difficulty: the GM decides what it means) */
+export interface GMRollResult {
+  /** Who rolled: their character's name and net id */
+  name: string;
+  netId?: string;
+  /** What they rolled, e.g. "Persuade" */
+  label: string;
+  roll: number;
+  bonus: number;
+  total: number;
+  /** When it arrived here (ms, performance clock), for showing it a while */
+  at?: number;
+}
+
 export interface GMCheckResult {
   name: string;
   label: string;

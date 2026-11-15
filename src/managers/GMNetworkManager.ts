@@ -44,7 +44,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -251,6 +251,7 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   unequip: { hostDriven: false, interrupts: false },
   stealth: { hostDriven: false, interrupts: false },
   levelup: { hostDriven: false, interrupts: false },
+  roll: { hostDriven: false, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */
@@ -285,6 +286,7 @@ export interface GMPacketMap {
   'talk.leave': { convId?: string };
   'talk.line': any;
   'talk.end': { convId?: string; [key: string]: any };
+  'roll.result': { name: string; netId?: string; label: string; roll: number; bonus: number; total: number };
   'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
   'player.respawn': Record<string, never>;

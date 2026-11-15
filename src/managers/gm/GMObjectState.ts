@@ -42,6 +42,8 @@ export interface GMObjectState {
   gmTeleportSeq?: number;
   /** Replica: where the host says it is; it moves there smoothly */
   gmNetTarget?: THREE.Vector3;
+  /** When this player character last rolled a skill (performance clock, ms), for GMChecks' cooldown */
+  gmLastRollAt?: number;
   /** Replica: the animation state the host says it is in */
   gmNetAnim?: number;
   /** Replica: an animation an effect from the host is playing on it */

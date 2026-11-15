@@ -10,6 +10,8 @@ import type { GMJoinForm } from "@/apps/game/components/gm-panel/overlays/JoinCa
 import { ConversationsDock } from "@/apps/game/components/gm-panel/overlays/ConversationsDock";
 import { DownedBanner } from "@/apps/game/components/gm-panel/overlays/DownedBanner";
 import { PromptCard } from "@/apps/game/components/gm-panel/overlays/PromptCard";
+import { SkillsOverlay } from "@/apps/game/components/gm-panel/overlays/SkillsOverlay";
+import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
 import { ScenesTab } from "@/apps/game/components/gm-panel/tabs/ScenesTab";
 import { ActorsTab } from "@/apps/game/components/gm-panel/tabs/ActorsTab";
 import { PlayersTab } from "@/apps/game/components/gm-panel/tabs/PlayersTab";
@@ -25,6 +27,7 @@ import "@/apps/game/components/gm-panel/gm-panel.scss";
 export const GMPanel: React.FC = () => {
   const forceUpdate = useGMStore();
   const [drawerTab, setDrawerTabState] = useState<DrawerTab>(null);
+  const [skillsOpen, setSkillsOpen] = useState(false);
   const [opened, setOpened] = useState<Set<Exclude<DrawerTab, null>>>(() => new Set());
   const [showQuickJoinOnMenu, setShowQuickJoinOnMenu] = useState(false);
 
@@ -151,6 +154,8 @@ export const GMPanel: React.FC = () => {
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
   const isPlayerView = !GMManager.isGMUser();
+  // A player's own skills, to roll (SkillsOverlay)
+  const canRollSkills = isPlayerView && GMNetworkManager.role === 'client' && !!currentLeader;
   if (isPlayerView && drawerTab && drawerTab !== 'multiplayer') {
     queueMicrotask(() => setDrawerTab(null));
   }
@@ -253,6 +258,11 @@ export const GMPanel: React.FC = () => {
               {tab.label}
             </button>
           ))}
+          {canRollSkills && (
+            <button className={`gm-btn ${skillsOpen ? 'active' : ''}`} onClick={() => setSkillsOpen(!skillsOpen)} title="Roll one of your skills; everyone sees the result">
+              Skills
+            </button>
+          )}
         </div>
 
         {!isPlayerView && (
@@ -340,6 +350,10 @@ export const GMPanel: React.FC = () => {
 
       {/* A question from the GM, waiting for this player's reply */}
       {isPlayerView && <PromptCard />}
+
+      {/* Our skills, to roll; and everyone's rolls, for a few seconds */}
+      {canRollSkills && skillsOpen && <SkillsOverlay onClose={() => setSkillsOpen(false)} />}
+      {GMNetworkManager.role !== 'offline' && <RollFeed />}
 
       {/* Bottom controls strip: what the current mode/tool does and its keys */}
       <div className="gm-controls-strip">
