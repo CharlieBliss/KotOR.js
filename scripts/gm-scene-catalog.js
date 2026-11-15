@@ -15,6 +15,7 @@
 const { app, BrowserWindow } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
 const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || '').split('=').slice(1).join('=');
 const GAMES = (arg('game') || 'kotor,tsl').split(',').map((s) => s.trim()).filter(Boolean);
@@ -36,6 +37,38 @@ async function exportCatalog() {
   const keys = K.KEYManager.Key.keys;
   const RT = K.ResourceTypes;
   const out = { areas: [], creatures: [], placeables: [], models: [], items: [], errors: [] };
+
+  /**
+   * The area's walkable floor as a grid of FLOOR_CELL-metre cells, each holding the index (1-based) of the
+   * room whose floor covers its centre, or 0. Returned with its origin and size; the cells are base64.
+   */
+  const FLOOR_CELL = 0.5;
+  const rasteriseFloor = (rooms, names) => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const r of rooms) for (const t of r.tris) for (const [x, y] of t) { minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); }
+    if (!isFinite(minX)) return null;
+    const x0 = Math.floor(minX), y0 = Math.floor(minY);
+    const w = Math.ceil((maxX - x0) / FLOOR_CELL) + 1, h = Math.ceil((maxY - y0) / FLOOR_CELL) + 1;
+    const cells = new Uint8Array(w * h);
+    const mark = (x, y, room) => { const i = Math.floor((x - x0) / FLOOR_CELL), j = Math.floor((y - y0) / FLOOR_CELL); if (i >= 0 && j >= 0 && i < w && j < h) cells[j * w + i] = room; };
+    const side = (ax, ay, bx, by, px, py) => (bx - ax) * (py - ay) - (by - ay) * (px - ax);
+    for (const r of rooms) {
+      for (const [[ax, ay], [bx, by], [cx, cy]] of r.tris) {
+        const i0 = Math.max(0, Math.floor((Math.min(ax, bx, cx) - x0) / FLOOR_CELL)), i1 = Math.min(w - 1, Math.floor((Math.max(ax, bx, cx) - x0) / FLOOR_CELL));
+        const j0 = Math.max(0, Math.floor((Math.min(ay, by, cy) - y0) / FLOOR_CELL)), j1 = Math.min(h - 1, Math.floor((Math.max(ay, by, cy) - y0) / FLOOR_CELL));
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          const px = x0 + (i + 0.5) * FLOOR_CELL, py = y0 + (j + 0.5) * FLOOR_CELL;
+          const d1 = side(ax, ay, bx, by, px, py), d2 = side(bx, by, cx, cy, px, py), d3 = side(cx, cy, ax, ay, px, py);
+          if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0))) cells[j * w + i] = r.room;
+        }
+        // Slivers narrower than a cell still mark the cells their corners and centre are in
+        mark(ax, ay, r.room); mark(bx, by, r.room); mark(cx, cy, r.room); mark((ax + bx + cx) / 3, (ay + by + cy) / 3, r.room);
+      }
+    }
+    let bin = '';
+    for (let k = 0; k < cells.length; k += 0x8000) bin += String.fromCharCode.apply(null, cells.subarray(k, k + 0x8000));
+    return { origin: [x0, y0], cell: FLOOR_CELL, width: w, height: h, rooms: names, cells: btoa(bin) };
+  };
 
   // --- Areas -------------------------------------------------------------------------------------
   const files = await K.GameFileSystem.readdir('modules');
@@ -69,6 +102,7 @@ async function exportCatalog() {
           }
         }
       } catch (e) {}
+      const floorFaces = [];
       try {
         const lyt = new K.LYTObject(await K.ResourceLoader.loadResource(RT.lyt, entryArea));
         for (const room of lyt.rooms) {
@@ -86,12 +120,24 @@ async function exportCatalog() {
             if (wok.walkableFaces.length) {
               entry.walkable = Math.round(areaSum);
               entry.size = [Math.round(maxX - minX), Math.round(maxY - minY)];
-              entry.centre = [r1(cx / wok.walkableFaces.length), r1(cy / wok.walkableFaces.length)];
+              // The importer's room spot (GMScenePlan.roomPoint): the floor triangle centroid nearest the mean of them
+              const n = wok.walkableFaces.length;
+              const mx = cx / n, my = cy / n;
+              let best = null, bestD = Infinity;
+              for (const face of wok.walkableFaces) {
+                const t = face.triangle;
+                const fx = (t.a.x + t.b.x + t.c.x) / 3, fy = (t.a.y + t.b.y + t.c.y) / 3;
+                const d = (fx - mx) ** 2 + (fy - my) ** 2;
+                if (d < bestD) { bestD = d; best = [fx, fy]; }
+              }
+              entry.centre = [r1(best[0]), r1(best[1])];
+              floorFaces.push({ room: area.rooms.length + 1, tris: wok.walkableFaces.map((fc) => [fc.triangle.a, fc.triangle.b, fc.triangle.c].map((p) => [p.x, p.y])) });
             }
           } catch (e) {}
           area.rooms.push(entry);
         }
       } catch (e) {}
+      area.floor = rasteriseFloor(floorFaces, area.rooms.map((r) => r.name));
       out.areas.push(area);
     } catch (e) {
       out.errors.push(`${name}: ${e && e.message}`);
@@ -102,7 +148,7 @@ async function exportCatalog() {
   // --- Creature templates -----------------------------------------------------------------------
   const utcs = [...new Set(keys.filter((k) => k.resType == RT.utc).map((k) => k.resRef.toLowerCase()))].sort();
   for (const resRef of utcs) {
-    const info = await K.GMManager.describeCreatureTemplate(resRef);
+    const info = await K.GMSpawner.describeCreatureTemplate(resRef);
     if (!info) continue;
     out.creatures.push(info);
   }
@@ -159,7 +205,8 @@ function writeCatalog(game, data) {
     '',
     `Every area (module) in ${title}. Use with "area": { "game": "${game}", "module": "<module>" }.`,
     'Coordinates are the area\'s own metres (x east, y north). Rooms are listed biggest first: walkable floor in m²,',
-    'its width x depth in metres, and the centre of its floor. Spots: "entry", "room:<room>", "waypoint:<tag>".',
+    'its width x depth in metres, and its spot point (@x,y: where "room:<room>" puts things, always on its floor).',
+    'Spots: "entry", "room:<room>", "waypoint:<tag>".',
     '',
   ];
   for (const a of data.areas) {
@@ -173,6 +220,18 @@ function writeCatalog(game, data) {
     lines.push('');
   }
   fs.writeFileSync(path.join(dir, 'areas.md'), lines.join('\n'));
+
+  // Floors: each area's walkable-floor grid, for the plan checker (skills/kotor-gm-scenes/scripts/layout.py)
+  const floors = {};
+  for (const a of data.areas) {
+    if (!a.floor) continue;
+    const { cells, ...rest } = a.floor;
+    floors[a.module] = { ...rest, cells: zlib.deflateSync(Buffer.from(cells, 'base64'), { level: 9 }).toString('base64') };
+  }
+  fs.writeFileSync(path.join(dir, 'floors.json'), JSON.stringify({
+    note: 'Generated by scripts/gm-scene-catalog.js. Per area: origin [x, y] and cell size in metres, width x height cells, and room names. cells is zlib-deflated, then base64: one byte per cell, row by row from the origin (x first). 0 = no floor, n = rooms[n-1].',
+    areas: floors,
+  }) + '\n');
 
   fs.writeFileSync(path.join(dir, 'creatures.tsv'), tsv([
     ['template', 'name', 'faction', 'classes', 'hp', 'fp', 'appearance', 'weapon'],

@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """Check a KotOR.js GM scene plan before handing it over.
 
-Checks the plan's shape (as the game's importer does) and that everything it names exists in the catalog:
-the area and its rooms and waypoints, creature and placeable templates, models and items.
+1. Its shape (as the game's importer reads it), and that everything it names exists in the catalog: the
+   area and its rooms and waypoints, creature and placeable templates, models and items.
+2. Its layout (layout.py): where everything lands on the area's floor, and whether the blocking and the
+   beats work. It ends with a text map of the scene to read.
 
-Usage: python3 check_plan.py plan.json
-Exit code 0 when there are no errors (warnings are fine).
+Usage: python3 check_plan.py plan.json [--map scene.png] [--json positions.json] [--no-map]
+  --map    also draw the scene as a picture (for the GM)
+  --json   write where everything lands (scripts/gm-scene-check.js compares it with the game)
+  --no-map don't print the text map
+Exit code 0 when there are no errors (notes are fine).
 """
 import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import layout  # noqa: E402
 
 CATALOG = Path(__file__).resolve().parent.parent / "reference" / "catalog"
 # The words a plan may use, as the game reads them: generated from its sources (src/tests/gmPlanVocab.test.ts)
@@ -52,11 +60,14 @@ def read_areas(path):
 
 
 def main():
-    if len(sys.argv) != 2:
+    args = sys.argv[1:]
+    files = [a for a in args if not a.startswith("--") and not (args.index(a) > 0 and args[args.index(a) - 1] in ("--map", "--json"))]
+    opt = lambda name: args[args.index(name) + 1] if name in args and args.index(name) + 1 < len(args) else None
+    if len(files) != 1:
         print(__doc__)
         return 2
     try:
-        plan = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+        plan = json.loads(Path(files[0]).read_text(encoding="utf-8"))
     except Exception as e:
         print(f"ERROR file: not valid JSON: {e}")
         return 1
@@ -233,13 +244,26 @@ def main():
             if what in ("say", "narrate") and not action.get("text"):
                 err(where, "needs text")
 
-    hidden_ids = {a["id"] for a in actors if a.get("hidden")} | {p["id"] for p in props if p.get("hidden")}
-    revealed = {i for beat in plan.get("beats") or [] for action in beat.get("actions") or [] if action.get("do") == "reveal" for i in action.get("ids", [])}
-    for id_ in sorted(hidden_ids - revealed):
-        warn(id_, "is hidden but no beat reveals it")
+    # The layout, once the plan reads correctly
+    scene = None
+    if not errors:
+        scene, why = layout.check(plan)
+        if why:
+            warn("layout", why)
+        for level, where, message in (scene.problems if scene else []):
+            (err if level == "ERROR" else warn)(where, message)
 
     for line in errors + warnings:
         print(line)
+    if scene and "--no-map" not in args:
+        print()
+        print(layout.text_map(scene))
+        print()
+    if scene and opt("--map"):
+        if layout.png_map(scene, opt("--map")):
+            print(f"Picture of the scene: {opt('--map')}")
+    if scene and opt("--json"):
+        Path(opt("--json")).write_text(json.dumps(layout.resolved(scene), indent=1), encoding="utf-8")
     n_actors = sum(int(a.get("count", 1)) for a in actors)
     n_props = sum(int(p.get("count", 1)) for p in props)
     print(f"{'OK' if not errors else 'NOT OK'}: {plan.get('title', '(untitled)')} in {area.get('game')}:{module}, "

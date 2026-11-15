@@ -29,7 +29,9 @@ function walk(d) {
   });
 }
 
-const files = walk(dir).sort();
+// The skill's own tests and Python caches stay out of the zip
+const LEFT_OUT = new Set(['tests', '__pycache__']);
+const files = walk(dir).filter((f) => !path.relative(dir, f).split(path.sep).some((part) => LEFT_OUT.has(part))).sort();
 const locals = [];
 const centrals = [];
 let offset = 0;

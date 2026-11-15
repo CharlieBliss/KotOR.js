@@ -56,7 +56,17 @@ A **placement** is a spot plus optional extras:
 - `formation`: how several copies (`count`) stand: `"cluster"` (default: bunched up), `"ring"` (around the spot, facing in) or `"line"` (side by side along x).
 - `spacing`: metres between copies (default 1.5).
 
-Every point is snapped to the nearest walkable floor, so a slightly-off offset is safe. A spot that isn't in the area is reported to the GM, and that actor or prop is skipped.
+Every point is snapped to the nearest walkable floor, so a slightly-off offset is safe. A point far off the floor (inside a wall, past a room's edge) is moved to whatever floor is nearest, which can be metres away in another room; the checker flags it. A spot that isn't in the area is reported to the GM, and that actor or prop is skipped.
+
+`room:<room>` puts things at the room's spot point, the `@x,y` in `areas.md`. That point is always on the room's floor, but not always in its middle: in a room built around something you can't walk on (a garden, a pit), it is at the edge of the walkway.
+
+## Checking a plan
+
+`scripts/check_plan.py` checks a plan's names and its layout. For the layout, it uses each area's floor map (`catalog/<game>/floors.json`, half-metre cells) and works out where everything lands, as the importer does. Where it lands is then checked against the floor, the rooms, the other actors and props, and the players, and the beats are run over who's visible, on which side and frozen. It prints a text map of the scene.
+
+The floor map is flat: where floors stack (a walkway over a hall), they're merged, so check stacked areas in the game.
+
+`npm run scene:check -- <plan.json>` (in the KotOR.js repository, with the game) imports the plan in the game and runs its beats. It takes screenshots, and reports what really happened: where things stand, fights, deaths, and orders that didn't play out.
 
 **Choosing spots:** the area catalog gives each room's walkable size, width x depth, and floor centre (`@x,y`), plus each waypoint's position. Use them to:
 - put groups in rooms big enough for them;

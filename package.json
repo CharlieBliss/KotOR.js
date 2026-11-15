@@ -14,6 +14,7 @@
     "test:gm-e2e": "electron scripts/gm-e2e.js",
     "bench:abilities": "electron scripts/gm-ability-bench.js",
     "catalog:scenes": "electron scripts/gm-scene-catalog.js",
+    "scene:check": "electron scripts/gm-scene-check.js",
     "skill:pack": "node scripts/pack-skill.js",
     "electron:watch": "tsc-watch --project tsconfig.electron.json",
     "electron:compile": "tsc --project tsconfig.electron.json",

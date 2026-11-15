@@ -3,19 +3,30 @@
   "version": 1,
   "title": "Massacre at the Onderon Temple",
   "summary": "Dark Jedi storm a Jedi temple on Onderon and cut down the Jedi gathered in its great hall. The players, hidden in a side corridor, can only watch; afterwards they search the ruin and find one survivor.",
-  "gmNotes": "Run beats 1-4 back to back with a breath between them; let the fight play out before beat 4. The players are frozen until beat 5, and the dark Jedi can't target them while they are. In beat 5 the dark Jedi leave and the players are free: the survivor gives them their lead.",
+  "gmNotes": "Run beats 1-4 with a breath between them; let the fight play out before beat 3 and beat 4. The players are frozen until beat 5, and the dark Jedi can't target them while they are. In beat 5 the dark Jedi are gone and the players are free: the survivor gives them their lead.",
   "content": "tsl",
   "area": {
     "game": "kotor",
     "module": "danm13",
-    "reason": "KotOR's Dantooine Jedi Enclave is the best Jedi-temple interior: a great central hall (m13aa_02a, 35x35 m) with corridors off it, which plays as the Onderon temple."
+    "reason": "KotOR's Dantooine Jedi Enclave is the best Jedi-temple interior: its great hall (m13aa_02a) is a ring walkway around a garden, with arms to the west, east and south, which plays as the Onderon temple."
   },
-  "settings": { "npcAi": true, "deathRule": "kotor" },
+  "settings": {
+    "npcAi": true,
+    "deathRule": "kotor"
+  },
   "players": {
-    "at": { "spot": "room:m13aa_02h", "offset": [5, 0], "formation": "line", "spacing": 1.2 },
+    "at": {
+      "spot": "room:m13aa_02h",
+      "offset": [
+        -6,
+        0
+      ],
+      "formation": "line",
+      "spacing": 1.2
+    },
     "facing": "toward:room:m13aa_02a",
     "frozen": true,
-    "note": "In the east corridor (m13aa_02h), looking west into the great hall."
+    "note": "At the hall end of the east corridor (m13aa_02h), looking west across the garden into the great hall."
   },
   "actors": [
     {
@@ -23,9 +34,17 @@
       "name": "Master Vanar",
       "template": "n_jedimemm",
       "faction": "friendly",
-      "at": { "spot": "room:m13aa_02a", "offset": [-6, 0] },
-      "facing": "toward:room:m13aa_02h",
-      "customize": { "hp": 120 },
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          -4,
+          0
+        ]
+      },
+      "facing": "toward:actor:jedi",
+      "customize": {
+        "hp": 120
+      },
       "bark": "Stay hidden. Whatever happens, you must live to tell the Order."
     },
     {
@@ -34,9 +53,20 @@
       "template": "n_jedicounm",
       "faction": "friendly",
       "count": 4,
-      "at": { "spot": "room:m13aa_02a", "offset": [-2, 0], "formation": "ring", "spacing": 2.5 },
-      "customize": { "hp": 40 },
-      "stance": "meditate"
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          -9,
+          -2
+        ],
+        "formation": "line",
+        "spacing": 2
+      },
+      "customize": {
+        "hp": 40
+      },
+      "stance": "meditate",
+      "facing": "toward:actor:master"
     },
     {
       "id": "padawans",
@@ -44,8 +74,17 @@
       "template": "n_jedicounf",
       "faction": "friendly",
       "count": 3,
-      "at": { "spot": "room:m13aa_02a", "offset": [-10, 6], "formation": "line", "spacing": 2 },
-      "stance": "listen"
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          -2,
+          7
+        ],
+        "formation": "line",
+        "spacing": 2
+      },
+      "stance": "listen",
+      "facing": "toward:actor:master"
     },
     {
       "id": "dark_jedi",
@@ -54,9 +93,20 @@
       "faction": "hostile",
       "count": 4,
       "hidden": true,
-      "at": { "spot": "room:m13aa_02j", "formation": "line", "spacing": 1.5 },
+      "at": {
+        "spot": "room:m13aa_02b",
+        "offset": [
+          -6,
+          0
+        ],
+        "formation": "line",
+        "spacing": 1.5
+      },
       "facing": "toward:room:m13aa_02a",
-      "order": { "kind": "attack", "target": "jedi" }
+      "order": {
+        "kind": "attack",
+        "target": "jedi"
+      }
     },
     {
       "id": "dark_master",
@@ -64,9 +114,18 @@
       "template": "g_dark_mas01f",
       "faction": "hostile",
       "hidden": true,
-      "at": { "spot": "room:m13aa_02j", "offset": [3, 0] },
+      "at": {
+        "spot": "room:m13aa_02b",
+        "offset": [
+          -6,
+          2
+        ]
+      },
       "facing": "toward:room:m13aa_02a",
-      "order": { "kind": "attack", "target": "master" }
+      "order": {
+        "kind": "attack",
+        "target": "master"
+      }
     },
     {
       "id": "survivor",
@@ -74,7 +133,13 @@
       "template": "n_jedicounf",
       "faction": "neutral",
       "hidden": true,
-      "at": { "spot": "room:m13aa_02a", "offset": [-14, -10] },
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          -5,
+          -10
+        ]
+      },
       "stance": "kneel_sad",
       "bark": "They took the holocrons... they're going to Dxun."
     }
@@ -85,8 +150,16 @@
       "appearance": "Statue2_heroic_Jedi",
       "name": "Statue of a Jedi Master",
       "count": 2,
-      "at": { "spot": "room:m13aa_02a", "offset": [-6, 0], "formation": "line", "spacing": 20 },
-      "facing": "toward:room:m13aa_02a"
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          3,
+          10
+        ],
+        "formation": "line",
+        "spacing": 10
+      },
+      "facing": 180
     },
     {
       "id": "fires",
@@ -94,7 +167,15 @@
       "name": "Burning wreckage",
       "count": 3,
       "hidden": true,
-      "at": { "spot": "room:m13aa_02a", "offset": [2, -4], "formation": "cluster", "spacing": 6 }
+      "at": {
+        "spot": "room:m13aa_02a",
+        "offset": [
+          8,
+          -12
+        ],
+        "formation": "cluster",
+        "spacing": 4
+      }
     },
     {
       "id": "rubble",
@@ -102,7 +183,15 @@
       "name": "Shattered masonry",
       "count": 2,
       "hidden": true,
-      "at": { "spot": "room:m13aa_02j", "offset": [-2, 2], "formation": "line", "spacing": 4 }
+      "at": {
+        "spot": "room:m13aa_02b",
+        "offset": [
+          -3,
+          2
+        ],
+        "formation": "line",
+        "spacing": 3
+      }
     }
   ],
   "beats": [
@@ -110,35 +199,105 @@
       "title": "Evening at the temple",
       "narration": "Lamplight fills the great hall. The masters speak quietly with their students; nobody notices you in the side corridor.",
       "actions": [
-        { "do": "say", "id": "master", "text": "The Council's warnings were right. Something is coming." }
+        {
+          "do": "say",
+          "id": "master",
+          "text": "The Council's warnings were right. Something is coming."
+        }
       ]
     },
     {
       "title": "The doors burst open",
-      "narration": "The great doors buckle and blow inward. Red blades ignite in the smoke.",
+      "narration": "The west doors blow inward behind the knights. Red blades ignite in the smoke.",
       "notes": "Reveals the dark Jedi; they attack at once.",
       "actions": [
-        { "do": "reveal", "ids": ["dark_jedi", "dark_master", "rubble"] },
-        { "do": "animate", "ids": ["jedi", "padawans"], "stance": "" },
-        { "do": "say", "id": "dark_master", "text": "Leave none of them alive." },
-        { "do": "animate", "ids": ["dark_master"], "gesture": "point" }
+        {
+          "do": "reveal",
+          "ids": [
+            "dark_jedi",
+            "dark_master",
+            "rubble"
+          ]
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "jedi",
+            "padawans"
+          ],
+          "stance": ""
+        },
+        {
+          "do": "say",
+          "id": "dark_master",
+          "text": "Leave none of them alive."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "dark_master"
+          ],
+          "gesture": "point"
+        }
       ]
     },
     {
       "title": "The master stands alone",
       "notes": "Once most of the knights are down. The padawans run, but there's nowhere to go.",
       "actions": [
-        { "do": "order", "ids": ["padawans"], "order": { "kind": "flee" } },
-        { "do": "say", "id": "master", "text": "Run, children! Run!" },
-        { "do": "order", "ids": ["dark_jedi"], "order": { "kind": "attack", "target": "padawans" } }
+        {
+          "do": "order",
+          "ids": [
+            "padawans"
+          ],
+          "order": {
+            "kind": "flee"
+          }
+        },
+        {
+          "do": "say",
+          "id": "master",
+          "text": "Run, children! Run!"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "dark_jedi"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "padawans"
+          }
+        }
       ]
     },
     {
       "title": "Fire and silence",
-      "narration": "Fires catch in the tapestries. The dark Jedi walk out the way they came, unhurried.",
+      "narration": "Fires catch in the garden. The dark Jedi walk back out through the broken west doors, unhurried.",
       "actions": [
-        { "do": "reveal", "ids": ["fires"] },
-        { "do": "order", "ids": ["dark_jedi", "dark_master"], "order": { "kind": "move", "to": { "spot": "room:m13aa_02j", "offset": [10, 0] } } }
+        {
+          "do": "reveal",
+          "ids": [
+            "fires"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "dark_jedi",
+            "dark_master"
+          ],
+          "order": {
+            "kind": "move",
+            "to": {
+              "spot": "room:m13aa_02b",
+              "offset": [
+                -6,
+                0
+              ]
+            }
+          }
+        }
       ]
     },
     {
@@ -146,10 +305,28 @@
       "narration": "The footsteps fade. You can move again.",
       "notes": "The dark Jedi are gone. An Awareness check finds the survivor quickly; otherwise she calls out after a while.",
       "actions": [
-        { "do": "hide", "ids": ["dark_jedi", "dark_master"] },
-        { "do": "freezePlayers", "on": false },
-        { "do": "reveal", "ids": ["survivor"] },
-        { "do": "check", "check": "awareness", "dc": 15 }
+        {
+          "do": "hide",
+          "ids": [
+            "dark_jedi",
+            "dark_master"
+          ]
+        },
+        {
+          "do": "freezePlayers",
+          "on": false
+        },
+        {
+          "do": "reveal",
+          "ids": [
+            "survivor"
+          ]
+        },
+        {
+          "do": "check",
+          "check": "awareness",
+          "dc": 15
+        }
       ]
     }
   ]
