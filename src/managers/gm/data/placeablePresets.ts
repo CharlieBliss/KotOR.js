@@ -1,0 +1,400 @@
+import type { GMPlaceableSpawnConfig } from "@/managers/gm/GMTypes";
+
+// Curated Placeable Presets
+export const PLACEABLE_PRESETS: GMPlaceableSpawnConfig[] = [
+  { name: 'Supply Footlocker', category: 'Storage & Cargo', appearanceId: 52, modelKeywords: ['footlker', 'locker', 'box'], useable: true, hasInventory: true, locked: false, openLockDC: 15, lootResRefs: ['g_i_medeqpmnt01', 'g_i_medeqpmnt02', 'g_i_secspike01'], barkText: '' },
+  { name: 'Jedi Weapons Cache', category: 'Temple & Sacred', appearanceId: 53, modelKeywords: ['ornate', 'chest', 'wicker', 'box'], useable: true, hasInventory: true, locked: false, openLockDC: 18, lootResRefs: ['g_w_lghtsbr01', 'g_w_lghtsbr02', 'g_w_dblsbr001', 'g_a_jedirobe01'], barkText: '' },
+  { name: 'Locked Sith Vault (DC 18)', category: 'Storage & Cargo', appearanceId: 54, modelKeywords: ['metal', 'vault', 'safe', 'box'], useable: true, hasInventory: true, locked: true, openLockDC: 18, lootResRefs: ['g_w_lghtsbr02', 'g_a_mstrrobe02', 'g_i_medeqpmnt03'], barkText: '' },
+  { name: 'Sith Sarcophagus', category: 'Temple & Sacred', appearanceId: 64, modelKeywords: ['sarcoph', 'tomb', 'altar'], useable: true, hasInventory: true, locked: false, openLockDC: 20, lootResRefs: ['g_w_dblsbr002', 'g_a_mstrrobe02'], barkText: '' },
+  { name: 'Computer Terminal', category: 'Tech & Consoles', appearanceId: 57, modelKeywords: ['comp', 'terminal', 'console', 'panel'], useable: true, hasInventory: false, locked: false, openLockDC: 15, lootResRefs: [], barkText: '[Terminal Active]: Security grid online. All sector doors operational.' },
+  { name: 'Workbench', category: 'Storage & Cargo', appearanceId: 68, modelKeywords: ['workbench', 'bench'], useable: true, hasInventory: true, locked: false, openLockDC: 10, lootResRefs: ['g_w_blstrrfl001', 'g_w_vbroswrd01'], barkText: '[Workbench]: Ready for weapon & armor modifications.' },
+  { name: 'Kolto Healing Tank', category: 'Medical & Lab', appearanceId: 39, modelKeywords: ['kolto', 'bacta', 'tank'], useable: true, hasInventory: false, locked: false, openLockDC: 10, lootResRefs: [], barkText: '[Kolto Dispenser]: Dispensing emergency Bacta/Kolto mist.' },
+  { name: 'Skeletal Remains', category: 'Temple & Sacred', appearanceId: 62, modelKeywords: ['skeleton', 'corpse', 'remains', 'bones'], useable: true, hasInventory: true, locked: false, openLockDC: 10, lootResRefs: ['g_i_medeqpmnt01', 'g_w_blstrpstl001'], barkText: '' },
+];
+
+// Categorized Architectural & Prop Library for Building Custom Scenes (Office, Temple, Lab, etc.)
+export const CATEGORIZED_PROPS: GMPlaceableSpawnConfig[] = [
+  // Office & Furniture
+  {
+    name: 'Executive Office Desk',
+    category: 'Office & Furniture',
+    appearanceId: 55,
+    modelKeywords: ['desk', 'table', 'counter'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 12,
+    lootResRefs: ['g_i_progspike01', 'g_i_secspike01'],
+    barkText: '[Executive Desk]: Stacked with corporate datapads and sector clearance files.'
+  },
+  {
+    name: 'Office / Cantina Chair',
+    category: 'Office & Furniture',
+    appearanceId: 44,
+    modelKeywords: ['chair', 'seat', 'stool'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Office Chair]: Ergonomic repulsor-cushioned seating.'
+  },
+  {
+    name: 'Conference / Briefing Table',
+    category: 'Office & Furniture',
+    appearanceId: 45,
+    modelKeywords: ['table', 'pazaak', 'desk'],
+    scale: 1.3,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Conference Table]: Built-in holo-emitters for executive briefings.'
+  },
+  {
+    name: 'Workstation Computer Terminal',
+    category: 'Office & Furniture',
+    appearanceId: 57,
+    modelKeywords: ['comp', 'panel', 'terminal', 'console'],
+    scale: 0.9,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 14,
+    lootResRefs: [],
+    barkText: '[Desktop Terminal]: Connected to the facility intranet and personnel directory.'
+  },
+  {
+    name: 'Filing Cabinet / Office Locker',
+    category: 'Office & Furniture',
+    appearanceId: 52,
+    modelKeywords: ['locker', 'cabinet', 'footlker'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 14,
+    lootResRefs: ['g_i_progspike01', 'g_i_medeqpmnt01'],
+    barkText: '[Filing Cabinet]: Contains classified employee records and keycards.'
+  },
+  {
+    name: 'Executive Vault Safe (Locked DC 18)',
+    category: 'Office & Furniture',
+    appearanceId: 54,
+    modelKeywords: ['safe', 'vault', 'metal', 'box', 'footlker'],
+    scale: 1.05,
+    useable: true,
+    hasInventory: true,
+    locked: true,
+    openLockDC: 18,
+    lootResRefs: ['g_w_blstrpstl001', 'g_i_secspike01', 'g_i_medeqpmnt03'],
+    barkText: '[Executive Safe]: Heavy durasteel safe with biometric security lock.'
+  },
+  {
+    name: 'Architectural Partition / Pillar',
+    category: 'Office & Furniture',
+    appearanceId: 50,
+    modelKeywords: ['pillar', 'column', 'sign', 'post'],
+    scale: 1.25,
+    useable: false,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: ''
+  },
+
+  // Temple & Sacred
+  {
+    name: 'Ancient Temple Guardian Statue',
+    category: 'Temple & Sacred',
+    appearanceId: 65,
+    modelKeywords: ['statue', 'idol', 'monument'],
+    scale: 1.4,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Guardian Statue]: A towering stone sentinel carved in a forgotten era of the Force.'
+  },
+  {
+    name: 'Sacred Temple Pillar / Obelisk',
+    category: 'Temple & Sacred',
+    appearanceId: 65,
+    appearanceLabel: 'RuneObelisk',
+    modelKeywords: ['pillar', 'obelisk', 'column', 'statue'],
+    scale: 1.75,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Temple Obelisk]: Ancient Force runes shimmer faintly along the weathered stone.'
+  },
+  {
+    name: 'Sacred Altar / Sith Sarcophagus',
+    category: 'Temple & Sacred',
+    appearanceId: 64,
+    modelKeywords: ['sarcoph', 'altar', 'tomb', 'grave'],
+    scale: 1.2,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 20,
+    lootResRefs: ['g_w_lghtsbr01', 'g_w_dblsbr002', 'g_a_mstrrobe02'],
+    barkText: '[Sacred Altar]: A ceremonial stone altar radiating a powerful presence in the Force.'
+  },
+  {
+    name: 'Holocron Pedestal / Star Map Shrine',
+    category: 'Temple & Sacred',
+    appearanceId: 57,
+    modelKeywords: ['starmap', 'holo', 'pedestal', 'panel', 'console'],
+    scale: 1.05,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 15,
+    lootResRefs: ['g_w_lghtsbr03', 'g_a_mstrrobe01'],
+    barkText: '[Holocron Pedestal]: A crystalline matrix projects ancient teachings of the Force.'
+  },
+  {
+    name: 'Ceremonial Temple Brazier',
+    category: 'Temple & Sacred',
+    appearanceId: 48,
+    modelKeywords: ['brazier', 'torch', 'flame', 'light', 'lamp'],
+    scale: 1.15,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Ceremonial Brazier]: Eternal temple flames cast dancing shadows across the sanctuary.'
+  },
+  {
+    name: 'Sanctified Relic Chest',
+    category: 'Temple & Sacred',
+    appearanceId: 53,
+    modelKeywords: ['ornate', 'chest', 'wicker', 'box', 'footlker'],
+    scale: 1.05,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 18,
+    lootResRefs: ['g_w_lghtsbr01', 'g_w_lghtsbr04', 'g_a_jedirobe01'],
+    barkText: '[Sacred Relic Chest]: Ornate reliquary containing ancient Jedi artifacts.'
+  },
+  {
+    name: 'Fallen Pilgrim Remains',
+    category: 'Temple & Sacred',
+    appearanceId: 62,
+    modelKeywords: ['skeleton', 'corpse', 'bones', 'remains'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: ['g_i_medeqpmnt01', 'g_w_lghtsbr02'],
+    barkText: '[Ancient Remains]: A fallen acolyte who did not survive the temple trials.'
+  },
+
+  // Tech & Consoles
+  {
+    name: 'Mainframe Command Console',
+    category: 'Tech & Consoles',
+    appearanceId: 57,
+    modelKeywords: ['comp', 'terminal', 'console'],
+    scale: 1.1,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 15,
+    lootResRefs: [],
+    barkText: '[Mainframe Console]: Sector defense grid, security cameras, and blast doors online.'
+  },
+  {
+    name: 'Tactical Holo-Projector Table',
+    category: 'Tech & Consoles',
+    appearanceId: 58,
+    modelKeywords: ['holo', 'table', 'comp', 'console'],
+    scale: 1.35,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 15,
+    lootResRefs: [],
+    barkText: '[Tactical Holo-Projector]: Displaying live planetary sector coordinates and fleet telemetry.'
+  },
+  {
+    name: 'Security Override Panel',
+    category: 'Tech & Consoles',
+    appearanceId: 56,
+    modelKeywords: ['panel', 'switch', 'comp'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 15,
+    lootResRefs: [],
+    barkText: '[Security Panel]: Insert computer spike to override lockdown protocols.'
+  },
+  {
+    name: 'Power Core / Reactor Conduit',
+    category: 'Tech & Consoles',
+    appearanceId: 60,
+    modelKeywords: ['gen', 'power', 'turbine', 'droid'],
+    scale: 1.25,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 18,
+    lootResRefs: [],
+    barkText: '[Power Core]: Primary fusion generator humming at 98% output.'
+  },
+
+  // Medical & Lab
+  {
+    name: 'Kolto Regeneration Tank',
+    category: 'Medical & Lab',
+    appearanceId: 39,
+    modelKeywords: ['kolto', 'bacta', 'tank'],
+    scale: 1.15,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Kolto Tank]: Pressurized Manaan Kolto immersion cylinder.'
+  },
+  {
+    name: 'Medical Examination Bed',
+    category: 'Medical & Lab',
+    appearanceId: 40,
+    modelKeywords: ['bed', 'cot', 'table'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: false,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: [],
+    barkText: '[Examination Bed]: Surgical recovery bed with integrated vital monitors.'
+  },
+  {
+    name: 'Bio-Research Lab Bench',
+    category: 'Medical & Lab',
+    appearanceId: 68,
+    modelKeywords: ['workbench', 'bench', 'table'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 12,
+    lootResRefs: ['g_i_medeqpmnt01', 'g_i_medeqpmnt02', 'g_i_medeqpmnt03'],
+    barkText: '[Bio-Research Bench]: Stocked with chemical analyzers and medpac synthesis supplies.'
+  },
+  {
+    name: 'Medical Trauma Locker',
+    category: 'Medical & Lab',
+    appearanceId: 52,
+    modelKeywords: ['med', 'locker', 'footlker', 'box'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 12,
+    lootResRefs: ['g_i_medeqpmnt02', 'g_i_medeqpmnt03'],
+    barkText: '[Medical Locker]: Emergency trauma kits and life-support packs.'
+  },
+
+  // Storage & Cargo
+  {
+    name: 'Heavy Industrial Cargo Crate',
+    category: 'Storage & Cargo',
+    appearanceId: 51,
+    modelKeywords: ['crate', 'cargo', 'box'],
+    scale: 1.2,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 14,
+    lootResRefs: ['g_w_blstrrfl001', 'g_i_medeqpmnt01'],
+    barkText: '[Cargo Crate]: Heavy durasteel shipping crate.'
+  },
+  {
+    name: 'Plasteel Storage Cylinder',
+    category: 'Storage & Cargo',
+    appearanceId: 53,
+    modelKeywords: ['cylinder', 'plasteel', 'canister', 'barrel'],
+    scale: 1.0,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 14,
+    lootResRefs: ['g_i_secspike01', 'g_i_progspike01', 'g_w_vbroswrd01'],
+    barkText: '[Plasteel Cylinder]: Sealed cylindrical storage container.'
+  },
+  {
+    name: 'Armory Weapons Locker',
+    category: 'Storage & Cargo',
+    appearanceId: 54,
+    modelKeywords: ['rack', 'weapon', 'metal', 'locker', 'footlker'],
+    scale: 1.1,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 16,
+    lootResRefs: ['g_w_blstrrfl001', 'g_w_hvrptbltr01', 'g_w_blstrpstl001', 'g_w_vbroswrd01'],
+    barkText: '[Weapons Locker]: Military ordnance and heavy blasters.'
+  },
+  {
+    name: 'Armorer Upgrade Workbench',
+    category: 'Storage & Cargo',
+    appearanceId: 68,
+    modelKeywords: ['workbench', 'bench'],
+    scale: 1.05,
+    useable: true,
+    hasInventory: true,
+    locked: false,
+    openLockDC: 10,
+    lootResRefs: ['g_w_lghtsbr01', 'g_w_blstrrfl001'],
+    barkText: '[Upgrade Workbench]: Calibrated for weapon and armor assembly.'
+  }
+];
+
+/**
+ * The placeables.2da model each preset keyword means (by its first keyword). Checked against KotOR's
+ * table: the presets' numeric ids and a loose keyword search had picked unrelated models (a speeder for
+ * a desk, a fountain for a vault).
+ */
+export const PLACEABLE_KEYWORD_LABELS: Record<string, string> = {
+  comp: 'CompPanel',
+  panel: 'ButtonPanel_hightech',
+  chair: 'Chair1_military_style',
+  desk: 'Desk2_fancy',
+  counter: 'Desk1_office',
+  table: 'ManaanTable1',
+  pazaak: 'ManaanTable2',
+  pillar: 'Pillar',
+  statue: 'Statue2_heroic_Jedi',
+  starmap: 'StarMap',
+  holo: 'Hologram2_abstract',
+  sarcoph: 'Sith_Sarcophagus',
+  brazier: 'Firepit',
+  skeleton: 'HumanSkeleton',
+  ornate: 'RakataBin2_wicker_footlocker',
+  footlker: 'Footlocker',
+  locker: 'LargeLocker',
+  rack: 'LargeLocker',
+  med: 'Footlocker',
+  safe: 'MetalBox_octagonal',
+  metal: 'MetalBox_octagonal',
+  crate: 'Crate_wooden',
+  cylinder: 'PlasticCrate_cylinder',
+  workbench: 'RepairTable1',
+  bed: 'Bed1_military_cot',
+  kolto: 'KoltoTank_empty',
+  gen: 'PowerConductor',
+};

@@ -1,0 +1,130 @@
+import type { GMModuleEntry } from "@/managers/gm/GMTypes";
+
+// Curated Module Catalog (KotOR; KotOR II's is CURATED_MODULES_TSL)
+export const CURATED_MODULES: GMModuleEntry[] = [
+  // Dantooine
+  { resRef: 'danm14aa', planet: 'Dantooine', title: 'Courtyard (danm14aa)', description: 'Jedi Enclave exterior courtyard and grassy plains' },
+  { resRef: 'danm13', planet: 'Dantooine', title: 'Jedi Enclave (danm13)', description: 'Jedi Council chambers, training rooms, and landing pad' },
+  { resRef: 'danm14ab', planet: 'Dantooine', title: 'Matale Grounds (danm14ab)', description: 'Rolling plains, bridge, and estate grounds' },
+  { resRef: 'danm14ac', planet: 'Dantooine', title: 'Grove (danm14ac)', description: 'Ancient grove, ruins path, and kath hound plains' },
+  { resRef: 'danm14ad', planet: 'Dantooine', title: 'Sandral Grounds (danm14ad)', description: 'Sandral estate exterior and crystal cave entrance' },
+  { resRef: 'danm15', planet: 'Dantooine', title: 'Ancient Ruins (danm15)', description: 'Star Map temple interior with droid guardians' },
+  { resRef: 'danm16', planet: 'Dantooine', title: 'Sandral Estate (danm16)', description: 'Fortified private compound interior' },
+  // Taris
+  { resRef: 'tar_m02aa', planet: 'Taris', title: 'Upper City South (tar_m02aa)', description: 'Skyscraper walkways, apartamentos plaza, and cantina entrance' },
+  { resRef: 'tar_m02ab', planet: 'Taris', title: 'Upper City North (tar_m02ab)', description: 'Upper City promenade, medical clinic, and Sith base entrance' },
+  { resRef: 'tar_m02ac', planet: 'Taris', title: 'Upper City Cantina (tar_m02ac)', description: 'Dueling ring, pazaak den, and lounge' },
+  { resRef: 'tar_m03aa', planet: 'Taris', title: 'Lower City (tar_m03aa)', description: 'Swoop gang street between Javyar\'s Cantina and bases' },
+  { resRef: 'tar_m03ae', planet: 'Taris', title: 'Javyar\'s Cantina (tar_m03ae)', description: 'Lower City cantina interior' },
+  { resRef: 'tar_m04aa', planet: 'Taris', title: 'Undercity (tar_m04aa)', description: 'Outcast village and rakghoul-infested wasteland' },
+  { resRef: 'tar_m09aa', planet: 'Taris', title: 'Sith Military Base (tar_m09aa)', description: 'Imperial/Sith garrison command center' },
+  { resRef: 'tar_m10aa', planet: 'Taris', title: 'Black Vulkar Base (tar_m10aa)', description: 'Gang headquarters and garage' },
+  { resRef: 'tar_m11aa', planet: 'Taris', title: 'Hidden Bek Base (tar_m11aa)', description: 'Gadon Thek\'s base of operations' },
+  // Ships & Stations
+  { resRef: 'ebo_m12aa', planet: 'Ships & Stations', title: 'Ebon Hawk Interior (ebo_m12aa)', description: 'Player starship interior hub' },
+  { resRef: 'end_m01aa', planet: 'Ships & Stations', title: 'Endar Spire - Command Module (end_m01aa)', description: 'Republic cruiser corridors under Sith attack' },
+  { resRef: 'end_m01ab', planet: 'Ships & Stations', title: 'Endar Spire - Starboard Section (end_m01ab)', description: 'Bridge, engine room, and escape pods' },
+  { resRef: 'liv_m99aa', planet: 'Ships & Stations', title: 'Yavin Station (liv_m99aa)', description: 'Suvam Tan\'s orbital space station' },
+  { resRef: 'lev_m40aa', planet: 'Ships & Stations', title: 'Leviathan - Prison Block (lev_m40aa)', description: 'Sith flagship detention cells' },
+  { resRef: 'lev_m40ab', planet: 'Ships & Stations', title: 'Leviathan - Command Deck (lev_m40ab)', description: 'Sith flagship bridge and hangar access' },
+  { resRef: 'lev_m40ac', planet: 'Ships & Stations', title: 'Leviathan - Hangar (lev_m40ac)', description: 'Main docking bay where Darth Malak confronts the party' },
+  // Tatooine
+  { resRef: 'tat_m17aa', planet: 'Tatooine', title: 'Anchorhead (tat_m17aa)', description: 'Desert spaceport town streets' },
+  { resRef: 'tat_m17ab', planet: 'Tatooine', title: 'Docking Bay (tat_m17ab)', description: 'Anchorhead starport landing pad' },
+  { resRef: 'tat_m17ae', planet: 'Tatooine', title: 'Hunting Lodge (tat_m17ae)', description: 'Czerka hunters lounge' },
+  { resRef: 'tat_m18aa', planet: 'Tatooine', title: 'Dune Sea (tat_m18aa)', description: 'Vast desert dunes and Sandcrawler' },
+  { resRef: 'tat_m18ab', planet: 'Tatooine', title: 'Eastern Dune Sea (tat_m18ab)', description: 'Krayt Dragon cave and Star Map ruins' },
+  { resRef: 'tat_m20aa', planet: 'Tatooine', title: 'Sand People Enclave (tat_m20aa)', description: 'Tusken Raider camp interior' },
+  // Kashyyyk
+  { resRef: 'kas_m22aa', planet: 'Kashyyyk', title: 'Czerka Landing Port (kas_m22aa)', description: 'Wroshyr tree landing pad' },
+  { resRef: 'kas_m22ab', planet: 'Kashyyyk', title: 'The Great Walkway (kas_m22ab)', description: 'Canopy bridges leading to the Wookiee village' },
+  { resRef: 'kas_m23aa', planet: 'Kashyyyk', title: 'Village of Rwookrrorro (kas_m23aa)', description: 'Wookiee chieftain halls and tree village' },
+  { resRef: 'kas_m24aa', planet: 'Kashyyyk', title: 'Upper Shadowlands (kas_m24aa)', description: 'Dark forest floor where Jolee Bindo dwells' },
+  { resRef: 'kas_m25aa', planet: 'Kashyyyk', title: 'Lower Shadowlands (kas_m25aa)', description: 'Deep jungle floor with Star Map and Mandalorians' },
+  // Manaan
+  { resRef: 'manm26aa', planet: 'Manaan', title: 'Ahto West (manm26aa)', description: 'Floating city courts and Republic/Sith embassies' },
+  { resRef: 'manm26ab', planet: 'Manaan', title: 'Ahto East (manm26ab)', description: 'Central plaza and swoop track' },
+  { resRef: 'manm26ad', planet: 'Manaan', title: 'Docking Bay (manm26ad)', description: 'Ahto City hangar bay' },
+  { resRef: 'manm27aa', planet: 'Manaan', title: 'Sith Base (manm27aa)', description: 'Sith Embassy interior on Manaan' },
+  { resRef: 'manm28aa', planet: 'Manaan', title: 'Hrakert Station (manm28aa)', description: 'Underwater research facility' },
+  // Korriban
+  { resRef: 'korr_m33aa', planet: 'Korriban', title: 'Dreshdae (korr_m33aa)', description: 'Sith colony port and cantina' },
+  { resRef: 'korr_m35aa', planet: 'Korriban', title: 'Sith Academy (korr_m35aa)', description: 'Main Sith training academy halls' },
+  { resRef: 'korr_m36aa', planet: 'Korriban', title: 'Valley of the Dark Lords (korr_m36aa)', description: 'Canyon of ancient Sith Lord tombs' },
+  { resRef: 'korr_m37aa', planet: 'Korriban', title: 'Tomb of Ajunta Pall (korr_m37aa)', description: 'Ancient Sith tomb with blade bridge' },
+  { resRef: 'korr_m38aa', planet: 'Korriban', title: 'Tomb of Marko Ragnos (korr_m38aa)', description: 'Rogue droid tomb interior' },
+  { resRef: 'korr_m38ab', planet: 'Korriban', title: 'Tomb of Tulak Hord (korr_m38ab)', description: 'Ancient Sith Lord tomb' },
+  { resRef: 'korr_m39aa', planet: 'Korriban', title: 'Tomb of Naga Sadow (korr_m39aa)', description: 'Final trial tomb with Star Map and Terentateks' },
+  // Unknown World & Star Forge
+  { resRef: 'unk_m41aa', planet: 'Unknown World', title: 'Central Beach (unk_m41aa)', description: 'Tropical beach landing site on Lehon' },
+  { resRef: 'unk_m41ac', planet: 'Unknown World', title: 'Temple Exterior (unk_m41ac)', description: 'Summit of the Ancient Rakatan Temple' },
+  { resRef: 'unk_m44aa', planet: 'Unknown World', title: 'Temple Main Floor (unk_m44aa)', description: 'Interior of the Rakatan Temple' },
+  { resRef: 'sta_m45aa', planet: 'Star Forge', title: 'Deck 1 (sta_m45aa)', description: 'Star Forge exterior walkways and defense towers' },
+  { resRef: 'sta_m45ad', planet: 'Star Forge', title: 'Viewing Platform (sta_m45ad)', description: 'Final confrontation arena with Darth Malak' },
+];
+
+/** KotOR II's curated scenes (CURATED_MODULES are KotOR's) */
+export const CURATED_MODULES_TSL: GMModuleEntry[] = [
+  // Ships
+  { resRef: '001ebo', planet: 'Ships', title: 'Ebon Hawk Interior (001ebo)', description: 'The party\'s freighter: cockpit, hold, crew quarters, medbay' },
+  { resRef: '151har', planet: 'Ships', title: 'Harbinger - Command Deck (151har)', description: 'Republic cruiser bridge and command corridors' },
+  { resRef: '152har', planet: 'Ships', title: 'Harbinger - Crew Quarters (152har)', description: 'Republic cruiser bunks and corridors' },
+  { resRef: '153har', planet: 'Ships', title: 'Harbinger - Engine Deck (153har)', description: 'Republic cruiser engine room and maintenance decks' },
+  { resRef: '852nih', planet: 'Ships', title: 'Ravager - Bridge (852nih)', description: 'Darth Nihilus\'s shattered flagship bridge' },
+  { resRef: '851nih', planet: 'Ships', title: 'Ravager - Command Deck (851nih)', description: 'Wrecked Sith warship decks and corridors' },
+  { resRef: '351nar', planet: 'Ships', title: 'Goto\'s Yacht (351nar)', description: 'A crime lord\'s luxury yacht above Nar Shaddaa' },
+  // Peragus
+  { resRef: '101per', planet: 'Peragus', title: 'Administration Level (101per)', description: 'Abandoned mining station offices and medbay' },
+  { resRef: '102per', planet: 'Peragus', title: 'Mining Tunnels (102per)', description: 'Dark asteroid mining tunnels and droid bays' },
+  { resRef: '103per', planet: 'Peragus', title: 'Fuel Depot (103per)', description: 'Explosive fuel storage and pipeworks' },
+  { resRef: '105per', planet: 'Peragus', title: 'Dormitories (105per)', description: 'Miners\' quarters, empty and silent' },
+  { resRef: '106per', planet: 'Peragus', title: 'Hangar Bay (106per)', description: 'Station hangar with a docked freighter' },
+  { resRef: '104per', planet: 'Peragus', title: 'Asteroid Exterior (104per)', description: 'Walkways on the asteroid surface, open to space' },
+  // Telos
+  { resRef: '201tel', planet: 'Telos', title: 'Citadel Station - Dock Module (201tel)', description: 'Station docks, customs and security checkpoints' },
+  { resRef: '202tel', planet: 'Telos', title: 'Citadel Station - Entertainment (202tel)', description: 'Station promenade with shops and cantina entrance' },
+  { resRef: '207tel', planet: 'Telos', title: 'Citadel Station - Cantina (207tel)', description: 'Station cantina with pazaak tables' },
+  { resRef: '203tel', planet: 'Telos', title: 'Citadel Station - Residential East (203tel)', description: 'Apartments and residential corridors' },
+  { resRef: '208tel', planet: 'Telos', title: 'Citadel Station - Bumani Exchange (208tel)', description: 'Corporate trading offices' },
+  { resRef: '209tel', planet: 'Telos', title: 'Czerka Offices (209tel)', description: 'Corporate offices on the station' },
+  { resRef: '231tel', planet: 'Telos', title: 'Restoration Zone (231tel)', description: 'Planetary restoration wilderness, grassland and lakes' },
+  { resRef: '232tel', planet: 'Telos', title: 'Underground Base (232tel)', description: 'Hidden military bunker beneath the surface' },
+  { resRef: '233tel', planet: 'Telos', title: 'Czerka Site (233tel)', description: 'Corporate excavation site in the wilderness' },
+  { resRef: '261tel', planet: 'Telos', title: 'Polar Plateau (261tel)', description: 'Frozen plateau and landing area' },
+  { resRef: '262tel', planet: 'Telos', title: 'Secret Academy (262tel)', description: 'Hidden Jedi academy in the ice' },
+  { resRef: '299tel', planet: 'Telos', title: 'HK Factory (299tel)', description: 'Droid manufacturing plant' },
+  // Nar Shaddaa
+  { resRef: '301nar', planet: 'Nar Shaddaa', title: 'Refugee Landing Pad (301nar)', description: 'Crowded landing pad in the smugglers\' moon' },
+  { resRef: '302nar', planet: 'Nar Shaddaa', title: 'Refugee Quad (302nar)', description: 'Refugee slums, shanties and alleys' },
+  { resRef: '303nar', planet: 'Nar Shaddaa', title: 'Docks (303nar)', description: 'Smugglers\' docks and warehouses' },
+  { resRef: '304nar', planet: 'Nar Shaddaa', title: 'Jekk\'Jekk Tarr (304nar)', description: 'Toxic-air cantina for non-humans' },
+  { resRef: '306nar', planet: 'Nar Shaddaa', title: 'Entertainment Promenade (306nar)', description: 'Neon promenade, pazaak den and cantina' },
+  // Dxun & Onderon
+  { resRef: '401dxn', planet: 'Dxun', title: 'Jungle Landing (401dxn)', description: 'Jungle clearing landing site' },
+  { resRef: '402dxn', planet: 'Dxun', title: 'Jungle (402dxn)', description: 'Dense moon jungle full of beasts' },
+  { resRef: '403dxn', planet: 'Dxun', title: 'Mandalorian Ruins (403dxn)', description: 'Mandalorian camp in ancient ruins' },
+  { resRef: '411dxn', planet: 'Dxun', title: 'Sith Tomb (411dxn)', description: 'Freedon Nadd\'s Sith tomb' },
+  { resRef: '501ond', planet: 'Onderon', title: 'Iziz Spaceport (501ond)', description: 'Walled-city spaceport' },
+  { resRef: '502ond', planet: 'Onderon', title: 'Merchant Quarter (502ond)', description: 'Iziz city streets and market' },
+  { resRef: '503ond', planet: 'Onderon', title: 'Iziz Cantina (503ond)', description: 'City cantina' },
+  { resRef: '506ond', planet: 'Onderon', title: 'Royal Palace (506ond)', description: 'Palace halls and throne room' },
+  { resRef: '512ond', planet: 'Onderon', title: 'Western Square (512ond)', description: 'City square and approach to the palace' },
+  // Dantooine
+  { resRef: '601dan', planet: 'Dantooine', title: 'Khoonda Plains (601dan)', description: 'Open grassland around the Khoonda settlement' },
+  { resRef: '602dan', planet: 'Dantooine', title: 'Khoonda (602dan)', description: 'Settlement hall and militia barracks' },
+  { resRef: '604dan', planet: 'Dantooine', title: 'Crystal Cave (604dan)', description: 'Cave of glowing lightsaber crystals' },
+  { resRef: '605dan', planet: 'Dantooine', title: 'Ruined Enclave Courtyard (605dan)', description: 'The ruined, looted Jedi Enclave' },
+  { resRef: '610dan', planet: 'Dantooine', title: 'Enclave Sublevel (610dan)', description: 'Dark, ruined underground levels of the Enclave' },
+  { resRef: '650dan', planet: 'Dantooine', title: 'Rebuilt Jedi Enclave (650dan)', description: 'Restored Enclave and council chamber' },
+  // Korriban
+  { resRef: '701kor', planet: 'Korriban', title: 'Valley of the Dark Lords (701kor)', description: 'Canyon of ancient Sith tombs' },
+  { resRef: '702kor', planet: 'Korriban', title: 'Sith Academy (702kor)', description: 'Abandoned Sith academy halls' },
+  { resRef: '710kor', planet: 'Korriban', title: 'Shyrack Cave (710kor)', description: 'Dark caves full of shyracks' },
+  { resRef: '711kor', planet: 'Korriban', title: 'Secret Tomb (711kor)', description: 'Hidden Sith tomb of visions' },
+  // Malachor V
+  { resRef: '901mal', planet: 'Malachor V', title: 'Surface (901mal)', description: 'Shattered battlefield world' },
+  { resRef: '902mal', planet: 'Malachor V', title: 'Depths (902mal)', description: 'Caverns beneath the surface' },
+  { resRef: '903mal', planet: 'Malachor V', title: 'Trayus Academy (903mal)', description: 'Sith academy halls' },
+  { resRef: '904mal', planet: 'Malachor V', title: 'Trayus Core (904mal)', description: 'Final confrontation chamber' },
+  { resRef: '906mal', planet: 'Malachor V', title: 'Trayus Proving Grounds (906mal)', description: 'Sith training arena' },
+];
