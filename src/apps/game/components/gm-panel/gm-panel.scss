@@ -386,6 +386,30 @@
       font-size: 10.5px;
       color: #8cb0d0;
     }
+
+    .gm-conversation-camera {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .gm-conversation-camera-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+
+      .gm-segmented {
+        flex-wrap: wrap;
+      }
+    }
+
+    .gm-conversation-camera-label {
+      width: 62px;
+      flex: none;
+      color: #8cb0d0;
+      font-size: 11px;
+    }
   }
 
   // Our own character is down

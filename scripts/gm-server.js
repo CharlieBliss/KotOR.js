@@ -31,6 +31,7 @@ const HOST_ONLY_TYPES = new Set([
   'talk.line',
   'session.rules',
   'talk.end',
+  'talk.camera',
 ]);
 
 // Player packets that only the host needs to see

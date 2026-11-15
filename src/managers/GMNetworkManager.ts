@@ -284,6 +284,7 @@ export interface GMPacketMap {
   'talk.leave': { convId?: string };
   'talk.line': any;
   'talk.end': { convId?: string; [key: string]: any };
+  'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
   'player.respawn': Record<string, never>;
 }

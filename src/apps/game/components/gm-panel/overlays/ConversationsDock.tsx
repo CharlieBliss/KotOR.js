@@ -1,6 +1,60 @@
 import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
-import { GMNetworkManager, GMConversationManager, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { GMNetworkManager, GMConversationManager, GMPlayers, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
+
+const SHOTS: { id: 'close' | 'shoulder' | 'both'; label: string; title: string }[] = [
+  { id: 'close', label: 'Close-up', title: 'Head and shoulders, facing them' },
+  { id: 'shoulder', label: 'Over shoulder', title: 'Over the shoulder of whoever they face' },
+  { id: 'both', label: 'Both', title: 'Both of them, from the side' },
+];
+
+/**
+ * Directing a conversation: who players' cameras are on (Auto is KotOR's own: the NPC while it speaks, then the
+ * player choosing a reply), the shot, and whose eyes the GM watches through.
+ */
+const ConversationCamera: React.FC<{ conv: any }> = ({ conv }) => {
+  const camera = conv.camera || { focus: 'auto', shot: 'close' };
+  const set = (patch: Partial<{ focus: string; shot: string }>) => GMConversationManager.setCamera(conv.id, { ...camera, ...patch });
+  const people = [...conv.peers].map((peerId: string) => ({
+    peerId,
+    name: GMNetworkManager.peers.get(peerId)?.name || 'Player',
+    netId: GMPlayers.getPeerActor(peerId)?.gmNetId as string | undefined,
+  }));
+  const watching = GMConversationManager.watching?.convId === conv.id ? GMConversationManager.watching.peerId : null;
+  return (
+    <div className="gm-conversation-camera">
+      <div className="gm-conversation-camera-row">
+        <span className="gm-conversation-camera-label">Camera on</span>
+        <div className="gm-segmented" role="group" aria-label="Camera on">
+          <button className={`gm-btn small ${camera.focus === 'auto' ? 'active' : ''}`} onClick={() => set({ focus: 'auto' })} title="KotOR's own: the NPC while it speaks, then the player choosing a reply">Auto</button>
+          <button className={`gm-btn small ${camera.focus === conv.npcNetId ? 'active' : ''}`} onClick={() => set({ focus: conv.npcNetId })}>{conv.npcName}</button>
+          {people.filter((p) => p.netId).map((p) => (
+            <button key={p.peerId} className={`gm-btn small ${camera.focus === p.netId ? 'active' : ''}`} onClick={() => set({ focus: p.netId })}>{p.name}</button>
+          ))}
+        </div>
+      </div>
+      {camera.focus !== 'auto' && (
+        <div className="gm-conversation-camera-row">
+          <span className="gm-conversation-camera-label">Shot</span>
+          <div className="gm-segmented" role="group" aria-label="Shot">
+            {SHOTS.map((s) => (
+              <button key={s.id} className={`gm-btn small ${camera.shot === s.id ? 'active' : ''}`} title={s.title} onClick={() => set({ shot: s.id })}>{s.label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className="gm-conversation-camera-row">
+        <span className="gm-conversation-camera-label">You see</span>
+        <div className="gm-segmented" role="group" aria-label="Your view">
+          <button className={`gm-btn small ${!watching ? 'active' : ''}`} onClick={() => GMConversationManager.setWatching(null)}>GM camera</button>
+          {people.map((p) => (
+            <button key={p.peerId} className={`gm-btn small ${watching === p.peerId ? 'active' : ''}`} onClick={() => GMConversationManager.setWatching(conv.id, p.peerId)} title={`What ${p.name} sees`}>{p.name}&apos;s view</button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 /** The GM speaks for NPCs players are talking to: one card per conversation */
 export const ConversationsDock: React.FC = () => {
@@ -28,6 +82,7 @@ export const ConversationsDock: React.FC = () => {
               <span>Speaking as <b>{conv.npcName}</b> · {players}</span>
               <button className="gm-btn small danger" onClick={() => GMConversationManager.end(conv.id)}>End</button>
             </div>
+            <ConversationCamera conv={conv} />
             <div className="gm-conversation-log">
               {conv.transcript.slice(-8).map((t, i) => (
                 <div key={i} className={t.npc ? 'npc' : 'player'}>

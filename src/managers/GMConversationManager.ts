@@ -9,6 +9,22 @@ import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { DLGCameraAngle } from "@/enums/dialog/DLGCameraAngle";
+import { EngineMode } from "@/enums/engine/EngineMode";
+import * as THREE from "three";
+
+/** How the camera frames a conversation: close on someone, over the other's shoulder, or both side by side */
+export type GMTalkShot = 'close' | 'shoulder' | 'both';
+
+/**
+ * Where players' cameras point in a conversation. focus 'auto' is KotOR's own: on the NPC while it speaks, then
+ * on the player while they choose a reply. Otherwise focus is the net id of the NPC or a player's character, and
+ * the camera stays on them, lines and replies alike, until the GM changes it.
+ */
+export interface GMTalkCamera {
+  focus: string;
+  shot: GMTalkShot;
+}
 
 /** One line the GM speaks for an NPC, with the replies players can pick */
 export interface GMConversationLine {
@@ -18,6 +34,9 @@ export interface GMConversationLine {
   speaker: string;
   text: string;
   replies: string[];
+  /** Seconds the line is shown before players choose a reply (they can click on sooner) */
+  duration?: number;
+  camera?: GMTalkCamera;
 }
 
 export interface GMConversationTranscriptEntry {
@@ -36,6 +55,9 @@ export interface GMConversation {
   transcript: GMConversationTranscriptEntry[];
   lastLine: GMConversationLine | null;
   nextLineId: number;
+  camera: GMTalkCamera;
+  /** Host clock (GMConversationManager.clock) when the last line was said */
+  lineAt: number;
 }
 
 /**
@@ -66,6 +88,13 @@ export class GMConversationManager {
   /** Most replies the GM can offer on one line */
   static MAX_REPLIES = 8;
   static END_REPLY = '[End conversation]';
+  static AUTO_CAMERA: GMTalkCamera = { focus: 'auto', shot: 'close' };
+  /** Host: seconds since the session began, for timing lines */
+  static clock = 0;
+  /** Host: the conversation the GM is watching, through which player's eyes */
+  static watching: { convId: string; peerId: string } | null = null;
+  /** Host: the GM camera's pose before watching, put back after */
+  static savedView: { position: THREE.Vector3; quaternion: THREE.Quaternion; fov: number } | null = null;
   static CONTINUE_REPLY = '[Continue]';
 
   static events: GMEventEmitter = new GMEventEmitter();
@@ -134,6 +163,8 @@ export class GMConversationManager {
         transcript: [],
         lastLine: null,
         nextLineId: 1,
+        camera: { ...this.AUTO_CAMERA },
+        lineAt: 0,
       };
       this.conversations.set(conv.id, conv);
     }
@@ -186,8 +217,11 @@ export class GMConversationManager {
       speaker: conv.npcName,
       text: message,
       replies: cleanReplies.length ? cleanReplies : [this.CONTINUE_REPLY],
+      duration: this.lineDuration(message),
+      camera: { ...conv.camera },
     };
     conv.lastLine = line;
+    conv.lineAt = this.clock;
     conv.transcript.push({ speaker: conv.npcName, text: message, npc: true });
     for (const peerId of conv.peers) this.sendLine(line, peerId);
     GMNetworkManager.appendChat(conv.npcName, message);
@@ -196,7 +230,98 @@ export class GMConversationManager {
   }
 
   static sendLine(line: GMConversationLine, peerId: string) {
-    GMNetworkManager.send('talk.line', line, peerId);
+    // A latecomer hears the last line with the camera as it is now
+    GMNetworkManager.send('talk.line', { ...line, camera: this.conversations.get(line.convId)?.camera || line.camera }, peerId);
+  }
+
+  /** Seconds to show a line: time to read it, at least 3 and at most 12 */
+  static lineDuration(text: string): number {
+    return Math.round(Math.min(12, Math.max(3, 1 + String(text || '').length * 0.06)) * 10) / 10;
+  }
+
+  /**
+   * Host: point the conversation's camera (GMTalkCamera). Players' cameras move at once, and later lines keep
+   * it until it changes.
+   */
+  static setCamera(convId: string, camera: GMTalkCamera) {
+    const conv = this.conversations.get(convId);
+    if (!conv || !camera) return;
+    conv.camera = { focus: String(camera.focus || 'auto'), shot: camera.shot || 'close' };
+    for (const peerId of conv.peers) GMNetworkManager.send('talk.camera', { convId, camera: conv.camera }, peerId);
+    this.notifyChange();
+  }
+
+  static shotAngle(shot: GMTalkShot): DLGCameraAngle {
+    if (shot === 'shoulder') return DLGCameraAngle.ANGLE_SPEAKER_BEHIND_PLAYER;
+    if (shot === 'both') return DLGCameraAngle.ANGLE_SPEAKER_AND_PLAYER_SIDE;
+    return DLGCameraAngle.ANGLE_SPEAKER;
+  }
+
+  /**
+   * The shot a player sees: who the camera is on (speaker), who they face (listener), and the angle. npc is the
+   * NPC, pc the player's own character; speaking is whether the NPC's line is still showing.
+   */
+  static shotFor(camera: GMTalkCamera | undefined, npc: ModuleObject, pc: ModuleObject, speaking: boolean): { angle: DLGCameraAngle; speaker: ModuleObject; listener: ModuleObject } | null {
+    if (!npc || !pc) return null;
+    if (!camera || camera.focus === 'auto') {
+      // KotOR's own: the NPC while it speaks, then the player choosing a reply
+      return speaking
+        ? { angle: DLGCameraAngle.ANGLE_SPEAKER, speaker: npc, listener: pc }
+        : { angle: DLGCameraAngle.ANGLE_FOCUS_PLAYER, speaker: pc, listener: npc };
+    }
+    const focus = GMManager.netIdMap.get(camera.focus) || (camera.focus === pc.gmNetId ? pc : null);
+    if (!focus) return null;
+    return { angle: this.shotAngle(camera.shot), speaker: focus, listener: focus === npc ? pc : npc };
+  }
+
+  /** Host: watch a conversation as one of its players sees it (null: back to the GM camera) */
+  static setWatching(convId: string | null, peerId?: string) {
+    if (!convId || !peerId) {
+      if (this.watching && this.savedView) {
+        GameState.camera.position.copy(this.savedView.position);
+        GameState.camera.quaternion.copy(this.savedView.quaternion);
+        GameState.camera.fov = this.savedView.fov;
+        GameState.camera.updateProjectionMatrix();
+      }
+      this.watching = null;
+      this.savedView = null;
+      this.notifyChange();
+      return;
+    }
+    if (!this.watching) {
+      this.savedView = { position: GameState.camera.position.clone(), quaternion: GameState.camera.quaternion.clone(), fov: GameState.camera.fov };
+    }
+    this.watching = { convId, peerId };
+    this.notifyChange();
+  }
+
+  /**
+   * Host, every frame: keep time, and while watching, put the GM camera where that player's camera is. The
+   * player's screen follows the same rules (shotFor), so the two match.
+   */
+  static updateHost(delta: number = 0) {
+    this.clock += delta;
+    const watching = this.watching;
+    if (!watching) return;
+    const conv = this.conversations.get(watching.convId);
+    const npc = conv ? GMManager.netIdMap.get(conv.npcNetId) : undefined;
+    const pc = GMPlayers.getPeerActor(watching.peerId);
+    if (!conv || !npc || !pc || !conv.peers.has(watching.peerId)) {
+      this.setWatching(null);
+      return;
+    }
+    if (GameState.Mode !== EngineMode.FREELOOK) return;
+    const lastIsLine = !!conv.transcript.length && conv.transcript[conv.transcript.length - 1].npc;
+    const speaking = lastIsLine && this.clock - conv.lineAt < (conv.lastLine?.duration ?? 3);
+    const shot = this.shotFor(conv.camera, npc, pc, speaking);
+    if (!shot) return;
+    const view = GameState.CutsceneManager.frameDialogShot(shot.angle, shot.speaker, shot.listener);
+    GameState.camera.position.copy(view.position);
+    GameState.camera.quaternion.copy(view.quaternion);
+    if (GameState.camera.fov !== view.fov) {
+      GameState.camera.fov = view.fov;
+      GameState.camera.updateProjectionMatrix();
+    }
   }
 
   /**
@@ -225,6 +350,7 @@ export class GMConversationManager {
     if (!conv || !conv.peers.delete(peerId)) return;
     GMNetworkManager.appendChat('System', `${GMNetworkManager.peers.get(peerId)?.name || 'A player'} left the conversation with ${conv.npcName}.`);
     if (!conv.peers.size) this.conversations.delete(conv.id);
+    if (this.watching?.peerId === peerId && this.watching.convId === conv.id) this.setWatching(null);
     this.notifyChange();
   }
 
@@ -245,6 +371,7 @@ export class GMConversationManager {
       GMNetworkManager.send('talk.end', { convId }, peerId);
     }
     this.conversations.delete(convId);
+    if (this.watching?.convId === convId) this.setWatching(null);
     this.notifyChange();
   }
 
@@ -326,6 +453,10 @@ export class GMConversationManager {
     const dialog = sameConversation ? this.current.dialog : this.createLiveDialog(line.convId, npc, pc);
     const entry = this.addLine(dialog, line);
     this.current = { convId: line.convId, npcNetId: line.npcNetId, dialog, lineId: line.lineId };
+    // Shown long enough to read, framed on the NPC (or held where the GM put the camera)
+    entry.delay = Number(line.duration) > 0 ? Number(line.duration) : this.lineDuration(line.text);
+    entry.cameraAngle = DLGCameraAngle.ANGLE_SPEAKER;
+    this.applyCamera(line.camera, npc, pc);
 
     if (sameConversation) {
       CM.showEntry(entry);
@@ -334,6 +465,26 @@ export class GMConversationManager {
       CM.startConversation(dialog, npc, pc);
     }
     this.notifyChange();
+  }
+
+  /** Client: the GM moved the conversation's camera */
+  static onCamera(payload: { convId?: string; camera?: GMTalkCamera }) {
+    if (!this.current || payload?.convId !== this.current.convId) return;
+    const npc = GMManager.netIdMap.get(this.current.npcNetId);
+    const pc = GameState.getCurrentPlayer();
+    if (npc && pc) this.applyCamera(payload.camera, npc, pc);
+  }
+
+  /** Client: hold the camera where the GM points it, or hand it back to KotOR's own ('auto') */
+  static applyCamera(camera: GMTalkCamera | undefined, npc: ModuleObject, pc: ModuleObject) {
+    const CM = GameState.CutsceneManager;
+    if (!camera || camera.focus === 'auto') {
+      CM.releaseCamera();
+      return;
+    }
+    const shot = this.shotFor(camera, npc, pc, true);
+    if (shot) CM.holdCamera(shot.angle, shot.speaker, shot.listener);
+    else CM.releaseCamera();
   }
 
   /** Client: the GM ended the conversation */
@@ -414,6 +565,7 @@ export class GMConversationManager {
   static reset() {
     this.pendingTalk = null;
     this.current = null;
+    if (this.watching) this.setWatching(null);
     this.conversations.clear();
   }
 
@@ -425,4 +577,5 @@ GMNetworkManager.on('talk.reply', 'host', (packet) => GMConversationManager.onTa
 GMNetworkManager.on('talk.leave', 'host', (packet) => GMConversationManager.onTalkLeave(packet.senderId, packet.payload));
 GMNetworkManager.on('peer.leave', 'host', (packet) => GMConversationManager.onPeerLeft(packet.senderId));
 GMNetworkManager.on('talk.line', 'client', (packet) => GMConversationManager.onLine(packet.payload), 'to-me-or-all');
+GMNetworkManager.on('talk.camera', 'client', (packet) => GMConversationManager.onCamera(packet.payload), 'to-me-or-all');
 GMNetworkManager.on('talk.end', 'client', (packet) => GMConversationManager.onEnd(packet.payload), 'to-me-or-all');

@@ -38,6 +38,12 @@ export class CutsceneManager {
 
   static lastSpokenString: string = '';
 
+  /**
+   * A shot held through the lines and the replies instead of the dialog's own cameras: speaker is who the camera
+   * is on, listener the one they face (see holdCamera). A GM directing a conversation sets it.
+   */
+  static heldCamera: { angle: DLGCameraAngle, speaker: ModuleObject, listener: ModuleObject } | null = null;
+
   static listener: ModuleObject;
   static owner: ModuleObject;
 
@@ -408,7 +414,11 @@ export class CutsceneManager {
       console.error(e);
     }
 
-    this.setListenerCamera();
+    if (this.heldCamera) {
+      this.applyHeldCamera();
+    } else {
+      this.setListenerCamera();
+    }
     
     if(this.dialog.getConversationType() == DLGConversationType.COMPUTER){
       GameState.MenuManager.InGameComputer.setDialogMode(ConversationState.WAITING_FOR_PC_CHOICE);
@@ -423,6 +433,7 @@ export class CutsceneManager {
    */
   static endConversation(aborted = false) {
     const wasBark = this.cutsceneMode == CutsceneMode.BARK;
+    this.heldCamera = null;
     const live = this.dialog?.live;
     if (live && this.dialog) this.dialog.live = undefined;
     this.active = false;
@@ -668,6 +679,10 @@ export class CutsceneManager {
    * @param entry - The entry to set the camera for
    */
   static setEntryCamera(entry: DLGNode){
+    if (this.heldCamera) {
+      this.applyHeldCamera();
+      return;
+    }
     const angle = entry.cameraAngle;
     const cameraID = entry.cameraAnimation > -1 ? entry.cameraAnimation : entry.cameraID;
     const fov = entry.camFieldOfView;
@@ -680,6 +695,46 @@ export class CutsceneManager {
     } else {
       this.setDialogCamera(angle);
     }
+  }
+
+  /**
+   * Keep the camera on speaker (facing listener) with this angle, for lines and replies alike, until released;
+   * takes effect at once in a conversation that's open
+   */
+  static holdCamera(angle: DLGCameraAngle, speaker: ModuleObject, listener: ModuleObject) {
+    if (!speaker || !listener) return this.releaseCamera();
+    this.heldCamera = { angle, speaker, listener };
+    if (this.active) this.applyHeldCamera();
+  }
+
+  /** Go back to the dialog's own cameras: the entry's, or the player's while they choose a reply */
+  static releaseCamera() {
+    if (!this.heldCamera) return;
+    this.heldCamera = null;
+    if (!this.active || !this.dialog) return;
+    if (this.currentEntry) this.setEntryCamera(this.currentEntry);
+    else this.setListenerCamera();
+  }
+
+  static applyHeldCamera() {
+    const held = this.heldCamera;
+    if (!held) return;
+    GameState.currentCamera = GameState.camera_dialog;
+    this.cameraState.mode = CameraMode.DIALOG;
+    this.cameraState.cameraAngle = held.angle;
+    this.setCameraParticipants(held.listener, held.speaker);
+  }
+
+  /**
+   * Frame a dialog shot outside a conversation and return the dialog camera, posed: what a player in a
+   * conversation with these two would see. The GM's view of a conversation uses it.
+   */
+  static frameDialogShot(angle: DLGCameraAngle, speaker: ModuleObject, listener: ModuleObject): THREE.PerspectiveCamera {
+    this.cameraState.mode = CameraMode.DIALOG;
+    this.cameraState.cameraAngle = angle;
+    this.setCameraParticipants(listener, speaker);
+    this.updateDialogShot();
+    return GameState.camera_dialog;
   }
 
   /**
@@ -882,21 +937,27 @@ export class CutsceneManager {
         speaker.rotation.z = speaker.participant.rotation.z;
       }
 
-      switch (this.cameraState.cameraAngle) {
-        case DLGCameraAngle.ANGLE_SPEAKER:
-          this.updateCameraAngleSpeaker(delta);
-          break;
-        case DLGCameraAngle.ANGLE_SPEAKER_BEHIND_PLAYER:
-          this.updateCameraAngleSpeakerBehindPlayer(delta);
-          break;
-        case DLGCameraAngle.ANGLE_SPEAKER_AND_PLAYER_SIDE:
-          this.updateCameraAngleTwoShot(delta);
-          break;
-        case DLGCameraAngle.ANGLE_FOCUS_PLAYER:
-          this.updateListenerCamera(delta);
-          break;
-      }
+      this.updateDialogShot(delta);
       return;
+    }
+  }
+
+  /** Pose the dialog camera for the current angle and participants */
+  static updateDialogShot(delta: number = 0) {
+    if (!this.cameraState.speaker.participant || !this.cameraState.listener.participant) return;
+    switch (this.cameraState.cameraAngle) {
+      case DLGCameraAngle.ANGLE_SPEAKER:
+        this.updateCameraAngleSpeaker(delta);
+        break;
+      case DLGCameraAngle.ANGLE_SPEAKER_BEHIND_PLAYER:
+        this.updateCameraAngleSpeakerBehindPlayer(delta);
+        break;
+      case DLGCameraAngle.ANGLE_SPEAKER_AND_PLAYER_SIDE:
+        this.updateCameraAngleTwoShot(delta);
+        break;
+      case DLGCameraAngle.ANGLE_FOCUS_PLAYER:
+        this.updateListenerCamera(delta);
+        break;
     }
   }
 

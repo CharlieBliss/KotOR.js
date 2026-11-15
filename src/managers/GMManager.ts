@@ -1124,6 +1124,7 @@ export class GMManager {
     GMViewport.updateSelectionRing(this.selectedObject);
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
+    else GameState.GMConversationManager?.updateHost(delta);
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
     if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {

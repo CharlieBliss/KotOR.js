@@ -9,6 +9,7 @@ import * as THREE from "three";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager, GMPacket } from "@/managers/GMNetworkManager";
 import { GMConversationManager } from "@/managers/GMConversationManager";
+import { GameState } from "@/GameState";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 
 function mockCreature(netId: string, x: number, overrides: Record<string, any> = {}): any {
@@ -144,5 +145,59 @@ describe("talking to NPCs the GM voices", () => {
     expect(entry.text).toBe("Hello.");
     expect(entry.replies.map((link: any) => dialog.replyList[link.index].text)).toEqual(["Hi.", "[End conversation]"]);
     expect(dialog.replyList.map((r: any) => r.gmChoice)).toEqual([0, -1]);
+  });
+});
+
+describe("directing a conversation's camera", () => {
+  test("a line is shown long enough to read: 3 to 12 seconds", () => {
+    expect(GMConversationManager.lineDuration("Hi.")).toBe(3);
+    expect(GMConversationManager.lineDuration("x".repeat(100))).toBe(7);
+    expect(GMConversationManager.lineDuration("x".repeat(1000))).toBe(12);
+  });
+
+  test("lines carry their duration and the conversation's camera", () => {
+    mockCreature("pc_a", 1);
+    const npc = mockCreature("cre_0", 0, { name: "Guide" });
+    const conv = GMConversationManager.join(npc, ["peer_a"])!;
+    GMConversationManager.setCamera(conv.id, { focus: "cre_0", shot: "shoulder" });
+    expect(sent.filter((p) => p.type === "talk.camera").map((p) => [p.targetPeerId, p.payload.camera])).toEqual([["peer_a", { focus: "cre_0", shot: "shoulder" }]]);
+
+    const line = GMConversationManager.say(conv.id, "The ruins lie north.")!;
+    expect(line.duration).toBe(GMConversationManager.lineDuration("The ruins lie north."));
+    expect(line.camera).toEqual({ focus: "cre_0", shot: "shoulder" });
+  });
+
+  test("auto follows KotOR: the NPC while it speaks, then the player choosing a reply", () => {
+    const pc = mockCreature("pc_a", 1);
+    const npc = mockCreature("cre_0", 0);
+    const speaking = GMConversationManager.shotFor({ focus: "auto", shot: "close" }, npc, pc, true)!;
+    const replying = GMConversationManager.shotFor({ focus: "auto", shot: "close" }, npc, pc, false)!;
+    expect([speaking.speaker, speaking.listener]).toEqual([npc, pc]);
+    expect([replying.speaker, replying.listener]).toEqual([pc, npc]);
+  });
+
+  test("a chosen focus holds whether or not the line is showing, facing the other side", () => {
+    const pc = mockCreature("pc_a", 1);
+    const other = mockCreature("pc_b", 2);
+    const npc = mockCreature("cre_0", 0);
+    for (const speaking of [true, false]) {
+      const onNpc = GMConversationManager.shotFor({ focus: "cre_0", shot: "both" }, npc, pc, speaking)!;
+      expect([onNpc.speaker, onNpc.listener]).toEqual([npc, pc]);
+      expect(onNpc.angle).toBe(GMConversationManager.shotAngle("both"));
+    }
+    // On another player: the camera is on them, facing the NPC
+    const onOther = GMConversationManager.shotFor({ focus: "pc_b", shot: "close" }, npc, pc, true)!;
+    expect([onOther.speaker, onOther.listener]).toEqual([other, npc]);
+  });
+
+  test("watching stops when the conversation ends", () => {
+    mockCreature("pc_a", 1);
+    const npc = mockCreature("cre_0", 0);
+    const conv = GMConversationManager.join(npc, ["peer_a"])!;
+    (GameState as any).camera = new THREE.PerspectiveCamera();
+    GMConversationManager.setWatching(conv.id, "peer_a");
+    expect(GMConversationManager.watching).toEqual({ convId: conv.id, peerId: "peer_a" });
+    GMConversationManager.end(conv.id);
+    expect(GMConversationManager.watching).toBeNull();
   });
 });
