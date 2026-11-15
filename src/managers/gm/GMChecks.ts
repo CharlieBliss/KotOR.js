@@ -22,17 +22,7 @@ export class GMChecks {
    */
   static rollCheck(cre: ModuleCreature, check: GMCheck, dc: number): GMCheckResult {
     const roll = 1 + Math.floor(Math.random() * 20);
-    const mod = (score: number) => Math.floor(((score || 10) - 10) / 2);
-    let bonus = 0;
-    if (check.kind === 'skill') {
-      bonus = cre.getSkillLevel(check.skill);
-    } else if (check.save === 'fortitude') {
-      bonus = cre.getFortitudeSave() + mod(cre.getCON());
-    } else if (check.save === 'reflex') {
-      bonus = cre.getReflexSave() + mod(cre.getDEX());
-    } else {
-      bonus = cre.getWillSave() + mod(cre.getWIS());
-    }
+    const bonus = this.checkBonus(cre, check);
     const total = roll + bonus;
     let success = total >= dc;
     if (check.kind === 'save' && roll === 20) success = true;
@@ -63,28 +53,39 @@ export class GMChecks {
   /** Rolls players made, newest last, as they arrived here */
   static recentRolls: GMRollResult[] = [];
 
-  /** Client: roll one of our skills (skills.2da row). The GM's machine rolls it and tells everyone. */
-  static requestRoll(skill: number) {
-    if (GMNetworkManager.role !== 'client') return;
-    GMNetworkManager.sendIntent('roll', undefined, { abilityId: skill });
-    GMLog.info('roll', `Asked the host to roll ${this.SKILL_NAMES[skill] || `skill ${skill}`}`);
-  }
-
   /**
    * Host: a player rolls one of their character's skills: d20 + the skill's total, as the GM's checks roll it,
    * with no difficulty. Everyone sees it. Returns the result, or null when it can't be rolled now.
    */
-  static rollForPlayer(actor: ModuleCreature, skill: number): GMRollResult | null {
-    if (!actor || !Number.isInteger(skill) || skill < 0 || skill >= this.SKILL_NAMES.length) return null;
+  static rollForPlayer(actor: ModuleCreature, check: GMCheck | number): GMRollResult | null {
+    // A bare number is a skill (players before saves could be rolled)
+    const c: GMCheck | null = typeof check === 'number' ? { kind: 'skill', skill: check } : check || null;
+    if (!actor || !this.isValidCheck(c)) return null;
     const now = performance.now();
     if (actor.gmLastRollAt && now - actor.gmLastRollAt < this.ROLL_COOLDOWN_SECONDS * 1000) return null;
     actor.gmLastRollAt = now;
-    const r = this.rollCheck(actor, { kind: 'skill', skill }, 0);
+    const r = this.rollCheck(actor, c, 0);
     const result: GMRollResult = { name: r.name, netId: actor.gmNetId, label: r.label, roll: r.roll, bonus: r.bonus, total: r.total };
     GMNetworkManager.send('roll.result', result);
     this.onRollResult(result);
     GMNetworkManager.appendChat('Roll', this.describeRoll(result));
     return result;
+  }
+
+  /** A skill that exists, or one of the three saves */
+  static isValidCheck(check: GMCheck | null | undefined): check is GMCheck {
+    if (!check) return false;
+    if (check.kind === 'skill') return Number.isInteger(check.skill) && check.skill >= 0 && check.skill < this.SKILL_NAMES.length;
+    return check.kind === 'save' && ['fortitude', 'reflex', 'will'].includes(check.save);
+  }
+
+  /** The bonus a check adds to the d20, as rollCheck works it out (for showing it) */
+  static checkBonus(cre: ModuleCreature, check: GMCheck): number {
+    const mod = (score: number) => Math.floor(((score || 10) - 10) / 2);
+    if (check.kind === 'skill') return Number(cre.getSkillLevel(check.skill)) || 0;
+    if (check.save === 'fortitude') return cre.getFortitudeSave() + mod(cre.getCON());
+    if (check.save === 'reflex') return cre.getReflexSave() + mod(cre.getDEX());
+    return cre.getWillSave() + mod(cre.getWIS());
   }
 
   static describeRoll(r: GMRollResult): string {

@@ -202,6 +202,12 @@ export class MenuCharacter extends GameMenu {
     });
   }
 
+  /** Every way in (the P key, the overlay's button, the top menu's tab) comes here: a GM session player gets their sheet */
+  open() {
+    if (GameState.hooks.openCharacterSheet('overview')) return;
+    super.open();
+  }
+
   update(delta = 0) {
     super.update(delta);
     if (!this.bVisible)

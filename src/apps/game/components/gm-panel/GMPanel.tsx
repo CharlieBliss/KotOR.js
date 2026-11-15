@@ -10,8 +10,11 @@ import type { GMJoinForm } from "@/apps/game/components/gm-panel/overlays/JoinCa
 import { ConversationsDock } from "@/apps/game/components/gm-panel/overlays/ConversationsDock";
 import { DownedBanner } from "@/apps/game/components/gm-panel/overlays/DownedBanner";
 import { PromptCard } from "@/apps/game/components/gm-panel/overlays/PromptCard";
-import { SkillsOverlay } from "@/apps/game/components/gm-panel/overlays/SkillsOverlay";
+import { CharacterSheet } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
+import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
+import { installGameCursor } from "@/apps/game/components/gm-panel/gameCursor";
+import "@/apps/game/components/gm-panel/gm-cursor.scss";
 import { ScenesTab } from "@/apps/game/components/gm-panel/tabs/ScenesTab";
 import { ActorsTab } from "@/apps/game/components/gm-panel/tabs/ActorsTab";
 import { PlayersTab } from "@/apps/game/components/gm-panel/tabs/PlayersTab";
@@ -27,7 +30,9 @@ import "@/apps/game/components/gm-panel/gm-panel.scss";
 export const GMPanel: React.FC = () => {
   const forceUpdate = useGMStore();
   const [drawerTab, setDrawerTabState] = useState<DrawerTab>(null);
-  const [skillsOpen, setSkillsOpen] = useState(false);
+  // The character sheet: a player's own (instead of the game's Character and Abilities screens), or the GM's
+  // view of a player's (from the Players tab)
+  const [sheet, setSheet] = useState<{ creature: KotOR.ModuleCreature | null; section: SheetSectionId; gmView: boolean } | null>(null);
   const [opened, setOpened] = useState<Set<Exclude<DrawerTab, null>>>(() => new Set());
   const [showQuickJoinOnMenu, setShowQuickJoinOnMenu] = useState(false);
 
@@ -51,7 +56,13 @@ export const GMPanel: React.FC = () => {
 
   useEffect(() => {
     const onInspect = () => setDrawerTab('inspector');
+    // The game's cursor over the panel's layers, once its images can be read
+    void installGameCursor();
     const onOpenJoin = () => setShowQuickJoinOnMenu(true);
+    const onOpenSheet = (section: string) => setSheet({ creature: null, section: section === 'abilities' ? 'skills' : 'overview', gmView: false });
+    const onOpenPlayerSheet = (creature: KotOR.ModuleCreature) => setSheet({ creature, section: 'overview', gmView: true });
+    GMNetworkManager.events.addEventListener('open-character-sheet', onOpenSheet);
+    GMManager.events.addEventListener('open-player-sheet', onOpenPlayerSheet);
     GMManager.events.addEventListener('inspect', onInspect);
     GMNetworkManager.events.addEventListener('open-join', onOpenJoin);
 
@@ -83,6 +94,8 @@ export const GMPanel: React.FC = () => {
     return () => {
       GMManager.events.removeEventListener('inspect', onInspect);
       GMNetworkManager.events.removeEventListener('open-join', onOpenJoin);
+      GMNetworkManager.events.removeEventListener('open-character-sheet', onOpenSheet);
+      GMManager.events.removeEventListener('open-player-sheet', onOpenPlayerSheet);
       window.removeEventListener('keydown', onKeyDown, true);
     };
   }, [setDrawerTab]);
@@ -154,8 +167,8 @@ export const GMPanel: React.FC = () => {
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
   const isPlayerView = !GMManager.isGMUser();
-  // A player's own skills, to roll (SkillsOverlay)
-  const canRollSkills = isPlayerView && GMNetworkManager.role === 'client' && !!currentLeader;
+  // A player's own sheet: their character, as the host last sent it
+  const canOpenSheet = isPlayerView && GMNetworkManager.role === 'client' && !!currentLeader;
   if (isPlayerView && drawerTab && drawerTab !== 'multiplayer') {
     queueMicrotask(() => setDrawerTab(null));
   }
@@ -258,9 +271,9 @@ export const GMPanel: React.FC = () => {
               {tab.label}
             </button>
           ))}
-          {canRollSkills && (
-            <button className={`gm-btn ${skillsOpen ? 'active' : ''}`} onClick={() => setSkillsOpen(!skillsOpen)} title="Roll one of your skills; everyone sees the result">
-              Skills
+          {canOpenSheet && (
+            <button className={`gm-btn ${sheet && !sheet.gmView ? 'active' : ''}`} onClick={() => setSheet(sheet && !sheet.gmView ? null : { creature: null, section: 'overview', gmView: false })} title="Your character sheet: stats, skills to roll, feats, powers (P)">
+              Character
             </button>
           )}
         </div>
@@ -351,8 +364,15 @@ export const GMPanel: React.FC = () => {
       {/* A question from the GM, waiting for this player's reply */}
       {isPlayerView && <PromptCard />}
 
-      {/* Our skills, to roll; and everyone's rolls, for a few seconds */}
-      {canRollSkills && skillsOpen && <SkillsOverlay onClose={() => setSkillsOpen(false)} />}
+      {/* The character sheet; and everyone's rolls, for a few seconds */}
+      {sheet && (sheet.gmView ? sheet.creature : currentLeader) && (
+        <CharacterSheet
+          creature={sheet.gmView ? sheet.creature : currentLeader}
+          initialSection={sheet.section}
+          gmView={sheet.gmView}
+          onClose={() => setSheet(null)}
+        />
+      )}
       {GMNetworkManager.role !== 'offline' && <RollFeed />}
 
       {/* Bottom controls strip: what the current mode/tool does and its keys */}

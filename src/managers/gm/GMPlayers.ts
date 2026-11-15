@@ -38,6 +38,7 @@ import { GMMines } from "@/managers/gm/GMMines";
 import { GMSessions } from "@/managers/gm/GMSessions";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMChecks } from "@/managers/gm/GMChecks";
+import { GMPlayerRequests } from "@/managers/gm/GMPlayerRequests";
 
 /** Players in a GM session: their characters' sheets and inventories (kept by the host), what they ask the host to do, looting, rewards, questions from the GM, and what happens when they fall. */
 export class GMPlayers {
@@ -382,6 +383,7 @@ export class GMPlayers {
       maxForcePoints: cre.maxForcePoints || 0,
       currentForce: cre.currentForce || 0,
       xp: cre.experience || 0,
+      naturalAC: cre.naturalAC || 0,
       equipment,
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
     };
@@ -496,6 +498,7 @@ export class GMPlayers {
     cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
     sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
     cre.experience = sheet.xp;
+    if (typeof sheet.naturalAC === "number") cre.naturalAC = sheet.naturalAC;
     cre.forcePoints = sheet.forcePoints;
     cre.maxForcePoints = sheet.maxForcePoints;
     cre.currentForce = sheet.currentForce;
@@ -564,7 +567,7 @@ export class GMPlayers {
     unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
     levelup: (actor) => GMPlayers.levelUpOnHost(actor),
-    roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, Number(intent.abilityId)),
+    roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
     cancel: () => false,
     mine: (actor, intent) => {
       actor.gmNetTarget = undefined;
@@ -820,8 +823,7 @@ export class GMPlayers {
   static requestNetworkLevelUp(creature: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client') return false;
     if (!creature || creature.gmNetId !== GMNetworkManager.assignedActorNetId) return false;
-    GMNetworkManager.sendIntent('levelup');
-    GMLog.info('click', 'Asked the host to level our character up');
+    GMPlayerRequests.levelUp();
     return true;
   }
 

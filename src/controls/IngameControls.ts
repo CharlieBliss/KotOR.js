@@ -246,7 +246,11 @@ export class IngameControls {
     window.addEventListener('mousemove', (event: MouseEvent) => {
       // Allow look while pointer-locked; otherwise only track when over the canvas
       // (or while a canvas-started drag is held).
-      if(!this.isGameCanvasMouseTarget(event) && !Mouse.leftDown && !Mouse.rightDown){
+      // Over a page layer the page shows the cursor (as the game's own, see gameCursor.ts): hide the canvas's
+      const overCanvas = this.isGameCanvasMouseTarget(event);
+      GameState.pointerOverPage = !overCanvas && !Mouse.pointerLock && event.target instanceof Element;
+      if(!overCanvas && !Mouse.leftDown && !Mouse.rightDown){
+        GameState.scene_cursor_holder.visible = false;
         return;
       }
 

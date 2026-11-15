@@ -1247,6 +1247,12 @@ export class GMManager {
     onUseBlocked: (obj, user, reason) => GMPlayers.onUseBlocked(obj, user, reason),
     traceInteraction: (message, data) => GMLog.info('click', message, data),
     requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
+    openCharacterSheet: (section) => {
+      // A player gets their own sheet; the GM (even playing a character) keeps the game's screens
+      if (!GameState.gmMode || GMManager.isGMUser()) return false;
+      GMNetworkManager.events.dispatchEvent('open-character-sheet', section);
+      return true;
+    },
   };
 }
 

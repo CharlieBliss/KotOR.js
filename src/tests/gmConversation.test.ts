@@ -298,3 +298,49 @@ describe("players rolling their own skills", () => {
     expect(GMChecks.rollForPlayer(pc, Number.NaN)).toBeNull();
   });
 });
+
+describe("the player character sheet", () => {
+  test("a player in a GM session gets the sheet; the GM keeps the game's screens", () => {
+    const opened: string[] = [];
+    const listener = (section: string) => opened.push(section);
+    GMNetworkManager.events.addEventListener("open-character-sheet", listener);
+    (GameState as any).gmMode = true;
+    const isGM = jest.spyOn(GMManager, "isGMUser");
+    try {
+      isGM.mockReturnValue(false);
+      expect(GMManager.engineHooks.openCharacterSheet("abilities")).toBe(true);
+      isGM.mockReturnValue(true);
+      expect(GMManager.engineHooks.openCharacterSheet("overview")).toBe(false);
+      expect(opened).toEqual(["abilities"]);
+    } finally {
+      GMNetworkManager.events.removeEventListener("open-character-sheet", listener);
+    }
+  });
+
+  test("saves are rolled on the host as d20 + the save + its ability", () => {
+    const { GMChecks } = jest.requireActual("@/managers/gm/GMChecks") as any;
+    jest.spyOn(Math, "random").mockReturnValue(0.5); // d20 = 11
+    const pc = mockCreature("pc_s", 0, { name: "Saver", getWillSave: () => 3, getWIS: () => 14 });
+    expect(GMChecks.rollForPlayer(pc, { kind: "save", save: "will" })).toMatchObject({ label: "Will save", roll: 11, bonus: 5, total: 16 });
+    expect(GMChecks.rollForPlayer(mockCreature("pc_t", 0), { kind: "save", save: "luck" })).toBeNull();
+  });
+
+  test("a player's requests wait while the GM has players watching", () => {
+    const { GMPlayerRequests } = jest.requireActual("@/managers/gm/GMPlayerRequests") as any;
+    GMNetworkManager.role = "client";
+    GMNetworkManager.assignedActorNetId = "pc_a";
+    (GameState as any).getCurrentPlayer = () => ({ gmNetId: "pc_a" });
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    const frozen = jest.spyOn(GMManager, "isPlayerFrozen").mockReturnValue(true);
+    expect(GMPlayerRequests.roll({ kind: "skill", skill: 4 })).toBe(false);
+    expect(GMPlayerRequests.levelUp()).toBe(false);
+    frozen.mockReturnValue(false);
+    expect(GMPlayerRequests.roll({ kind: "save", save: "reflex" })).toBe(true);
+    expect(sent.filter((p) => p.type === "client.intent").map((p) => [p.payload.kind, p.payload.check])).toEqual([["roll", { kind: "save", save: "reflex" }]]);
+  });
+
+  test("a feat built from its feat.2da row keeps the row's id", () => {
+    const { TalentFeat } = jest.requireActual("@/talents/TalentFeat") as any;
+    expect(TalentFeat.From2DA({ __index: 46, label: "JEDI_SENSE" }).id).toBe(46);
+  });
+});

@@ -1,4 +1,4 @@
-import type { GMCharacter } from "@/managers/gm/GMTypes";
+import type { GMCharacter, GMCheck } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { GameState } from "@/GameState";
 
@@ -107,6 +107,8 @@ export interface GMPlayerSheet {
   maxForcePoints: number;
   currentForce: number;
   xp: number;
+  /** Natural armour (part of defense); older hosts don't send it */
+  naturalAC?: number;
   /** equipment slot name (RIGHTHAND, ARMOR...) -> item resref */
   equipment: Record<string, string>;
   inventory: GMLootItem[];
@@ -126,6 +128,8 @@ export interface GMClientIntent {
   abilityId?: number;
   /** mine: what to do (targetNetId is the mine, door or container; resRef the mine item) */
   mine?: GMMineAction;
+  /** roll: the skill or save (older players send abilityId, a skill) */
+  check?: GMCheck;
 }
 
 export interface GMPeerInfo {
@@ -742,7 +746,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {

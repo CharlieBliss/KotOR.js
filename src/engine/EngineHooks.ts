@@ -81,6 +81,8 @@ export interface EngineHooks {
   traceInteraction(message: string, data?: unknown): void;
   /** Level the character up elsewhere (the machine that owns it); true when that was asked for instead */
   requestNetworkLevelUp(creature: ModuleObject): boolean;
+  /** Show the mode's own character sheet instead of the game's Character or Abilities screen; true when it did */
+  openCharacterSheet(section: 'overview' | 'abilities'): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -117,4 +119,5 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   onUseBlocked: () => {},
   traceInteraction: () => {},
   requestNetworkLevelUp: () => false,
+  openCharacterSheet: () => false,
 };

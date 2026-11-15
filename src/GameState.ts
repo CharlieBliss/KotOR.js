@@ -297,6 +297,8 @@ export class GameState implements EngineContext {
   static interactableObjects: any[];
 
   static scene_cursor_holder: THREE.Group;
+  /** The mouse is over a page layer (the GM panel, a card...) rather than the canvas: the page shows the cursor */
+  static pointerOverPage = false;
   static controls: IngameControls;
 
   //Render pass properties
@@ -1455,7 +1457,7 @@ export class GameState implements EngineContext {
     }
 
     GameState.controls.Update(delta);
-    GameState.scene_cursor_holder.visible = GameState.Mode != EngineMode.MOVIE && GameState.Mode != EngineMode.LEGAL;
+    GameState.scene_cursor_holder.visible = GameState.Mode != EngineMode.MOVIE && GameState.Mode != EngineMode.LEGAL && !GameState.pointerOverPage;
     if(GameState.Mode == EngineMode.MOVIE || GameState.VideoManager.isMoviePlaying()){
       GameState.Mode = EngineMode.MOVIE;
       GameState.UpdateMovie(delta);

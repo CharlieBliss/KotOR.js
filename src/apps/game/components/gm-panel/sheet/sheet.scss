@@ -1,0 +1,107 @@
+// The character sheet: the creator's look (creator.scss), and what's its own
+
+.sheet-backdrop {
+  // The sheet sits over the game, not over a menu: let the world show through a little
+  background: rgba(0, 0, 0, 0.55);
+  &[data-game="tsl"] { background: rgba(0, 0, 0, 0.6); }
+}
+
+.sheet-stats dd { font-variant-numeric: tabular-nums; }
+
+.sheet-ability {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: var(--cc-panel-2);
+}
+.sheet-value { color: var(--cc-text-strong); text-align: right; font-variant: normal; }
+
+.sheet-alignment {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(90deg, #c62828 0%, #6a1b9a 50%, #1e88e5 100%);
+  border: 1px solid var(--cc-line);
+}
+.sheet-alignment-marker {
+  position: absolute;
+  top: -4px;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  background: var(--cc-text-strong);
+  border-radius: 2px;
+}
+
+.sheet-rolls { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.sheet-roll {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: var(--cc-panel-2);
+  color: var(--cc-text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  &:hover { border-color: var(--cc-line-bright); color: var(--cc-text-strong); }
+  &:active { background: var(--cc-on); }
+}
+.sheet-roll-bonus { color: var(--cc-text-strong); font-size: 16px; font-variant: normal; font-variant-numeric: tabular-nums; }
+
+.sheet-talents { display: flex; flex-direction: column; gap: 4px; }
+.sheet-talent {
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: var(--cc-panel-2);
+  summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 8px;
+    cursor: pointer;
+    color: var(--cc-text-strong);
+    list-style: none;
+    &::-webkit-details-marker { display: none; }
+  }
+  &[open] summary { border-bottom: 1px solid var(--cc-line); }
+}
+.sheet-talent-icon { width: 28px; height: 28px; flex: none; border-radius: 4px; }
+.sheet-talent-text {
+  margin: 0;
+  padding: 6px 10px 8px;
+  color: var(--cc-text);
+  font-size: 13px;
+  font-variant: normal;
+  letter-spacing: normal;
+  white-space: pre-line;
+}
+
+.sheet-effects { display: flex; flex-direction: column; gap: 4px; }
+.sheet-effect {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: var(--cc-panel-2);
+}
+.sheet-effect-name { color: var(--cc-text-strong); text-transform: capitalize; }
+
+.sheet-xp { display: flex; flex-direction: column; gap: 4px; }
+.sheet-xp-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--cc-panel-2);
+  border: 1px solid var(--cc-line);
+  overflow: hidden;
+  div { height: 100%; background: var(--cc-line-bright); }
+}

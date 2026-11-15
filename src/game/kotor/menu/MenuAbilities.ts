@@ -90,6 +90,12 @@ export class MenuAbilities extends GameMenu {
     });
   }
 
+  /** Every way in comes here: a GM session player gets the Abilities tabs of their sheet */
+  open() {
+    if (GameState.hooks.openCharacterSheet('abilities')) return;
+    super.open();
+  }
+
   show() {
     super.show();
     this.manager.MenuTop.LBLH_ABI.onHoverIn();

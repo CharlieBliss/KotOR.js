@@ -531,6 +531,7 @@ describe("GM multiplayer host authority", () => {
         hp: 150, maxHp: 150,
         forcePoints: 40, maxForcePoints: 40, currentForce: 0,
         xp: 1200,
+        naturalAC: 0,
         equipment: { RIGHTHAND: "g_w_lghtsbr01" },
         inventory: [{ resRef: "g_i_medeqpmnt02", stack: 1 }],
       });

@@ -168,6 +168,9 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
                         <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMPlayers.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
                           + Item
                         </button>
+                        <button className="gm-btn small" disabled={!pc} onClick={() => { if (pc) GMManager.events.dispatchEvent('open-player-sheet', pc); }} title={`${peer.name}'s character sheet: what they see, and roll or level up for them`}>
+                          Sheet
+                        </button>
                         <button className="gm-btn small" disabled={!pc} onClick={() => { if (pc) { GMManager.selectObject(pc); setDrawerTab('inspector'); } }} title="Inspect their character">
                           Inspect
                         </button>
