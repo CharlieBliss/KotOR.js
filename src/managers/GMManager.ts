@@ -1,4 +1,6 @@
 import { GMFaction, GM_SKILL_NAMES, gmItemResRef } from "@/managers/gm/GMVocab";
+import { GMTemplates } from "@/managers/gm/GMTemplates";
+import type { GMGear } from "@/managers/gm/GMTemplates";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import * as THREE from "three";
 import { GameState } from "@/GameState";
@@ -91,6 +93,7 @@ import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 export * from "@/managers/gm/GMTypes";
 export * from "@/managers/gm/GMObjectKind";
 export * from "@/managers/gm/GMVocab";
+export * from "@/managers/gm/GMTemplates";
 
 export class GMManager {
   static events: GMEventEmitter = new GMEventEmitter();
@@ -904,8 +907,8 @@ export class GMManager {
       keepPlaceables?: boolean;
       preserveParty?: boolean;
     }
-  ) {
-    if (!moduleResRef) return;
+  ): Promise<string> {
+    if (!moduleResRef) return '';
     GameState.gmMode = true;
     this.active = true;
     // The GM's machine decides which module that is (players load exactly what it sends)
@@ -975,47 +978,28 @@ export class GMManager {
 
     GameState.LoadModule(moduleResRef);
 
-    // Wait until module finishes loading and then restore preserved players if any
+    // Once the new scene is up, bring the preserved players back (not awaited: callers only start the load)
     if (savedPlayerConfigs.length > 0 || savedNetworkPlayers.length > 0) {
-      const checkInterval = setInterval(async () => {
-        // The old module still reports ready until the new one replaces it, so wait for this scene by name
-        const newSceneReady = !this.sceneLoading &&
-          String(GameState.module?.filename || '').toLowerCase() === moduleResRef.toLowerCase() &&
-          GameState.module?.readyToProcessEvents && !GameState.loadingTextures;
-        if (newSceneReady) {
-          clearInterval(checkInterval);
-          for (let i = 0; i < savedNetworkPlayers.length; i++) {
-            const saved = savedNetworkPlayers[i];
-            const offset = (savedPlayerConfigs.length + i) * 1.5;
-            const pc = await this.spawnPlayerCharacter(
-              saved.config,
-              new THREE.Vector3((GameState.module.entryX || 0) + offset, GameState.module.entryY || 0, GameState.module.entryZ || 0),
-              0,
-              saved.netId
-            );
-            if (!pc) continue;
-            pc.gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
-            await this.syncEquipmentTo(pc, saved.sheet.equipment);
-            this.setCreatureHP(pc, saved.sheet.hp, saved.sheet.maxHp);
-          }
-          for (let i = 0; i < savedPlayerConfigs.length; i++) {
-            const cfg = savedPlayerConfigs[i];
-            const entryX = (GameState.module.entryX || 0) + (i * 1.5);
-            const entryY = (GameState.module.entryY || 0);
-            const entryZ = (GameState.module.entryZ || 0);
-            const spawned = await this.spawnPlayerCharacter(
-              { ...cfg, possessImmediately: wasPossessing && i === 0 },
-              new THREE.Vector3(entryX, entryY, entryZ),
-              0
-            );
-            if (spawned && i === 0 && wasPossessing) {
-              this.possessCharacter(spawned);
-            }
-          }
-          this.notifyChange();
+      this.waitForScene(moduleResRef, Infinity).then(async (ready) => {
+        if (!ready) return;
+        const entryAt = (slot: number) => new THREE.Vector3(
+          (GameState.module.entryX || 0) + slot * 1.5, GameState.module.entryY || 0, GameState.module.entryZ || 0
+        );
+        for (let i = 0; i < savedNetworkPlayers.length; i++) {
+          const saved = savedNetworkPlayers[i];
+          const pc = await this.spawnPlayerCharacter(saved.config, entryAt(savedPlayerConfigs.length + i), 0, saved.netId);
+          if (!pc) continue;
+          pc.gmInventory = saved.sheet.inventory.map((e) => ({ ...e }));
+          await this.syncEquipmentTo(pc, saved.sheet.equipment);
+          this.setCreatureHP(pc, saved.sheet.hp, saved.sheet.maxHp);
         }
-      }, 250);
+        for (let i = 0; i < savedPlayerConfigs.length; i++) {
+          await this.spawnPlayerCharacter({ ...savedPlayerConfigs[i], possessImmediately: wasPossessing && i === 0 }, entryAt(i), 0);
+        }
+        this.notifyChange();
+      });
     }
+    return moduleResRef;
   }
 
   /**
@@ -1093,42 +1077,13 @@ export class GMManager {
     return config.appearanceId ?? 28;
   }
 
-  /** Set a creature template's hands and armour (see spawnCreature) */
-  static applyCreatureGear(root: GFFStruct, config: GMCreatureSpawnConfig, replace: boolean) {
-    let list = root.getFieldByLabel('Equip_ItemList');
-    if (!list) list = root.addField(new GFFField(GFFDataType.LIST, 'Equip_ItemList'));
-    const slots: [number, string | undefined][] = [
-      [ModuleCreatureArmorSlot.ARMOR, config.armorResRef],
-      [ModuleCreatureArmorSlot.RIGHTHAND, config.rightHandResRef],
-      [ModuleCreatureArmorSlot.LEFTHAND, config.leftHandResRef],
-    ];
-    for (const [slot, resRef] of slots) {
-      if (resRef === undefined) continue;
-      const structs = list.getChildStructs();
-      const existing = structs.find((st) => st.type === slot);
-      if (!replace) {
-        if (existing || !resRef) continue;
-      } else if (existing) {
-        list.removeChildStruct(existing);
-      }
-      if (!resRef) continue;
-      const st = new GFFStruct(slot);
-      st.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(resRef);
-      list.addChildStruct(st);
-    }
-  }
-
   static creatureTemplateIndex: GMCreatureTemplateInfo[] | null = null;
   static creatureTemplateIndexLoading: Promise<GMCreatureTemplateInfo[]> | null = null;
 
   /** Read a creature template (.utc): its name, look, faction, stats, class and gear */
   static async describeCreatureTemplate(resRef: string): Promise<GMCreatureTemplateInfo | null> {
     const key = (resRef || '').toLowerCase();
-    if (!key) return null;
-    let buffer = ResourceLoader.loadCachedResource(ResourceTypes.utc, key);
-    if (!buffer) {
-      try { buffer = await ResourceLoader.loadResource(ResourceTypes.utc, key); } catch (e) { buffer = undefined; }
-    }
+    const buffer = await GMTemplates.loadBuffer(ResourceTypes.utc, key);
     if (!buffer) return null;
     try {
       const root = new GFFObject(buffer).RootNode;
@@ -1214,34 +1169,14 @@ export class GMManager {
       ? { position: position.clone(), facing: facing ?? 0 }
       : this.getCameraTargetSpawnPoint(3.5);
 
-    let gff = new GFFObject();
-    let loadedFromUTC = false;
-    if (config.templateResRef) {
-      const resKey = config.templateResRef.toLowerCase();
-      let buffer = ResourceLoader.loadCachedResource(ResourceTypes.utc, resKey);
-      if (!buffer) {
-        try {
-          buffer = await ResourceLoader.loadResource(ResourceTypes.utc, resKey);
-        } catch (e) {
-          // fallback to procedural GFF
-        }
-      }
-      if (buffer) {
-        gff = new GFFObject(buffer);
-        loadedFromUTC = true;
-      }
-    }
+    const template = await GMTemplates.load(ResourceTypes.utc, config.templateResRef);
+    const loadedFromUTC = !!template;
+    const gff = template || new GFFObject();
 
     const root = gff.RootNode;
     // Remove TemplateResRef so creature.load() does not re-merge the unmodified .utc over our custom fields
     root.removeFieldByLabel('TemplateResRef');
-    const setOrAdd = (type: number, label: string, val: any) => {
-      if (root.hasField(label)) {
-        root.getFieldByLabel(label).setValue(val);
-      } else {
-        root.addField(new GFFField(type, label)).setValue(val);
-      }
-    };
+    const setOrAdd = (type: GFFDataType, label: string, val: any) => GMTemplates.set(root, type, label, val);
 
     // A template keeps its own look, stats and gear unless the GM customized them
     const useConfig = !loadedFromUTC || !!config.customized;
@@ -1257,16 +1192,8 @@ export class GMManager {
     }
 
     if (config.name) {
-      const locName = new CExoLocString();
-      locName.addSubString(config.name, 0);
-      if (root.hasField('FirstName')) {
-        root.getFieldByLabel('FirstName').setCExoLocString(locName);
-      } else {
-        root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName', locName));
-      }
-      if (root.hasField('LastName')) {
-        root.getFieldByLabel('LastName').setCExoLocString(new CExoLocString());
-      }
+      GMTemplates.setText(root, 'FirstName', config.name);
+      if (root.hasField('LastName')) GMTemplates.setText(root, 'LastName', '');
     }
 
     if (!loadedFromUTC) {
@@ -1296,41 +1223,13 @@ export class GMManager {
         attributes: { str: 14, dex: 14, con: 14, int: 12, wis: 14, cha: 12 },
         alignment: config.factionId === GMFaction.HOSTILE ? 'dark' : 'light',
       });
-      const classList = root.addField(new GFFField(GFFDataType.LIST, 'ClassList'));
-      const classStruct = new GFFStruct();
-      classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(config.classId ?? 0);
-      classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(config.level || 4);
-      const knownList = classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
-      for (const spellId of abilities.powers) {
-        const sp = new GFFStruct();
-        sp.addField(new GFFField(GFFDataType.WORD, 'Spell')).setValue(spellId);
-        knownList.addChildStruct(sp);
-      }
-      classList.addChildStruct(classStruct);
-
-      root.removeFieldByLabel('FeatList');
-      const featList = root.addField(new GFFField(GFFDataType.LIST, 'FeatList'));
-      for (const featId of abilities.feats) {
-        const ft = new GFFStruct();
-        ft.addField(new GFFField(GFFDataType.WORD, 'Feat')).setValue(featId);
-        featList.addChildStruct(ft);
-      }
-      root.removeFieldByLabel('SkillList');
-      const skillList = root.addField(new GFFField(GFFDataType.LIST, 'SkillList'));
-      for (let i = 0; i < Math.max(8, abilities.skillRanks.length); i++) {
-        const sk = new GFFStruct();
-        sk.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(abilities.skillRanks[i] || 0);
-        skillList.addChildStruct(sk);
-      }
-      setOrAdd(GFFDataType.WORD, 'ForcePoints', abilities.maxFp);
-      setOrAdd(GFFDataType.WORD, 'CurrentForce', abilities.maxFp);
-      setOrAdd(GFFDataType.WORD, 'MaxForcePoints', abilities.maxFp);
+      GMTemplates.writeBuild(root, abilities, config.classId ?? 0, config.level || 4);
     }
 
     // Gear. Customized (or built without a template): the hands and armour are what the config says, '' for
     // empty. From a template: its own gear, with the config only filling an empty hand. Either way the template's
     // other slots (creature claws and hides, belts, implants) stay.
-    this.applyCreatureGear(root, config, useConfig);
+    GMTemplates.writeGear(root, config, useConfig);
 
     setOrAdd(GFFDataType.FLOAT, 'XPosition', targetLoc.position.x);
     setOrAdd(GFFDataType.FLOAT, 'YPosition', targetLoc.position.y);
@@ -1409,23 +1308,9 @@ export class GMManager {
       targetLoc.position.z += config.zOffset;
     }
 
-    let gff = new GFFObject();
-    let fromTemplate = false;
-    if (config.templateResRef) {
-      const resKey = config.templateResRef.toLowerCase();
-      let buffer = ResourceLoader.loadCachedResource(ResourceTypes.utp, resKey);
-      if (!buffer) {
-        try {
-          buffer = await ResourceLoader.loadResource(ResourceTypes.utp, resKey);
-        } catch (e) {
-          // fallback to procedural GFF
-        }
-      }
-      if (buffer) {
-        gff = new GFFObject(buffer);
-        fromTemplate = true;
-      }
-    }
+    const template = await GMTemplates.load(ResourceTypes.utp, config.templateResRef);
+    const fromTemplate = !!template;
+    const gff = template || new GFFObject();
     // A template keeps its own model, name and settings unless the GM customized them
     const useConfig = !fromTemplate || !!config.customized;
     const resolvedAppearanceId = useConfig
@@ -1434,22 +1319,10 @@ export class GMManager {
 
     const root = gff.RootNode;
     root.removeFieldByLabel('TemplateResRef');
-    const setOrAdd = (type: number, label: string, val: any) => {
-      if (root.hasField(label)) {
-        root.getFieldByLabel(label).setValue(val);
-      } else {
-        root.addField(new GFFField(type, label)).setValue(val);
-      }
-    };
+    const setOrAdd = (type: GFFDataType, label: string, val: any) => GMTemplates.set(root, type, label, val);
 
     if (useConfig) {
-      const locName = new CExoLocString();
-      locName.addSubString(config.name || 'Interactive Object', 0);
-      if (root.hasField('LocName')) {
-        root.getFieldByLabel('LocName').setCExoLocString(locName);
-      } else {
-        root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName', locName));
-      }
+      GMTemplates.setText(root, 'LocName', config.name || 'Interactive Object');
 
       setOrAdd(GFFDataType.DWORD, 'Appearance', resolvedAppearanceId);
       setOrAdd(GFFDataType.BYTE, 'Useable', config.useable ? 1 : 0);
@@ -1580,94 +1453,43 @@ export class GMManager {
     const abilities = this.buildPlayerAbilities(config);
     const template = new GFFObject();
     const root = template.RootNode;
-    const locName = new CExoLocString();
-    locName.addSubString(config.name || 'Player Character', 0);
+    const set = (type: GFFDataType, label: string, val: any) => GMTemplates.set(root, type, label, val);
 
-    root.addField(new GFFField(GFFDataType.DWORD, 'ObjectId')).setValue(GameState.ModuleObjectManager.GetNextPlayerId());
-    root.addField(new GFFField(GFFDataType.WORD, 'Appearance_Type')).setValue(config.appearanceId ?? 136);
-    root.addField(new GFFField(GFFDataType.WORD, 'PortraitId')).setValue(config.portraitId ?? 15);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Gender')).setValue(config.gender ?? 0);
-    root.addField(new GFFField(GFFDataType.WORD, 'FactionID')).setValue(0); // Party/Player Faction
-    root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName', locName));
-    root.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName', new CExoLocString()));
-    root.addField(new GFFField(GFFDataType.WORD, 'HitPoints')).setValue(abilities.maxHp);
-    root.addField(new GFFField(GFFDataType.WORD, 'CurrentHitPoints')).setValue(abilities.maxHp);
-    root.addField(new GFFField(GFFDataType.WORD, 'MaxHitPoints')).setValue(abilities.maxHp);
-    root.addField(new GFFField(GFFDataType.WORD, 'ForcePoints')).setValue(abilities.maxFp);
-    root.addField(new GFFField(GFFDataType.WORD, 'CurrentForce')).setValue(abilities.maxFp);
-    root.addField(new GFFField(GFFDataType.WORD, 'MaxForcePoints')).setValue(abilities.maxFp);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Str')).setValue(config.str || 14);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Dex')).setValue(config.dex || 14);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Con')).setValue(config.con || 14);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Int')).setValue(config.int || 12);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Wis')).setValue(config.wis || 14);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Cha')).setValue(config.cha || 14);
-    root.addField(new GFFField(GFFDataType.BYTE, 'GoodEvil')).setValue(50);
-    root.addField(new GFFField(GFFDataType.BYTE, 'NaturalAC')).setValue(2);
-    root.addField(new GFFField(GFFDataType.BYTE, 'PerceptionRange')).setValue(13);
-    root.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(config.gender === 1 ? 83 : 85);
-    root.addField(new GFFField(GFFDataType.BYTE, 'Race')).setValue(6);
+    set(GFFDataType.DWORD, 'ObjectId', GameState.ModuleObjectManager.GetNextPlayerId());
+    set(GFFDataType.WORD, 'Appearance_Type', config.appearanceId ?? 136);
+    set(GFFDataType.WORD, 'PortraitId', config.portraitId ?? 15);
+    set(GFFDataType.BYTE, 'Gender', config.gender ?? 0);
+    set(GFFDataType.WORD, 'FactionID', GMFaction.PARTY);
+    GMTemplates.setText(root, 'FirstName', config.name || 'Player Character');
+    GMTemplates.setText(root, 'LastName', '');
+    set(GFFDataType.WORD, 'HitPoints', abilities.maxHp);
+    set(GFFDataType.WORD, 'CurrentHitPoints', abilities.maxHp);
+    set(GFFDataType.WORD, 'MaxHitPoints', abilities.maxHp);
+    set(GFFDataType.BYTE, 'Str', config.str || 14);
+    set(GFFDataType.BYTE, 'Dex', config.dex || 14);
+    set(GFFDataType.BYTE, 'Con', config.con || 14);
+    set(GFFDataType.BYTE, 'Int', config.int || 12);
+    set(GFFDataType.BYTE, 'Wis', config.wis || 14);
+    set(GFFDataType.BYTE, 'Cha', config.cha || 14);
+    set(GFFDataType.BYTE, 'GoodEvil', 50);
+    set(GFFDataType.BYTE, 'NaturalAC', 2);
+    set(GFFDataType.BYTE, 'PerceptionRange', 13);
+    set(GFFDataType.WORD, 'SoundSetFile', config.gender === 1 ? 83 : 85);
+    set(GFFDataType.BYTE, 'Race', 6);
 
     // Scripts for party/player behavior
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptAttacked')).setValue('k_hen_attacked01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptDamaged')).setValue('k_hen_damage01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptDialogue')).setValue('k_hen_dialogue01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptEndRound')).setValue('k_hen_combend01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat')).setValue('k_hen_heartbt01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked')).setValue('k_hen_blocked01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptOnNotice')).setValue('k_hen_percept01');
-    root.addField(new GFFField(GFFDataType.RESREF, 'ScriptSpawn')).setValue('k_hen_spawn01');
+    set(GFFDataType.RESREF, 'ScriptAttacked', 'k_hen_attacked01');
+    set(GFFDataType.RESREF, 'ScriptDamaged', 'k_hen_damage01');
+    set(GFFDataType.RESREF, 'ScriptDialogue', 'k_hen_dialogue01');
+    set(GFFDataType.RESREF, 'ScriptEndRound', 'k_hen_combend01');
+    set(GFFDataType.RESREF, 'ScriptHeartbeat', 'k_hen_heartbt01');
+    set(GFFDataType.RESREF, 'ScriptOnBlocked', 'k_hen_blocked01');
+    set(GFFDataType.RESREF, 'ScriptOnNotice', 'k_hen_percept01');
+    set(GFFDataType.RESREF, 'ScriptSpawn', 'k_hen_spawn01');
 
-    // Skills, as the class spends its skill points
-    const skillList = root.addField(new GFFField(GFFDataType.LIST, 'SkillList'));
-    for (let i = 0; i < Math.max(8, abilities.skillRanks.length); i++) {
-      const s = new GFFStruct();
-      s.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(abilities.skillRanks[i] || 0);
-      skillList.addChildStruct(s);
-    }
-
-    // Class & Force Powers
-    const classList = root.addField(new GFFField(GFFDataType.LIST, 'ClassList'));
-    const classStruct = new GFFStruct();
-    classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(config.classId ?? 3);
-    classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(config.level || 8);
-    const knownList = classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
-    {
-      for (const spellId of abilities.powers) {
-        const sp = new GFFStruct();
-        sp.addField(new GFFField(GFFDataType.WORD, 'Spell')).setValue(spellId);
-        knownList.addChildStruct(sp);
-      }
-    }
-    classList.addChildStruct(classStruct);
-
-    // Feats
-    const featList = root.addField(new GFFField(GFFDataType.LIST, 'FeatList'));
-    {
-      for (const featId of abilities.feats) {
-        const ft = new GFFStruct();
-        ft.addField(new GFFField(GFFDataType.WORD, 'Feat')).setValue(featId);
-        featList.addChildStruct(ft);
-      }
-    }
-
-    // Equipment
-    const equipList = root.addField(new GFFField(GFFDataType.LIST, 'Equip_ItemList'));
-    if (config.armorResRef) {
-      const s = new GFFStruct(ModuleCreatureArmorSlot.ARMOR);
-      s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.armorResRef);
-      equipList.addChildStruct(s);
-    }
-    if (config.rightHandResRef) {
-      const s = new GFFStruct(ModuleCreatureArmorSlot.RIGHTHAND);
-      s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.rightHandResRef);
-      equipList.addChildStruct(s);
-    }
-    if (config.leftHandResRef) {
-      const s = new GFFStruct(ModuleCreatureArmorSlot.LEFTHAND);
-      s.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(config.leftHandResRef);
-      equipList.addChildStruct(s);
-    }
+    // Class, Force powers, feats, skills and Force points, then gear
+    GMTemplates.writeBuild(root, abilities, config.classId ?? 3, config.level || 8);
+    GMTemplates.writeGear(root, config, true);
 
     const player = new ModulePlayer(template);
     player.gmPlayerConfig = { ...config };
@@ -1705,29 +1527,50 @@ export class GMManager {
       this.addToPlayerInventory(player, starterItems);
     }
 
+    return this.admitPlayer(player, targetLoc, {
+      netIdPrefix: 'pc',
+      existingNetId,
+      // Other players' characters are world creatures here, not members of this machine's 3-slot party;
+      // that keeps them off our HUD and out of party AI, and lets any number of players join
+      remote: !!config.ownerPeerId && config.ownerPeerId !== GMNetworkManager.peerId,
+      possess: !!config.possessImmediately,
+    });
+  }
+
+  /**
+   * Put a newly built player character into the scene: its model, the party (or the area, for another
+   * player's character or a full party), a network id, players told about it, and possessed if asked
+   */
+  static async admitPlayer(
+    player: ModulePlayer,
+    loc: { position: THREE.Vector3; facing: number },
+    opts: { netIdPrefix: string; existingNetId?: string; remote?: boolean; leadParty?: boolean; possess?: boolean }
+  ): Promise<ModulePlayer> {
+    const area = GameState.module.area;
     const model = await player.loadModel();
     if (model) {
       model.userData.moduleObject = player;
       model.hasCollision = true;
     }
 
-    player.position.copy(targetLoc.position);
-    player.setFacing(targetLoc.facing, true);
+    player.position.copy(loc.position);
+    player.setFacing(loc.facing, true);
 
     if (!this.spawnedPlayers.includes(player)) {
       this.spawnedPlayers.push(player);
     }
-    // Other players' characters are world creatures here, not members of this machine's 3-slot party;
-    // that keeps them off our HUD and out of party AI, and lets any number of players join
-    const remotelyControlled = !!config.ownerPeerId && config.ownerPeerId !== GMNetworkManager.peerId;
-    if (remotelyControlled) {
+    const party = GameState.PartyManager.party;
+    if (opts.remote) {
       GameState.group.creatures.add(player.container);
       area.attachObject(player);
     } else {
       GameState.group.party.add(player.container);
-      if (!GameState.PartyManager.party.includes(player)) {
-        if (GameState.PartyManager.party.length < 3) {
-          GameState.PartyManager.party.push(player);
+      if (!party.includes(player)) {
+        if (opts.leadParty) {
+          party.unshift(player);
+          if (party.length > 3) party.length = 3;
+        } else if (party.length < 3) {
+          party.push(player);
         } else {
           area.attachObject(player);
         }
@@ -1738,14 +1581,12 @@ export class GMManager {
     player.computeBoundingBox(true);
     this.markSpawned(player);
 
-    const netId = existingNetId || this.getNextNetId('pc');
-    this.registerNetObject(netId, player);
-
-    if (!existingNetId && GMNetworkManager.role !== 'offline') {
+    this.registerNetObject(opts.existingNetId || this.getNextNetId(opts.netIdPrefix), player);
+    if (!opts.existingNetId && GMNetworkManager.role !== 'offline') {
       GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(player));
     }
 
-    if (config.possessImmediately) {
+    if (opts.possess) {
       this.possessCharacter(player);
     }
 
@@ -1776,45 +1617,7 @@ export class GMManager {
       if (saveGame.PCNAME) {
         player.firstName = saveGame.PCNAME;
       }
-
-      const model = await player.loadModel();
-      if (model) {
-        model.userData.moduleObject = player;
-        model.hasCollision = true;
-      }
-
-      player.position.copy(targetLoc.position);
-      player.setFacing(targetLoc.facing, true);
-
-      GameState.group.party.add(player.container);
-      if (!this.spawnedPlayers.includes(player)) {
-        this.spawnedPlayers.push(player);
-      }
-      if (!GameState.PartyManager.party.includes(player)) {
-        if (GameState.PartyManager.party.length < 3) {
-          GameState.PartyManager.party.push(player);
-        } else {
-          GameState.module.area.attachObject(player);
-        }
-      }
-
-      player.getCurrentRoom();
-      player.computeBoundingBox(true);
-      this.markSpawned(player);
-
-      const netId = this.getNextNetId('pc_save');
-      this.registerNetObject(netId, player);
-
-      if (GMNetworkManager.role !== 'offline') {
-        GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(player));
-      }
-
-      if (possessImmediately) {
-        this.possessCharacter(player);
-      }
-
-      this.notifyChange();
-      return player;
+      return await this.admitPlayer(player, targetLoc, { netIdPrefix: 'pc_save', possess: possessImmediately });
     } catch (e) {
       console.error('[GMManager] Failed to load PC from SaveGame:', e);
       return null;
@@ -1836,44 +1639,7 @@ export class GMManager {
         player.firstName = customName;
       }
       this.assignFaction(player, GMFaction.PARTY);
-
-      const model = await player.loadModel();
-      if (model) {
-        model.userData.moduleObject = player;
-        model.hasCollision = true;
-      }
-
-      player.position.copy(targetLoc.position);
-      player.setFacing(targetLoc.facing, true);
-
-      GameState.group.party.add(player.container);
-      if (!this.spawnedPlayers.includes(player)) {
-        this.spawnedPlayers.push(player);
-      }
-      if (!GameState.PartyManager.party.includes(player)) {
-        GameState.PartyManager.party.unshift(player);
-        if (GameState.PartyManager.party.length > 3) {
-          GameState.PartyManager.party.length = 3;
-        }
-      }
-
-      player.getCurrentRoom();
-      player.computeBoundingBox(true);
-      this.markSpawned(player);
-
-      const netId = this.getNextNetId('pc_utc');
-      this.registerNetObject(netId, player);
-
-      if (GMNetworkManager.role !== 'offline') {
-        GMNetworkManager.broadcastActorSpawn(this.serializeSingleActor(player));
-      }
-
-      if (possessImmediately) {
-        this.possessCharacter(player);
-      }
-
-      this.notifyChange();
-      return player;
+      return await this.admitPlayer(player, targetLoc, { netIdPrefix: 'pc_utc', leadParty: true, possess: possessImmediately });
     } catch (e) {
       console.error('[GMManager] Failed to import UTC player:', e);
       return null;
@@ -2269,14 +2035,7 @@ export class GMManager {
 
   static async createItemFromResRefAsync(itemResRef: string): Promise<ModuleItem> {
     const resKey = itemResRef.toLowerCase().trim();
-    let buffer = ResourceLoader.loadCachedResource(ResourceTypes.uti, resKey);
-    if (!buffer) {
-      try {
-        buffer = await ResourceLoader.loadResource(ResourceTypes.uti, resKey);
-      } catch (e) {
-        // fallback to basic item stub
-      }
-    }
+    const buffer = await GMTemplates.loadBuffer(ResourceTypes.uti, resKey);
     if (buffer) {
       const gff = new GFFObject(buffer);
       const item = new ModuleItem(gff);
@@ -2408,55 +2167,108 @@ export class GMManager {
    */
   static async duplicateObject(obj: ModuleObject): Promise<ModuleObject | null> {
     if (!obj || !GameState.module?.area) return null;
-    const offsetPos = new THREE.Vector3(
-      obj.position.x + 1.5,
-      obj.position.y + 1.0,
-      obj.position.z
-    );
+    const described = this.describeObject(obj);
+    if (!described) return null;
+    const offsetPos = new THREE.Vector3(obj.position.x + 1.5, obj.position.y + 1.0, obj.position.z);
+    const cloned = await this.spawnDescribed(described, offsetPos, this.facingOf(obj));
+    if (cloned) this.selectObject(cloned);
+    return cloned;
+  }
 
-    if (GMObjectKind.isPlaceable(obj)) {
-      const plc = obj as ModulePlaceable;
-      const savedCfg: GMPlaceableSpawnConfig = plc.gmSpawnConfig || {
-        name: plc.getName() || 'Cloned Object',
+  // =========================================================================
+  // Describing objects as spawn configs (duplicating, kits, saved sessions)
+  // =========================================================================
+
+  /** A creature's hands and armour as item resrefs ('' for empty) */
+  static gearOf(cre: ModuleCreature): Required<GMGear> {
+    const eq = cre?.equipment;
+    return {
+      rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
+      leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
+      armorResRef: eq?.ARMOR?.getEquippedRes() || '',
+    };
+  }
+
+  /** The item resrefs an object carries */
+  static lootOf(obj: ModuleObject): string[] {
+    return (obj?.inventory || []).map((i) => gmItemResRef(i)).filter(Boolean);
+  }
+
+  /** Which way an object faces (placeables keep a bearing, creatures a facing) */
+  static facingOf(obj: ModuleObject): number {
+    return GMObjectKind.isPlaceable(obj) ? (obj.bearing || 0) : ((obj as ModuleCreature).getFacing?.() || 0);
+  }
+
+  /**
+   * A creature as the config that spawns it again as it is now: what it was spawned from (GM-placed) or its
+   * module template, with its current side, health, gear, bark and stance
+   */
+  static describeCreature(cre: ModuleCreature): GMCreatureSpawnConfig {
+    const base = cre.gmSpawnConfig;
+    const mainClass = cre.getMainClass?.() || undefined;
+    return {
+      ...(base || {
+        name: '',
+        templateResRef: cre.getTemplateResRef() || undefined,
+        appearanceId: cre.appearance || 28,
+        level: cre.getTotalClassLevel?.() || 5,
+        classId: mainClass ? mainClass.id : 0,
+        // A module creature has no preset to fall back on: keep the look, health and gear it has now
+        customized: true,
+      }),
+      name: cre.getName() || cre.firstName || base?.name || 'Actor',
+      factionId: cre.factionId ?? GMFaction.HOSTILE,
+      hp: cre.getMaxHP() || base?.hp || 50,
+      ...this.gearOf(cre),
+      barkText: cre.gmBarkText || '',
+      stance: cre.heldStance || undefined,
+      lootResRefs: base?.lootResRefs ? [...base.lootResRefs] : undefined,
+    };
+  }
+
+  /**
+   * A placeable as the config that spawns it again as it is now: what it was spawned from (GM-placed) or its
+   * current model and settings, with its current lock, size, bark and skill gate
+   */
+  static describePlaceable(plc: ModulePlaceable): GMPlaceableSpawnConfig {
+    const base = plc.gmSpawnConfig;
+    return {
+      ...(base || {
+        name: plc.getName() || 'Placeable',
         appearanceId: plc.appearance || 52,
-        scale: plc.gmScale || 1.0,
         useable: plc.useable,
         hasInventory: plc.hasInventory,
-        locked: plc.isLocked(),
         openLockDC: plc.openLockDC || 15,
-        lootResRefs: (plc.inventory || []).map(i => gmItemResRef(i)).filter(Boolean),
-        barkText: plc.gmBarkText || ''
-      };
-      const cloned = await this.spawnPlaceable(
-        { ...savedCfg, zOffset: 0 },
-        offsetPos,
-        plc.bearing || 0
-      );
-      if (cloned) this.selectObject(cloned);
-      return cloned;
-    } else if (GMObjectKind.isCreature(obj)) {
-      const cre = obj as ModuleCreature;
-      const eq = cre.equipment;
-      const cloned = await this.spawnCreature(
-        {
-          name: cre.getName() || cre.firstName || 'Cloned Creature',
-          appearanceId: cre.appearance || 28,
-          factionId: cre.factionId ?? 1,
-          hp: cre.getMaxHP() || 50,
-          level: 5,
-          classId: 0,
-          rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
-          leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
-          armorResRef: eq?.ARMOR?.getEquippedRes() || '',
-          barkText: cre.gmBarkText || ''
-        },
-        offsetPos,
-        cre.getFacing()
-      );
-      if (cloned) this.selectObject(cloned);
-      return cloned;
-    }
+        lootResRefs: this.lootOf(plc),
+      }),
+      zOffset: 0,
+      scale: plc.gmScale || base?.scale || 1.0,
+      locked: plc.isLocked(),
+      lootResRefs: base ? [...(base.lootResRefs || [])] : this.lootOf(plc),
+      barkText: plc.gmBarkText || '',
+      skillGate: plc.gmSkillGate ? { ...plc.gmSkillGate } : undefined,
+    };
+  }
+
+  /** A creature or placeable as a config that spawns it again, or null for anything else */
+  static describeObject(obj: ModuleObject):
+    | { kind: 'creature'; config: GMCreatureSpawnConfig }
+    | { kind: 'placeable'; config: GMPlaceableSpawnConfig }
+    | null {
+    if (GMObjectKind.isPlaceable(obj)) return { kind: 'placeable', config: this.describePlaceable(obj) };
+    if (GMObjectKind.isCreature(obj)) return { kind: 'creature', config: this.describeCreature(obj) };
     return null;
+  }
+
+  /** Spawn what describeObject (or a saved kit / session) describes */
+  static async spawnDescribed(
+    described: { kind: 'creature'; config: GMCreatureSpawnConfig } | { kind: 'placeable'; config: GMPlaceableSpawnConfig },
+    position: THREE.Vector3,
+    facing: number
+  ): Promise<ModuleObject | null> {
+    return described.kind === 'creature'
+      ? this.spawnCreature(described.config, position, facing)
+      : this.spawnPlaceable(described.config, position, facing);
   }
 
   /**
@@ -2540,23 +2352,16 @@ export class GMManager {
     const spawnNPCs = options?.spawnNPCs ?? true;
 
     if (loadClean) {
-      await this.loadScene(targetModule, {
+      const loaded = await this.loadScene(targetModule, {
         keepCreatures: false,
         keepTriggers: false,
         keepPlaceables: false,
         preserveParty: this.preservePartyOnWarp
       });
-
-      const waitTimer = setInterval(async () => {
-        if (GameState.module?.readyToProcessEvents && !GameState.loadingTextures && GameState.module?.area) {
-          clearInterval(waitTimer);
-          await this.spawnBlueprintInCurrentArea(blueprint, {
-            useCameraTargetAsOrigin: false,
-            clearExistingPlaceables: false,
-            spawnNPCs
-          });
-        }
-      }, 250);
+      // Placed once the new scene is up (not awaited, like loadScene itself)
+      this.waitForScene(loaded, Infinity).then((ready) => {
+        if (ready) return this.spawnBlueprintInCurrentArea(blueprint, { useCameraTargetAsOrigin: false, clearExistingPlaceables: false, spawnNPCs });
+      });
       return;
     }
 
@@ -2654,53 +2459,21 @@ export class GMManager {
     const originY = mod.entryY || 0;
     const originZ = mod.entryZ || 0;
 
-    const items: GMSceneBlueprintItem[] = [];
-    for (const plc of mod.area.placeables) {
-      if (!plc) continue;
-      // Include all remaining placeables in the scene
-      const savedCfg: GMPlaceableSpawnConfig = plc.gmSpawnConfig || {
-        name: plc.getName() || 'Placeable',
-        appearanceId: plc.appearance || 52,
-        scale: plc.gmScale || 1.0,
-        useable: plc.useable,
-        hasInventory: plc.hasInventory,
-        locked: plc.isLocked(),
-        openLockDC: plc.openLockDC || 15,
-        lootResRefs: (plc.inventory || []).map(i => gmItemResRef(i)).filter(Boolean),
-        barkText: plc.gmBarkText || ''
-      };
-      items.push({
-        dx: Number((plc.position.x - originX).toFixed(2)),
-        dy: Number((plc.position.y - originY).toFixed(2)),
-        dz: Number((plc.position.z - originZ).toFixed(2)),
-        yawDeg: Math.round(((plc.bearing || 0) * 180) / Math.PI),
-        config: { ...savedCfg }
-      });
-    }
+    // Where each object stands, relative to the area's entry point
+    const offset = (obj: ModuleObject) => ({
+      dx: Number((obj.position.x - originX).toFixed(2)),
+      dy: Number((obj.position.y - originY).toFixed(2)),
+      dz: Number((obj.position.z - originZ).toFixed(2)),
+      yawDeg: Math.round((this.facingOf(obj) * 180) / Math.PI),
+    });
 
-    const creatures: GMSceneBlueprintCreature[] = [];
-    for (const cre of mod.area.creatures) {
-      if (!cre || GameState.PartyManager.party.includes(cre)) continue;
-      const eq = cre.equipment;
-      creatures.push({
-        dx: Number((cre.position.x - originX).toFixed(2)),
-        dy: Number((cre.position.y - originY).toFixed(2)),
-        dz: Number((cre.position.z - originZ).toFixed(2)),
-        yawDeg: Math.round(((cre.getFacing() || 0) * 180) / Math.PI),
-        config: {
-          name: cre.getName() || cre.firstName || 'Actor',
-          appearanceId: cre.appearance || 28,
-          factionId: cre.factionId ?? 1,
-          hp: cre.getMaxHP() || 50,
-          level: 5,
-          classId: 0,
-          rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
-          leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
-          armorResRef: eq?.ARMOR?.getEquippedRes() || '',
-          barkText: cre.gmBarkText || ''
-        }
-      });
-    }
+    // Every placeable left in the scene, and every NPC (not the players' characters)
+    const items: GMSceneBlueprintItem[] = mod.area.placeables
+      .filter(Boolean)
+      .map((plc) => ({ ...offset(plc), config: this.describePlaceable(plc) }));
+    const creatures: GMSceneBlueprintCreature[] = mod.area.creatures
+      .filter((cre) => cre && !GameState.PartyManager.party.includes(cre) && !this.isPlayerCharacter(cre))
+      .map((cre) => ({ ...offset(cre), config: this.describeCreature(cre) }));
 
     const customBp: GMSceneBlueprint = {
       id: `custom_${Date.now()}`,
@@ -3164,15 +2937,9 @@ export class GMManager {
     const isPlaceable = GMObjectKind.isPlaceable(obj);
     const kind: 'creature' | 'player' | 'placeable' = isPlaceable ? 'placeable' : (isPlayer ? 'player' : 'creature');
 
-    let rightHandResRef = '';
-    let leftHandResRef = '';
-    let armorResRef = '';
-    if (!isPlaceable && (obj as ModuleCreature).equipment) {
-      const eq = (obj as ModuleCreature).equipment;
-      rightHandResRef = eq.RIGHTHAND?.getEquippedRes() || '';
-      leftHandResRef = eq.LEFTHAND?.getEquippedRes() || '';
-      armorResRef = eq.ARMOR?.getEquippedRes() || '';
-    }
+    const { rightHandResRef, leftHandResRef, armorResRef } = isPlaceable
+      ? { rightHandResRef: '', leftHandResRef: '', armorResRef: '' }
+      : this.gearOf(obj as ModuleCreature);
 
     return {
       netId,
@@ -3203,9 +2970,7 @@ export class GMManager {
       hasInventory: isPlaceable ? (obj as ModulePlaceable).hasInventory : false,
       locked: isPlaceable ? (obj as ModulePlaceable).isLocked() : false,
       openState: isPlaceable ? (obj as ModulePlaceable).state : 0,
-      lootResRefs: isPlaceable
-        ? ((obj as ModulePlaceable).inventory || []).map(i => gmItemResRef(i)).filter(Boolean)
-        : []
+      lootResRefs: isPlaceable ? this.lootOf(obj) : []
     };
   }
 
@@ -3266,7 +3031,7 @@ export class GMManager {
     this.keepDefaultCreatures = keepCreatures;
     this.keepDefaultTriggers = keepTriggers;
     this.keepDefaultPlaceables = keepPlaceables;
-    await this.loadScene(moduleResRef, {
+    return this.loadScene(moduleResRef, {
       keepCreatures,
       keepTriggers,
       keepPlaceables,
@@ -3278,18 +3043,16 @@ export class GMManager {
     if (!snapshot) return;
     const keepPlaceables = snapshot.keepDefaultPlaceables ?? true;
     if (!GameState.module || GameState.module.filename !== snapshot.moduleResRef) {
-      await this.loadSceneFromNetwork(
+      const loaded = await this.loadSceneFromNetwork(
         snapshot.moduleResRef,
         snapshot.keepDefaultCreatures,
         snapshot.keepDefaultTriggers,
         keepPlaceables
       );
-      const waitTimer = setInterval(async () => {
-        if (GameState.module?.readyToProcessEvents && !GameState.loadingTextures) {
-          clearInterval(waitTimer);
-          await this.syncSnapshotEntitiesOnClient(snapshot);
-        }
-      }, 250);
+      // Applied once the new scene is up (not awaited, so later packets aren't held up)
+      this.waitForScene(loaded, Infinity).then((ready) => {
+        if (ready) return this.syncSnapshotEntitiesOnClient(snapshot);
+      });
       return;
     }
     await this.syncSnapshotEntitiesOnClient(snapshot);
@@ -3906,11 +3669,10 @@ export class GMManager {
         });
         continue;
       }
-      const config: GMCreatureSpawnConfig | undefined = cre.gmSpawnConfig;
-      if (!config) continue; // part of the module itself; reloaded with the scene
+      if (!cre.gmSpawnConfig) continue; // part of the module itself; reloaded with the scene
       objects.push({
         kind: 'creature',
-        config: { ...config, lootResRefs: undefined },
+        config: { ...this.describeCreature(cre), lootResRefs: undefined },
         x: cre.position.x, y: cre.position.y, z: cre.position.z,
         facing: cre.getFacing(),
         factionId: cre.factionId,
@@ -3924,11 +3686,10 @@ export class GMManager {
     }
 
     for (const plc of area.placeables) {
-      const config: GMPlaceableSpawnConfig | undefined = plc?.gmSpawnConfig;
-      if (!plc || !config || plc.destroyed) continue;
+      if (!plc || !plc.gmSpawnConfig || plc.destroyed) continue;
       objects.push({
         kind: 'placeable',
-        config: { ...config, lootResRefs: [] },
+        config: { ...this.describePlaceable(plc), lootResRefs: [] },
         x: plc.position.x, y: plc.position.y, z: plc.position.z,
         facing: plc.bearing || 0,
         locked: plc.isLocked(),
@@ -4005,7 +3766,10 @@ export class GMManager {
     }
   }
 
-  /** Resolves once the given scene has finished loading, or false after timeoutMs */
+  /**
+   * Resolves once the given scene has finished loading, or false after timeoutMs. The old module still reports
+   * ready until the new one replaces it, so this waits for the scene by name.
+   */
   static waitForScene(moduleResRef: string, timeoutMs: number = 120000): Promise<boolean> {
     const want = moduleResRef.toLowerCase();
     const start = Date.now();

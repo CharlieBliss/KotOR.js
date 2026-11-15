@@ -8,6 +8,7 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 import * as THREE from "three";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager, GMPacket } from "@/managers/GMNetworkManager";
+import { GMTemplates } from "@/managers/gm/GMTemplates";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { OdysseyModelAnimation } from "@/odyssey";
@@ -750,7 +751,7 @@ describe("GM multiplayer host authority", () => {
     test("saves the scene, GM-placed objects, doors and player characters, but not module objects", () => {
       GMNetworkManager.role = "host";
       const npc = mockCreature("cre_0", {
-        gmSpawnConfig: { name: "Guard", factionId: 2, hp: 45 }, factionId: 1, getHP: () => 20, getMaxHP: () => 45,
+        gmSpawnConfig: { name: "Guard", factionId: 2, hp: 45 }, factionId: 1, getName: () => "Guard", getHP: () => 20, getMaxHP: () => 45,
         getFacing: () => 1.5, inventory: [item("g_w_vbroswrd01")], gmBarkText: "Halt", gmHidden: true,
       });
       const moduleNpc = mockCreature("cre_area_0", { inventory: [], getFacing: () => 0 });
@@ -1013,17 +1014,17 @@ describe("GM multiplayer host authority", () => {
 
     test("from a template it keeps its own gear; a preset's weapon only fills an empty hand", () => {
       const armed = template({ [ModuleCreatureArmorSlot.RIGHTHAND]: "g_w_blstrrfl001", [ModuleCreatureArmorSlot.ARMOR]: "g_a_class8001" });
-      GMManager.applyCreatureGear(armed, { name: "x", appearanceId: 0, factionId: 1, hp: 1, level: 1, classId: 0, rightHandResRef: "g_w_blstrpstl001", armorResRef: "" }, false);
+      GMTemplates.writeGear(armed, { rightHandResRef: "g_w_blstrpstl001", armorResRef: "" }, false);
       expect(gearOf(armed)).toEqual({ [ModuleCreatureArmorSlot.RIGHTHAND]: "g_w_blstrrfl001", [ModuleCreatureArmorSlot.ARMOR]: "g_a_class8001" });
 
       const unarmed = template({});
-      GMManager.applyCreatureGear(unarmed, { name: "x", appearanceId: 0, factionId: 2, hp: 1, level: 1, classId: 0, rightHandResRef: "g_w_blstrrfl001" }, false);
+      GMTemplates.writeGear(unarmed, { rightHandResRef: "g_w_blstrrfl001" }, false);
       expect(gearOf(unarmed)).toEqual({ [ModuleCreatureArmorSlot.RIGHTHAND]: "g_w_blstrrfl001" });
     });
 
     test("customized, its hands and armour are the GM's ('' empties one), and its claws stay", () => {
       const beast = template({ [CLAW]: "g_w_crslash006", [ModuleCreatureArmorSlot.RIGHTHAND]: "g_w_gaffi001", [ModuleCreatureArmorSlot.ARMOR]: "g_a_class8001" });
-      GMManager.applyCreatureGear(beast, { name: "x", appearanceId: 0, factionId: 1, hp: 1, level: 1, classId: 0, rightHandResRef: "g_w_lghtsbr01", armorResRef: "" }, true);
+      GMTemplates.writeGear(beast, { rightHandResRef: "g_w_lghtsbr01", armorResRef: "" }, true);
       expect(gearOf(beast)).toEqual({ [CLAW]: "g_w_crslash006", [ModuleCreatureArmorSlot.RIGHTHAND]: "g_w_lghtsbr01" });
     });
 
