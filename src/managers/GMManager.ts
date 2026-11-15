@@ -1164,6 +1164,7 @@ export class GMManager {
     isNetReplica: (creature) => GMReplication.isNetReplica(creature),
     isNetMotionDriven: (creature) => GMReplication.isNetMotionDriven(creature),
     updateNetMotion: (creature, delta) => GMReplication.updateNetMotion(creature, delta),
+    isHidden: (obj) => !!obj?.gmHidden,
     isMineReplica: (mine) => GMMines.isMineReplica(mine),
     interceptInteraction: (pc, target) => GMPlayers.interceptInteraction(pc, target),
     interceptMenuAction: (pc, entry, target) => GMPlayers.interceptMenuAction(pc, entry, target),

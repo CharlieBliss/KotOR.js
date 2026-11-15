@@ -854,6 +854,10 @@ export class ModuleCreature extends ModuleObject {
     if(this.isDead())
       return true;
 
+    // Hidden by the game mode: it notices nobody until it's revealed
+    if(GameState.hooks.isHidden(this))
+      return;
+
     if(this.room){
       if(!this.room.model.visible){
         return;
@@ -2991,6 +2995,8 @@ export class ModuleCreature extends ModuleObject {
    * Awareness check (d20 + Awareness) against the other's Stealth (d20 + Stealth), held for a few seconds.
    */
   canDetect(other: ModuleCreature): boolean {
+    // Something hidden by the game mode (an actor waiting for its cue) can't be noticed, so it starts no fights
+    if(other && GameState.hooks.isHidden(other)) return false;
     if(!other || other === this || !other.stealthMode || !this.isHostile(other)) return true;
     const now = performance.now() / 1000;
     const cached = this.stealthChecks.get(other);

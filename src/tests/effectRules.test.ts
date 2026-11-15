@@ -1,6 +1,6 @@
 import { describe, expect, jest, test, afterEach } from "@jest/globals";
 
-jest.mock("@/GameState", () => ({ GameState: { gmMode: false } }));
+jest.mock("@/GameState", () => ({ GameState: { gmMode: false, hooks: jest.requireActual<typeof import("@/engine/EngineHooks")>("@/engine/EngineHooks").DEFAULT_ENGINE_HOOKS } }));
 jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
 jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 

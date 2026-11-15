@@ -22,6 +22,8 @@ export interface EngineHooks {
   isNetMotionDriven(creature: ModuleCreature): boolean;
   /** Move a network-driven creature toward the position it was last sent */
   updateNetMotion(creature: ModuleCreature, delta: number): void;
+  /** The object is hidden by the mode (waiting for its cue): nobody perceives it, and it perceives nobody */
+  isHidden(obj: ModuleObject): boolean;
   /** This machine's mines are copies: they don't trigger here, and creatures here don't spot them */
   isMineReplica(mine?: ModuleTrigger): boolean;
 
@@ -80,6 +82,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isNetReplica: () => false,
   isNetMotionDriven: () => false,
   updateNetMotion: () => {},
+  isHidden: () => false,
   isMineReplica: () => false,
   interceptInteraction: () => false,
   interceptMenuAction: () => false,
