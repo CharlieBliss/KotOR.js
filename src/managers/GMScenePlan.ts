@@ -155,6 +155,9 @@ export class GMScenePlan {
 
   static FORMAT = 'kotorjs-gm-scene';
   static SKILLS = GM_SKILL_NAMES.map((name) => name.toLowerCase());
+  static SAVES: ('fortitude' | 'reflex' | 'will')[] = ['fortitude', 'reflex', 'will'];
+  static ORDERS: GMPlanOrder['kind'][] = ['attack', 'follow', 'move', 'guard', 'patrol', 'flee', 'standDown'];
+  static ACTIONS: GMPlanAction['do'][] = ['reveal', 'hide', 'order', 'faction', 'say', 'animate', 'narrate', 'freezePlayers', 'movePlayers', 'check'];
   static FACTIONS: Record<GMPlanFaction, number> = { hostile: GMFaction.HOSTILE, friendly: GMFaction.FRIENDLY, neutral: GMFaction.NEUTRAL };
 
   /** The plan running now, the objects each of its ids became, and the beats already run */
@@ -245,7 +248,7 @@ export class GMScenePlan {
       if (['attack', 'follow'].includes(order.kind) && order.target !== 'players' && !actorIds.has(order.target)) error(where, `No actor "${order.target}" to ${order.kind}.`);
       if (order.kind === 'move') spotOk(order.to?.spot, where);
       if (order.kind === 'patrol') (order.points || []).forEach((p: any) => spotOk(p?.spot, where));
-      if (!['attack', 'follow', 'move', 'guard', 'patrol', 'flee', 'standDown'].includes(order.kind)) error(where, `Unknown order "${order.kind}".`);
+      if (!this.ORDERS.includes(order.kind)) error(where, `Unknown order "${order.kind}".`);
     };
     // An empty stance means standing normally
     const stanceOk = (stance: any, where: string) => {
@@ -272,7 +275,7 @@ export class GMScenePlan {
           stanceOk(action.stance, where);
           if (action.gesture && !GMManager.findAnimationChoice('gesture', action.gesture)) warn(where, `Unknown gesture "${action.gesture}".`);
         }
-        if (!['reveal', 'hide', 'order', 'faction', 'say', 'animate', 'narrate', 'freezePlayers', 'movePlayers', 'check'].includes(action?.do)) error(where, `Unknown action "${action?.do}".`);
+        if (!this.ACTIONS.includes(action?.do)) error(where, `Unknown action "${action?.do}".`);
       });
     });
     return problems;
@@ -635,7 +638,7 @@ export class GMScenePlan {
     const key = String(name || '').toLowerCase();
     const skill = this.SKILLS.indexOf(key);
     if (skill >= 0) return { kind: 'skill', skill };
-    if (['fortitude', 'reflex', 'will'].includes(key)) return { kind: 'save', save: key as 'fortitude' | 'reflex' | 'will' };
+    if ((this.SAVES as string[]).includes(key)) return { kind: 'save', save: key as 'fortitude' | 'reflex' | 'will' };
     return null;
   }
 

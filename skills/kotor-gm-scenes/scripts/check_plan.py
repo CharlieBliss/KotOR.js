@@ -13,13 +13,16 @@ import sys
 from pathlib import Path
 
 CATALOG = Path(__file__).resolve().parent.parent / "reference" / "catalog"
-SKILLS = ["computer use", "demolitions", "stealth", "awareness", "persuade", "repair", "security", "treat injury"]
-SAVES = ["fortitude", "reflex", "will"]
-ORDERS = ["attack", "follow", "move", "guard", "patrol", "flee", "standDown"]
-ACTIONS = ["reveal", "hide", "order", "faction", "say", "animate", "narrate", "freezePlayers", "movePlayers", "check"]
-# Stance and gesture ids (GMManager.STANCES / GESTURES); a creature's model may not have every one
-STANCES = ["listen", "talk", "talk_forceful", "talk_pleading", "talk_sad", "laugh", "kneel_angry", "kneel_sad", "attention", "pointing", "injured", "tired", "sick", "crouched", "meditate", "meditate_sit", "meditate_stand", "sit", "chair", "chair_drunk", "chair_pazaak", "computer", "datapad", "weld", "treat", "cards", "dance", "dance2", "flirt", "horror", "fear", "choke", "spasm", "paralyzed", "collapsed", "sleep", "prone", "prone_talk", "dead", "dead_back", "dead_face", "shut_down"]
-GESTURES = ["bow", "salute", "greet", "nod", "shake", "shrug", "heart", "roll_eyes", "persuade", "cheer", "taunt", "point", "point_up", "point_down", "look_left", "look_right", "look_around", "scratch", "bored", "pick_up", "take_table", "console", "activate", "inject", "drink", "lock", "throw", "kneel", "sit_down", "stand_up", "power", "roll"]
+# The words a plan may use, as the game reads them: generated from its sources (src/tests/gmPlanVocab.test.ts)
+VOCAB = json.loads((CATALOG / "vocab.json").read_text(encoding="utf-8"))
+SKILLS = VOCAB["skills"]
+SAVES = VOCAB["saves"]
+FACTIONS = VOCAB["factions"]
+ORDERS = VOCAB["orders"]
+ACTIONS = VOCAB["actions"]
+# Stance and gesture ids; a creature's model may not have every one
+STANCES = VOCAB["stances"]
+GESTURES = VOCAB["gestures"]
 
 
 def read_tsv(path):
@@ -164,7 +167,7 @@ def main():
             err(where, "needs a creature template")
         elif creatures and template not in creatures:
             err(where, f'no creature template "{template}" in {content}')
-        if a.get("faction") not in ("hostile", "friendly", "neutral"):
+        if a.get("faction") not in FACTIONS:
             err(where, 'faction is "hostile", "friendly" or "neutral"')
         if not 1 <= int(a.get("count", 1)) <= 20:
             err(where, "count is 1 to 20")

@@ -666,6 +666,20 @@ export class ModuleArea extends ModuleObject {
     return GameState.Module.IsBorrowedModule(name);
   }
 
+  /**
+   * Whether the area loads without the module's own objects of a kind: a borrowed area never has them (they
+   * are the other game's), and a GM scene has them only when the GM kept them (props by default, creatures,
+   * encounters and triggers not)
+   */
+  skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean {
+    if(this.isBorrowedScene()) return true;
+    if(!GameState.gmMode) return false;
+    const gm = GameState.GMManager;
+    if(kind === 'placeables') return gm?.keepDefaultPlaceables === false;
+    if(kind === 'creatures') return !gm?.keepDefaultCreatures;
+    return !gm?.keepDefaultTriggers;
+  }
+
   /** Tables that areas index into by row (music, ambience): the other game's, for a borrowed area */
   static BorrowedTables: (name: string) => any = () => undefined;
 
@@ -1395,8 +1409,7 @@ export class ModuleArea extends ModuleObject {
 
       try { await this.loadCameras(); } catch(e){ console.error(e); }
 
-      const borrowed = this.isBorrowedScene();
-      if(borrowed || (GameState.gmMode && GameState.GMManager?.keepDefaultPlaceables === false)){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
+      if(this.skipsModuleObjects('placeables')){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(20);
 
@@ -1405,7 +1418,7 @@ export class ModuleArea extends ModuleObject {
       GameState.MenuManager.LoadScreen.setProgress(30);
 
       try { await this.loadAreaEffects(); } catch(e){ console.error(e); }
-      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures)){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
+      if(this.skipsModuleObjects('creatures')){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
       if(!GameState.gmMode){ try { await this.loadParty(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(40);
@@ -1414,9 +1427,9 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(50);
 
-      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultTriggers)){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
+      if(this.skipsModuleObjects('triggers')){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
 
-      if(borrowed || (GameState.gmMode && !GameState.GMManager?.keepDefaultCreatures)){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
+      if(this.skipsModuleObjects('creatures')){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(60);
 
