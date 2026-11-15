@@ -10,6 +10,7 @@ import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { BitWise } from "@/utility/BitWise";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
 
 /** One line the GM speaks for an NPC, with the replies players can pick */
 export interface GMConversationLine {
@@ -112,7 +113,7 @@ export class GMConversationManager {
    */
   static onTalkRequest(peerId: string, payload: { npcNetId?: string }) {
     if (GMNetworkManager.role !== 'host' || !payload?.npcNetId) return;
-    const pc = GMManager.getPeerActor(peerId);
+    const pc = GMPlayers.getPeerActor(peerId);
     const npc = GMManager.netIdMap.get(payload.npcNetId);
     if (!pc || !this.canTalkTo(npc, pc)) return;
     if (pc.position.distanceTo(npc.position) > this.TALK_RANGE * 3) return;
@@ -142,7 +143,7 @@ export class GMConversationManager {
     const newcomers = peerIds.filter((id) => !conv.peers.has(id) && GMNetworkManager.peers.has(id));
     for (const peerId of newcomers) {
       conv.peers.add(peerId);
-      const pc = GMManager.getPeerActor(peerId);
+      const pc = GMPlayers.getPeerActor(peerId);
       if (pc) {
         npc.clearAllActions();
         npc.setFacingObject?.(pc);
@@ -165,7 +166,7 @@ export class GMConversationManager {
   static getNearbyPeers(npc: ModuleObject, range: number = this.NEARBY_RANGE): string[] {
     const out: string[] = [];
     for (const peerId of GMNetworkManager.peers.keys()) {
-      const pc = GMManager.getPeerActor(peerId);
+      const pc = GMPlayers.getPeerActor(peerId);
       if (pc && pc.position.distanceTo(npc.position) <= range) out.push(peerId);
     }
     return out;

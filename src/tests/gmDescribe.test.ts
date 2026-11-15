@@ -8,6 +8,7 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 import * as THREE from "three";
 import { GMManager } from "@/managers/GMManager";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { GMSpawner } from "@/managers/gm/GMSpawner";
 
 const item = (resRef: string) => ({ getEquippedRes: () => resRef, getInventoryRes: () => resRef });
 
@@ -38,7 +39,7 @@ describe("GM objects described as spawn configs", () => {
       gmBarkText: "You are too late.",
     });
 
-    expect(GMManager.describeCreature(cre)).toEqual(expect.objectContaining({
+    expect(GMSpawner.describeCreature(cre)).toEqual(expect.objectContaining({
       name: "Dark Jedi",
       templateResRef: "n_darkjedi01",
       classId: 4,
@@ -62,7 +63,7 @@ describe("GM objects described as spawn configs", () => {
       gmSpawnConfig: { name: "Guard", templateResRef: "g_sithtroop01", appearanceId: 28, factionId: 1, hp: 25, level: 3, classId: 0, lootResRefs: ["g_i_medeqpmnt01"] },
     });
 
-    const config = GMManager.describeCreature(cre);
+    const config = GMSpawner.describeCreature(cre);
     expect(config).toEqual(expect.objectContaining({ templateResRef: "g_sithtroop01", level: 3, factionId: 2, stance: "sit", lootResRefs: ["g_i_medeqpmnt01"] }));
     expect(config.customized).toBeUndefined();
     // A copy: changing it never reaches the creature's own config
@@ -80,7 +81,7 @@ describe("GM objects described as spawn configs", () => {
       inventory: [],
     };
 
-    expect(GMManager.describeObject(plc)).toEqual({
+    expect(GMSpawner.describeObject(plc)).toEqual({
       kind: "placeable",
       config: expect.objectContaining({ name: "Vault", locked: true, scale: 1.5, skillGate: { skill: 6, dc: 20 }, zOffset: 0 }),
     });

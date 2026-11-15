@@ -15,7 +15,7 @@ import type {
   GMToolMode
 } from "@/managers/GMManager";
 
-const { GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders } = KotOR;
+const { GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders, GMChecks, GMMines, GMPlayers, GMSessions, GMSpawner, GMViewport } = KotOR;
 import "@/apps/game/components/gm-panel/gm-panel.scss";
 
 type DrawerTab = 'scenes' | 'actors' | 'players' | 'inspector' | 'multiplayer' | null;
@@ -67,7 +67,7 @@ export const GMPanel: React.FC = () => {
   const [templateIndex, setTemplateIndex] = useState<GMCreatureTemplateInfo[] | null>(null);
   // The preset the GM picked; placeableCfg is what gets placed (a copy of it, customized only on request)
   const [placeablePreset, setPlaceablePreset] = useState<GMPlaceableSpawnConfig>(GMManager.pendingPlaceableConfig);
-  const [placeableCfg, setPlaceableCfg] = useState<GMPlaceableSpawnConfig>(() => GMManager.copyPlaceablePreset(GMManager.pendingPlaceableConfig));
+  const [placeableCfg, setPlaceableCfg] = useState<GMPlaceableSpawnConfig>(() => GMSpawner.copyPlaceablePreset(GMManager.pendingPlaceableConfig));
   const [customLootResRef, setCustomLootResRef] = useState<string>('g_i_medeqpmnt01');
 
   // Players tab states
@@ -160,8 +160,8 @@ export const GMPanel: React.FC = () => {
             GMManager.spawnedPlayers[0];
           if (target) GMManager.possessCharacter(target);
         }
-      } else if (e.code === 'KeyR' && GMManager.isPlacementTool(GMManager.activeTool)) {
-        GMManager.rotatePlacement(e.shiftKey ? -GMManager.PLACEMENT_KEY_STEP : GMManager.PLACEMENT_KEY_STEP);
+      } else if (e.code === 'KeyR' && GMViewport.isPlacementTool(GMManager.activeTool)) {
+        GMViewport.rotatePlacement(e.shiftKey ? -GMViewport.PLACEMENT_KEY_STEP : GMViewport.PLACEMENT_KEY_STEP);
       }
     };
     window.addEventListener('keydown', onKeyDown, true);
@@ -188,7 +188,7 @@ export const GMPanel: React.FC = () => {
     let live = true;
     setCreatureTemplateInfo(null);
     if (creaturePick.templateResRef) {
-      GMManager.describeCreatureTemplate(creaturePick.templateResRef).then((info) => { if (live) setCreatureTemplateInfo(info); });
+      GMSpawner.describeCreatureTemplate(creaturePick.templateResRef).then((info) => { if (live) setCreatureTemplateInfo(info); });
     }
     return () => { live = false; };
   }, [creaturePick]);
@@ -197,7 +197,7 @@ export const GMPanel: React.FC = () => {
   useEffect(() => {
     if (spawnSubTab !== 'creatures' || creatureSource !== 'templates' || templateIndex) return;
     let live = true;
-    GMManager.loadCreatureTemplateIndex().then((list) => { if (live) setTemplateIndex(list); });
+    GMSpawner.loadCreatureTemplateIndex().then((list) => { if (live) setTemplateIndex(list); });
     return () => { live = false; };
   }, [spawnSubTab, creatureSource, templateIndex]);
 
@@ -226,7 +226,7 @@ export const GMPanel: React.FC = () => {
       rightHandResRef: creatureCfg.rightHandResRef || t.rightHandResRef,
       leftHandResRef: t.leftHandResRef,
       armorResRef: t.armorResRef,
-    } : { appearanceId: GMManager.resolveCreatureAppearance(creatureCfg), appearanceLabel: undefined });
+    } : { appearanceId: GMSpawner.resolveCreatureAppearance(creatureCfg), appearanceLabel: undefined });
   };
 
   const factionName = KotOR.gmFactionName;
@@ -240,7 +240,7 @@ export const GMPanel: React.FC = () => {
 
   /** Pick a preset: place exactly it, with nothing carried over from the previous pick */
   const selectPlaceablePreset = (preset: GMPlaceableSpawnConfig) => {
-    const next = GMManager.copyPlaceablePreset(preset);
+    const next = GMSpawner.copyPlaceablePreset(preset);
     setPlaceablePreset(preset);
     setPlaceableCfg(next);
     GMManager.pendingPlaceableConfig = next;
@@ -253,7 +253,7 @@ export const GMPanel: React.FC = () => {
     }
     // Start customizing from the model the preset really uses, so the Model list shows it
     updatePlaceableCfg({
-      appearanceId: GMManager.resolvePlaceableAppearance(placeableCfg),
+      appearanceId: GMSpawner.resolvePlaceableAppearance(placeableCfg),
       appearanceLabel: undefined,
       modelKeywords: undefined,
     });
@@ -414,7 +414,7 @@ export const GMPanel: React.FC = () => {
     tool === 'place_creature' ? GMManager.pendingCreatureConfig?.name :
     tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
     tool === 'place_player' ? GMManager.pendingPlayerConfig?.name :
-    tool === 'place_mine' ? `mine: ${GMManager.getMineTypes().find((m) => m.id === GMManager.pendingMineType)?.label || 'mine'}` : '';
+    tool === 'place_mine' ? `mine: ${GMMines.getMineTypes().find((m) => m.id === GMMines.pendingMineType)?.label || 'mine'}` : '';
   // What the toolbar's Place button puts down (the last kind of thing placed)
   const lastPlace = GMManager.lastPlacementTool;
   const placeButtonName =
@@ -422,16 +422,16 @@ export const GMPanel: React.FC = () => {
     lastPlace === 'place_player' ? GMManager.pendingPlayerConfig?.name || 'player' :
     lastPlace === 'place_mine' ? 'mine' :
     GMManager.pendingCreatureConfig?.name || 'creature';
-  const teleportTarget = GMManager.getTeleportTarget();
+  const teleportTarget = GMViewport.getTeleportTarget();
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
   if (isPlayerView) {
     controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
-  } else if (GMManager.isPlacementTool(tool)) {
-    statusChip = `Placing: ${placingName || 'object'} · ${GMManager.placementYawOffset}°`;
+  } else if (GMViewport.isPlacementTool(tool)) {
+    statusChip = `Placing: ${placingName || 'object'} · ${GMViewport.placementYawOffset}°`;
     controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc / Right-click', 'done']];
-  } else if (GMManager.isOrderTool(tool)) {
-    const who = GMManager.orderSubject?.getName() || 'NPC';
+  } else if (GMViewport.isOrderTool(tool)) {
+    const who = GMViewport.orderSubject?.getName() || 'NPC';
     if (tool === 'order_move') {
       statusChip = `Order ${who}: move here`;
       controlHints = [['Click ground', 'go there, then guard it'], ['Esc / Right-click', 'cancel']];
@@ -442,7 +442,7 @@ export const GMPanel: React.FC = () => {
       statusChip = `Order ${who}: follow`;
       controlHints = [['Click a creature or player', 'follow them'], ['Esc / Right-click', 'cancel']];
     } else {
-      const points = Math.max(0, GMManager.patrolDraft.length - 1);
+      const points = Math.max(0, GMViewport.patrolDraft.length - 1);
       statusChip = `Order ${who}: patrol · ${points} point${points === 1 ? '' : 's'}`;
       controlHints = [['Click ground', 'add a point'], ['Esc / Right-click', points ? 'start patrolling' : 'cancel']];
     }
@@ -474,7 +474,7 @@ export const GMPanel: React.FC = () => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    const save = GMManager.importSessionJSON(await file.text());
+    const save = GMSessions.importSessionJSON(await file.text());
     GMNetworkManager.appendChat('System', save ? `Imported session "${save.name}".` : `${file.name} isn't a GM session save.`);
     forceUpdate();
   };
@@ -486,13 +486,13 @@ export const GMPanel: React.FC = () => {
   const iAmDown = !!myCharacter && myCharacter.isDead();
   if (iAmDown && !downedSince.current) downedSince.current = Date.now();
   if (!iAmDown) downedSince.current = 0;
-  const deathRule = isPlayerView ? GMNetworkManager.sessionRules.deathRule : GMManager.deathRule;
-  const respawnIn = iAmDown ? Math.max(0, Math.ceil(GMManager.RESPAWN_DELAY_SECONDS - (Date.now() - downedSince.current) / 1000)) : 0;
+  const deathRule = isPlayerView ? GMNetworkManager.sessionRules.deathRule : GMPlayers.deathRule;
+  const respawnIn = iAmDown ? Math.max(0, Math.ceil(GMPlayers.RESPAWN_DELAY_SECONDS - (Date.now() - downedSince.current) / 1000)) : 0;
 
-  const recentPrompts = [...GMManager.dmPrompts.values()].slice(-3).reverse();
+  const recentPrompts = [...GMPlayers.dmPrompts.values()].slice(-3).reverse();
 
   const possessCandidateOrSpawn = async () => {
-    const target = possessCandidate || await GMManager.spawnPlayerCharacter(playerCfg);
+    const target = possessCandidate || await GMSpawner.spawnPlayerCharacter(playerCfg);
     if (target) GMManager.possessCharacter(target);
   };
 
@@ -552,7 +552,7 @@ export const GMPanel: React.FC = () => {
     if (!file) return;
     const ab = await file.arrayBuffer();
     const nameWithoutExt = file.name.replace(/\.utc$/i, '');
-    await GMManager.importPlayerFromUTCBuffer(new Uint8Array(ab), nameWithoutExt, true);
+    await GMSpawner.importPlayerFromUTCBuffer(new Uint8Array(ab), nameWithoutExt, true);
     e.target.value = '';
   };
 
@@ -598,8 +598,8 @@ export const GMPanel: React.FC = () => {
                 Select
               </button>
               <button
-                className={`gm-btn small ${GMManager.isPlacementTool(tool) ? 'active' : ''}`}
-                onClick={() => GMManager.setToolMode(GMManager.isPlacementTool(tool) ? 'select' : GMManager.lastPlacementTool)}
+                className={`gm-btn small ${GMViewport.isPlacementTool(tool) ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode(GMViewport.isPlacementTool(tool) ? 'select' : GMManager.lastPlacementTool)}
                 title={`Click the ground to place it. Choose what in the Place tab.`}
               >
                 Place: {placeButtonName}
@@ -1003,18 +1003,18 @@ export const GMPanel: React.FC = () => {
 
                 {/* Kits: whole sets of props (and NPCs) placed at once */}
                 {spawnSubTab === 'kits' && (() => {
-                  const savedKits = GMManager.getSavedCustomBlueprints();
+                  const savedKits = GMSessions.getSavedCustomBlueprints();
                   const kits = [
                     ...GMManager.SCENE_BLUEPRINTS.map((bp) => ({ bp, saved: false })),
                     ...savedKits.map((bp) => ({ bp, saved: true })),
                   ];
-                  const buildHere = (bp: GMSceneBlueprint) => GMManager.buildSceneBlueprint(bp, {
+                  const buildHere = (bp: GMSceneBlueprint) => GMSpawner.buildSceneBlueprint(bp, {
                     loadCleanBackgroundFirst: false,
                     clearExistingPlaceables: blueprintClearExisting,
                     spawnNPCs: blueprintSpawnNPCs,
                     useCameraTargetAsOrigin: blueprintOriginMode === 'camera',
                   });
-                  const buildOnNewStage = (bp: GMSceneBlueprint, saved: boolean) => GMManager.buildSceneBlueprint(bp, {
+                  const buildOnNewStage = (bp: GMSceneBlueprint, saved: boolean) => GMSpawner.buildSceneBlueprint(bp, {
                     loadCleanBackgroundFirst: true,
                     backgroundModuleResRef: saved ? (bp.recommendedModule || blueprintBgModule) : blueprintBgModule,
                     clearExistingPlaceables: true,
@@ -1054,7 +1054,7 @@ export const GMPanel: React.FC = () => {
                                 {saved && (
                                   <div className="gm-row">
                                     <button className="gm-btn small" title="Copy this kit as JSON, to share it" onClick={() => navigator.clipboard?.writeText(JSON.stringify(bp))}>Copy</button>
-                                    <button className="gm-btn small danger" title="Delete this saved kit" onClick={() => { GMManager.deleteCustomBlueprint(bp.id); forceUpdate(); }}>✕</button>
+                                    <button className="gm-btn small danger" title="Delete this saved kit" onClick={() => { GMSessions.deleteCustomBlueprint(bp.id); forceUpdate(); }}>✕</button>
                                   </div>
                                 )}
                               </div>
@@ -1115,7 +1115,7 @@ export const GMPanel: React.FC = () => {
                         </div>
                         <button
                           className="gm-btn active"
-                          onClick={() => { GMManager.saveCurrentSceneAsBlueprint(customBlueprintTitle, customBlueprintDesc); forceUpdate(); }}
+                          onClick={() => { GMSessions.saveCurrentSceneAsBlueprint(customBlueprintTitle, customBlueprintDesc); forceUpdate(); }}
                           title="Saves every prop and NPC you placed here as a kit you can build anywhere"
                         >
                           Save as kit
@@ -1128,7 +1128,7 @@ export const GMPanel: React.FC = () => {
                               className="gm-btn small success"
                               disabled={!importBlueprintJson.trim()}
                               onClick={() => {
-                                if (GMManager.importCustomBlueprintFromJSON(importBlueprintJson)) {
+                                if (GMSessions.importCustomBlueprintFromJSON(importBlueprintJson)) {
                                   setImportBlueprintJson('');
                                   setShowJsonImportBox(false);
                                   forceUpdate();
@@ -1174,7 +1174,7 @@ export const GMPanel: React.FC = () => {
                       </div>
                       <button
                         className="gm-btn success"
-                        onClick={() => GMManager.spawnEncounter({ presetIndex: encounterPreset, count: encounterCount, spread: encounterSpread, factionId: encounterFaction })}
+                        onClick={() => GMSpawner.spawnEncounter({ presetIndex: encounterPreset, count: encounterCount, spread: encounterSpread, factionId: encounterFaction })}
                         title="Spawns the group in a ring around where the camera is looking"
                       >
                         Spawn encounter where the camera looks
@@ -1237,7 +1237,7 @@ export const GMPanel: React.FC = () => {
                                     <div
                                       key={t.resRef}
                                       className={`gm-card ${creaturePick.templateResRef === t.resRef ? 'selected' : ''}`}
-                                      onClick={() => selectCreature(GMManager.creatureConfigFromTemplate(t))}
+                                      onClick={() => selectCreature(GMSpawner.creatureConfigFromTemplate(t))}
                                     >
                                       <div className="gm-card-info">
                                         <div className="gm-card-title">{t.name} <span className="gm-badge" style={{ marginLeft: 4 }}>{t.resRef}</span></div>
@@ -1247,7 +1247,7 @@ export const GMPanel: React.FC = () => {
                                         className="gm-btn small warning"
                                         onClick={e => {
                                           e.stopPropagation();
-                                          selectCreature(GMManager.creatureConfigFromTemplate(t));
+                                          selectCreature(GMSpawner.creatureConfigFromTemplate(t));
                                           GMManager.setToolMode('place_creature');
                                         }}
                                         title="Click the ground to place it"
@@ -1281,7 +1281,7 @@ export const GMPanel: React.FC = () => {
                                 </>
                           ) : 'Reading the template…'
                         ) : (
-                          <>Built by class: {GMManager.getAvailableAppearanceOptions().find(o => o.id === GMManager.resolveCreatureAppearance(creatureCfg))?.label || `appearance ${creatureCfg.appearanceId}`} • Level {creatureCfg.level} • HP {creatureCfg.hp}</>
+                          <>Built by class: {GMManager.getAvailableAppearanceOptions().find(o => o.id === GMSpawner.resolveCreatureAppearance(creatureCfg))?.label || `appearance ${creatureCfg.appearanceId}`} • Level {creatureCfg.level} • HP {creatureCfg.hp}</>
                         )}
                       </div>
 
@@ -1317,7 +1317,7 @@ export const GMPanel: React.FC = () => {
                           className="gm-btn success"
                           style={{ flex: 1 }}
                           onClick={async () => {
-                            const c = await GMManager.spawnCreature(creatureCfg);
+                            const c = await GMSpawner.spawnCreature(creatureCfg);
                             if (c) GMManager.selectObject(c);
                           }}
                         >
@@ -1491,7 +1491,7 @@ export const GMPanel: React.FC = () => {
                         <span>{placeableCfg.customized ? 'Placing (customized)' : 'Placing'}: {placeableCfg.name}</span>
                       </div>
                       <div className="gm-hint">
-                        Model: {GMManager.getPlaceableAppearanceLabel(GMManager.resolvePlaceableAppearance(placeableCfg))}
+                        Model: {GMSpawner.getPlaceableAppearanceLabel(GMSpawner.resolvePlaceableAppearance(placeableCfg))}
                         {placeableCfg.hasInventory ? ` • Container with ${placeableCfg.lootResRefs.length} item${placeableCfg.lootResRefs.length === 1 ? '' : 's'}` : ''}
                         {placeableCfg.locked ? ` • Locked (DC ${placeableCfg.openLockDC})` : ''}
                       </div>
@@ -1510,7 +1510,7 @@ export const GMPanel: React.FC = () => {
                           className="gm-btn success"
                           style={{ flex: 1 }}
                           onClick={async () => {
-                            const plc = await GMManager.spawnPlaceable(placeableCfg);
+                            const plc = await GMSpawner.spawnPlaceable(placeableCfg);
                             if (plc) GMManager.selectObject(plc);
                           }}
                         >
@@ -1524,10 +1524,10 @@ export const GMPanel: React.FC = () => {
                           <select
                             className="gm-select"
                             style={{ flex: 1 }}
-                            value={GMManager.pendingMineType}
-                            onChange={e => { GMManager.pendingMineType = Number(e.target.value); forceUpdate(); }}
+                            value={GMMines.pendingMineType}
+                            onChange={e => { GMMines.pendingMineType = Number(e.target.value); forceUpdate(); }}
                           >
-                            {GMManager.getMineTypes().map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
+                            {GMMines.getMineTypes().map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
                           </select>
                           <button
                             className={`gm-btn warning ${GMManager.activeTool === 'place_mine' ? 'active' : ''}`}
@@ -1543,9 +1543,9 @@ export const GMPanel: React.FC = () => {
                           <label>Grid snap</label>
                           <select
                             className="gm-select"
-                            value={GMManager.gridSnapSize}
+                            value={GMViewport.gridSnapSize}
                             onChange={e => {
-                              GMManager.gridSnapSize = Number(e.target.value);
+                              GMViewport.gridSnapSize = Number(e.target.value);
                               forceUpdate();
                             }}
                           >
@@ -1559,13 +1559,13 @@ export const GMPanel: React.FC = () => {
                           <label>Rotation (R / Shift+R or wheel while placing)</label>
                           <select
                             className="gm-select"
-                            value={GMManager.placementYawOffset}
+                            value={GMViewport.placementYawOffset}
                             onChange={e => {
-                              GMManager.placementYawOffset = Number(e.target.value);
+                              GMViewport.placementYawOffset = Number(e.target.value);
                               forceUpdate();
                             }}
                           >
-                            {Array.from(new Set([0, 45, 90, 135, 180, 225, 270, 315, GMManager.placementYawOffset])).sort((a, b) => a - b).map(deg => (
+                            {Array.from(new Set([0, 45, 90, 135, 180, 225, 270, 315, GMViewport.placementYawOffset])).sort((a, b) => a - b).map(deg => (
                               <option key={deg} value={deg}>{deg}°</option>
                             ))}
                           </select>
@@ -1690,7 +1690,7 @@ export const GMPanel: React.FC = () => {
                               onChange={e => updatePlaceableCfg({ skillGate: e.target.value === '' ? undefined : { skill: Number(e.target.value), dc: placeableCfg.skillGate?.dc || 15 } })}
                             >
                               <option value="">no skill check</option>
-                              {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
+                              {GMChecks.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
                             </select>
                           </label>
                           {placeableCfg.skillGate && (
@@ -1760,7 +1760,7 @@ export const GMPanel: React.FC = () => {
                     <div className="gm-section-title">
                       <span>Fallen players ({fallenPlayers.length})</span>
                       {fallenPlayers.length > 1 && (
-                        <button className="gm-btn small success" onClick={() => GMManager.reviveAllPlayers()}>Revive everyone</button>
+                        <button className="gm-btn small success" onClick={() => GMPlayers.reviveAllPlayers()}>Revive everyone</button>
                       )}
                     </div>
                     <div className="gm-list">
@@ -1771,8 +1771,8 @@ export const GMPanel: React.FC = () => {
                             <div className="gm-card-sub">Down for {Math.round((Date.now() - (pc.gmDowned?.since || Date.now())) / 1000)}s</div>
                           </div>
                           <div className="gm-row">
-                            <button className="gm-btn small success" onClick={() => GMManager.revivePlayer(pc)} title="Back on their feet with full vitality">Revive</button>
-                            <button className="gm-btn small" onClick={() => GMManager.respawnPlayer(pc)} title="Back at the scene's entry with half their vitality">Send to entry</button>
+                            <button className="gm-btn small success" onClick={() => GMPlayers.revivePlayer(pc)} title="Back on their feet with full vitality">Revive</button>
+                            <button className="gm-btn small" onClick={() => GMPlayers.respawnPlayer(pc)} title="Back at the scene's entry with half their vitality">Send to entry</button>
                           </div>
                         </div>
                       ))}
@@ -1859,7 +1859,7 @@ export const GMPanel: React.FC = () => {
                         </div>
                         <div className="gm-list">
                           {connectedPeers.map(peer => {
-                            const pc = GMManager.getPeerActor(peer.peerId);
+                            const pc = GMPlayers.getPeerActor(peer.peerId);
                             return (
                               <div key={peer.peerId} className="gm-card">
                                 <div className="gm-card-info">
@@ -1869,10 +1869,10 @@ export const GMPanel: React.FC = () => {
                                   </div>
                                 </div>
                                 <div className="gm-row">
-                                  <button className="gm-btn small" disabled={!pc} onClick={() => GMManager.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
+                                  <button className="gm-btn small" disabled={!pc} onClick={() => GMPlayers.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
                                     + XP
                                   </button>
-                                  <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMManager.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
+                                  <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMPlayers.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
                                     + Item
                                   </button>
                                   <button className="gm-btn small" disabled={!pc} onClick={() => { if (pc) { GMManager.selectObject(pc); setDrawerTab('inspector'); } }} title="Inspect their character">
@@ -1917,7 +1917,7 @@ export const GMPanel: React.FC = () => {
                           <label>Check</label>
                           <select className="gm-select" value={checkWhat} onChange={e => setCheckWhat(e.target.value)}>
                             <optgroup label="Skills">
-                              {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={`skill:${i}`}>{name}</option>)}
+                              {GMChecks.SKILL_NAMES.map((name, i) => <option key={name} value={`skill:${i}`}>{name}</option>)}
                             </optgroup>
                             <optgroup label="Saving throws">
                               <option value="save:fortitude">Fortitude</option>
@@ -1938,7 +1938,7 @@ export const GMPanel: React.FC = () => {
                       <button
                         className="gm-btn success"
                         disabled={!targets().length}
-                        onClick={() => { GMManager.callCheck(targets(), parseCheck(checkWhat), checkDc, checkSecret); forceUpdate(); }}
+                        onClick={() => { GMChecks.callCheck(targets(), parseCheck(checkWhat), checkDc, checkSecret); forceUpdate(); }}
                         title="Rolls d20 + the skill (or save) for each, as KotOR does; results go to chat"
                       >
                         Roll
@@ -1963,7 +1963,7 @@ export const GMPanel: React.FC = () => {
                           <div className="gm-card-title">{preset.name}</div>
                           <div className="gm-card-sub">
                             {(() => {
-                              const built = GMManager.buildPlayerAbilities(preset);
+                              const built = GMSpawner.buildPlayerAbilities(preset);
                               return `Lv.${preset.level} • HP ${built.maxHp} • FP ${built.maxFp} • ${built.feats.length} feats, ${built.powers.length} powers`;
                             })()}
                           </div>
@@ -1973,7 +1973,7 @@ export const GMPanel: React.FC = () => {
                           onClick={async e => {
                             e.stopPropagation();
                             updatePlayerCfg({ ...preset });
-                            await GMManager.spawnPlayerCharacter({ ...preset, possessImmediately: true });
+                            await GMSpawner.spawnPlayerCharacter({ ...preset, possessImmediately: true });
                           }}
                         >
                           Add & play
@@ -2028,7 +2028,7 @@ export const GMPanel: React.FC = () => {
                         type="number"
                         className="gm-input"
                         value={playerCfg.hp ?? ''}
-                        placeholder={String(GMManager.buildPlayerAbilities({ ...playerCfg, hp: undefined }).maxHp)}
+                        placeholder={String(GMSpawner.buildPlayerAbilities({ ...playerCfg, hp: undefined }).maxHp)}
                         onChange={e => updatePlayerCfg({ hp: e.target.value === '' ? undefined : Number(e.target.value) })}
                       />
                     </div>
@@ -2038,7 +2038,7 @@ export const GMPanel: React.FC = () => {
                         type="number"
                         className="gm-input"
                         value={playerCfg.fp ?? ''}
-                        placeholder={String(GMManager.buildPlayerAbilities({ ...playerCfg, fp: undefined }).maxFp)}
+                        placeholder={String(GMSpawner.buildPlayerAbilities({ ...playerCfg, fp: undefined }).maxFp)}
                         onChange={e => updatePlayerCfg({ fp: e.target.value === '' ? undefined : Number(e.target.value) })}
                       />
                     </div>
@@ -2075,7 +2075,7 @@ export const GMPanel: React.FC = () => {
                     <button
                       className="gm-btn success"
                       style={{ flex: 1 }}
-                      onClick={() => GMManager.spawnPlayerCharacter({ ...playerCfg, possessImmediately: true })}
+                      onClick={() => GMSpawner.spawnPlayerCharacter({ ...playerCfg, possessImmediately: true })}
                     >
                       Add & play
                     </button>
@@ -2132,7 +2132,7 @@ export const GMPanel: React.FC = () => {
                             </div>
                             <button
                               className="gm-btn small success"
-                              onClick={() => GMManager.loadPlayerFromSaveGame(sg, true)}
+                              onClick={() => GMSpawner.loadPlayerFromSaveGame(sg, true)}
                             >
                               Add
                             </button>
@@ -2284,7 +2284,7 @@ export const GMPanel: React.FC = () => {
                                 className="gm-select"
                                 value={(selectedObj as KotOR.ModuleCreature).equipment?.RIGHTHAND?.getEquippedRes() || ''}
                                 onChange={e =>
-                                  GMManager.equipWeaponOnCreature(
+                                  GMSpawner.equipWeaponOnCreature(
                                     selectedObj as KotOR.ModuleCreature,
                                     KotOR.ModuleCreatureArmorSlot.RIGHTHAND,
                                     e.target.value
@@ -2302,7 +2302,7 @@ export const GMPanel: React.FC = () => {
                                 className="gm-select"
                                 value={(selectedObj as KotOR.ModuleCreature).equipment?.ARMOR?.getEquippedRes() || ''}
                                 onChange={e =>
-                                  GMManager.equipWeaponOnCreature(
+                                  GMSpawner.equipWeaponOnCreature(
                                     selectedObj as KotOR.ModuleCreature,
                                     KotOR.ModuleCreatureArmorSlot.ARMOR,
                                     e.target.value
@@ -2349,10 +2349,10 @@ export const GMPanel: React.FC = () => {
                                   <select
                                     className="gm-select"
                                     value={gate ? String(gate.skill) : ''}
-                                    onChange={e => GMManager.setSkillGate(selectedObj, e.target.value === '' ? undefined : { skill: Number(e.target.value), dc: gate?.dc || 15 })}
+                                    onChange={e => GMChecks.setSkillGate(selectedObj, e.target.value === '' ? undefined : { skill: Number(e.target.value), dc: gate?.dc || 15 })}
                                   >
                                     <option value="">no skill check</option>
-                                    {GMManager.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
+                                    {GMChecks.SKILL_NAMES.map((name, i) => <option key={name} value={i}>{name}</option>)}
                                   </select>
                                 </label>
                                 {gate && (
@@ -2365,7 +2365,7 @@ export const GMPanel: React.FC = () => {
                                       min={1}
                                       max={60}
                                       value={gate.dc}
-                                      onChange={e => GMManager.setSkillGate(selectedObj, { skill: gate.skill, dc: Number(e.target.value) || 15 })}
+                                      onChange={e => GMChecks.setSkillGate(selectedObj, { skill: gate.skill, dc: Number(e.target.value) || 15 })}
                                     />
                                   </label>
                                 )}
@@ -2392,7 +2392,7 @@ export const GMPanel: React.FC = () => {
                                 </select>
                                 <button
                                   className="gm-btn small success"
-                                  onClick={() => GMManager.addItemToObject(selectedObj, inspectorAddItemResRef)}
+                                  onClick={() => GMSpawner.addItemToObject(selectedObj, inspectorAddItemResRef)}
                                 >
                                   Put inside
                                 </button>
@@ -2418,7 +2418,7 @@ export const GMPanel: React.FC = () => {
                       <div className="gm-row">
                         <button
                           className="gm-btn small success"
-                          onClick={() => GMManager.duplicateObject(selectedObj)}
+                          onClick={() => GMSpawner.duplicateObject(selectedObj)}
                           title="Spawn an exact duplicate of this Placeable or Creature next to it"
                         >
                           Duplicate
@@ -2426,7 +2426,7 @@ export const GMPanel: React.FC = () => {
                         <button
                           className="gm-btn small"
                           onClick={() => {
-                            const pt = GMManager.getCameraTargetSpawnPoint(3.0);
+                            const pt = GMViewport.getCameraTargetSpawnPoint(3.0);
                             GMManager.teleportObject(selectedObj, pt.position);
                           }}
                           title="Where the camera looks"
@@ -2502,10 +2502,10 @@ export const GMPanel: React.FC = () => {
                           <div className="gm-section">
                             <div className="gm-section-title"><span>Orders</span><span className="gm-summary-note">{GMNpcOrders.describe(order)}</span></div>
                             <div className="gm-row">
-                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_move', npc)} title="Click the ground: it walks there, then guards the spot">Move here…</button>
-                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_attack', npc)} title="Click a creature: it attacks until that one is dead">Attack…</button>
-                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_follow', npc)} title="Click a creature or player: it stays close and fights back if attacked">Follow…</button>
-                              <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_patrol', npc)} title="Click points on the ground, then Esc: it walks the loop and fights what it meets">Patrol…</button>
+                              <button className="gm-btn small" onClick={() => GMViewport.startOrderTool('order_move', npc)} title="Click the ground: it walks there, then guards the spot">Move here…</button>
+                              <button className="gm-btn small" onClick={() => GMViewport.startOrderTool('order_attack', npc)} title="Click a creature: it attacks until that one is dead">Attack…</button>
+                              <button className="gm-btn small" onClick={() => GMViewport.startOrderTool('order_follow', npc)} title="Click a creature or player: it stays close and fights back if attacked">Follow…</button>
+                              <button className="gm-btn small" onClick={() => GMViewport.startOrderTool('order_patrol', npc)} title="Click points on the ground, then Esc: it walks the loop and fights what it meets">Patrol…</button>
                             </div>
                             <div className="gm-row">
                               <button className="gm-btn small" onClick={() => GMManager.giveOrder(npc, { kind: 'guard', point: GMManager.pointOf(npc), radius: GMNpcOrders.GUARD_RADIUS })} title={`Holds this spot and fights enemies within ${GMNpcOrders.GUARD_RADIUS}m`}>Guard here</button>
@@ -2563,7 +2563,7 @@ export const GMPanel: React.FC = () => {
                               className="gm-btn small active"
                               disabled={!askText.trim() || !askOptions.trim()}
                               onClick={() => {
-                                const id = GMManager.askPlayers(selectedObj, askText, askOptions.split('\n'), askTarget || undefined);
+                                const id = GMPlayers.askPlayers(selectedObj, askText, askOptions.split('\n'), askTarget || undefined);
                                 if (id) setAskText('');
                               }}
                             >
@@ -2760,15 +2760,15 @@ export const GMPanel: React.FC = () => {
                   <>
                   <div className="gm-section">
                     <div className="gm-section-title">When a player falls</div>
-                    <select className="gm-select" value={GMManager.deathRule} onChange={(e) => GMManager.setDeathRule(e.target.value as KotOR.GMDeathRule)}>
+                    <select className="gm-select" value={GMPlayers.deathRule} onChange={(e) => GMPlayers.setDeathRule(e.target.value as KotOR.GMDeathRule)}>
                       <option value="kotor">KotOR rules: they get up with 1 HP once no enemy is near</option>
                       <option value="gm">GM decides: they stay down until you revive them</option>
-                      <option value="respawn">Respawn: after {GMManager.RESPAWN_DELAY_SECONDS}s they can respawn at the entrance</option>
+                      <option value="respawn">Respawn: after {GMPlayers.RESPAWN_DELAY_SECONDS}s they can respawn at the entrance</option>
                     </select>
                     <div className="gm-hint">You can always revive them from the Players tab.</div>
                   </div>
-                  <details className="gm-section" open={GMManager.getSavedSessions().length > 0}>
-                    <summary>Saved sessions <span className="gm-summary-note">{GMManager.getSavedSessions().length} saved</span></summary>
+                  <details className="gm-section" open={GMSessions.getSavedSessions().length > 0}>
+                    <summary>Saved sessions <span className="gm-summary-note">{GMSessions.getSavedSessions().length} saved</span></summary>
                     <div className="gm-row">
                       <input
                         className="gm-input"
@@ -2777,7 +2777,7 @@ export const GMPanel: React.FC = () => {
                         onChange={e => setSessionName(e.target.value)}
                         placeholder={`${currentModuleName} session`}
                       />
-                      <button className="gm-btn small success" onClick={() => { if (GMManager.saveSession(sessionName)) setSessionName(''); }}>
+                      <button className="gm-btn small success" onClick={() => { if (GMSessions.saveSession(sessionName)) setSessionName(''); }}>
                         Save
                       </button>
                       <button className="gm-btn small" onClick={() => sessionFileRef.current?.click()} title="Add a session exported from another browser">
@@ -2789,7 +2789,7 @@ export const GMPanel: React.FC = () => {
                       Keeps the scene, what you placed, doors and every player character. Players get theirs back by joining under the same name.
                     </div>
                     <div className="gm-list">
-                      {GMManager.getSavedSessions().map(save => (
+                      {GMSessions.getSavedSessions().map(save => (
                         <div key={save.id} className="gm-card">
                           <div className="gm-card-info">
                             <div className="gm-card-title">{save.name}</div>
@@ -2798,9 +2798,9 @@ export const GMPanel: React.FC = () => {
                             </div>
                           </div>
                           <div className="gm-row">
-                            <button className="gm-btn small active" onClick={() => GMManager.loadSession(save)}>Load</button>
+                            <button className="gm-btn small active" onClick={() => GMSessions.loadSession(save)}>Load</button>
                             <button className="gm-btn small" onClick={() => downloadSession(save)}>Export</button>
-                            <button className="gm-btn small danger" onClick={() => GMManager.deleteSavedSession(save.id)}>Delete</button>
+                            <button className="gm-btn small danger" onClick={() => GMSessions.deleteSavedSession(save.id)}>Delete</button>
                           </div>
                         </div>
                       ))}

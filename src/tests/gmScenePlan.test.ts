@@ -13,6 +13,8 @@ import type { GMScenePlanData } from "@/managers/GMScenePlan";
 import { ApplicationProfile } from "@/utility/ApplicationProfile";
 import { GameEngineType } from "@/enums/engine/GameEngineType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMViewport } from "@/managers/gm/GMViewport";
 
 const plan = (extra: Partial<GMScenePlanData> = {}): GMScenePlanData => ({
   format: "kotorjs-gm-scene",
@@ -50,8 +52,8 @@ beforeEach(() => {
       getNearestWalkablePoint: (p: THREE.Vector3) => p.clone(),
     },
   };
-  jest.spyOn(GMManager, "getGroundZAt").mockImplementation((_x, _y, z) => z);
-  jest.spyOn(GMManager, "getRespawnPoint").mockReturnValue(new THREE.Vector3(0, 0, 0));
+  jest.spyOn(GMViewport, "getGroundZAt").mockImplementation((_x, _y, z) => z);
+  jest.spyOn(GMPlayers, "getRespawnPoint").mockReturnValue(new THREE.Vector3(0, 0, 0));
   jest.spyOn(GMNetworkManager, "appendChat").mockImplementation(() => {});
 });
 

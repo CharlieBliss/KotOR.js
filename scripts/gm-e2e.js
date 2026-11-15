@@ -587,7 +587,7 @@ async function run() {
     await must('Player 1 loots the body', async () => {
       const corpse = placed.npcs[0];
       const inventories = async () => ({
-        hostRecords: await gm.eval((KotOR, ids) => ids.map((id) => KotOR.GMManager.getPlayerInventory(KotOR.GMManager.netIdMap.get(id)).map((e) => e.resRef)), playerNetIds),
+        hostRecords: await gm.eval((KotOR, ids) => ids.map((id) => KotOR.GMPlayers.getPlayerInventory(KotOR.GMManager.netIdMap.get(id)).map((e) => e.resRef)), playerNetIds),
         gmOwn: await gm.eval((KotOR) => KotOR.GameState.InventoryManager.inventory.map((i) => i.getEquippedRes() || i.getInventoryRes())),
         players: await Promise.all(players.map((p) => p.eval((KotOR) => KotOR.GameState.InventoryManager.inventory.map((i) => i.getEquippedRes() || i.getInventoryRes())))),
       });
@@ -597,7 +597,7 @@ async function run() {
       }
 
       // Player 1 uses the body, as a click on a dead creature does; the host shows them its contents
-      const sent = await players[0].eval((KotOR, id) => KotOR.GMManager.interceptInteraction(KotOR.GameState.getCurrentPlayer(), KotOR.GMManager.netIdMap.get(id)), corpse);
+      const sent = await players[0].eval((KotOR, id) => KotOR.GMPlayers.interceptInteraction(KotOR.GameState.getCurrentPlayer(), KotOR.GMManager.netIdMap.get(id)), corpse);
       expect(sent, 'clicking the body did not send a request to the host');
       let shown;
       try {
@@ -682,7 +682,7 @@ async function run() {
     await must('GM gives Player 2 XP and an item', async () => {
       const p2Peer = await peerOf(playerNetIds[1]);
       const before = await Promise.all(players.map(sheetOf));
-      const given = await gm.eval((KotOR, peerId, xp, item) => [KotOR.GMManager.giveXP(peerId, xp), KotOR.GMManager.giveItem(peerId, item)], p2Peer, REWARD_XP, REWARD_ITEM);
+      const given = await gm.eval((KotOR, peerId, xp, item) => [KotOR.GMPlayers.giveXP(peerId, xp), KotOR.GMPlayers.giveItem(peerId, item)], p2Peer, REWARD_XP, REWARD_ITEM);
       expect(given.every(Boolean), `giveXP / giveItem returned ${JSON.stringify(given)}`);
       await players[1].waitFor('the reward on our sheet', (KotOR, xp, item) => {
         const me = KotOR.GameState.getCurrentPlayer();
@@ -696,7 +696,7 @@ async function run() {
 
     await must('GM asks Player 1 a question as an NPC', async () => {
       const p1Peer = await peerOf(playerNetIds[0]);
-      const promptId = await gm.eval((KotOR, npcId, peerId) => KotOR.GMManager.askPlayers(KotOR.GMManager.netIdMap.get(npcId), 'Surrender, rebel?', ['Never!', 'Fine...'], peerId), placed.npcs[1], p1Peer);
+      const promptId = await gm.eval((KotOR, npcId, peerId) => KotOR.GMPlayers.askPlayers(KotOR.GMManager.netIdMap.get(npcId), 'Surrender, rebel?', ['Never!', 'Fine...'], peerId), placed.npcs[1], p1Peer);
       expect(promptId, 'askPlayers returned nothing');
       const shown = await players[0].waitFor('the question', (KotOR, id) => {
         const prompt = KotOR.GMNetworkManager.pendingPrompts.find((p) => p.promptId === id);
@@ -707,7 +707,7 @@ async function run() {
       expect(p2Saw === 0, 'Player 2 was also asked');
       await players[0].eval((KotOR, id) => KotOR.GMNetworkManager.answerPrompt(id, 0), promptId);
       const replies = await gm.waitFor('Player 1\'s reply', (KotOR, id) => {
-        const record = KotOR.GMManager.dmPrompts.get(id);
+        const record = KotOR.GMPlayers.dmPrompts.get(id);
         return record && record.replies.length ? record.replies.map((r) => `${r.name}: ${record.prompt.options[r.choice]}`) : false;
       }, SYNC_TIMEOUT, promptId);
       return replies.join(', ');
@@ -736,7 +736,7 @@ async function run() {
       placed.encounter = await gm.eval(async (KotOR, spotSrc) => {
         const spot = eval(spotSrc);
         const p = spot(KotOR, 6, -6);
-        return KotOR.GMManager.spawnEncounter({ presetIndex: 0, count: 3, spread: 2, factionId: 2, center: new window.THREE.Vector3(p.x, p.y, p.z) });
+        return KotOR.GMSpawner.spawnEncounter({ presetIndex: 0, count: 3, spread: 2, factionId: 2, center: new window.THREE.Vector3(p.x, p.y, p.z) });
       }, spotNearEntry.toString());
       expect(placed.encounter.length === 3, `expected 3 creatures, got ${placed.encounter.length}`);
       for (const p of players) {
@@ -747,7 +747,7 @@ async function run() {
 
     let savedSession = null;
     await must('GM saves the session', async () => {
-      savedSession = await gm.eval((KotOR) => KotOR.GMManager.saveSession('GM e2e save'));
+      savedSession = await gm.eval((KotOR) => KotOR.GMSessions.saveSession('GM e2e save'));
       expect(savedSession, 'saveSession returned nothing');
       const creatures = savedSession.objects.filter((o) => o.kind === 'creature').length;
       const placeables = savedSession.objects.filter((o) => o.kind === 'placeable').length;
@@ -785,7 +785,7 @@ async function run() {
           return original(packet);
         };
       });
-      const inventoriesBefore = await gm.eval((KotOR, ids) => ids.map((id) => KotOR.GMManager.getPlayerInventory(KotOR.GMManager.netIdMap.get(id)).length), playerNetIds);
+      const inventoriesBefore = await gm.eval((KotOR, ids) => ids.map((id) => KotOR.GMPlayers.getPlayerInventory(KotOR.GMManager.netIdMap.get(id)).length), playerNetIds);
       await gm.eval((KotOR, scene) => KotOR.GMManager.loadScene(scene, { keepCreatures: false, keepPlaceables: true }), FINAL_SCENE);
       await gm.waitFor(`${FINAL_SCENE} to load`, sceneReady, SCENE_TIMEOUT, FINAL_SCENE);
 
@@ -823,7 +823,7 @@ async function run() {
     await must('GM loads the saved session with players connected', async () => {
       expect(savedSession, 'no saved session to load');
       const expected = Object.fromEntries(savedSession.players.map((p) => [p.name, p.sheet]));
-      const loaded = await gm.eval((KotOR, save) => KotOR.GMManager.loadSession(save), savedSession);
+      const loaded = await gm.eval((KotOR, save) => KotOR.GMSessions.loadSession(save), savedSession);
       expect(loaded, 'loadSession returned false');
       await gm.waitFor(`${SECOND_SCENE} to load`, sceneReady, SCENE_TIMEOUT, SECOND_SCENE);
 

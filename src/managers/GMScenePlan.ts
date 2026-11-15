@@ -11,6 +11,10 @@ import { ApplicationProfile } from "@/utility/ApplicationProfile";
 import { GameEngineType } from "@/enums/engine/GameEngineType";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
+import { GMChecks } from "@/managers/gm/GMChecks";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMSpawner } from "@/managers/gm/GMSpawner";
+import { GMViewport } from "@/managers/gm/GMViewport";
 
 /*
  * A scene plan: a whole GM scene written as data, so it can be drafted outside the game (by Claude, from a
@@ -284,8 +288,8 @@ export class GMScenePlan {
     if (!area) return null;
     const [kind, ...rest] = String(spot || '').split(':');
     const name = rest.join(':').toLowerCase();
-    if (spot === 'entry') return GMManager.getRespawnPoint();
-    if (spot === 'players') return this.playerStart ? this.playerStart.clone() : GMManager.getRespawnPoint();
+    if (spot === 'entry') return GMPlayers.getRespawnPoint();
+    if (spot === 'players') return this.playerStart ? this.playerStart.clone() : GMPlayers.getRespawnPoint();
     if (kind === 'waypoint') {
       const wp = area.waypoints.find((w: any) => String(w.getTag?.() || w.tag || '').toLowerCase() === name);
       return wp ? wp.position.clone() : null;
@@ -354,7 +358,7 @@ export class GMScenePlan {
   walkable(p: THREE.Vector3): THREE.Vector3 {
     const area = GameState.module?.area;
     const snapped = area?.getNearestWalkablePoint ? area.getNearestWalkablePoint(p, 0.5).clone() : p.clone();
-    snapped.z = GMManager.getGroundZAt(snapped.x, snapped.y, snapped.z);
+    snapped.z = GMViewport.getGroundZAt(snapped.x, snapped.y, snapped.z);
     return snapped;
   }
 
@@ -395,13 +399,13 @@ export class GMScenePlan {
 
   async populate() {
     const plan = this.plan;
-    if (plan.settings?.deathRule) GMManager.setDeathRule(plan.settings.deathRule);
+    if (plan.settings?.deathRule) GMPlayers.setDeathRule(plan.settings.deathRule);
     if (typeof plan.settings?.npcAi === 'boolean') GMManager.npcAiEnabled = plan.settings.npcAi;
 
     // Players first: other spots may be "players"
     const start = this.placementPoints({ ...plan.players.at, formation: undefined }, 1)?.[0];
     if (!start) this.note(`Players' spot "${plan.players.at.spot}" isn't in this area; they start at its entry.`);
-    this.playerStart = start || GMManager.getRespawnPoint();
+    this.playerStart = start || GMPlayers.getRespawnPoint();
     GMManager.sceneStartPoint = this.playerStart ? this.playerStart.clone() : null;
 
     for (const prop of plan.props || []) await this.placeProp(prop);
@@ -423,9 +427,9 @@ export class GMScenePlan {
     const count = Math.max(1, Math.min(20, actor.count || 1));
     const points = this.placementPoints(actor.at, count);
     if (!points) { this.note(`Actor "${actor.id}": spot "${actor.at.spot}" isn't in this area.`); return; }
-    const info = await GMManager.describeCreatureTemplate(String(actor.template || ''));
+    const info = await GMSpawner.describeCreatureTemplate(String(actor.template || ''));
     if (!info) { this.note(`Actor "${actor.id}": no creature template "${actor.template}".`); return; }
-    const base = GMManager.creatureConfigFromTemplate(info);
+    const base = GMSpawner.creatureConfigFromTemplate(info);
     const custom = actor.customize;
     const config: GMCreatureSpawnConfig = {
       ...base,
@@ -445,7 +449,7 @@ export class GMScenePlan {
     const placed: ModuleObject[] = [];
     for (let i = 0; i < points.length; i++) {
       const name = count > 1 && actor.name ? `${actor.name} ${i + 1}` : config.name;
-      const cre = await GMManager.spawnCreature({ ...config, name }, points[i], this.facingFrom(points[i], actor.facing));
+      const cre = await GMSpawner.spawnCreature({ ...config, name }, points[i], this.facingFrom(points[i], actor.facing));
       if (!cre) continue;
       // Each model picks its own take on the stance (a droid lies dead differently)
       if (actor.stance && !GMManager.setCreatureStance(cre, actor.stance)) this.note(`Actor "${actor.id}": its model can't take the stance "${actor.stance}".`);
@@ -477,7 +481,7 @@ export class GMScenePlan {
     };
     const placed: ModuleObject[] = [];
     for (const point of points) {
-      const plc = await GMManager.spawnPlaceable(config, point, this.facingFrom(point, prop.facing));
+      const plc = await GMSpawner.spawnPlaceable(config, point, this.facingFrom(point, prop.facing));
       if (!plc) continue;
       if (prop.hidden) this.setHidden(plc, true);
       placed.push(plc);
@@ -620,7 +624,7 @@ export class GMScenePlan {
         break;
       case 'check': {
         const check = GMScenePlan.parseCheck(action.check);
-        if (check) GMManager.callCheck(GMManager.getPlayerCharacters(), check, action.dc, !!action.secret);
+        if (check) GMChecks.callCheck(GMManager.getPlayerCharacters(), check, action.dc, !!action.secret);
         break;
       }
     }
