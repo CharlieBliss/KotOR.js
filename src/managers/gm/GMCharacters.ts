@@ -6,9 +6,6 @@ import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
 import { GMTemplates } from "@/managers/gm/GMTemplates";
 import { GFFObject } from "@/resource/GFFObject";
 import { GFFDataType } from "@/enums/resource/GFFDataType";
-import { ResourceTypes } from "@/resource/ResourceTypes";
-import { KEYManager } from "@/managers/KEYManager";
-import { WEAPON_OPTIONS, ARMOR_OPTIONS } from "@/managers/gm/data/itemOptions";
 
 const STORAGE_PREFIX = 'kotorjs.gm.characters.';
 
@@ -141,18 +138,6 @@ export class GMCharacters {
       spellIds: character.powers,
       skillRanks: character.skillRanks,
     };
-  }
-
-  /**
-   * The weapons and armour a character can start with in the running game: the GM lists' items that this
-   * game's files have (the lists name KotOR's items, and KotOR II lacks some)
-   */
-  static gearOptions(): { weapons: { resRef: string; label: string }[]; armor: { resRef: string; label: string }[] } {
-    const exists = (resRef: string) => {
-      try { return !!KEYManager.Key?.getFileKey(resRef, ResourceTypes.uti); } catch (e) { return false; }
-    };
-    const available = (items: { resRef: string; label: string }[]) => items.filter((i) => i.resRef && exists(i.resRef));
-    return { weapons: available(WEAPON_OPTIONS), armor: available(ARMOR_OPTIONS) };
   }
 
   /**

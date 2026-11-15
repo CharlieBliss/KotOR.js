@@ -34,7 +34,7 @@ import { CREATURE_PRESETS } from "@/managers/gm/data/creaturePresets";
 import { PLACEABLE_PRESETS, CATEGORIZED_PROPS, PLACEABLE_KEYWORD_LABELS } from "@/managers/gm/data/placeablePresets";
 import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
-import { WEAPON_OPTIONS, ARMOR_OPTIONS, LOOT_ITEM_OPTIONS } from "@/managers/gm/data/itemOptions";
+import { GMItems } from "@/managers/gm/GMItems";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -213,11 +213,12 @@ export class GMManager {
 
   static PLAYER_PRESETS: GMPlayerSpawnConfig[] = PLAYER_PRESETS;
 
-  static WEAPON_OPTIONS: { resRef: string; label: string }[] = WEAPON_OPTIONS;
+  /** The running game's weapons, armour and loot (GMItems), for the panel's item lists */
+  static get WEAPON_OPTIONS(): { resRef: string; label: string }[] { return GMItems.options().weapons; }
 
-  static ARMOR_OPTIONS: { resRef: string; label: string }[] = ARMOR_OPTIONS;
+  static get ARMOR_OPTIONS(): { resRef: string; label: string }[] { return GMItems.options().armor; }
 
-  static LOOT_ITEM_OPTIONS: { resRef: string; label: string }[] = LOOT_ITEM_OPTIONS;
+  static get LOOT_ITEM_OPTIONS(): { resRef: string; label: string }[] { return GMItems.options().loot; }
 
   static init() {
     GMNetworkManager.Init();

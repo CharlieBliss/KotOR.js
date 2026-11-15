@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import type { GMCharacter } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
@@ -243,7 +243,17 @@ export const SkillsSection: React.FC<{ c: GMCharacter; update: Update; recommend
 export const GearSection: React.FC<{ c: GMCharacter; update: Update; limits: ICharacterLimits }> = React.memo(({ c, update, limits }) => {
   if (limits.gear === false) return <Panel title="Equipment"><span className="cc-hint">The GM chooses starting equipment in this session.</span></Panel>;
   const gear = c.gear || {};
-  const options = useMemo(() => KotOR.GMCharacters.gearOptions(), []);
+  // The game's own items; the full lists arrive once GMItems has read them
+  const [itemsRead, setItemsRead] = useState(0);
+  useEffect(() => {
+    const done = () => setItemsRead((n) => n + 1);
+    KotOR.GMItems.listeners.add(done);
+    return () => { KotOR.GMItems.listeners.delete(done); };
+  }, []);
+  const options = useMemo(() => {
+    const all = KotOR.GMItems.options();
+    return { weapons: all.weapons.filter((i: any) => i.resRef), armor: all.armor.filter((i: any) => i.resRef) };
+  }, [itemsRead]);
   const slot = (key: 'rightHand' | 'leftHand' | 'armor', label: string, items: { resRef: string; label: string }[]) => (
     <label className="cc-field">
       <span>{label}</span>
