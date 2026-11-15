@@ -28,8 +28,8 @@ export class MenuToolTip extends GameMenu {
     if(skipInit) return;
     return new Promise<void>((resolve, reject) => {
       this.addEventListener('resize', () => {
-        this.width = GameState.ResolutionManager.getViewportWidth();
-        this.height = GameState.ResolutionManager.getViewportHeight();
+        this.width = GameState.ResolutionManager.getGUIWidth();
+        this.height = GameState.ResolutionManager.getGUIHeight();
         this.tGuiPanel.extent.width = this.width;
         this.tGuiPanel.extent.height = this.height;
         this.recalculatePosition();
@@ -44,8 +44,8 @@ export class MenuToolTip extends GameMenu {
   showToolTip(text: string, x: number = 0, y: number = 0, control: GUIControl) {
     if(this.isVisible()) return;
     this.currentControl = control;
-    this.width = GameState.ResolutionManager.getViewportWidth();
-    this.height = GameState.ResolutionManager.getViewportHeight();
+    this.width = GameState.ResolutionManager.getGUIWidth();
+    this.height = GameState.ResolutionManager.getGUIHeight();
     this.tGuiPanel.extent.width = this.width;
     this.tGuiPanel.extent.height = this.height;
     this.recalculatePosition();
@@ -70,8 +70,8 @@ export class MenuToolTip extends GameMenu {
 
   show() {
     super.show();
-    this.width = GameState.ResolutionManager.getViewportWidth();
-    this.height = GameState.ResolutionManager.getViewportHeight();
+    this.width = GameState.ResolutionManager.getGUIWidth();
+    this.height = GameState.ResolutionManager.getGUIHeight();
     this.tGuiPanel.extent.width = this.width;
     this.tGuiPanel.extent.height = this.height;
     this.recalculatePosition();

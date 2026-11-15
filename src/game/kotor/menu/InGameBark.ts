@@ -87,8 +87,8 @@ export class InGameBark extends GameMenu {
     this.LBL_BARKTEXT.text.geometry.boundingBox?.getSize(size);
     this.tGuiPanel.extent.height = Math.ceil(size.y) + 14;
     this.tGuiPanel.resizeControl();
-    this.tGuiPanel.widget.position.x = -GameState.ResolutionManager.getViewportWidth() / 2 + this.tGuiPanel.extent.width / 2 + 10;
-    this.tGuiPanel.widget.position.y = GameState.ResolutionManager.getViewportHeight() / 2 - this.tGuiPanel.extent.height / 2 - 134;
+    this.tGuiPanel.widget.position.x = -GameState.ResolutionManager.getGUIWidth() / 2 + this.tGuiPanel.extent.width / 2 + 10;
+    this.tGuiPanel.widget.position.y = GameState.ResolutionManager.getGUIHeight() / 2 - this.tGuiPanel.extent.height / 2 - 134;
     this.LBL_BARKTEXT.setText(entry.text);
 
     if (!!entry.getVoiceResRef()?.length) {

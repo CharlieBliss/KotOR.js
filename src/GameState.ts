@@ -717,10 +717,10 @@ export class GameState implements EngineContext {
     GameState.camera.lookAt(new THREE.Vector3( 0, 0, 0 ));
     
     GameState.camera_gui = new THREE.OrthographicCamera(
-      GameState.ResolutionManager.getViewportWidth() / -2,
-      GameState.ResolutionManager.getViewportWidth() / 2,
-      GameState.ResolutionManager.getViewportHeight() / 2,
-      GameState.ResolutionManager.getViewportHeight() / -2,
+      GameState.ResolutionManager.getGUIWidth() / -2,
+      GameState.ResolutionManager.getGUIWidth() / 2,
+      GameState.ResolutionManager.getGUIHeight() / 2,
+      GameState.ResolutionManager.getGUIHeight() / -2,
       1, 1000
     );
     GameState.camera_gui.up = new THREE.Vector3( 0, 0, 1 );
@@ -950,16 +950,25 @@ export class GameState implements EngineContext {
     let width = GameState.ResolutionManager.getViewportWidth();
     let height = GameState.ResolutionManager.getViewportHeight();
 
+    // The GUI's own screen (the viewport over the UI scale), which the GUI camera spreads across the viewport
+    const guiWidth = GameState.ResolutionManager.getGUIWidth();
+    const guiHeight = GameState.ResolutionManager.getGUIHeight();
+
+    // Draw at the screen's pixel density (display scaling, high-density screens), up to 2x
+    const pixelRatio = GameState.forgePreviewHost ? 1 : Math.min(2, Math.max(1, window.devicePixelRatio || 1));
+    GameState.renderer.setPixelRatio(pixelRatio);
+    GameState.composer.setPixelRatio?.(pixelRatio);
+
     GameState.composer.setSize(width * GameState.rendererUpscaleFactor, height * GameState.rendererUpscaleFactor);
 
-    GameState.FadeOverlayManager.plane.scale.set(width, height, 1);
+    GameState.FadeOverlayManager.plane.scale.set(guiWidth, guiHeight, 1);
 
-    GameState.VideoManager.resize(width, height);
+    GameState.VideoManager.resize(guiWidth, guiHeight);
 
-    GameState.camera_gui.left = width / -2;
-    GameState.camera_gui.right = width / 2;
-    GameState.camera_gui.top = height / 2;
-    GameState.camera_gui.bottom = height / -2;
+    GameState.camera_gui.left = guiWidth / -2;
+    GameState.camera_gui.right = guiWidth / 2;
+    GameState.camera_gui.top = guiHeight / 2;
+    GameState.camera_gui.bottom = guiHeight / -2;
 
     GameState.camera_gui.updateProjectionMatrix();
 
@@ -986,7 +995,7 @@ export class GameState implements EngineContext {
 
     GameState.MenuManager.Resize();
 
-    GameState.depthTarget.setSize(GameState.ResolutionManager.getViewportWidth() * GameState.rendererUpscaleFactor, GameState.ResolutionManager.getViewportHeight() * GameState.rendererUpscaleFactor);
+    GameState.depthTarget.setSize(GameState.ResolutionManager.getViewportWidth() * GameState.rendererUpscaleFactor * pixelRatio, GameState.ResolutionManager.getViewportHeight() * GameState.rendererUpscaleFactor * pixelRatio);
 
     if(GameState.ResolutionManager.vpScaleFactor && !GameState.forgePreviewHost){
       GameState.canvas.style.transform = 'scale('+GameState.ResolutionManager.vpScaleFactor+')';

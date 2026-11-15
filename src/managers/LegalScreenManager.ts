@@ -41,8 +41,8 @@ export class LegalScreenManager {
 
   static Update(delta: number = 0){
     //the aspect ratio of the legal screen is 4:3
-    const width = GameState.ResolutionManager.getViewportWidth();
-    const height = GameState.ResolutionManager.getViewportHeight();
+    const width = GameState.ResolutionManager.getGUIWidth();
+    const height = GameState.ResolutionManager.getGUIHeight();
     const scale = Math.min(width / this.width, height / this.height);
     this.plane.scale.set(this.width * scale, this.height * scale, 1);
     this.timer += delta;

@@ -617,10 +617,10 @@ export class InGameOverlay extends GameMenu {
     this.namePlateArrow.visible = !!selectedObject;
     if(!selectedObject) return;
     
-    const viewportXMin = -GameState.ResolutionManager.getViewportWidth()/2 + ARROW_SCALE_HALF;
-    const viewportXMax = GameState.ResolutionManager.getViewportWidth()/2 - ARROW_SCALE_HALF;
-    const viewportYMin2 = -GameState.ResolutionManager.getViewportHeight()/2 + ARROW_SCALE_HALF;
-    const viewportYMax2 = GameState.ResolutionManager.getViewportHeight()/2 - ARROW_SCALE_HALF;
+    const viewportXMin = -GameState.ResolutionManager.getGUIWidth()/2 + ARROW_SCALE_HALF;
+    const viewportXMax = GameState.ResolutionManager.getGUIWidth()/2 - ARROW_SCALE_HALF;
+    const viewportYMin2 = -GameState.ResolutionManager.getGUIHeight()/2 + ARROW_SCALE_HALF;
+    const viewportYMax2 = GameState.ResolutionManager.getGUIHeight()/2 - ARROW_SCALE_HALF;
     const viewportYMin = -240/2 + ARROW_SCALE_HALF;
     const viewportYMax = 240/2 - ARROW_SCALE_HALF;
     const offLeft = this.reticleScreenPosition.x <= viewportXMin;
@@ -712,8 +712,8 @@ export class InGameOverlay extends GameMenu {
     if (health > 100)
       health = 100;
     this.PB_HEALTH.setProgress(health);
-    const maxBoundsX = GameState.ResolutionManager.getViewportWidth() / 2 + 640 / 2 - 125;
-    const maxBoundsX2 = GameState.ResolutionManager.getViewportWidth() / 2 - 640 / 2 - 125;
+    const maxBoundsX = GameState.ResolutionManager.getGUIWidth() / 2 + 640 / 2 - 125;
+    const maxBoundsX2 = GameState.ResolutionManager.getGUIWidth() / 2 - 640 / 2 - 125;
     this.targetScreenPosition.set(640 / 2, 480 / 2, 0);
     if (BitWise.InstanceOfObject(GameState.CursorManager.selectedObject, ModuleObjectType.ModuleCreature)) {
       this.reticlePosition.copy(GameState.CursorManager.selectedObject.position);
@@ -724,8 +724,8 @@ export class InGameOverlay extends GameMenu {
     this.reticleScreenPosition.copy(this.reticlePosition);
     this.reticleScreenPosition.project(GameState.currentCamera);
 
-    const widthHalf = GameState.ResolutionManager.getViewportWidth() / 2;
-    const heightHalf = GameState.ResolutionManager.getViewportHeight() / 2;
+    const widthHalf = GameState.ResolutionManager.getGUIWidth() / 2;
+    const heightHalf = GameState.ResolutionManager.getGUIHeight() / 2;
     this.reticleScreenPosition.x = this.reticleScreenPosition.x * widthHalf;
     this.reticleScreenPosition.y = -(this.reticleScreenPosition.y * heightHalf);
     this.reticleScreenPosition.z = 0;

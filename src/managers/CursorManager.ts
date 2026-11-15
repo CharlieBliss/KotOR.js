@@ -367,8 +367,8 @@ export class CursorManager {
 		let guiHoverCaptured = false;
 
 		CursorManager.setCursor('default');
-		GameState.scene_cursor_holder.position.x = Mouse.positionViewport.x - (GameState.ResolutionManager.getViewportWidth()/2) + (32/2);
-		GameState.scene_cursor_holder.position.y = (Mouse.positionViewport.y*-1) + (GameState.ResolutionManager.getViewportHeight()/2) - (32/2);
+		GameState.scene_cursor_holder.position.x = Mouse.positionViewport.x - (GameState.ResolutionManager.getGUIWidth()/2) + (32/2);
+		GameState.scene_cursor_holder.position.y = (Mouse.positionViewport.y*-1) + (GameState.ResolutionManager.getGUIHeight()/2) - (32/2);
 
 		CursorManager.MenuManager.hoveredGUIElement = undefined;
 

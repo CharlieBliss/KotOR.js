@@ -252,8 +252,8 @@ export class GameMenu {
 
     if(this.voidFill){
       this.backgroundVoidMaterial.uniforms.u_time.value = this.context.deltaTimeFixed;
-      this.backgroundVoidMaterial.uniforms.u_resolution.value.set(ResolutionManager.getViewportWidth(), ResolutionManager.getViewportHeight());
-      this.backgroundVoidSprite.scale.set(ResolutionManager.getViewportWidth(), ResolutionManager.getViewportHeight(), 1);
+      this.backgroundVoidMaterial.uniforms.u_resolution.value.set(ResolutionManager.getGUIWidth(), ResolutionManager.getGUIHeight());
+      this.backgroundVoidSprite.scale.set(ResolutionManager.getGUIWidth(), ResolutionManager.getGUIHeight(), 1);
     }
 
     if(this.background){

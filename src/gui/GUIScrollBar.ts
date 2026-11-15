@@ -213,8 +213,8 @@ export class GUIScrollBar extends GUIControl{
     });
 
     this.addEventListener('click', () =>{
-      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getViewportWidthScaled() / 2);
-      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getViewportHeightScaled() / 2);
+      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getGUIWidthScaled() / 2);
+      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getGUIHeightScaled() / 2);
 
       let scrollTop = ( this.thumb.position.y + (this.thumb.scale.y / 2) ) + mouseY;
       this.mouseOffset.y = scrollTop;
@@ -229,8 +229,8 @@ export class GUIScrollBar extends GUIControl{
 
     this.addEventListener('mouseDown', (e) => {
       e.stopPropagation();
-      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getViewportWidthScaled() / 2);
-      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getViewportHeightScaled() / 2);
+      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getGUIWidthScaled() / 2);
+      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getGUIHeightScaled() / 2);
       let scrollTop = ( this.thumb.position.y + (this.thumb.scale.y / 2) ) + mouseY;
       this.mouseOffset.y = scrollTop;
       this.upArrow.userData.updateBox();
@@ -238,8 +238,8 @@ export class GUIScrollBar extends GUIControl{
     });
 
     this.addEventListener('mouseUp', () => {
-      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getViewportWidthScaled() / 2);
-      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getViewportHeightScaled() / 2);
+      let mouseX = Mouse.positionViewport.x - (ResolutionManager.getGUIWidthScaled() / 2);
+      let mouseY = Mouse.positionViewport.y - (ResolutionManager.getGUIHeightScaled() / 2);
       //let scrollTop = ( this.thumb.position.y + (this.thumb.scale.y / 2) ) + mouseY;
       //this.mouseOffset.y = scrollTop;
       //console.log('GUIScrollBar', 'blah');
@@ -266,8 +266,8 @@ export class GUIScrollBar extends GUIControl{
 
   mouseInside(){
 
-    let mouseX = Mouse.positionViewport.x - (ResolutionManager.getViewportWidthScaled() / 2);
-    let mouseY = Mouse.positionViewport.y - (ResolutionManager.getViewportHeightScaled() / 2);
+    let mouseX = Mouse.positionViewport.x - (ResolutionManager.getGUIWidthScaled() / 2);
+    let mouseY = Mouse.positionViewport.y - (ResolutionManager.getGUIHeightScaled() / 2);
     //console.log(mouseY);
     //if(this.inner_box.containsPoint({x: mouseX, y: mouseY})){
 
