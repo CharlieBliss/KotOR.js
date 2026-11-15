@@ -654,8 +654,10 @@ export class TalentFeat extends TalentObject {
       this.pips = TwoDAObject.normalizeValue(row.pips, 'number', -1);
   }
 
+  /** A feat from its feat.2da row (the row's __index is the feat's id) */
   static From2DA(row: any = {}) {
-    const talentFeat = new TalentFeat();
+    const id = Number(row?.__index);
+    const talentFeat = new TalentFeat(Number.isFinite(id) ? id : 0);
     talentFeat.apply2DA(row);
     return talentFeat;
   }
