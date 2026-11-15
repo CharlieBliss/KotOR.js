@@ -1,3 +1,6 @@
+import { CharacterRules, ABILITIES } from "@/engine/rules/CharacterRules";
+import { GMCharacters } from "@/managers/gm/GMCharacters";
+import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { gmItemResRef } from "@/managers/gm/GMVocab";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
@@ -770,6 +773,65 @@ export class GMPlayers {
     return false;
   }
 
+  /**
+   * A player's character held to this session's creation limits (CharacterRules), as the config to spawn:
+   * - a class a player can't take becomes the first one they can; the level comes into the session's range;
+   * - abilities come within the base, cap and pool (highest first);
+   * - feats, powers or skills that don't fit go back to the class's recommended ones;
+   * - with player bodies only, another model becomes the class preset's;
+   * - with gear off, the class preset's gear replaces the character's.
+   * changes says what was adjusted, for the GM.
+   */
+  static admitCharacter(character: GMCharacter): { config: GMPlayerSpawnConfig, changes: string[] } {
+    const limits = this.creationLimits;
+    const changes: string[] = [];
+    const c: GMCharacter = { ...character, attributes: { ...character.attributes } };
+
+    const classes = CharacterRules.classes();
+    if (classes.length && !classes.some((k) => k.id === c.classId)) {
+      c.classId = classes[0].id;
+      changes.push(`Its class isn't one a player can take; it's now ${classes[0].name}.`);
+    }
+    const [minLevel, maxLevel] = CharacterRules.levelRange(limits);
+    const level = Math.max(minLevel, Math.min(maxLevel, Math.round(c.level || 1)));
+    if (level !== c.level) {
+      changes.push(`Level ${c.level} is now ${level}.`);
+      c.level = level;
+    }
+    const attributes = CharacterRules.clampAbilities(c.attributes, limits);
+    if (ABILITIES.some((k) => attributes[k] !== c.attributes[k])) {
+      changes.push('Its abilities were brought within the points.');
+      c.attributes = attributes;
+    }
+
+    const preset = GMManager.PLAYER_PRESETS.find((p) => p.classId === c.classId) || GMManager.PLAYER_PRESETS[0];
+    const config = GMCharacters.toSpawnConfig(c);
+    const choices = { classId: c.classId, level: c.level, attributes: c.attributes };
+    if (c.feats && CharacterRules.validate({ ...choices, feats: c.feats }, limits).length) {
+      config.featIds = undefined;
+      changes.push('Its feats went back to the recommended ones.');
+    }
+    if (c.powers && CharacterRules.validate({ ...choices, powers: c.powers }, limits).length) {
+      config.spellIds = undefined;
+      changes.push('Its Force powers went back to the recommended ones.');
+    }
+    if (c.skillRanks && CharacterRules.validate({ ...choices, skillRanks: c.skillRanks }, limits).length) {
+      config.skillRanks = undefined;
+      changes.push('Its skills went back to the recommended ones.');
+    }
+    if (limits.anyModel === false && !CharacterRules.playerAppearances().has(config.appearanceId)) {
+      config.appearanceId = preset.appearanceId;
+      changes.push('This session only allows the player bodies, so it took its class\'s.');
+    }
+    if (limits.gear === false && (config.rightHandResRef || config.leftHandResRef || config.armorResRef)) {
+      config.rightHandResRef = preset.rightHandResRef;
+      config.leftHandResRef = preset.leftHandResRef;
+      config.armorResRef = preset.armorResRef;
+      changes.push('This session chooses gear, so it has its class\'s.');
+    }
+    return { config, changes };
+  }
+
   static async spawnPlayerFromNetworkPreset(peerId: string, playerName: string, preset: GMPlayerJoinPreset): Promise<string | null> {
     // A player rejoining a loaded session gets the character saved under their name
     const reserved = GMSessions.reservedPlayers.get(String(playerName || '').trim().toLowerCase());
@@ -777,6 +839,15 @@ export class GMPlayers {
       GMSessions.reservedPlayers.delete(reserved.name.trim().toLowerCase());
       const pc = await GMSessions.spawnSavedPlayer(reserved, peerId);
       if (pc) GMNetworkManager.appendChat('System', `${reserved.name} picked up their saved character.`);
+      return pc ? (pc.gmNetId || null) : null;
+    }
+    if (preset?.character && GMCharacters.isCharacter(preset.character)) {
+      const { config, changes } = this.admitCharacter(preset.character);
+      if (changes.length) GMNetworkManager.appendChat('System', `${config.name}'s character was adjusted to this session's rules: ${changes.join(' ')}`);
+      const pc = await GMSpawner.spawnPlayerCharacter(
+        { ...config, possessImmediately: false, ownerPeerId: peerId },
+        GMManager.sceneStartPoint ? GMManager.sceneStartPoint.clone() : undefined
+      );
       return pc ? (pc.gmNetId || null) : null;
     }
     const basePreset = GMManager.PLAYER_PRESETS.find(p => p.classId === preset?.classId) || GMManager.PLAYER_PRESETS[0];

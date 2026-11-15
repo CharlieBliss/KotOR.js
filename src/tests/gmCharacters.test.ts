@@ -1,10 +1,14 @@
 import { beforeEach, describe, expect, jest, test } from "@jest/globals";
 
 jest.mock("@/GameState", () => ({ GameState: {} }));
+jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
+jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 
 import { GameState } from "@/GameState";
 import { GMCharacters } from "@/managers/gm/GMCharacters";
 import type { GMCharacter } from "@/managers/gm/GMTypes";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMNetworkManager } from "@/managers/GMNetworkManager";
 
 /** localStorage as the browser has it */
 function memoryStorage() {
@@ -107,5 +111,64 @@ describe('into a session', () => {
     expect(blank).toMatchObject({ level: 1, attributes: { str: 8, dex: 8, con: 8, int: 8, wis: 8, cha: 8 } });
     const fromPreset = GMCharacters.blank({ name: 'Guardian', appearanceId: 4, portraitId: 1, gender: 0, classId: 3, level: 10, str: 18, dex: 14, con: 15, int: 10, wis: 14, cha: 12, rightHandResRef: 'g_w_lghtsbr01' });
     expect(fromPreset).toMatchObject({ name: 'Guardian', appearanceLabel: 'P_BastilaBB', classId: 3, level: 10, gear: { rightHand: 'g_w_lghtsbr01' } });
+  });
+});
+
+describe("joining with a made character", () => {
+  /** A 2DA table as the engine holds it */
+  const table = (rows: Record<string, any>[]) => ({ rows: Object.fromEntries(rows.map((r, i) => [i, { __index: i, ...r }])) });
+
+  beforeEach(() => {
+    const tables = new Map<string, any>([
+      ["classes", table([
+        { label: "Soldier", playerclass: "1", featstable: "SOL", skillstable: "SOL", featgain: "SOL", spellgaintable: "****", hitdie: "10", forcedie: "0", skillpointbase: "2" },
+        { label: "Droid", playerclass: "0", featstable: "DRO", skillstable: "DRO", featgain: "DRO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "1" },
+        { label: "Scout", playerclass: "1", featstable: "SCO", skillstable: "SCO", featgain: "SCO", spellgaintable: "****", hitdie: "8", forcedie: "0", skillpointbase: "4" },
+      ])],
+      ["featgain", table([{ sol_reg: "1", sco_reg: "1" }])],
+      ["feat", table([
+        { label: "PROF", sol_list: "3", sol_granted: "1", sco_list: "3", sco_granted: "1", prereqfeat1: "****", prereqfeat2: "****" },
+        { label: "POWER_ATTACK", sol_list: "1", sco_list: "1", prereqfeat1: "****", prereqfeat2: "****" },
+        { label: "IMPROVED", sol_list: "1", sco_list: "1", prereqfeat1: "1", prereqfeat2: "****" },
+      ])],
+      ["skills", table([{ label: "Awareness", sol_class: "1", sol_reco: "1", sco_class: "1", sco_reco: "1" }])],
+      ["portraits", table([{ forpc: "1", appearancenumber: "4", appearance_s: "5", appearance_l: "6" }, { forpc: "0", appearancenumber: "77" }])],
+    ]);
+    (GameState as any).TwoDAManager = { datatables: tables };
+    (GameState as any).TLKManager = { GetStringById: (): any => undefined };
+    GMPlayers.creationLimits = {};
+    jest.spyOn(GMNetworkManager, "appendChat").mockImplementation(() => {});
+  });
+
+  const made = (overrides: Partial<GMCharacter> = {}) => character({ classId: 0, level: 3, attributes: { str: 14, dex: 14, con: 12, int: 10, wis: 10, cha: 8 }, feats: [0, 1], powers: undefined, skillRanks: undefined, ...overrides });
+
+  test("a character within the rules comes through as it is", () => {
+    const { config, changes } = GMPlayers.admitCharacter(made());
+    expect(changes).toEqual([]);
+    expect(config).toMatchObject({ classId: 0, level: 3, str: 14, featIds: [0, 1], appearanceId: 4 });
+  });
+
+  test("what doesn't fit the session is brought in line, and the GM is told what changed", () => {
+    GMPlayers.creationLimits = { level: [1, 2] };
+    const { config, changes } = GMPlayers.admitCharacter(made({
+      classId: 1,                                   // not a player class
+      level: 9,
+      attributes: { str: 18, dex: 18, con: 8, int: 8, wis: 8, cha: 8 },  // 38 points
+      feats: [0, 2],                                // Improved without Power Attack
+    }));
+    expect(config.classId).toBe(0);
+    expect(config.level).toBe(2);
+    expect(config.str + config.dex).toBeLessThan(36);
+    expect(config.featIds).toBeUndefined();
+    expect(changes.join(" ")).toMatch(/class isn't one a player can take.*Level 9 is now 2.*abilities were brought within.*feats went back/);
+  });
+
+  test("models and gear follow the GM's choices", () => {
+    const droid = made({ appearanceLabel: "Droid_Astromech", appearanceId: 77 });
+    expect(GMPlayers.admitCharacter(droid).config.appearanceId).toBe(77);
+    GMPlayers.creationLimits = { anyModel: false, gear: false };
+    const { config, changes } = GMPlayers.admitCharacter(droid);
+    expect(config.appearanceId).not.toBe(77);
+    expect(changes.join(" ")).toMatch(/only allows the player bodies.*chooses gear/);
   });
 });

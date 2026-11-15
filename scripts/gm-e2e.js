@@ -45,6 +45,9 @@ const FACTION_FRIENDLY = 2;
 // Carried by the first NPC, taken from its body by Player 1. Neither player starts with these.
 const NPC_LOOT = ['g_w_vbroswrd01', 'g_w_blstrrfl001'];
 
+// Player 2 joins with a character they made: level 6, 30 points of abilities
+const MADE_CHARACTER = { level: 6, attributes: { str: 16, dex: 14, con: 14, int: 10, wis: 10, cha: 8 } };
+
 // What the GM gives Player 2
 const REWARD_XP = 500;
 const REWARD_ITEM = 'g_i_medeqpmnt03';
@@ -371,20 +374,23 @@ async function run() {
     if (!await must('Two players boot and join', async () => {
       await Promise.all(players.map((p) => p.boot()));
       for (let i = 0; i < players.length; i++) {
-        await players[i].eval((KotOR, url, name) => {
+        await players[i].eval((KotOR, url, name, made) => {
           const G = KotOR.GMManager;
           const preset = G.PLAYER_PRESETS[0];
           // Same as the main menu's "Connect & Enter World" button
           KotOR.GameState.gmMode = true;
           G.active = true;
+          // Player 2 brings a character they made (GMCharacters), as the join card's character list sends it
+          const character = made ? { ...KotOR.GMCharacters.blank(preset), name, ...made } : undefined;
           KotOR.GMNetworkManager.joinSession(url, name, {
             name,
             appearanceId: preset.appearanceId,
             classId: preset.classId,
             rightHandResRef: preset.rightHandResRef,
             armorResRef: preset.armorResRef,
+            character,
           });
-        }, WS_URL, `E2E Player ${i + 1}`);
+        }, WS_URL, `E2E Player ${i + 1}`, i === 1 ? MADE_CHARACTER : null);
       }
       playerNetIds = await Promise.all(players.map((p) => p.waitFor('our character to be assigned and possessed', (KotOR, scene) => {
         const N = KotOR.GMNetworkManager;
@@ -393,6 +399,13 @@ async function run() {
         return inScene && N.assignedActorNetId && me && me.gmNetId === N.assignedActorNetId ? N.assignedActorNetId : false;
       }, SCENE_TIMEOUT, SECOND_SCENE)));
       expect(new Set(playerNetIds).size === 2, `players were given the same character: ${playerNetIds}`);
+      // Player 2's made character arrives on the host as they made it
+      const made = await gm.eval((KotOR, netId) => {
+        const pc = KotOR.GMManager.netIdMap.get(netId);
+        return pc && { name: pc.getName(), level: pc.getTotalClassLevel(), str: pc.getSTR(false), dex: pc.getDEX(false), con: pc.getCON(false) };
+      }, playerNetIds[1]);
+      expect(made && made.level === MADE_CHARACTER.level && made.str === MADE_CHARACTER.attributes.str && made.dex === MADE_CHARACTER.attributes.dex && made.con === MADE_CHARACTER.attributes.con,
+        `Player 2's made character arrived as ${JSON.stringify(made)}, not level ${MADE_CHARACTER.level} with ${JSON.stringify(MADE_CHARACTER.attributes)}`);
 
       // The join screen has gone, and players can't switch to another character or fly the GM camera
       for (let i = 0; i < players.length; i++) {

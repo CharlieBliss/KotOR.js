@@ -65,17 +65,24 @@ export class CharacterBuilder {
     const build: ICharacterBuild = { classId, level, feats: [], powers: [], skillRanks: [], maxHp: 1, maxFp: 0 };
     if (!CharacterRules.classRow(classId)) return build;
 
-    const vitality = CharacterRules.vitality(classId, level, attributes);
-    build.maxHp = vitality.maxHp;
-    build.maxFp = vitality.maxFp;
     build.feats = this.buildFeats(classId, level);
-    // Toughness and Master Toughness: +1 vitality per level each; Wookiee Toughness +2; Force Sensitive +40 FP
-    const has = (feat: number) => build.feats.includes(feat);
-    build.maxHp += level * ((has(84) ? 1 : 0) + (has(124) ? 1 : 0) + (has(95) ? 2 : 0));
-    if (has(116)) build.maxFp += 40;
+    Object.assign(build, this.vitalityWith(classId, level, attributes, build.feats));
     build.powers = this.buildPowers(classId, level, options.alignment || 'light');
     build.skillRanks = this.buildSkills(classId, level, attributes);
     return build;
+  }
+
+  /**
+   * Vitality and Force points for a class, level and abilities with these feats: Toughness and Master
+   * Toughness add 1 vitality per level each, Wookiee Toughness 2; Force Sensitive adds 40 Force points
+   */
+  static vitalityWith(classId: number, level: number, attributes: ICharacterAttributes, feats: number[]): { maxHp: number, maxFp: number } {
+    const { maxHp, maxFp } = CharacterRules.vitality(classId, level, attributes);
+    const has = (feat: number) => feats.includes(feat);
+    return {
+      maxHp: maxHp + level * ((has(84) ? 1 : 0) + (has(124) ? 1 : 0) + (has(95) ? 2 : 0)),
+      maxFp: maxFp + (has(116) ? 40 : 0),
+    };
   }
 
   /** The class's automatic feats, then its picks: recommended first, then any it can take, prerequisites allowing */

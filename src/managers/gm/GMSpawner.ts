@@ -486,8 +486,14 @@ export class GMSpawner {
       },
       alignment: config.alignment,
     });
-    if (Array.isArray(config.featIds) && config.featIds.length) build.feats = [...config.featIds];
+    if (Array.isArray(config.featIds) && config.featIds.length) {
+      build.feats = [...config.featIds];
+      Object.assign(build, CharacterBuilder.vitalityWith(build.classId, build.level, {
+        str: config.str || 14, dex: config.dex || 14, con: config.con || 14, int: config.int || 12, wis: config.wis || 14, cha: config.cha || 14,
+      }, build.feats));
+    }
     if (Array.isArray(config.spellIds) && config.spellIds.length) build.powers = [...config.spellIds];
+    if (Array.isArray(config.skillRanks) && config.skillRanks.length) build.skillRanks = [...config.skillRanks];
     if (typeof config.hp === 'number' && config.hp > 0) build.maxHp = config.hp;
     if (typeof config.fp === 'number' && config.fp >= 0) build.maxFp = config.fp;
     return build;

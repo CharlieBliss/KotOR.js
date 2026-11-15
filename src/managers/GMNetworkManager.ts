@@ -1,3 +1,4 @@
+import type { GMCharacter } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { GameState } from "@/GameState";
 
@@ -216,6 +217,8 @@ export interface GMPlayerJoinPreset {
   classId: number;
   rightHandResRef?: string;
   armorResRef?: string;
+  /** A character the player made (GMCharacters); the host holds it to the session's creation limits */
+  character?: GMCharacter;
 }
 
 /** A player's character as their game streams it to the host (see GMNetworkManager.update) */

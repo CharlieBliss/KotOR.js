@@ -36,6 +36,8 @@ export interface ICharacterChoices {
   powers?: number[];
   /** skills.2da row -> rank; left out: the class's recommended ranks */
   skillRanks?: number[];
+  /** appearance.2da row of the model (checked against the player bodies when a session asks) */
+  appearanceId?: number;
 }
 
 /** A row of a picker: a 2DA row id and its name */
@@ -110,6 +112,33 @@ export class CharacterRules {
 
   static abilityModifier(score: number): number {
     return mod(score);
+  }
+
+  /** Bring abilities within the base, the cap and the pool: the highest scores come down first */
+  static clampAbilities(attributes: ICharacterAttributes, limits: ICharacterLimits = {}): ICharacterAttributes {
+    const out = { ...attributes };
+    for (const key of ABILITIES) out[key] = Math.max(this.ABILITY_BASE, Math.min(this.ABILITY_MAX, Math.round(out[key] || this.ABILITY_BASE)));
+    const pool = this.abilityPool(limits);
+    while (this.abilitiesCost(out) > pool) {
+      const highest = ABILITIES.reduce((a, b) => (out[b] > out[a] ? b : a));
+      out[highest]--;
+    }
+    return out;
+  }
+
+  // --- Models ------------------------------------------------------------------------------------
+
+  /** The player bodies: the models the game's own creator offers (portraits.2da rows for PCs) */
+  static playerAppearances(): Set<number> {
+    const ids = new Set<number>();
+    for (const row of this.table('portraits')) {
+      if (num(row.forpc, 0) !== 1) continue;
+      for (const column of ['appearancenumber', 'appearance_s', 'appearance_l']) {
+        const id = num(row[column]);
+        if (id >= 0) ids.add(id);
+      }
+    }
+    return ids;
   }
 
   // --- Classes -----------------------------------------------------------------------------------
@@ -290,6 +319,9 @@ export class CharacterRules {
     const [minLevel, maxLevel] = this.levelRange(limits);
     if (choices.level < minLevel || choices.level > maxLevel) problems.push(minLevel === maxLevel ? `Characters start at level ${minLevel}.` : `Level must be ${minLevel} to ${maxLevel}.`);
 
+    if (limits.anyModel === false && choices.appearanceId !== undefined && !this.playerAppearances().has(choices.appearanceId)) {
+      problems.push('This session only allows the player bodies as models.');
+    }
     for (const key of ABILITIES) {
       const score = choices.attributes[key];
       if (score < this.ABILITY_BASE || score > this.ABILITY_MAX) problems.push(`${key.toUpperCase()} must be ${this.ABILITY_BASE} to ${this.ABILITY_MAX}.`);
