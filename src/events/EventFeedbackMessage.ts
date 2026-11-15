@@ -47,13 +47,13 @@ export class EventFeedbackMessage extends GameEvent {
 
   saveMessageData(){
     let struct = new GFFStruct(0xCCCC);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'Type') ).setValue(this.messageType);
+    struct.addByte('Type', this.messageType);
 
     //Export message ints
     let intList = struct.addField( new GFFField(GFFDataType.LIST, 'IntList') );
     for(let i = 0; i < this.intList.length; i++){
       let intStruct = new GFFStruct(0xBAAD);
-      intStruct.addField( new GFFField(GFFDataType.INT, 'IntegerValue') ).setValue(this.intList[i]);
+      intStruct.addInt('IntegerValue', this.intList[i]);
       intList.addChildStruct( intStruct );
     }
 
@@ -61,7 +61,7 @@ export class EventFeedbackMessage extends GameEvent {
     let floatList = struct.addField( new GFFField(GFFDataType.LIST, 'FloatList') );
     for(let i = 0; i < this.floatList.length; i++){
       let floatStruct = new GFFStruct(0xBAAD);
-      floatStruct.addField( new GFFField(GFFDataType.FLOAT, 'FloatValue') ).setValue(this.floatList[i]);
+      floatStruct.addFloat('FloatValue', this.floatList[i]);
       floatList.addChildStruct( floatStruct );
     }
 
@@ -69,7 +69,7 @@ export class EventFeedbackMessage extends GameEvent {
     let objectList = struct.addField( new GFFField(GFFDataType.LIST, 'ObjectList') );
     for(let i = 0; i < this.objectList.length; i++){
       let objectStruct = new GFFStruct(0xBAAD);
-      objectStruct.addField( new GFFField(GFFDataType.DWORD, 'ObjectValue') ).setValue(this.objectList[i]);
+      objectStruct.addDWord('ObjectValue', this.objectList[i]);
       objectList.addChildStruct( objectStruct );
     }
 
@@ -77,7 +77,7 @@ export class EventFeedbackMessage extends GameEvent {
     let stringList = struct.addField( new GFFField(GFFDataType.LIST, 'StringList') );
     for(let i = 0; i < this.stringList.length; i++){
       let stringStruct = new GFFStruct(0xBAAD);
-      stringStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'StringValue') ).setValue(this.stringList[i]);
+      stringStruct.addCExoString('StringValue', this.stringList[i]);
       stringList.addChildStruct( stringStruct );
     }
     return struct;
@@ -86,13 +86,13 @@ export class EventFeedbackMessage extends GameEvent {
   export(){
     let struct = new GFFStruct( 0xABCD );
 
-    struct.addField( new GFFField(GFFDataType.DWORD, 'CallerId') ).setValue( BitWise.InstanceOfObject(this.script.caller, ModuleObjectType.ModuleObject) ? this.script.caller.id : 2130706432 );
-    struct.addField( new GFFField(GFFDataType.DWORD, 'Day') ).setValue(this.day);
+    struct.addDWord('CallerId',  BitWise.InstanceOfObject(this.script.caller, ModuleObjectType.ModuleObject) ? this.script.caller.id : 2130706432 );
+    struct.addDWord('Day', this.day);
     let eventData = struct.addField( new GFFField(GFFDataType.STRUCT, 'EventData') );
       // eventData.addChildStruct( this.script.saveMessageData() );
-    struct.addField( new GFFField(GFFDataType.DWORD, 'EventId') ).setValue(this.id);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( BitWise.InstanceOfObject(this.script.object, ModuleObjectType.ModuleObject) ? this.script.caller.id : 2130706432 );
-    struct.addField( new GFFField(GFFDataType.DWORD, 'Time') ).setValue(this.time);
+    struct.addDWord('EventId', this.id);
+    struct.addDWord('ObjectId',  BitWise.InstanceOfObject(this.script.object, ModuleObjectType.ModuleObject) ? this.script.caller.id : 2130706432 );
+    struct.addDWord('Time', this.time);
 
     return struct;
   }

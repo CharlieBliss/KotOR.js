@@ -957,8 +957,7 @@ export class ModuleArea extends ModuleObject {
 
     //BEGIN AREA LOAD
 
-    if(this.are.RootNode.hasField('ObjectId'))
-      this.id = this.are.getFieldByLabel('ObjectId').getValue();
+    this.id = this.are.RootNode.get('ObjectId', this.id);
 
     let rooms = this.are.getFieldByLabel('Rooms');
 
@@ -1510,7 +1509,7 @@ export class ModuleArea extends ModuleObject {
 
   getPlayerTemplate(): GFFObject {
     if(GameState.PartyManager.PlayerTemplate){
-      GameState.PartyManager.PlayerTemplate.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( GameState.ModuleObjectManager.GetNextPlayerId() );
+      GameState.PartyManager.PlayerTemplate.RootNode.addDWord('ObjectId',  GameState.ModuleObjectManager.GetNextPlayerId() );
       return GameState.PartyManager.PlayerTemplate;
     }else{
       return GameState.PartyManager.GeneratePlayerTemplate();
@@ -2258,34 +2257,34 @@ export class ModuleArea extends ModuleObject {
 
   getAreaPropertiesStruct(){
     let struct = new GFFStruct();
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndDay') ).setValue(this.audio.ambient.day);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndDayVol') ).setValue(this.audio.ambient.dayVolume);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndNight') ).setValue(this.audio.ambient.night);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndNitVol') ).setValue(this.audio.ambient.nightVolume);
-    struct.addField( new GFFField(GFFDataType.INT, 'EnvAudio') ).setValue(this.audio.environmentAudio);
+    struct.addInt('AmbientSndDay', this.audio.ambient.day);
+    struct.addInt('AmbientSndDayVol', this.audio.ambient.dayVolume);
+    struct.addInt('AmbientSndNight', this.audio.ambient.night);
+    struct.addInt('AmbientSndNitVol', this.audio.ambient.nightVolume);
+    struct.addInt('EnvAudio', this.audio.environmentAudio);
     
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicBattle') ).setValue(this.audio.music.battle);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicDay') ).setValue(this.audio.music.day);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicDelay') ).setValue(this.audio.music.delay);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicNight') ).setValue(this.audio.music.night);
+    struct.addInt('MusicBattle', this.audio.music.battle);
+    struct.addInt('MusicDay', this.audio.music.day);
+    struct.addInt('MusicDelay', this.audio.music.delay);
+    struct.addInt('MusicNight', this.audio.music.night);
 
-    struct.addField( new GFFField(GFFDataType.BYTE, 'RestrictMode') ).setValue(this.restrictMode ? 1 : 0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'StealthXPCurrent') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'StealthXPLoss') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'StealthXPMax') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'SunFogColor') ).setValue(0);
+    struct.addByte('RestrictMode', this.restrictMode ? 1 : 0);
+    struct.addDWord('StealthXPCurrent', 0);
+    struct.addByte('StealthXPLoss', 0);
+    struct.addDWord('StealthXPMax', 0);
+    struct.addDWord('SunFogColor', 0);
     
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPendCurrID') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPendNextID') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPending') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'Unescapable') ).setValue(this.unescapable);
+    struct.addByte('TransPendCurrID', 0);
+    struct.addByte('TransPendNextID', 0);
+    struct.addByte('TransPending', 0);
+    struct.addByte('Unescapable', this.unescapable);
     return struct;
   }
 
   saveAreaListStruct(){
     let areaStruct = new GFFStruct();
-    areaStruct.addField( new GFFField(GFFDataType.RESREF, 'Area_Name') ).setValue(this.name);
-    areaStruct.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    areaStruct.addRESREF('Area_Name', this.name);
+    areaStruct.addDWord('ObjectId', this.id);
     //unescapable
     return areaStruct;
   }
@@ -2349,9 +2348,9 @@ export class ModuleArea extends ModuleObject {
       storeList.addChildStruct( this.stores[i].save().RootNode );
     }
     
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPendCurrID') ).setValue(0);
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPendNextID') ).setValue(0);
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPending') ).setValue(0);
+    git.RootNode.addByte('TransPendCurrID', 0);
+    git.RootNode.addByte('TransPendNextID', 0);
+    git.RootNode.addByte('TransPending', 0);
 
     const triggerList = git.RootNode.addField( new GFFField(GFFDataType.LIST, 'TriggerList') );
     for(let i = 0; i < this.triggers.length; i++){
@@ -2365,7 +2364,7 @@ export class ModuleArea extends ModuleObject {
       waypointList.addChildStruct( this.waypoints[i].save().RootNode );
     }
     
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'WeatherStarted') ).setValue(this.weather.started ? 1 : 0);
+    git.RootNode.addByte('WeatherStarted', this.weather.started ? 1 : 0);
 
     this.git = git;
 

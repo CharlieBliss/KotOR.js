@@ -19,8 +19,8 @@ export class EncounterSpawnEntry {
   save(){
     let struct = new GFFStruct();
 
-    struct.addField( new GFFField(GFFDataType.RESREF, 'SpawnResRef') ).setValue(this.spawnResref);
-    struct.addField( new GFFField(GFFDataType.FLOAT, 'SpawnCR') ).setValue(this.spawnCR);
+    struct.addRESREF('SpawnResRef', this.spawnResref);
+    struct.addFloat('SpawnCR', this.spawnCR);
 
     return struct;
   }
@@ -29,11 +29,9 @@ export class EncounterSpawnEntry {
     if(struct instanceof GFFStruct){
       let entry = new EncounterSpawnEntry();
 
-      if(struct.hasField('SpawnResRef'))
-        entry.spawnResref = struct.getFieldByLabel('SpawnResRef').getValue();
+      entry.spawnResref = struct.get('SpawnResRef', entry.spawnResref);
 
-      if(struct.hasField('SpawnCR'))
-        entry.spawnCR = struct.getFieldByLabel('SpawnCR').getValue();
+      entry.spawnCR = struct.get('SpawnCR', entry.spawnCR);
 
       return entry;
     }

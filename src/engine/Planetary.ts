@@ -78,7 +78,7 @@ export class Planetary {
   static SaveStruct(){
     let struct = new GFFStruct();
 
-    struct.addField( new GFFField(GFFDataType.DWORD, 'GlxyMapNumPnts') ).setValue(Planetary.planets.length);
+    struct.addDWord('GlxyMapNumPnts', Planetary.planets.length);
 
     let planetMask = 0
     for(let i = 0; i < Planetary.planets.length; i++){
@@ -88,8 +88,8 @@ export class Planetary {
       }
       planetMask = planetMask >>> 0;
     }
-    struct.addField( new GFFField(GFFDataType.DWORD, 'GlxyMapPlntMsk') ).setValue(planetMask);
-    struct.addField( new GFFField(GFFDataType.INT, 'GlxyMapSelPnt') ).setValue(Planetary.selectedIndex);
+    struct.addDWord('GlxyMapPlntMsk', planetMask);
+    struct.addInt('GlxyMapSelPnt', Planetary.selectedIndex);
 
     return struct;
   }

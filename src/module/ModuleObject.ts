@@ -2924,7 +2924,7 @@ export class ModuleObject {
     if(this.template.RootNode.hasField('TemplateResRef')){
       this.template.RootNode.getFieldByLabel('TemplateResRef').setValue(sRef)
     }else{
-      this.template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'TemplateResRef') ).setValue(sRef)
+      this.template.RootNode.addRESREF('TemplateResRef', sRef)
     }
     
   }
@@ -3487,6 +3487,21 @@ export class ModuleObject {
   /**
    * Initialize the properties
    */
+  /**
+   * Read the fields every object type keeps: tag, template resref, position and orientation.
+   * A field the template doesn't have leaves the current value.
+   */
+  initCommonProperties(){
+    this.tag = this.template.RootNode.get('Tag', this.tag);
+    this.templateResRef = this.template.RootNode.get('TemplateResRef', this.templateResRef);
+    this.position.x = this.template.RootNode.get('XPosition', this.position.x);
+    this.position.y = this.template.RootNode.get('YPosition', this.position.y);
+    this.position.z = this.template.RootNode.get('ZPosition', this.position.z);
+    this.xOrientation = this.template.RootNode.get('XOrientation', this.xOrientation);
+    this.yOrientation = this.template.RootNode.get('YOrientation', this.yOrientation);
+    this.zOrientation = this.template.RootNode.get('ZOrientation', this.zOrientation);
+  }
+
   initProperties(){
 
     if(!this.initialized){
@@ -3499,27 +3514,20 @@ export class ModuleObject {
       GameState.ModuleObjectManager.AddObjectById(this);
     }
     
-    if(this.template.RootNode.hasField('Animation'))
-      this.animState = this.template.getFieldByLabel('Animation').getValue();
+    this.animState = this.template.RootNode.get('Animation', this.animState);
     
-    if(this.template.RootNode.hasField('Appearance')){
-      this.appearance = this.template.getFieldByLabel('Appearance').getValue();
-    }
+    this.appearance = this.template.RootNode.get('Appearance', this.appearance);
     
     if(this.template.RootNode.hasField('Description'))
       this.description = this.template.getFieldByLabel('Description').getCExoLocString();
     
-    if(this.template.RootNode.hasField('ObjectId'))
-      this.id = this.template.getFieldByLabel('ObjectId').getValue();
+    this.id = this.template.RootNode.get('ObjectId', this.id);
 
-    if(this.template.RootNode.hasField('AutoRemoveKey'))
-      this.autoRemoveKey = this.template.getFieldByLabel('AutoRemoveKey').getValue();
+    this.autoRemoveKey = this.template.RootNode.get('AutoRemoveKey', this.autoRemoveKey);
 
-    if(this.template.RootNode.hasField('Commandable'))
-      this.commandable = this.template.getFieldByLabel('Commandable').getValue();
+    this.commandable = this.template.RootNode.get('Commandable', this.commandable);
 
-    if(this.template.RootNode.hasField('Cursor'))
-      this.cursor = this.template.getFieldByLabel('Cursor').getValue();
+    this.cursor = this.template.RootNode.get('Cursor', this.cursor);
 
     if(this.template.RootNode.hasField('Faction')){
       this.factionId = this.template.getFieldByLabel('Faction').getValue();
@@ -3543,26 +3551,19 @@ export class ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('HasMapNote'))
-      this.hasMapNote = this.template.getFieldByLabel('HasMapNote').getValue();
+    this.hasMapNote = this.template.RootNode.get('HasMapNote', this.hasMapNote);
 
-    if(this.template.RootNode.hasField('HighlightHeight'))
-      this.highlightHeight = this.template.getFieldByLabel('HighlightHeight').getValue();
+    this.highlightHeight = this.template.RootNode.get('HighlightHeight', this.highlightHeight);
 
-    if(this.template.RootNode.hasField('KeyName'))
-      this.keyName = this.template.getFieldByLabel('KeyName').getValue();
+    this.keyName = this.template.RootNode.get('KeyName', this.keyName);
 
-    if(this.template.RootNode.hasField('LinkedTo'))
-      this.linkedTo = this.template.getFieldByLabel('LinkedTo').getValue();
+    this.linkedTo = this.template.RootNode.get('LinkedTo', this.linkedTo);
 
-    if(this.template.RootNode.hasField('LinkedToFlags'))
-      this.linkedToFlags = this.template.getFieldByLabel('LinkedToFlags').getValue();
+    this.linkedToFlags = this.template.RootNode.get('LinkedToFlags', this.linkedToFlags);
   
-    if(this.template.RootNode.hasField('LinkedToModule'))
-      this.linkedToModule = this.template.RootNode.getFieldByLabel('LinkedToModule').getValue();
+    this.linkedToModule = this.template.RootNode.get('LinkedToModule', this.linkedToModule);
         
-    if(this.template.RootNode.hasField('LoadScreenID'))
-      this.loadScreenID = this.template.getFieldByLabel('LoadScreenID').getValue();
+    this.loadScreenID = this.template.RootNode.get('LoadScreenID', this.loadScreenID);
 
     if(this.template.RootNode.hasField('LocName'))
       this.locName = this.template.getFieldByLabel('LocName').getCExoLocString();
@@ -3573,67 +3574,35 @@ export class ModuleObject {
     if(this.template.RootNode.hasField('MapNote'))
       this.mapNote = this.template.getFieldByLabel('MapNote').getCExoLocString();
 
-    if(this.template.RootNode.hasField('MapNoteEnabled'))
-      this.mapNoteEnabled = this.template.getFieldByLabel('MapNoteEnabled').getValue();
+    this.mapNoteEnabled = this.template.RootNode.get('MapNoteEnabled', this.mapNoteEnabled);
 
     if(this.template.RootNode.hasField('PortraidId')){
       this.portraitId = this.template.getFieldByLabel('PortraidId').getValue();
       this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
     }
 
-    if(this.template.RootNode.hasField('SetByPlayerParty'))
-      this.setByPlayerParty = this.template.getFieldByLabel('SetByPlayerParty').getValue();
+    this.setByPlayerParty = this.template.RootNode.get('SetByPlayerParty', this.setByPlayerParty);
 
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue();
-
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
+    this.initCommonProperties();
 
     if(this.template.RootNode.hasField('TransitionDestin'))
       this.transitionDestin = this.template.getFieldByLabel('TransitionDestin').getCExoLocString();
 
-    if(this.template.RootNode.hasField('TrapDetectable'))
-      this.trapDetectable = this.template.RootNode.getFieldByLabel('TrapDetectable').getValue();
+    this.trapDetectable = this.template.RootNode.get('TrapDetectable', this.trapDetectable);
 
-    if(this.template.RootNode.hasField('TrapDisarmable'))
-      this.trapDisarmable = this.template.RootNode.getFieldByLabel('TrapDisarmable').getValue();
+    this.trapDisarmable = this.template.RootNode.get('TrapDisarmable', this.trapDisarmable);
 
-    if(this.template.RootNode.hasField('TrapOneShot'))
-      this.trapOneShot = this.template.getFieldByLabel('TrapOneShot').getValue();
+    this.trapOneShot = this.template.RootNode.get('TrapOneShot', this.trapOneShot);
 
-    if(this.template.RootNode.hasField('TrapType'))
-      this.trapType = this.template.getFieldByLabel('TrapType').getValue();
+    this.trapType = this.template.RootNode.get('TrapType', this.trapType);
 
-    if(this.template.RootNode.hasField('Type'))
-      this.type = this.template.getFieldByLabel('Type').getValue();
+    this.type = this.template.RootNode.get('Type', this.type);
 
-    if(this.template.RootNode.hasField('XPosition'))
-      this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
+    this.fortitudeSaveThrow = this.template.RootNode.get('FortSaveThrow', this.fortitudeSaveThrow);
 
-    if(this.template.RootNode.hasField('YPosition'))
-      this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
+    this.reflexSaveThrow = this.template.RootNode.get('RefSaveThrow', this.reflexSaveThrow);
 
-    if(this.template.RootNode.hasField('ZPosition'))
-      this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
-
-    if(this.template.RootNode.hasField('XOrientation'))
-      this.xOrientation = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
-
-    if(this.template.RootNode.hasField('YOrientation'))
-      this.yOrientation = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
-
-    if(this.template.RootNode.hasField('ZOrientation'))
-      this.zOrientation = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
-      
-    if(this.template.RootNode.hasField('FortSaveThrow'))
-      this.fortitudeSaveThrow = this.template.RootNode.getFieldByLabel('FortSaveThrow').getValue();
-
-    if(this.template.RootNode.hasField('RefSaveThrow'))
-      this.reflexSaveThrow = this.template.RootNode.getFieldByLabel('RefSaveThrow').getValue();
-
-    if(this.template.RootNode.hasField('WillSaveThrow'))
-      this.willSaveThrow = this.template.RootNode.getFieldByLabel('WillSaveThrow').getValue();
+    this.willSaveThrow = this.template.RootNode.get('WillSaveThrow', this.willSaveThrow);
 
     if(this.template.RootNode.hasField('SWVarTable')){
       let swVarTableStruct = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0];
@@ -3693,7 +3662,7 @@ export class ModuleObject {
         }
       }
       value = value >>> 0;
-      varStruct.addField( new GFFField(GFFDataType.DWORD, 'Variable') ).setValue( value );
+      varStruct.addDWord('Variable',  value );
       swVarTableBitArray.addChildStruct(varStruct);
     }
 
@@ -3701,7 +3670,7 @@ export class ModuleObject {
 
     for(let i = 0; i < 8; i++){
       let varStruct = new GFFStruct();
-      varStruct.addField( new GFFField(GFFDataType.BYTE, 'Variable') ).setValue( Number(this.getLocalNumber(i)) );
+      varStruct.addByte('Variable',  Number(this.getLocalNumber(i)) );
       swVarTableByteArray.addChildStruct(varStruct);
     }
     return swVarTableStruct;

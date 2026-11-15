@@ -220,32 +220,23 @@ export class ItemProperty {
   }
 
   initProperties(){
-    if(this.template.RootNode.hasField('PropertyName'))
-      this.propertyName = this.template.RootNode.getFieldByLabel('PropertyName').getValue();
+    this.propertyName = this.template.RootNode.get('PropertyName', this.propertyName);
     
-    if(this.template.RootNode.hasField('Subtype'))
-      this.subType = this.template.RootNode.getFieldByLabel('Subtype').getValue();
+    this.subType = this.template.RootNode.get('Subtype', this.subType);
 
-    if(this.template.RootNode.hasField('CostTable'))
-      this.costTable = this.template.RootNode.getFieldByLabel('CostTable').getValue();
+    this.costTable = this.template.RootNode.get('CostTable', this.costTable);
 
-    if(this.template.RootNode.hasField('CostValue'))
-      this.costValue = this.template.RootNode.getFieldByLabel('CostValue').getValue();
+    this.costValue = this.template.RootNode.get('CostValue', this.costValue);
 
-    if(this.template.RootNode.hasField('Param1'))
-      this.param1 = this.template.RootNode.getFieldByLabel('Param1').getValue();
+    this.param1 = this.template.RootNode.get('Param1', this.param1);
 
-    if(this.template.RootNode.hasField('Param1Value'))
-      this.param1Value = this.template.RootNode.getFieldByLabel('Param1Value').getValue();
+    this.param1Value = this.template.RootNode.get('Param1Value', this.param1Value);
 
-    if(this.template.RootNode.hasField('ChanceAppear'))
-      this.chanceAppear = this.template.RootNode.getFieldByLabel('ChanceAppear').getValue();
+    this.chanceAppear = this.template.RootNode.get('ChanceAppear', this.chanceAppear);
 
-    if(this.template.RootNode.hasField('UsesPerDay'))
-      this.usesPerDay = this.template.RootNode.getFieldByLabel('UsesPerDay').getValue();
+    this.usesPerDay = this.template.RootNode.get('UsesPerDay', this.usesPerDay);
 
-    if(this.template.RootNode.hasField('Useable'))
-      this.useable = this.template.RootNode.getFieldByLabel('Useable').getValue();
+    this.useable = this.template.RootNode.get('Useable', this.useable);
 
     if(this.template.RootNode.hasField('UpgradeType'))
       this.upgradeType = this.template.RootNode.getFieldByLabel('UpgradeType').getValue();

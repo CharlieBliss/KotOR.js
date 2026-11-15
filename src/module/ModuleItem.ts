@@ -79,7 +79,7 @@ export class ModuleItem extends ModuleObject {
     if(typeof gff === 'string'){
       this.equippedRes = gff;
       this.template = new GFFObject();
-      this.template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(gff);
+      this.template.RootNode.addRESREF('EquippedRes', gff);
     }else{
       this.template = gff;
     }
@@ -746,56 +746,41 @@ export class ModuleItem extends ModuleObject {
       this.baseItem = BaseItem.From2DA(this.baseItemId);
     }
 
-    if(this.template.RootNode.hasField('Charges'))
-      this.charges = this.template.getFieldByLabel('Charges').getValue();
+    this.charges = this.template.RootNode.get('Charges', this.charges);
 
     if(this.template.RootNode.hasField('Cost'))
       this.cost = parseInt(this.template.getFieldByLabel('Cost').getValue());
 
-    if(this.template.RootNode.hasField('DELETING'))
-      this.deleting = this.template.getFieldByLabel('DELETING').getValue();
+    this.deleting = this.template.RootNode.get('DELETING', this.deleting);
 
-    if(this.template.RootNode.hasField('DescIdentified'))
-      this.descIdentified = this.template.getFieldByLabel('DescIdentified').getValue();
+    this.descIdentified = this.template.RootNode.get('DescIdentified', this.descIdentified);
 
-    if(this.template.RootNode.hasField('Description'))
-      this.description = this.template.getFieldByLabel('Description').getValue();
+    this.description = this.template.RootNode.get('Description', this.description);
 
-    if(this.template.RootNode.hasField('Dropable'))
-      this.dropable = this.template.getFieldByLabel('Dropable').getValue();
+    this.dropable = this.template.RootNode.get('Dropable', this.dropable);
       
-    if(this.template.RootNode.hasField('EquippedRes'))
-      this.equippedRes = this.template.getFieldByLabel('EquippedRes').getValue();
+    this.equippedRes = this.template.RootNode.get('EquippedRes', this.equippedRes);
 
-    if(this.template.RootNode.hasField('Identified'))
-      this.identified = this.template.getFieldByLabel('Identified').getValue();
+    this.identified = this.template.RootNode.get('Identified', this.identified);
 
-    if(this.template.RootNode.hasField('Infinite'))
-      this.infinite = this.template.getFieldByLabel('Infinite').getValue();
+    this.infinite = this.template.RootNode.get('Infinite', this.infinite);
 
-    if(this.template.RootNode.hasField('InventoryRes'))
-      this.inventoryRes = this.template.getFieldByLabel('InventoryRes').getValue();
+    this.inventoryRes = this.template.RootNode.get('InventoryRes', this.inventoryRes);
   
     if(this.template.RootNode.hasField('LocalizedName'))
       this.localizedName = this.template.RootNode.getFieldByLabel('LocalizedName').getCExoLocString();
         
-    if(this.template.RootNode.hasField('MaxCharges'))
-      this.maxCharges = this.template.RootNode.getFieldByLabel('MaxCharges').getValue();
+    this.maxCharges = this.template.RootNode.get('MaxCharges', this.maxCharges);
 
-    if(this.template.RootNode.hasField('ModelVariation'))
-      this.modelVariation = this.template.RootNode.getFieldByLabel('ModelVariation').getValue();
+    this.modelVariation = this.template.RootNode.get('ModelVariation', this.modelVariation);
     
-    if(this.template.RootNode.hasField('NewItem'))
-      this.newItem = this.template.RootNode.getFieldByLabel('NewItem').getValue();
+    this.newItem = this.template.RootNode.get('NewItem', this.newItem);
         
-    if(this.template.RootNode.hasField('NonEquippable'))
-      this.nonEquippable = this.template.RootNode.getFieldByLabel('NonEquippable').getValue();
+    this.nonEquippable = this.template.RootNode.get('NonEquippable', this.nonEquippable);
   
-    if(this.template.RootNode.hasField('Pickpocketable'))
-      this.pickpocketable = this.template.RootNode.getFieldByLabel('Pickpocketable').getValue();
+    this.pickpocketable = this.template.RootNode.get('Pickpocketable', this.pickpocketable);
       
-    if(this.template.RootNode.hasField('Plot'))
-      this.plot = this.template.getFieldByLabel('Plot').getValue();
+    this.plot = this.template.RootNode.get('Plot', this.plot);
 
     if(this.template.RootNode.hasField('PropertiesList')){
       let propertiesList = this.template.getFieldByLabel('PropertiesList').getChildStructs();
@@ -809,70 +794,44 @@ export class ModuleItem extends ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('StackSize'))
-      this.stackSize = this.template.getFieldByLabel('StackSize').getValue();
+    this.stackSize = this.template.RootNode.get('StackSize', this.stackSize);
 
-    if(this.template.RootNode.hasField('Stolen'))
-      this.stolen = this.template.getFieldByLabel('Stolen').getValue();
+    this.stolen = this.template.RootNode.get('Stolen', this.stolen);
 
     if(this.template.RootNode.hasField('Tag'))
       this.tag = this.template.getFieldByLabel('Tag').getValue().replace(/\0[\s\S]*$/g,'');
 
-    if(this.template.RootNode.hasField('TextureVar'))
-      this.textureVariation = this.template.getFieldByLabel('TextureVar').getValue();
+    this.textureVariation = this.template.RootNode.get('TextureVar', this.textureVariation);
 
-    if(this.template.RootNode.hasField('Upgrades')){
-      this.upgrades = this.template.getFieldByLabel('Upgrades').getValue();
-    }
+    this.upgrades = this.template.RootNode.get('Upgrades', this.upgrades);
 
-    if(this.template.RootNode.hasField('UpgradeLevel')){
-      this.upgradeLevel = this.template.getFieldByLabel('UpgradeLevel').getValue();
-    }
+    this.upgradeLevel = this.template.RootNode.get('UpgradeLevel', this.upgradeLevel);
 
-    if(this.template.RootNode.hasField('UpgradeSlot0')){
-      this.upgradeSlot0 = this.template.getFieldByLabel('UpgradeSlot0').getValue();
-    }
+    this.upgradeSlot0 = this.template.RootNode.get('UpgradeSlot0', this.upgradeSlot0);
 
-    if(this.template.RootNode.hasField('UpgradeSlot1')){
-      this.upgradeSlot1 = this.template.getFieldByLabel('UpgradeSlot1').getValue();
-    }
+    this.upgradeSlot1 = this.template.RootNode.get('UpgradeSlot1', this.upgradeSlot1);
 
-    if(this.template.RootNode.hasField('UpgradeSlot2')){
-      this.upgradeSlot2 = this.template.getFieldByLabel('UpgradeSlot2').getValue();
-    }
+    this.upgradeSlot2 = this.template.RootNode.get('UpgradeSlot2', this.upgradeSlot2);
 
-    if(this.template.RootNode.hasField('UpgradeSlot3')){
-      this.upgradeSlot3 = this.template.getFieldByLabel('UpgradeSlot3').getValue();
-    }
+    this.upgradeSlot3 = this.template.RootNode.get('UpgradeSlot3', this.upgradeSlot3);
 
-    if(this.template.RootNode.hasField('UpgradeSlot4')){
-      this.upgradeSlot4 = this.template.getFieldByLabel('UpgradeSlot4').getValue();
-    }
+    this.upgradeSlot4 = this.template.RootNode.get('UpgradeSlot4', this.upgradeSlot4);
 
-    if(this.template.RootNode.hasField('UpgradeSlot5')){
-      this.upgradeSlot5 = this.template.getFieldByLabel('UpgradeSlot5').getValue();
-    }
+    this.upgradeSlot5 = this.template.RootNode.get('UpgradeSlot5', this.upgradeSlot5);
 
-    if(this.template.RootNode.hasField('XPosition'))
-      this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
+    this.position.x = this.template.RootNode.get('XPosition', this.position.x);
 
-    if(this.template.RootNode.hasField('YPosition'))
-      this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
+    this.position.y = this.template.RootNode.get('YPosition', this.position.y);
 
-    if(this.template.RootNode.hasField('ZPosition'))
-      this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
+    this.position.z = this.template.RootNode.get('ZPosition', this.position.z);
 
-    if(this.template.RootNode.hasField('XOrientation'))
-      this.xOrientation = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
+    this.xOrientation = this.template.RootNode.get('XOrientation', this.xOrientation);
 
-    if(this.template.RootNode.hasField('YOrientation'))
-      this.yOrientation = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
+    this.yOrientation = this.template.RootNode.get('YOrientation', this.yOrientation);
 
-    if(this.template.RootNode.hasField('ZOrientation'))
-      this.zOrientation = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
+    this.zOrientation = this.template.RootNode.get('ZOrientation', this.zOrientation);
 
-    if(this.template.RootNode.hasField('PaletteID'))
-      this.palleteID = this.template.RootNode.getFieldByLabel('PaletteID').getValue();
+    this.palleteID = this.template.RootNode.get('PaletteID', this.palleteID);
 
     this.weaponSound = GameState.SWRuleSet.weaponSounds[this.baseItem?.poweredItem];
 
@@ -928,40 +887,40 @@ export class ModuleItem extends ModuleObject {
     let itemStruct = new GFFStruct(0);
 
     if(this.id >= 0)
-      itemStruct.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+      itemStruct.addDWord('ObjectId', this.id);
     
-    itemStruct.addField( new GFFField(GFFDataType.INT, 'BaseItem') ).setValue(this.getBaseItemId());
-    itemStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Identified') ).setValue(this.identified);
+    itemStruct.addInt('BaseItem', this.getBaseItemId());
+    itemStruct.addCExoString('Tag', this.tag);
+    itemStruct.addByte('Identified', this.identified);
     itemStruct.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') ).setValue(this.template.getFieldByLabel('Description')?.getCExoLocString());
     itemStruct.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'DescIdentified') ).setValue(this.template.getFieldByLabel('DescIdentified')?.getCExoLocString());
     itemStruct.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LocalizedName') ).setValue(this.template.getFieldByLabel('LocalizedName')?.getCExoLocString());
-    itemStruct.addField( new GFFField(GFFDataType.WORD, 'StackSize') ).setValue(this.stackSize);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Stolen') ).setValue(this.stolen);
-    itemStruct.addField( new GFFField(GFFDataType.DWORD, 'Upgrades') ).setValue(this.upgrades);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Dropable') ).setValue(this.dropable);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Pickpocketable') ).setValue(1);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'ModelVariation') ).setValue(this.modelVariation);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Charges') ).setValue(this.charges);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'MaxCharges') ).setValue(this.maxCharges);
-    itemStruct.addField( new GFFField(GFFDataType.DWORD, 'Cost') ).setValue(this.cost);
-    itemStruct.addField( new GFFField(GFFDataType.DWORD, 'AddCost') ).setValue(this.addCost);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'Plot') ).setValue(this.plot);
+    itemStruct.addWord('StackSize', this.stackSize);
+    itemStruct.addByte('Stolen', this.stolen);
+    itemStruct.addDWord('Upgrades', this.upgrades);
+    itemStruct.addByte('Dropable', this.dropable);
+    itemStruct.addByte('Pickpocketable', 1);
+    itemStruct.addByte('ModelVariation', this.modelVariation);
+    itemStruct.addByte('Charges', this.charges);
+    itemStruct.addByte('MaxCharges', this.maxCharges);
+    itemStruct.addDWord('Cost', this.cost);
+    itemStruct.addDWord('AddCost', this.addCost);
+    itemStruct.addByte('Plot', this.plot);
 
     let propertiesList = itemStruct.addField( new GFFField(GFFDataType.LIST, 'PropertiesList') );
     for(let i = 0; i < this.properties.length; i++){
       propertiesList.addChildStruct( this.properties[i].save() );
     }
 
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue(this.position.x);
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue(this.position.y);
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue(this.position.z);
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue(this.xOrientation);
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue(this.yOrientation);
-    itemStruct.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue(this.zOrientation);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'NonEquippable') ).setValue(this.nonEquippable);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'NewItem') ).setValue(this.newItem);
-    itemStruct.addField( new GFFField(GFFDataType.BYTE, 'DELETING') ).setValue(0);
+    itemStruct.addFloat('XPosition', this.position.x);
+    itemStruct.addFloat('YPosition', this.position.y);
+    itemStruct.addFloat('ZPosition', this.position.z);
+    itemStruct.addFloat('XOrientation', this.xOrientation);
+    itemStruct.addFloat('YOrientation', this.yOrientation);
+    itemStruct.addFloat('ZOrientation', this.zOrientation);
+    itemStruct.addByte('NonEquippable', this.nonEquippable);
+    itemStruct.addByte('NewItem', this.newItem);
+    itemStruct.addByte('DELETING', 0);
 
     return itemStruct;
   }

@@ -80,12 +80,12 @@ export class GMTemplates {
   static writeBuild(root: GFFStruct, abilities: GMBuildAbilities, classId: number, level: number) {
     const classList = this.newList(root, 'ClassList');
     const classStruct = new GFFStruct();
-    classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(classId);
-    classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(level);
+    classStruct.addInt('Class', classId);
+    classStruct.addShort('ClassLevel', level);
     const knownList = classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
     for (const spellId of abilities.powers) {
       const sp = new GFFStruct();
-      sp.addField(new GFFField(GFFDataType.WORD, 'Spell')).setValue(spellId);
+      sp.addWord('Spell', spellId);
       knownList.addChildStruct(sp);
     }
     classList.addChildStruct(classStruct);
@@ -93,14 +93,14 @@ export class GMTemplates {
     const featList = this.newList(root, 'FeatList');
     for (const featId of abilities.feats) {
       const ft = new GFFStruct();
-      ft.addField(new GFFField(GFFDataType.WORD, 'Feat')).setValue(featId);
+      ft.addWord('Feat', featId);
       featList.addChildStruct(ft);
     }
 
     const skillList = this.newList(root, 'SkillList');
     for (let i = 0; i < Math.max(8, abilities.skillRanks.length); i++) {
       const sk = new GFFStruct();
-      sk.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(abilities.skillRanks[i] || 0);
+      sk.addByte('Rank', abilities.skillRanks[i] || 0);
       skillList.addChildStruct(sk);
     }
 
@@ -132,7 +132,7 @@ export class GMTemplates {
       }
       if (!resRef) continue;
       const st = new GFFStruct(slot);
-      st.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue(resRef);
+      st.addRESREF('EquippedRes', resRef);
       list.addChildStruct(st);
     }
   }

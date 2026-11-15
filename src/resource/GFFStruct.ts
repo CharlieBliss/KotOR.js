@@ -89,63 +89,63 @@ export class GFFStruct {
     return this;
   }
 
-  addDWord64(label: string, value: bigint): GFFField {
+  addDWord64(label: string, value: number | bigint): GFFField {
     const field = new GFFField(GFFDataType.DWORD64, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addInt64(label: string, value: bigint): GFFField {
+  addInt64(label: string, value: number | bigint): GFFField {
     const field = new GFFField(GFFDataType.INT64, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addDouble(label: string, value: number): GFFField {
+  addDouble(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.DOUBLE, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addFloat(label: string, value: number): GFFField {
+  addFloat(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.FLOAT, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addDWord(label: string, value: number): GFFField {
+  addDWord(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.DWORD, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addInt(label: string, value: number): GFFField {
+  addInt(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.INT, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addWord(label: string, value: number): GFFField {
+  addWord(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.WORD, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addShort(label: string, value: number): GFFField  {
+  addShort(label: string, value: number | boolean): GFFField  {
     const field = new GFFField(GFFDataType.SHORT, label);
     field.setValue(value);
     this.addField(field);
     return field;
   }
 
-  addByte(label: string, value: number): GFFField {
+  addByte(label: string, value: number | boolean): GFFField {
     const field = new GFFField(GFFDataType.BYTE, label);
     field.setValue(value);
     this.addField(field);
@@ -337,6 +337,17 @@ export class GFFStruct {
     }
 
     return null;
+  }
+
+  /**
+   * The value of the field with this label, or fallback when this struct has no such field.
+   *
+   * @example
+   * this.hitPoints = root.get('HitPoints', this.hitPoints);
+   */
+  get<T = any>(label: string, fallback?: T): T {
+    const field = this.getFieldByLabel(label);
+    return field ? field.getValue() : fallback;
   }
 
   /**

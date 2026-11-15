@@ -317,17 +317,17 @@ export class AreaMap {
   export(): GFFStruct {
     let mapStruct = new GFFStruct(14);
 
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'MapPt1X') ).setValue(this.mapPt1X);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'MapPt1Y') ).setValue(this.mapPt1Y);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'MapPt2X') ).setValue(this.mapPt2X);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'MapPt2Y') ).setValue(this.mapPt2Y);
-    mapStruct.addField( new GFFField(GFFDataType.INT, 'MapResX') ).setValue(this.mapResX);
-    mapStruct.addField( new GFFField(GFFDataType.INT, 'MapZoom') ).setValue(this.mapZoom);
-    mapStruct.addField( new GFFField(GFFDataType.INT, 'NorthAxis') ).setValue(this.northAxis);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'WorldPt1X') ).setValue(this.worldPt1X);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'WorldPt1Y') ).setValue(this.worldPt1Y);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'WorldPt2X') ).setValue(this.worldPt2X);
-    mapStruct.addField( new GFFField(GFFDataType.FLOAT, 'WorldPt2Y') ).setValue(this.worldPt2Y);
+    mapStruct.addFloat('MapPt1X', this.mapPt1X);
+    mapStruct.addFloat('MapPt1Y', this.mapPt1Y);
+    mapStruct.addFloat('MapPt2X', this.mapPt2X);
+    mapStruct.addFloat('MapPt2Y', this.mapPt2Y);
+    mapStruct.addInt('MapResX', this.mapResX);
+    mapStruct.addInt('MapZoom', this.mapZoom);
+    mapStruct.addInt('NorthAxis', this.northAxis);
+    mapStruct.addFloat('WorldPt1X', this.worldPt1X);
+    mapStruct.addFloat('WorldPt1Y', this.worldPt1Y);
+    mapStruct.addFloat('WorldPt2X', this.worldPt2X);
+    mapStruct.addFloat('WorldPt2Y', this.worldPt2Y);
 
     return mapStruct;
   }
@@ -346,9 +346,9 @@ export class AreaMap {
     }
 
     dataStruct.addField( new GFFField(GFFDataType.VOID, 'AreaMapData') ).setData(this.data);
-    dataStruct.addField( new GFFField(GFFDataType.DWORD, 'AreaMapDataSize') ).setValue(this.dataSize);
-    dataStruct.addField( new GFFField(GFFDataType.INT, 'AreaMapResX') ).setValue(this.mapResX);
-    dataStruct.addField( new GFFField(GFFDataType.INT, 'AreaMapResY') ).setValue(this.mapResY);
+    dataStruct.addDWord('AreaMapDataSize', this.dataSize);
+    dataStruct.addInt('AreaMapResX', this.mapResX);
+    dataStruct.addInt('AreaMapResY', this.mapResY);
     
     return dataStruct;
   }

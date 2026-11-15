@@ -176,89 +176,89 @@ export class CharGenManager {
       }
     }
     const gender = nth < 3 ? 0 : 1;
-    template.RootNode.addField(new GFFField(GFFDataType.INT, 'AIState')).setValue(appearanceIdx);
+    template.RootNode.addInt('AIState', appearanceIdx);
     template.RootNode.addField(new GFFField(GFFDataType.LIST, 'ActionList'));
-    template.RootNode.addField(new GFFField(GFFDataType.INT, 'Age')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'AmbientAnimState')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.INT, 'Animation')).setValue(10000);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Appearance_Head')).setValue(1);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'Appearance_Type')).setValue(appearanceIdx);
-    template.RootNode.addField(new GFFField(GFFDataType.SHORT, 'ArmorClass')).setValue(10);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'BodyBag')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'FactionID')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'PortraitId')).setValue(portraitId);
+    template.RootNode.addInt('Age', 0);
+    template.RootNode.addByte('AmbientAnimState', 0);
+    template.RootNode.addInt('Animation', 10000);
+    template.RootNode.addByte('Appearance_Head', 1);
+    template.RootNode.addWord('Appearance_Type', appearanceIdx);
+    template.RootNode.addShort('ArmorClass', 10);
+    template.RootNode.addByte('BodyBag', 0);
+    template.RootNode.addWord('FactionID', 0);
+    template.RootNode.addWord('PortraitId', portraitId);
     template.RootNode.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName')).setValue(CharGenManager.generateRandomName(gender));
     template.RootNode.addField(new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName'));
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'HitPoints')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'CurrentHitPoints')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'MaxHitPoints')).setValue(20);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'ForcePoints')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.WORD, 'CurrentForce')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Gender')).setValue(gender);
+    template.RootNode.addWord('HitPoints', 8);
+    template.RootNode.addWord('CurrentHitPoints', 8);
+    template.RootNode.addWord('MaxHitPoints', 20);
+    template.RootNode.addWord('ForcePoints', 0);
+    template.RootNode.addWord('CurrentForce', 0);
+    template.RootNode.addByte('Gender', gender);
     let equipment = template.RootNode.addField(new GFFField(GFFDataType.LIST, 'Equip_ItemList'));
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptAttacked')).setValue('k_hen_attacked01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptDamaged')).setValue('k_hen_damage01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptDeath')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptDialogue')).setValue('k_hen_dialogue01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptDisturbed')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptEndDialogu')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptEndRound')).setValue('k_hen_combend01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat')).setValue('k_hen_heartbt01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked')).setValue('k_hen_blocked01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptOnNotice')).setValue('k_hen_percept01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptRested')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptSpawn')).setValue('k_hen_spawn01');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptSpellAt')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.RESREF, 'ScriptUserDefine')).setValue('');
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'GoodEvil')).setValue(50);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'NaturalAC')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Con')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Dex')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Str')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Wis')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Cha')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Int')).setValue(8);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'fortbonus')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'refbonus')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'willbonus')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'PerceptionRange')).setValue(13);
+    template.RootNode.addRESREF('ScriptAttacked', 'k_hen_attacked01');
+    template.RootNode.addRESREF('ScriptDamaged', 'k_hen_damage01');
+    template.RootNode.addRESREF('ScriptDeath', '');
+    template.RootNode.addRESREF('ScriptDialogue', 'k_hen_dialogue01');
+    template.RootNode.addRESREF('ScriptDisturbed', '');
+    template.RootNode.addRESREF('ScriptEndDialogu', '');
+    template.RootNode.addRESREF('ScriptEndRound', 'k_hen_combend01');
+    template.RootNode.addRESREF('ScriptHeartbeat', 'k_hen_heartbt01');
+    template.RootNode.addRESREF('ScriptOnBlocked', 'k_hen_blocked01');
+    template.RootNode.addRESREF('ScriptOnNotice', 'k_hen_percept01');
+    template.RootNode.addRESREF('ScriptRested', '');
+    template.RootNode.addRESREF('ScriptSpawn', 'k_hen_spawn01');
+    template.RootNode.addRESREF('ScriptSpellAt', '');
+    template.RootNode.addRESREF('ScriptUserDefine', '');
+    template.RootNode.addByte('GoodEvil', 50);
+    template.RootNode.addByte('NaturalAC', 0);
+    template.RootNode.addByte('Con', 8);
+    template.RootNode.addByte('Dex', 8);
+    template.RootNode.addByte('Str', 8);
+    template.RootNode.addByte('Wis', 8);
+    template.RootNode.addByte('Cha', 8);
+    template.RootNode.addByte('Int', 8);
+    template.RootNode.addByte('fortbonus', 0);
+    template.RootNode.addByte('refbonus', 0);
+    template.RootNode.addByte('willbonus', 0);
+    template.RootNode.addByte('PerceptionRange', 13);
     let skillList = template.RootNode.addField(new GFFField(GFFDataType.LIST, 'SkillList'));
     for (let i = 0; i < 8; i++) {
       let _skill = new GFFStruct();
-      _skill.addField(new GFFField(GFFDataType.BYTE, 'Rank')).setValue(0);
+      _skill.addByte('Rank', 0);
       skillList.addChildStruct(_skill);
     }
     let classList = template.RootNode.addField(new GFFField(GFFDataType.LIST, 'ClassList'));
     let classStruct = new GFFStruct();
-    classStruct.addField(new GFFField(GFFDataType.INT, 'Class')).setValue(classId);
-    classStruct.addField(new GFFField(GFFDataType.SHORT, 'ClassLevel')).setValue(1);
+    classStruct.addInt('Class', classId);
+    classStruct.addShort('ClassLevel', 1);
     classStruct.addField(new GFFField(GFFDataType.LIST, 'KnownList0'));
     classList.addChildStruct(classStruct);
     let armorStruct = new GFFStruct(ModuleCreatureArmorSlot.ARMOR);
-    armorStruct.addField(new GFFField(GFFDataType.RESREF, 'EquippedRes')).setValue('g_a_clothes01');
+    armorStruct.addRESREF('EquippedRes', 'g_a_clothes01');
     equipment.addChildStruct(armorStruct);
     if (appearanceIdx >= 91 && appearanceIdx <= 105) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(83);
+      template.RootNode.addWord('SoundSetFile', 83);
     } else if (appearanceIdx >= 106 && appearanceIdx <= 120) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(82);
+      template.RootNode.addWord('SoundSetFile', 82);
     } else if (appearanceIdx >= 121 && appearanceIdx <= 135) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(83);
+      template.RootNode.addWord('SoundSetFile', 83);
     } else if (appearanceIdx >= 136 && appearanceIdx <= 150) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(85);
+      template.RootNode.addWord('SoundSetFile', 85);
     } else if (appearanceIdx >= 151 && appearanceIdx <= 165) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(84);
+      template.RootNode.addWord('SoundSetFile', 84);
     } else if (appearanceIdx >= 166 && appearanceIdx <= 180) {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(85);
+      template.RootNode.addWord('SoundSetFile', 85);
     } else {
-      template.RootNode.addField(new GFFField(GFFDataType.WORD, 'SoundSetFile')).setValue(nth < 3 ? 85 : 83);
+      template.RootNode.addWord('SoundSetFile', nth < 3 ? 85 : 83);
     }
-    template.RootNode.addField(new GFFField(GFFDataType.BYTE, 'Race')).setValue(6);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'XPosition')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'YPosition')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'ZPosition')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'XOrientation')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'YOrientation')).setValue(0);
-    template.RootNode.addField(new GFFField(GFFDataType.FLOAT, 'ZOrientation')).setValue(0);
+    template.RootNode.addByte('Race', 6);
+    template.RootNode.addFloat('XPosition', 0);
+    template.RootNode.addFloat('YPosition', 0);
+    template.RootNode.addFloat('ZPosition', 0);
+    template.RootNode.addFloat('XOrientation', 0);
+    template.RootNode.addFloat('YOrientation', 0);
+    template.RootNode.addFloat('ZOrientation', 0);
     return template;
   }
 

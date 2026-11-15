@@ -222,7 +222,7 @@ export class NWScriptStack {
   saveForEventSituation(){
     let struct = new GFFStruct();
 
-    struct.addField( new GFFField(GFFDataType.INT, 'BasePointer') ).setValue(this.basePointer);
+    struct.addInt('BasePointer', this.basePointer);
 
     let stack = struct.addField( new GFFField(GFFDataType.LIST, 'Stack') ).setValue(this.pointer);
     for(let i = 0; i < this.stack.length; i++){
@@ -232,16 +232,16 @@ export class NWScriptStack {
       elementStruct.addField( new GFFField(GFFDataType.CHAR, 'Type') ).setValue( element.type );
       switch(element.type){
         case NWScriptDataType.OBJECT:
-          elementStruct.addField( new GFFField(GFFDataType.DWORD, 'Value') ).setValue( typeof element.value === 'object' ? element.value.id : 2130706432 );
+          elementStruct.addDWord('Value',  typeof element.value === 'object' ? element.value.id : 2130706432 );
         break;
         case NWScriptDataType.INTEGER:
-          elementStruct.addField( new GFFField(GFFDataType.INT, 'Value') ).setValue( element.value );
+          elementStruct.addInt('Value',  element.value );
         break;
         case NWScriptDataType.FLOAT:
-          elementStruct.addField( new GFFField(GFFDataType.FLOAT, 'Value') ).setValue( element.value );
+          elementStruct.addFloat('Value',  element.value );
         break;
         case NWScriptDataType.STRING:
-          elementStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Value') ).setValue( element.value );
+          elementStruct.addCExoString('Value',  element.value );
         break;
         case NWScriptDataType.EFFECT:
           let gameDefinedStruct = new GFFStruct(0);
@@ -250,8 +250,8 @@ export class NWScriptStack {
       stack.addChildStruct(elementStruct);
     }
 
-    struct.addField( new GFFField(GFFDataType.INT, 'StackPointer') ).setValue(this.pointer);
-    struct.addField( new GFFField(GFFDataType.INT, 'StackPointer') ).setValue(this.stackSize);
+    struct.addInt('StackPointer', this.pointer);
+    struct.addInt('StackPointer', this.stackSize);
   
     return struct;
   }

@@ -97,7 +97,7 @@ export class NWScriptEvent {
   save(){
 
     let eventStruct = new GFFStruct(2);
-    eventStruct.addField( new GFFField(GFFDataType.WORD, 'EventType') ).setValue(this.type);
+    eventStruct.addWord('EventType', this.type);
 
     let intList = eventStruct.addField( new GFFField(GFFDataType.LIST, 'IntList') );
     for(let i = 0; i < this.intList.length; i++){

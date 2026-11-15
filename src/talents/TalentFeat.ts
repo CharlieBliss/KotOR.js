@@ -662,7 +662,7 @@ export class TalentFeat extends TalentObject {
 
   save(){
     let featStruct = new GFFStruct(1);
-    featStruct.addField( new GFFField(GFFDataType.WORD, 'Feat') ).setValue(this.getId());
+    featStruct.addWord('Feat', this.getId());
     return featStruct;
   }
 
