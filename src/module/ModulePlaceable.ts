@@ -26,6 +26,7 @@ import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { BitWise } from "@/utility/BitWise";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import { ModuleObject } from "@/module/ModuleObject";
+import { ModuleLockable } from "@/module/ModuleLockable";
 import type { ModuleItem } from "@/module/ModuleItem";
 import { DLGConversationType } from "@/enums/dialog/DLGConversationType";
 import { SkillType } from "@/enums/nwscript/SkillType";
@@ -60,23 +61,18 @@ enum ModulePlaceableEvent {
 * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
 * @memberof KotOR
 */
-export class ModulePlaceable extends ModuleObject {
+export class ModulePlaceable extends ModuleLockable {
   openState: boolean;
   _state: ModulePlaceableState;
   lastUsedBy: any;
   state: ModulePlaceableState;
   bodyBag: number;
-  closeLockDC: number;
   disarmDC: number;
   fort: number;
   genericType: number;
   hasInventory: boolean;
   hardness: number;
   interruptable: boolean;
-  keyRequired: boolean;
-  lockable: boolean;
-  locked: boolean;
-  openLockDC: number;
   paletteID: number;
   partyInteract: boolean;
   ref: number;
@@ -292,14 +288,6 @@ export class ModulePlaceable extends ModuleObject {
     return 0;
   }
 
-  isLocked(){
-    return this.locked;
-  }
-
-  setLocked(value: boolean){
-    this.locked = value ? true : false;
-  }
-
   requiresKey(){
     return this.keyRequired ? true : false;
   }
@@ -353,57 +341,6 @@ export class ModulePlaceable extends ModuleObject {
 
   getAppearance(): SWPlaceableAppearance {
     return this.placeableAppearance;
-  }
-
-  getObjectSounds(){
-    let result = {"__rowlabel":-1,"label":"","armortype":"","opened":"****","closed":"****","destroyed":"****","used":"****","locked":"****"};
-    const apppearance = this.getAppearance();
-    if(!apppearance) return result;
-
-    const soundIdx = apppearance.soundapptype;
-    if(!isNaN(soundIdx) && soundIdx >= 0){
-      const table = GameState.TwoDAManager.datatables.get('placeableobjsnds');
-      if(table && typeof table.rows[soundIdx] !== 'undefined'){
-        result = table.rows[soundIdx];
-      }
-    }
-    return result;
-  }
-
-  playObjectSound(type: ModulePlaceableObjectSound){
-    const objSounds = this.getObjectSounds();
-
-    if(!this.audioEmitter){
-      return;
-    }
-
-    switch(type){
-      case ModulePlaceableObjectSound.OPENED:
-        if(objSounds?.opened != '****'){
-          this.audioEmitter.playSound(objSounds?.opened);
-        }
-      break;
-      case ModulePlaceableObjectSound.CLOSED:
-        if(objSounds?.closed != '****'){
-          this.audioEmitter.playSound(objSounds?.closed);
-        }
-      break;
-      case ModulePlaceableObjectSound.DESTROYED:
-        if(objSounds?.destroyed != '****'){
-          this.audioEmitter.playSound(objSounds?.destroyed);
-        }
-      break;
-      case ModulePlaceableObjectSound.USED:
-        if(objSounds?.used != '****'){
-          this.audioEmitter.playSound(objSounds?.used);
-        }
-      break;
-      case ModulePlaceableObjectSound.LOCKED:
-        if(objSounds?.locked != '****'){
-          this.audioEmitter.playSound(objSounds?.locked);
-        }
-      break;
-    }
   }
 
   retrieveInventory(){
@@ -510,49 +447,6 @@ export class ModulePlaceable extends ModuleObject {
 
       object.playSoundSet(SSFType.UNLOCK_FAIL);
     }
-  }
-
-  lock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = true;
-    
-    const instance = this.scripts[ModuleObjectScript.PlaceableOnLock];
-    if(!instance){ return; }
-    instance.run(this);
-  }
-
-  unlock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = false;
-    
-    const instance = this.scripts[ModuleObjectScript.PlaceableOnUnlock];
-    if(!instance){ return; }
-    instance.run(this);
-  }
-
-  attemptUnlock(object: ModuleObject){
-    if(!BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-      return false;
-    }
-
-    const nSecuritySkill = object.getSkillLevel(SkillType.SECURITY);
-    if(this.isLocked() && !this.keyRequired && nSecuritySkill >= 1){
-      let d20 = 20;//d20 rolls are auto 20's outside of combat
-      let skillCheck = (((object.getWIS()/2) + nSecuritySkill) + d20) - this.openLockDC;
-      if(skillCheck >= 1 && nSecuritySkill >= 1){
-        this.unlock(object);
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_SUCCESS);
-        }
-      }else{
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_FAIL);
-        }
-      }
-    }
-
-    this.use(object);
-    return true;
   }
 
   close(object: ModuleObject){

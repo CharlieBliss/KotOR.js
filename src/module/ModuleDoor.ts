@@ -1,4 +1,5 @@
 import { ModuleObject } from "@/module/ModuleObject";
+import { ModuleLockable } from "@/module/ModuleLockable";
 import type { ModuleRoom } from "@/module/ModuleRoom";
 import { AudioEmitter } from "@/audio/AudioEmitter";
 import { GameState } from "@/GameState";
@@ -53,7 +54,7 @@ interface AnimStateInfo {
 * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
 * @memberof KotOR
 */
-export class ModuleDoor extends ModuleObject {
+export class ModuleDoor extends ModuleLockable {
   openState: ModuleDoorOpenState = ModuleDoorOpenState.DEFAULT;
   objectInteractSide: ModuleDoorInteractSide = ModuleDoorInteractSide.SIDE_1;
 
@@ -64,16 +65,11 @@ export class ModuleDoor extends ModuleObject {
   lastUsedBy: ModuleObject;
 
   animationState: number;
-  closeLockDC: number;
   disarmDC: number;
   fort: number;
   genericType: number;
   hardness: number;
   interruptable: boolean;
-  keyRequired: boolean;
-  lockable: boolean;
-  locked: boolean;
-  openLockDC: number;
   paletteID: number;
   ref: number;
   static: boolean;
@@ -207,14 +203,6 @@ export class ModuleDoor extends ModuleObject {
     return this.bearing;
   }
 
-  isLocked(){
-    return this.locked;
-  }
-
-  setLocked(value: boolean){
-    this.locked = value ? true : false;
-  }
-
   requiresKey(){
     return this.keyRequired && this.keyName.length ? true : false;
   }
@@ -230,56 +218,8 @@ export class ModuleDoor extends ModuleObject {
   getDoorAppearance(){
     return this.doorAppearance;
   }
-
-  getObjectSounds(){
-    let result = {"__rowlabel":-1,"label":"","armortype":"","opened":"****","closed":"****","destroyed":"****","used":"****","locked":"****"};
-    const appearance = this.getDoorAppearance();
-    if(!appearance) return result;
-
-    const soundIdx = appearance.soundapptype;
-    if(!isNaN(soundIdx) && soundIdx >= 0){
-      const table = GameState.TwoDAManager.datatables.get('placeableobjsnds');
-      if(table && typeof table.rows[soundIdx] !== 'undefined'){
-        return table.rows[soundIdx];
-      }
-    }
-    return result;
-  }
-
-  playObjectSound(type: ModulePlaceableObjectSound){
-    const objSounds = this.getObjectSounds();
-
-    if(!this.audioEmitter){
-      return;
-    }
-
-    switch(type){
-      case ModulePlaceableObjectSound.OPENED:
-        if(objSounds?.opened != '****'){
-          this.audioEmitter.playSound(objSounds?.opened);
-        }
-      break;
-      case ModulePlaceableObjectSound.CLOSED:
-        if(objSounds?.closed != '****'){
-          this.audioEmitter.playSound(objSounds?.closed);
-        }
-      break;
-      case ModulePlaceableObjectSound.DESTROYED:
-        if(objSounds?.destroyed != '****'){
-          this.audioEmitter.playSound(objSounds?.destroyed);
-        }
-      break;
-      case ModulePlaceableObjectSound.USED:
-        if(objSounds?.used != '****'){
-          this.audioEmitter.playSound(objSounds?.used);
-        }
-      break;
-      case ModulePlaceableObjectSound.LOCKED:
-        if(objSounds?.locked != '****'){
-          this.audioEmitter.playSound(objSounds?.locked);
-        }
-      break;
-    }
+  getObjectSoundsAppearance(){
+    return this.getDoorAppearance();
   }
 
   /*getTemplateResRef(){
@@ -413,51 +353,6 @@ export class ModuleDoor extends ModuleObject {
     
     this.openDoor(object);
 
-  }
-
-  lock(object: ModuleObject){
-    if(this.locked){ return; }
-    this.locked = true;
-    
-    const onLock = this.scripts[ModuleObjectScript.DoorOnLock];
-    if(onLock){
-      onLock.run(this);
-    }
-  }
-
-  unlock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = false;
-    
-    const onUnlock = this.scripts[ModuleObjectScript.DoorOnUnlock];
-    if(onUnlock){
-      onUnlock.run(this);
-    }
-  }
-
-  attemptUnlock(object: ModuleObject){
-    if(!BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleObject)){
-      return false;
-    }
-    
-    const nSecuritySkill = object.getSkillLevel(SkillType.SECURITY);
-    if(this.isLocked() && !this.keyRequired && nSecuritySkill >= 1){
-      let d20 = 20;//d20 rolls are auto 20's outside of combat
-      let skillCheck = (((object.getWIS()/2) + nSecuritySkill) + d20) - this.openLockDC;
-      if(skillCheck >= 1 && nSecuritySkill >= 1){
-        this.unlock(object);
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_SUCCESS);
-        }
-      }else{
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_FAIL);
-        }
-      }
-    }
-        
-    this.use(object);
-    return true;
   }
 
   openDoor(object: ModuleObject){
