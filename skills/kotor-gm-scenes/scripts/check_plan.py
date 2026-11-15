@@ -16,7 +16,10 @@ CATALOG = Path(__file__).resolve().parent.parent / "reference" / "catalog"
 SKILLS = ["computer use", "demolitions", "stealth", "awareness", "persuade", "repair", "security", "treat injury"]
 SAVES = ["fortitude", "reflex", "will"]
 ORDERS = ["attack", "follow", "move", "guard", "patrol", "flee", "standDown"]
-ACTIONS = ["reveal", "hide", "order", "faction", "say", "narrate", "freezePlayers", "movePlayers", "check"]
+ACTIONS = ["reveal", "hide", "order", "faction", "say", "animate", "narrate", "freezePlayers", "movePlayers", "check"]
+# Stance and gesture ids (GMManager.STANCES / GESTURES); a creature's model may not have every one
+STANCES = ["listen", "talk", "talk_forceful", "talk_pleading", "talk_sad", "laugh", "kneel_angry", "kneel_sad", "attention", "pointing", "injured", "tired", "sick", "crouched", "meditate", "meditate_sit", "meditate_stand", "sit", "chair", "chair_drunk", "chair_pazaak", "computer", "datapad", "weld", "treat", "cards", "dance", "dance2", "flirt", "horror", "fear", "choke", "spasm", "paralyzed", "collapsed", "sleep", "prone", "prone_talk", "dead", "dead_back", "dead_face", "shut_down"]
+GESTURES = ["bow", "salute", "greet", "nod", "shake", "shrug", "heart", "roll_eyes", "persuade", "cheer", "taunt", "point", "point_up", "point_down", "look_left", "look_right", "look_around", "scratch", "bored", "pick_up", "take_table", "console", "activate", "inject", "drink", "lock", "throw", "kneel", "sit_down", "stand_up", "power", "roll"]
 
 
 def read_tsv(path):
@@ -168,6 +171,8 @@ def main():
         check_placement(a.get("at"), where)
         check_facing(a.get("facing"), where)
         check_order(a.get("order"), where)
+        if a.get("stance") and a["stance"] not in STANCES:
+            warn(where, f'unknown stance "{a["stance"]}"')
         for item in a.get("loot", []) + [v for k, v in (a.get("customize") or {}).items() if k in ("rightHand", "leftHand", "armor") and v]:
             if items and str(item).lower() not in items:
                 err(where, f'no item "{item}" in {content}')
@@ -215,6 +220,13 @@ def main():
                 check_placement(action.get("to"), where)
             if what == "check" and str(action.get("check", "")).lower() not in SKILLS + SAVES:
                 err(where, f'unknown check "{action.get("check")}"')
+            if what == "animate":
+                if "stance" not in action and not action.get("gesture"):
+                    err(where, "give a stance or a gesture")
+                if action.get("stance") and action["stance"] not in STANCES:
+                    warn(where, f'unknown stance "{action["stance"]}"')
+                if action.get("gesture") and action["gesture"] not in GESTURES:
+                    warn(where, f'unknown gesture "{action["gesture"]}"')
             if what in ("say", "narrate") and not action.get("text"):
                 err(where, "needs text")
 

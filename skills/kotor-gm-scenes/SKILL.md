@@ -35,6 +35,7 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
    - **Find templates:** grep `creatures.tsv` for fitting ones by name, look or weapon. Generic templates (e.g. "Dark Jedi", "Jedi", "Sith Trooper") beat named story characters, unless that character is wanted.
    - **Factions:** set the faction the scene needs; it overrides the template's.
    - **Numbers:** keep them sane. 25 or fewer creatures on screen plays well.
+   - **Body language:** give actors a `stance` that sells the moment (meditating Jedi, a prisoner kneeling, the wounded lying down, a technician at a console). Change it, or add a gesture, in a beat with `animate`. The ids are in `reference/format.md`; some exist only in KotOR II.
 6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
 7. **Script it as beats.**
    - **Arrivals:** place them up front with `"hidden": true`, then reveal them in a beat, with orders.

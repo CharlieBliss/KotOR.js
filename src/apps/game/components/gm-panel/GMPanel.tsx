@@ -18,7 +18,7 @@ import type {
 const { GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders } = KotOR;
 import "@/apps/game/components/gm-panel/gm-panel.scss";
 
-type DrawerTab = 'scenes' | 'builder' | 'actors' | 'players' | 'inspector' | 'multiplayer' | null;
+type DrawerTab = 'scenes' | 'actors' | 'players' | 'inspector' | 'multiplayer' | null;
 
 export const GMPanel: React.FC = () => {
   const [, setTick] = useState(0);
@@ -33,6 +33,8 @@ export const GMPanel: React.FC = () => {
   const [otherModules, setOtherModules] = useState<string[] | null>(null);
   const [otherStatus, setOtherStatus] = useState<string>('');
   const [otherQuery, setOtherQuery] = useState<string>('');
+  // Scene tab: this game's areas, or the other game's
+  const [areaSource, setAreaSource] = useState<'this' | 'other'>('this');
   // A scene plan to import (from the kotor-gm-scenes skill)
   const [planJson, setPlanJson] = useState<string>('');
   const [planProblems, setPlanProblems] = useState<KotOR.GMPlanProblem[]>([]);
@@ -53,7 +55,7 @@ export const GMPanel: React.FC = () => {
   const [showJsonImportBox, setShowJsonImportBox] = useState<boolean>(false);
 
   // Actors & Placeables tab states
-  const [spawnSubTab, setSpawnSubTab] = useState<'creatures' | 'placeables'>('placeables');
+  const [spawnSubTab, setSpawnSubTab] = useState<'creatures' | 'placeables' | 'kits'>('placeables');
   const [propCategoryFilter, setPropCategoryFilter] = useState<'All' | GMPlaceablePropCategory>('All');
   // The creature preset or template the GM picked; creatureCfg is what gets placed (customized only on request)
   const [creaturePick, setCreaturePick] = useState<GMCreatureSpawnConfig>({ ...GMManager.pendingCreatureConfig });
@@ -399,12 +401,11 @@ export const GMPanel: React.FC = () => {
   const drawerTabs: { id: Exclude<DrawerTab, null>; label: string; title: string }[] = isPlayerView
     ? [{ id: 'multiplayer', label: 'Session', title: 'Connection status and chat' }]
     : [
-      { id: 'scenes', label: 'Scenes', title: 'Load a module as the scene' },
-      { id: 'builder', label: 'Build', title: 'Build whole scenes from blueprints (office, temple, ...)' },
-      { id: 'actors', label: 'Place', title: 'Choose the creature or prop that Place Actor / Place Object puts down' },
-      { id: 'players', label: `Players (${GMManager.spawnedPlayers.length})`, title: 'Player characters and party' },
+      { id: 'scenes', label: 'Scene', title: 'Load an area, or import a scene plan' },
+      { id: 'actors', label: 'Place', title: 'Choose what the Place tool puts down: creatures, objects, mines or whole kits' },
+      { id: 'players', label: `Players (${GMManager.spawnedPlayers.length})`, title: 'Player characters, checks, and adding characters' },
       { id: 'inspector', label: selectedObj ? `Inspect: ${selectedObj.getName() || 'Selected'}` : 'Inspect', title: 'Edit the selected object, or browse everything in the scene' },
-      { id: 'multiplayer', label: 'Session', title: 'Host a session, connected players and chat' },
+      { id: 'multiplayer', label: 'Session', title: 'Hosting, rules, saves and chat' },
     ];
 
   // Context-sensitive status chip and control hints shown at the bottom of the screen
@@ -414,6 +415,13 @@ export const GMPanel: React.FC = () => {
     tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
     tool === 'place_player' ? GMManager.pendingPlayerConfig?.name :
     tool === 'place_mine' ? `mine: ${GMManager.getMineTypes().find((m) => m.id === GMManager.pendingMineType)?.label || 'mine'}` : '';
+  // What the toolbar's Place button puts down (the last kind of thing placed)
+  const lastPlace = GMManager.lastPlacementTool;
+  const placeButtonName =
+    lastPlace === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name || 'object' :
+    lastPlace === 'place_player' ? GMManager.pendingPlayerConfig?.name || 'player' :
+    lastPlace === 'place_mine' ? 'mine' :
+    GMManager.pendingCreatureConfig?.name || 'creature';
   const teleportTarget = GMManager.getTeleportTarget();
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
@@ -590,18 +598,11 @@ export const GMPanel: React.FC = () => {
                 Select
               </button>
               <button
-                className={`gm-btn small ${tool === 'place_creature' ? 'active' : ''}`}
-                onClick={() => GMManager.setToolMode(tool === 'place_creature' ? 'select' : 'place_creature')}
-                title={`Click the ground to place: ${GMManager.pendingCreatureConfig?.name || 'creature'} (change it in Place)`}
+                className={`gm-btn small ${GMManager.isPlacementTool(tool) ? 'active' : ''}`}
+                onClick={() => GMManager.setToolMode(GMManager.isPlacementTool(tool) ? 'select' : GMManager.lastPlacementTool)}
+                title={`Click the ground to place it. Choose what in the Place tab.`}
               >
-                Place Actor
-              </button>
-              <button
-                className={`gm-btn small ${tool === 'place_placeable' ? 'active' : ''}`}
-                onClick={() => GMManager.setToolMode(tool === 'place_placeable' ? 'select' : 'place_placeable')}
-                title={`Click the ground to place: ${GMManager.pendingPlaceableConfig?.name || 'object'} (change it in Place)`}
-              >
-                Place Object
+                Place: {placeButtonName}
               </button>
               <button
                 className={`gm-btn small ${tool === 'teleport' ? 'active' : ''}`}
@@ -640,7 +641,7 @@ export const GMPanel: React.FC = () => {
               }}
               title="Freeze movement, combat and effects for everyone"
             >
-              {GMManager.worldPaused ? 'World Paused' : 'Pause World'}
+              {GMManager.worldPaused ? 'Paused' : 'Pause'}
             </button>
             <button
               className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
@@ -650,14 +651,14 @@ export const GMPanel: React.FC = () => {
               }}
               title="Whether hostile NPCs pick fights on their own. Off: they only act when you tell them to."
             >
-              {GMManager.npcAiEnabled ? 'NPC AI: On' : 'NPC AI: Off'}
+              {GMManager.npcAiEnabled ? 'NPC AI' : 'NPC AI off'}
             </button>
             <button
               className={`gm-btn small ${GMManager.playersFrozen ? 'warning active' : ''}`}
               onClick={() => GMManager.setPlayersFrozen(!GMManager.playersFrozen)}
-              title="Players can only watch: they can't move or act, and NPCs leave them alone"
+              title="Players watch only: they can't move or act, and NPCs leave them alone"
             >
-              {GMManager.playersFrozen ? 'Players: Watching' : 'Players: Free'}
+              {GMManager.playersFrozen ? 'Players watching' : 'Watch'}
             </button>
           </div>
         )}
@@ -770,312 +771,159 @@ export const GMPanel: React.FC = () => {
         <div className="gm-drawer">
           <div className="gm-drawer-header">
             <span>
-              {drawerTab === 'builder' && 'Scene Builder — Office Building, Ancient Temple & Custom Placeable Kits'}
-              {drawerTab === 'scenes' && 'Scene & Module Selector'}
-              {drawerTab === 'actors' && 'Actor & Categorized Placeable Prop Spawner'}
-              {drawerTab === 'players' && 'Player Characters & Party Manager'}
-              {drawerTab === 'inspector' && 'Live World Object Inspector & DM Controls'}
-              {drawerTab === 'multiplayer' && 'Neverwinter Nights-Style GM Host & Multiplayer'}
+              {drawerTab === 'scenes' && 'Scene'}
+              {drawerTab === 'actors' && 'Place'}
+              {drawerTab === 'players' && 'Players'}
+              {drawerTab === 'inspector' && 'Inspect'}
+              {drawerTab === 'multiplayer' && 'Session'}
             </span>
-            <button className="gm-btn small" onClick={() => setDrawerTab(null)}>Minimize ▲</button>
+            <button className="gm-btn small" onClick={() => setDrawerTab(null)} title="Close the panel (click the tab again to reopen it)">Close</button>
           </div>
 
           <div className="gm-drawer-body">
-            {/* ==================== TAB 0: SCENE BUILDER (OFFICE / TEMPLE / KITS) ==================== */}
-            {drawerTab === 'builder' && (
-              <>
-                <div className="gm-hint">
-                  <b>Quick Scene Builder:</b> Set up complete interactive environments—such as an <b>Office Building</b>, an <b>Ancient Jedi / Sith Temple</b>, a <b>Command Center</b>, or a <b>Medical Bay</b>—by arranging placeables inside a clean default scene background (<code>danm14aa</code> or any module) with a single click!
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">Default Background & Stage Setup Options</div>
-                  <div className="gm-grid-2">
-                    <div className="gm-field">
-                      <label>Default Background Module (for &quot;Load Clean Stage &amp; Build&quot;)</label>
-                      <select
-                        className="gm-select"
-                        value={blueprintBgModule}
-                        onChange={e => setBlueprintBgModule(e.target.value)}
-                      >
-                        <option value={GMManager.defaultSceneModule()}>Default open stage ({GMManager.defaultSceneModule()})</option>
-                        {curatedModules.map(m => (
-                          <option key={m.resRef} value={m.resRef}>{m.planet} — {m.title}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="gm-field">
-                      <label>Placement Anchor (for &quot;Build in Current Scene&quot;)</label>
-                      <select
-                        className="gm-select"
-                        value={blueprintOriginMode}
-                        onChange={e => setBlueprintOriginMode(e.target.value as 'entry' | 'camera')}
-                      >
-                        <option value="entry">Scene Entry Spawn Point (Default Stage Center)</option>
-                        <option value="camera">Current 3D Camera Target Point</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div className="gm-row">
-                    <label className="gm-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={blueprintSpawnNPCs}
-                        onChange={e => setBlueprintSpawnNPCs(e.target.checked)}
-                      />
-                      Include Thematic NPCs (Receptionist, Temple Guardian, Commander, etc.)
-                    </label>
-                    <label className="gm-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={blueprintClearExisting}
-                        onChange={e => setBlueprintClearExisting(e.target.checked)}
-                      />
-                      Clear Existing Placeables Before Building
-                    </label>
-                  </div>
-
-                  <div className="gm-row">
-                    <button
-                      className="gm-btn small warning"
-                      onClick={() => GMManager.clearDefaultAreaPlaceables()}
-                      title="Remove default module crates/containers while keeping GM-placed props"
-                    >
-                      Clear Default Area Placeables
-                    </button>
-                    <button
-                      className="gm-btn small danger"
-                      onClick={() => GMManager.clearGMSpawnedPlaceables()}
-                      title="Remove all GM-placed placeables from the current scene"
-                    >
-                      Clear GM-Placed Props ({currentArea?.placeables.length || 0})
-                    </button>
-                    <button
-                      className="gm-btn small"
-                      onClick={() => {
-                        setSpawnSubTab('placeables');
-                        setDrawerTab('actors');
-                      }}
-                    >
-                      Open Individual Prop Palette →
-                    </button>
-                  </div>
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Pre-Built Multi-Placeable Scene Blueprints ({GMManager.SCENE_BLUEPRINTS.length})</span>
-                  </div>
-                  <div className="gm-list" style={{ maxHeight: 265 }}>
-                    {GMManager.SCENE_BLUEPRINTS.map(bp => (
-                      <div key={bp.id} className="gm-card" style={{ cursor: 'default', alignItems: 'flex-start' }}>
-                        <div className="gm-card-info">
-                          <div className="gm-card-title">
-                            {bp.title} <span className="gm-badge" style={{ marginLeft: 4 }}>{bp.items.length} Placeables</span>
-                          </div>
-                          <div className="gm-card-sub" style={{ whiteSpace: 'normal', lineHeight: 1.35, marginTop: 3 }}>
-                            {bp.description}
-                          </div>
+            {/* ==================== TAB 1: SCENES ==================== */}
+            {drawerTab === 'scenes' && (() => {
+              const loadOptions = { keepCreatures, keepTriggers, keepPlaceables, preserveParty };
+              const q = sceneSearch.trim().toLowerCase();
+              const showOther = areaSource === 'other';
+              const otherList = (otherModules || [])
+                .map((m) => ({ m, known: otherCuratedModules.find((c) => c.resRef === m) }))
+                .filter(({ m, known }) => !q || m.includes(q) || (known && `${known.planet} ${known.title} ${known.description}`.toLowerCase().includes(q)));
+              const openOther = async () => {
+                setAreaSource('other');
+                if (otherModules !== null) return;
+                setOtherStatus(`Opening ${otherTitle}…`);
+                const list = await KotOR.OtherGameManager.listModules();
+                setOtherModules(list);
+                setOtherStatus(list.length ? '' : (KotOR.OtherGameManager.lastError || `No ${otherTitle} areas found.`));
+              };
+              return (
+                <>
+                  {KotOR.GMScenePlan.active && (() => {
+                    const runner = KotOR.GMScenePlan.active;
+                    const plan = runner.plan;
+                    return (
+                      <div className="gm-section">
+                        <div className="gm-section-title">
+                          <span>{plan.title}</span>
+                          <button className="gm-btn small" onClick={() => { KotOR.GMScenePlan.active = null; forceUpdate(); }} title="Put the plan away (the scene stays)">Close</button>
                         </div>
-                        <div className="gm-row" style={{ flexDirection: 'column', alignItems: 'stretch', minWidth: 165 }}>
-                          <button
-                            className="gm-btn small success"
-                            onClick={() =>
-                              GMManager.buildSceneBlueprint(bp, {
-                                loadCleanBackgroundFirst: true,
-                                backgroundModuleResRef: blueprintBgModule,
-                                clearExistingPlaceables: true,
-                                spawnNPCs: blueprintSpawnNPCs,
-                                useCameraTargetAsOrigin: false
-                              })
-                            }
-                            title={`Load ${blueprintBgModule} with default clutter cleared and build ${bp.title}`}
-                          >
-                            Load Clean Stage &amp; Build
-                          </button>
-                          <button
-                            className="gm-btn small active"
-                            onClick={() =>
-                              GMManager.buildSceneBlueprint(bp, {
-                                loadCleanBackgroundFirst: false,
-                                clearExistingPlaceables: blueprintClearExisting,
-                                spawnNPCs: blueprintSpawnNPCs,
-                                useCameraTargetAsOrigin: blueprintOriginMode === 'camera'
-                              })
-                            }
-                            title="Stamp this placeable layout directly into the currently loaded scene"
-                          >
-                            Build Here ({blueprintOriginMode === 'camera' ? 'At Camera' : 'At Entry'})
-                          </button>
+                        {plan.summary && <div className="gm-hint">{plan.summary}</div>}
+                        {plan.gmNotes && <div className="gm-hint"><b>GM notes:</b> {plan.gmNotes}</div>}
+                        {plan.players.note && <div className="gm-hint"><b>Players:</b> {plan.players.note}</div>}
+                        {runner.log.map((line, i) => (
+                          <div key={i} className="gm-hint" style={{ color: '#ffd740' }}>{line}</div>
+                        ))}
+                        <div className="gm-list" style={{ maxHeight: 260 }}>
+                          {(plan.beats || []).map((beat, i) => (
+                            <div key={i} className={`gm-card ${runner.beatsRun.has(i) ? 'selected' : ''}`}>
+                              <div className="gm-card-info">
+                                <div className="gm-card-title">{i + 1}. {beat.title}{runner.beatsRun.has(i) ? ' ✓' : ''}</div>
+                                {beat.narration && <div className="gm-card-sub">“{beat.narration}”</div>}
+                                {beat.notes && <div className="gm-card-sub">{beat.notes}</div>}
+                              </div>
+                              <button className="gm-btn small success" onClick={() => { runner.runBeat(i); forceUpdate(); }} title="Say its narration and do its actions">
+                                {runner.beatsRun.has(i) ? 'Again' : 'Run'}
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    );
+                  })()}
 
-                <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Save Current Scene Layout / Custom Blueprints ({GMManager.getSavedCustomBlueprints().length})</span>
-                    <button
-                      className="gm-btn small"
-                      onClick={() => setShowJsonImportBox(!showJsonImportBox)}
-                    >
-                      {showJsonImportBox ? 'Hide JSON Import' : 'Import JSON'}
-                    </button>
-                  </div>
-
-                  <div className="gm-grid-2">
-                    <div className="gm-field">
-                      <label>Custom Scene Layout Title</label>
-                      <input
-                        className="gm-input"
-                        value={customBlueprintTitle}
-                        onChange={e => setCustomBlueprintTitle(e.target.value)}
-                        placeholder="e.g. Coruscant Detective Office"
-                      />
-                    </div>
-                    <div className="gm-field">
-                      <label>Description</label>
-                      <input
-                        className="gm-input"
-                        value={customBlueprintDesc}
-                        onChange={e => setCustomBlueprintDesc(e.target.value)}
-                        placeholder="Notes about this scene setup..."
-                      />
-                    </div>
-                  </div>
-
-                  <div className="gm-row">
-                    <button
-                      className="gm-btn active"
-                      style={{ flex: 1 }}
-                      onClick={() => {
-                        GMManager.saveCurrentSceneAsBlueprint(customBlueprintTitle, customBlueprintDesc);
-                        forceUpdate();
-                      }}
-                    >
-                      Save Current Scene Placeables &amp; Actors as Blueprint
-                    </button>
-                  </div>
-
-                  {showJsonImportBox && (
-                    <div className="gm-field" style={{ marginTop: 6 }}>
-                      <label>Paste Exported Scene Blueprint JSON</label>
-                      <div className="gm-row">
-                        <input
-                          className="gm-input"
-                          style={{ flex: 1 }}
-                          value={importBlueprintJson}
-                          onChange={e => setImportBlueprintJson(e.target.value)}
-                          placeholder='{"title":"My Scene","items":[...]}'
-                        />
-                        <button
-                          className="gm-btn small success"
-                          onClick={() => {
-                            if (GMManager.importCustomBlueprintFromJSON(importBlueprintJson)) {
-                              setImportBlueprintJson('');
-                              setShowJsonImportBox(false);
-                              forceUpdate();
-                            }
-                          }}
-                        >
-                          Import
+                  <div className="gm-section">
+                    <div className="gm-section-title">
+                      <span>Areas</span>
+                      <div className="gm-segmented" role="group" aria-label="Which game's areas">
+                        <button className={`gm-btn small ${!showOther ? 'active' : ''}`} onClick={() => setAreaSource('this')} title="This game's areas">
+                          {runningTSL ? 'KotOR II' : 'KotOR'}
+                        </button>
+                        <button className={`gm-btn small ${showOther ? 'active' : ''}`} onClick={openOther} title={`Borrow an area from ${otherTitle}: its rooms, sky and lighting, without its characters or objects`}>
+                          {otherTitle}
                         </button>
                       </div>
                     </div>
-                  )}
-
-                  {GMManager.getSavedCustomBlueprints().length > 0 && (
-                    <div className="gm-list" style={{ maxHeight: 140, marginTop: 6 }}>
-                      {GMManager.getSavedCustomBlueprints().map(cbp => (
-                        <div key={cbp.id} className="gm-card">
+                    <div className="gm-row">
+                      {!showOther && (
+                        <select className="gm-select" style={{ maxWidth: 140 }} value={planetFilter} onChange={e => setPlanetFilter(e.target.value)} title="Planet or region">
+                          {planets.map(p => <option key={p} value={p}>{p === 'All' ? 'All planets' : p}</option>)}
+                        </select>
+                      )}
+                      <input
+                        className="gm-input"
+                        style={{ flex: 1 }}
+                        placeholder={showOther ? 'Search areas (e.g. enclave, tat_)' : 'Search (e.g. enclave, cantina, tomb)'}
+                        value={sceneSearch}
+                        onChange={e => setSceneSearch(e.target.value)}
+                      />
+                    </div>
+                    {showOther && <div className="gm-hint">Only the area comes across: fill it with this game's characters and objects. Players need {otherTitle} set up too.</div>}
+                    {showOther && otherStatus && <div className="gm-hint">{otherStatus}</div>}
+                    <div className="gm-list" style={{ maxHeight: 300 }}>
+                      {!showOther && filteredCuratedModules.map(mod => (
+                        <div
+                          key={mod.resRef}
+                          className={`gm-card ${currentModuleName === curatedSceneName(mod.resRef) ? 'selected' : ''}`}
+                          onClick={() => GMManager.loadScene(curatedSceneName(mod.resRef), loadOptions)}
+                        >
                           <div className="gm-card-info">
-                            <div className="gm-card-title">{cbp.title}</div>
-                            <div className="gm-card-sub">{cbp.description}</div>
+                            <div className="gm-card-title">{mod.planet} — {mod.title}</div>
+                            <div className="gm-card-sub">{mod.description}</div>
                           </div>
-                          <div className="gm-row">
-                            <button
-                              className="gm-btn small success"
-                              onClick={() =>
-                                GMManager.buildSceneBlueprint(cbp, {
-                                  loadCleanBackgroundFirst: true,
-                                  backgroundModuleResRef: cbp.recommendedModule || blueprintBgModule,
-                                  clearExistingPlaceables: true,
-                                  spawnNPCs: blueprintSpawnNPCs
-                                })
-                              }
-                            >
-                              Load &amp; Build
-                            </button>
-                            <button
-                              className="gm-btn small active"
-                              onClick={() =>
-                                GMManager.buildSceneBlueprint(cbp, {
-                                  loadCleanBackgroundFirst: false,
-                                  clearExistingPlaceables: blueprintClearExisting,
-                                  spawnNPCs: blueprintSpawnNPCs,
-                                  useCameraTargetAsOrigin: blueprintOriginMode === 'camera'
-                                })
-                              }
-                            >
-                              Stamp Here
-                            </button>
-                            <button
-                              className="gm-btn small"
-                              title="Copy Blueprint JSON to Clipboard"
-                              onClick={() => {
-                                navigator.clipboard?.writeText(JSON.stringify(cbp));
-                              }}
-                            >
-                              Copy JSON
-                            </button>
-                            <button
-                              className="gm-btn small danger"
-                              onClick={() => GMManager.deleteCustomBlueprint(cbp.id)}
-                            >
-                              ✕
-                            </button>
-                          </div>
+                          <button className="gm-btn small active">Load</button>
                         </div>
                       ))}
+                      {showOther && otherList.map(({ m, known }) => {
+                        const name = KotOR.OtherGameManager.foreignModuleName(m);
+                        return (
+                          <div key={m} className={`gm-card ${currentModuleName === name ? 'selected' : ''}`} onClick={() => GMManager.loadScene(name, loadOptions)}>
+                            <div className="gm-card-info">
+                              <div className="gm-card-title">{known ? `${known.planet} — ${known.title}` : m}</div>
+                              <div className="gm-card-sub">{known?.description || `${otherTitle} area`}</div>
+                            </div>
+                            <button className="gm-btn small active">Load</button>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* ==================== TAB 1: SCENES ==================== */}
-            {drawerTab === 'scenes' && (
-              <>
-                <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Scene plan</span>
-                    <label className="gm-btn small" title="A .json scene plan (from the kotor-gm-scenes Claude skill)">
-                      Open file…
-                      <input
-                        type="file"
-                        accept=".json,application/json"
-                        style={{ display: 'none' }}
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          e.target.value = '';
-                          if (file) setPlanJson(await file.text());
-                        }}
-                      />
-                    </label>
+                    {!showOther && (
+                      <div className="gm-row" title="Any area of this game, by its module name">
+                        <select className="gm-select" style={{ flex: 1 }} value={customModuleResRef} onChange={e => setCustomModuleResRef(e.target.value)}>
+                          {(GMManager.discoveredModules.length ? GMManager.discoveredModules : [customModuleResRef]).map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                        <button className="gm-btn" onClick={() => GMManager.loadScene(customModuleResRef, loadOptions)}>Load by name</button>
+                      </div>
+                    )}
                   </div>
-                  <textarea
-                    className="gm-input"
-                    style={{ minHeight: 70, fontFamily: 'monospace', fontSize: 11 }}
-                    placeholder="Paste a scene plan here, or open its file"
-                    value={planJson}
-                    onChange={(e) => { setPlanJson(e.target.value); setPlanProblems([]); }}
-                  />
-                  <div className="gm-row">
+
+                  <details className="gm-section" open={!!planJson || planProblems.length > 0}>
+                    <summary>Import a scene plan <span className="gm-summary-note">from the Claude skill</span></summary>
+                    <div className="gm-row">
+                      <label className="gm-btn small" title="A .json scene plan (from the kotor-gm-scenes Claude skill)">
+                        Open file…
+                        <input
+                          type="file"
+                          accept=".json,application/json"
+                          style={{ display: 'none' }}
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            e.target.value = '';
+                            if (file) setPlanJson(await file.text());
+                          }}
+                        />
+                      </label>
+                      <span className="gm-hint" style={{ flex: 1 }}>or paste it below</span>
+                    </div>
+                    <textarea
+                      className="gm-input"
+                      style={{ minHeight: 60, fontFamily: 'monospace', fontSize: 11 }}
+                      placeholder="Scene plan JSON"
+                      value={planJson}
+                      onChange={(e) => { setPlanJson(e.target.value); setPlanProblems([]); }}
+                    />
                     <button
                       className="gm-btn success"
-                      style={{ flex: 1 }}
                       disabled={!planJson.trim() || planImporting}
                       onClick={async () => {
                         const { plan, problems } = KotOR.GMScenePlan.parse(planJson);
@@ -1093,239 +941,35 @@ export const GMPanel: React.FC = () => {
                     >
                       {planImporting ? 'Setting the scene…' : 'Import and set the scene'}
                     </button>
-                  </div>
-                  {planProblems.map((p, i) => (
-                    <div key={i} className="gm-hint" style={{ color: p.level === 'error' ? '#ff8a80' : '#ffd740' }}>
-                      {p.level === 'error' ? 'Error' : 'Note'} ({p.where}): {p.message}
-                    </div>
-                  ))}
-                </div>
-
-                {KotOR.GMScenePlan.active && (() => {
-                  const runner = KotOR.GMScenePlan.active;
-                  const plan = runner.plan;
-                  return (
-                    <div className="gm-section">
-                      <div className="gm-section-title">
-                        <span>{plan.title}</span>
-                        <button className="gm-btn small" onClick={() => { KotOR.GMScenePlan.active = null; forceUpdate(); }} title="Put the plan away (the scene stays)">Close</button>
-                      </div>
-                      {plan.summary && <div className="gm-hint">{plan.summary}</div>}
-                      {plan.gmNotes && <div className="gm-hint"><b>GM notes:</b> {plan.gmNotes}</div>}
-                      {plan.players.note && <div className="gm-hint"><b>Players:</b> {plan.players.note}</div>}
-                      {runner.log.map((line, i) => (
-                        <div key={i} className="gm-hint" style={{ color: '#ffd740' }}>{line}</div>
-                      ))}
-                      <div className="gm-list" style={{ maxHeight: 260 }}>
-                        {(plan.beats || []).map((beat, i) => (
-                          <div key={i} className={`gm-card ${runner.beatsRun.has(i) ? 'selected' : ''}`}>
-                            <div className="gm-card-info">
-                              <div className="gm-card-title">{i + 1}. {beat.title}{runner.beatsRun.has(i) ? ' ✓' : ''}</div>
-                              {beat.narration && <div className="gm-card-sub">“{beat.narration}”</div>}
-                              {beat.notes && <div className="gm-card-sub">{beat.notes}</div>}
-                            </div>
-                            <button className="gm-btn small success" onClick={() => { runner.runBeat(i); forceUpdate(); }} title="Say its narration and do its actions">
-                              {runner.beatsRun.has(i) ? 'Again' : 'Run'}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                <div className="gm-section">
-                  <div className="gm-section-title">Scene Load Options</div>
-                  <label className="gm-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={keepPlaceables}
-                      onChange={e => {
-                        setKeepPlaceables(e.target.checked);
-                        GMManager.keepDefaultPlaceables = e.target.checked;
-                      }}
-                    />
-                    Include Default Module Placeables &amp; Containers (uncheck for clean background stage)
-                  </label>
-                  <label className="gm-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={keepCreatures}
-                      onChange={e => {
-                        setKeepCreatures(e.target.checked);
-                        GMManager.keepDefaultCreatures = e.target.checked;
-                      }}
-                    />
-                    Include Default Module Creatures &amp; Encounters (uncheck for clean GM stage)
-                  </label>
-                  <label className="gm-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={keepTriggers}
-                      onChange={e => {
-                        setKeepTriggers(e.target.checked);
-                        GMManager.keepDefaultTriggers = e.target.checked;
-                      }}
-                    />
-                    Include Default Area Transition Triggers
-                  </label>
-                  <label className="gm-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={preserveParty}
-                      onChange={e => {
-                        setPreserveParty(e.target.checked);
-                        GMManager.preservePartyOnWarp = e.target.checked;
-                      }}
-                    />
-                    Carry Spawned Player Characters Across Scene Warps
-                  </label>
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">Browse Planet / Area Modules</div>
-                  <div className="gm-grid-2">
-                    <div className="gm-field">
-                      <label>Planet / Region</label>
-                      <select
-                        className="gm-select"
-                        value={planetFilter}
-                        onChange={e => setPlanetFilter(e.target.value)}
-                      >
-                        {planets.map(p => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="gm-field">
-                      <label>Search Scene</label>
-                      <input
-                        className="gm-input"
-                        placeholder="e.g. Enclave, Cantina, Tomb..."
-                        value={sceneSearch}
-                        onChange={e => setSceneSearch(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="gm-list" style={{ maxHeight: 250 }}>
-                    {filteredCuratedModules.map(mod => (
-                      <div
-                        key={mod.resRef}
-                        className={`gm-card ${currentModuleName === curatedSceneName(mod.resRef) ? 'selected' : ''}`}
-                        onClick={() =>
-                          GMManager.loadScene(curatedSceneName(mod.resRef), {
-                            keepCreatures,
-                            keepTriggers,
-                            keepPlaceables,
-                            preserveParty
-                          })
-                        }
-                      >
-                        <div className="gm-card-info">
-                          <div className="gm-card-title">{mod.planet} — {mod.title}</div>
-                          <div className="gm-card-sub">{mod.description}</div>
-                        </div>
-                        <button className="gm-btn small active">Load</button>
+                    {planProblems.map((p, i) => (
+                      <div key={i} className="gm-hint" style={{ color: p.level === 'error' ? '#ff8a80' : '#ffd740' }}>
+                        {p.level === 'error' ? 'Error' : 'Note'} ({p.where}): {p.message}
                       </div>
                     ))}
-                  </div>
-                </div>
+                  </details>
 
-                <div className="gm-section">
-                  <div className="gm-section-title">Load Any Module by ResRef ({GMManager.discoveredModules.length} found on disk)</div>
-                  <div className="gm-row">
-                    {GMManager.discoveredModules.length > 0 ? (
-                      <select
-                        className="gm-select"
-                        style={{ flex: 1 }}
-                        value={customModuleResRef}
-                        onChange={e => setCustomModuleResRef(e.target.value)}
-                      >
-                        {GMManager.discoveredModules.map(m => (
-                          <option key={m} value={m}>{m}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        className="gm-input"
-                        style={{ flex: 1 }}
-                        value={customModuleResRef}
-                        onChange={e => setCustomModuleResRef(e.target.value)}
-                        placeholder="Module name e.g. danm14aa"
-                      />
-                    )}
-                    <button
-                      className="gm-btn active"
-                      onClick={() =>
-                        GMManager.loadScene(customModuleResRef, {
-                          keepCreatures,
-                          keepTriggers,
-                          keepPlaceables,
-                          preserveParty
-                        })
-                      }
-                    >
-                      Warp to Module
-                    </button>
-                  </div>
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Scenes from {otherTitle}</span>
-                    {otherModules === null && (
-                      <button
-                        className="gm-btn small active"
-                        onClick={async () => {
-                          setOtherStatus(`Opening ${otherTitle}…`);
-                          const list = await KotOR.OtherGameManager.listModules();
-                          setOtherModules(list);
-                          setOtherStatus(list.length ? '' : (KotOR.OtherGameManager.lastError || `No ${otherTitle} areas found.`));
-                        }}
-                        title={`Borrow an area from ${otherTitle}: its rooms, sky and lighting, without its characters or objects`}
-                      >
-                        Show
-                      </button>
-                    )}
-                  </div>
-                  <div className="gm-hint">
-                    The area only (terrain, buildings, sky, music); fill it with this game's characters and objects.
-                    Players need {otherTitle} set up in their launcher too.
-                  </div>
-                  {otherStatus && <div className="gm-hint">{otherStatus}</div>}
-                  {otherModules && otherModules.length > 0 && (
-                    <>
-                      <input
-                        className="gm-input"
-                        placeholder={`Search ${otherModules.length} areas (e.g. danm, tat_, ebo_)`}
-                        value={otherQuery}
-                        onChange={e => setOtherQuery(e.target.value)}
-                      />
-                      <div className="gm-list" style={{ maxHeight: 220 }}>
-                        {otherModules.filter(m => !otherQuery.trim() || m.includes(otherQuery.trim().toLowerCase())).map(m => {
-                          const name = KotOR.OtherGameManager.foreignModuleName(m);
-                          const known = otherCuratedModules.find(c => c.resRef === m);
-                          return (
-                            <div
-                              key={m}
-                              className={`gm-card ${currentModuleName === name ? 'selected' : ''}`}
-                              onClick={() => GMManager.loadScene(name, { keepCreatures, keepTriggers, keepPlaceables, preserveParty })}
-                            >
-                              <div className="gm-card-info">
-                                <div className="gm-card-title">{known ? `${known.planet} — ${known.title}` : m}</div>
-                                <div className="gm-card-sub">{known?.description || `${otherTitle} area`}</div>
-                              </div>
-                              <button className="gm-btn small active">Load</button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
+                  <details className="gm-section">
+                    <summary>When loading an area <span className="gm-summary-note">{[keepPlaceables && 'its props', keepCreatures && 'its creatures', keepTriggers && 'its triggers'].filter(Boolean).join(', ') || 'empty stage'}</span></summary>
+                    <label className="gm-checkbox">
+                      <input type="checkbox" checked={keepPlaceables} onChange={e => { setKeepPlaceables(e.target.checked); GMManager.keepDefaultPlaceables = e.target.checked; }} />
+                      Keep the area's own props and containers
+                    </label>
+                    <label className="gm-checkbox">
+                      <input type="checkbox" checked={keepCreatures} onChange={e => { setKeepCreatures(e.target.checked); GMManager.keepDefaultCreatures = e.target.checked; }} />
+                      Keep the area's own creatures
+                    </label>
+                    <label className="gm-checkbox">
+                      <input type="checkbox" checked={keepTriggers} onChange={e => { setKeepTriggers(e.target.checked); GMManager.keepDefaultTriggers = e.target.checked; }} />
+                      Keep its area transitions and traps
+                    </label>
+                    <label className="gm-checkbox">
+                      <input type="checkbox" checked={preserveParty} onChange={e => { setPreserveParty(e.target.checked); GMManager.preservePartyOnWarp = e.target.checked; }} />
+                      Bring the player characters along
+                    </label>
+                  </details>
+                </>
+              );
+            })()}
 
             {/* ==================== TAB 2: ACTORS & PLACEABLES ==================== */}
             {drawerTab === 'actors' && (
@@ -1335,19 +979,172 @@ export const GMPanel: React.FC = () => {
                     className={`gm-btn ${spawnSubTab === 'creatures' ? 'active' : ''}`}
                     style={{ flex: 1 }}
                     onClick={() => setSpawnSubTab('creatures')}
+                    title="Creatures and NPCs"
                   >
-                    Creatures & NPCs ({currentArea?.creatures.length || 0})
+                    Creatures
                   </button>
                   <button
                     className={`gm-btn ${spawnSubTab === 'placeables' ? 'active' : ''}`}
                     style={{ flex: 1 }}
                     onClick={() => setSpawnSubTab('placeables')}
+                    title="Props, containers and mines"
                   >
-                    Interactive Placeables & Containers ({currentArea?.placeables.length || 0})
+                    Objects
+                  </button>
+                  <button
+                    className={`gm-btn ${spawnSubTab === 'kits' ? 'active' : ''}`}
+                    style={{ flex: 1 }}
+                    onClick={() => setSpawnSubTab('kits')}
+                    title="Whole sets placed at once: an office, a temple, a command centre... and your own saved layouts"
+                  >
+                    Kits
                   </button>
                 </div>
 
-                {spawnSubTab === 'creatures' ? (
+                {/* Kits: whole sets of props (and NPCs) placed at once */}
+                {spawnSubTab === 'kits' && (() => {
+                  const savedKits = GMManager.getSavedCustomBlueprints();
+                  const kits = [
+                    ...GMManager.SCENE_BLUEPRINTS.map((bp) => ({ bp, saved: false })),
+                    ...savedKits.map((bp) => ({ bp, saved: true })),
+                  ];
+                  const buildHere = (bp: GMSceneBlueprint) => GMManager.buildSceneBlueprint(bp, {
+                    loadCleanBackgroundFirst: false,
+                    clearExistingPlaceables: blueprintClearExisting,
+                    spawnNPCs: blueprintSpawnNPCs,
+                    useCameraTargetAsOrigin: blueprintOriginMode === 'camera',
+                  });
+                  const buildOnNewStage = (bp: GMSceneBlueprint, saved: boolean) => GMManager.buildSceneBlueprint(bp, {
+                    loadCleanBackgroundFirst: true,
+                    backgroundModuleResRef: saved ? (bp.recommendedModule || blueprintBgModule) : blueprintBgModule,
+                    clearExistingPlaceables: true,
+                    spawnNPCs: blueprintSpawnNPCs,
+                    useCameraTargetAsOrigin: false,
+                  });
+                  return (
+                    <>
+                      <div className="gm-section">
+                        <div className="gm-section-title">
+                          <span>Kits ({kits.length})</span>
+                        </div>
+                        <div className="gm-list" style={{ maxHeight: 320 }}>
+                          {kits.map(({ bp, saved }) => (
+                            <div key={bp.id} className="gm-card" style={{ cursor: 'default', alignItems: 'flex-start' }}>
+                              <div className="gm-card-info">
+                                <div className="gm-card-title">
+                                  {bp.title} <span className="gm-badge" style={{ marginLeft: 4 }}>{saved ? 'saved' : `${bp.items.length} props`}</span>
+                                </div>
+                                <div className="gm-card-sub" style={{ whiteSpace: 'normal', lineHeight: 1.35, marginTop: 3 }}>{bp.description}</div>
+                              </div>
+                              <div className="gm-row" style={{ flexDirection: 'column', alignItems: 'stretch', minWidth: 100 }}>
+                                <button
+                                  className="gm-btn small active"
+                                  onClick={() => buildHere(bp)}
+                                  title={`Build it in this scene, ${blueprintOriginMode === 'camera' ? 'where the camera looks' : 'at the scene entry'}`}
+                                >
+                                  Build here
+                                </button>
+                                <button
+                                  className="gm-btn small"
+                                  onClick={() => buildOnNewStage(bp, saved)}
+                                  title={`Load an empty ${saved ? (bp.recommendedModule || blueprintBgModule) : blueprintBgModule} and build it there`}
+                                >
+                                  New stage
+                                </button>
+                                {saved && (
+                                  <div className="gm-row">
+                                    <button className="gm-btn small" title="Copy this kit as JSON, to share it" onClick={() => navigator.clipboard?.writeText(JSON.stringify(bp))}>Copy</button>
+                                    <button className="gm-btn small danger" title="Delete this saved kit" onClick={() => { GMManager.deleteCustomBlueprint(bp.id); forceUpdate(); }}>✕</button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <details className="gm-section">
+                        <summary>Kit options <span className="gm-summary-note">{blueprintOriginMode === 'camera' ? 'at the camera' : 'at the entry'}{blueprintSpawnNPCs ? ', with NPCs' : ''}</span></summary>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>"Build here" puts it</label>
+                            <select className="gm-select" value={blueprintOriginMode} onChange={e => setBlueprintOriginMode(e.target.value as 'entry' | 'camera')}>
+                              <option value="entry">At the scene entry</option>
+                              <option value="camera">Where the camera looks</option>
+                            </select>
+                          </div>
+                          <div className="gm-field">
+                            <label>"New stage" loads</label>
+                            <select className="gm-select" value={blueprintBgModule} onChange={e => setBlueprintBgModule(e.target.value)}>
+                              <option value={GMManager.defaultSceneModule()}>Default open stage ({GMManager.defaultSceneModule()})</option>
+                              {curatedModules.map(m => (
+                                <option key={m.resRef} value={m.resRef}>{m.planet} — {m.title}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <label className="gm-checkbox">
+                          <input type="checkbox" checked={blueprintSpawnNPCs} onChange={e => setBlueprintSpawnNPCs(e.target.checked)} />
+                          Include the kit's NPCs (receptionist, guardian, commander...)
+                        </label>
+                        <label className="gm-checkbox">
+                          <input type="checkbox" checked={blueprintClearExisting} onChange={e => setBlueprintClearExisting(e.target.checked)} />
+                          "Build here" first clears the props already placed
+                        </label>
+                        <div className="gm-row">
+                          <button className="gm-btn small warning" onClick={() => GMManager.clearDefaultAreaPlaceables()} title="Remove the area's own crates and containers, keeping what you placed">
+                            Clear the area's props
+                          </button>
+                          <button className="gm-btn small danger" onClick={() => GMManager.clearGMSpawnedPlaceables()} title="Remove every prop you placed">
+                            Clear my props
+                          </button>
+                        </div>
+                      </details>
+
+                      <details className="gm-section" open={showJsonImportBox}>
+                        <summary>Save this scene as a kit</summary>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>Name</label>
+                            <input className="gm-input" value={customBlueprintTitle} onChange={e => setCustomBlueprintTitle(e.target.value)} placeholder="e.g. Coruscant detective office" />
+                          </div>
+                          <div className="gm-field">
+                            <label>Description</label>
+                            <input className="gm-input" value={customBlueprintDesc} onChange={e => setCustomBlueprintDesc(e.target.value)} placeholder="What it's for" />
+                          </div>
+                        </div>
+                        <button
+                          className="gm-btn active"
+                          onClick={() => { GMManager.saveCurrentSceneAsBlueprint(customBlueprintTitle, customBlueprintDesc); forceUpdate(); }}
+                          title="Saves every prop and NPC you placed here as a kit you can build anywhere"
+                        >
+                          Save as kit
+                        </button>
+                        <div className="gm-field">
+                          <label>Or import a kit (JSON copied from "Copy")</label>
+                          <div className="gm-row">
+                            <input className="gm-input" style={{ flex: 1 }} value={importBlueprintJson} onChange={e => setImportBlueprintJson(e.target.value)} placeholder='{"title":"My Scene","items":[...]}' />
+                            <button
+                              className="gm-btn small success"
+                              disabled={!importBlueprintJson.trim()}
+                              onClick={() => {
+                                if (GMManager.importCustomBlueprintFromJSON(importBlueprintJson)) {
+                                  setImportBlueprintJson('');
+                                  setShowJsonImportBox(false);
+                                  forceUpdate();
+                                }
+                              }}
+                            >
+                              Import
+                            </button>
+                          </div>
+                        </div>
+                      </details>
+                    </>
+                  );
+                })()}
+
+                {spawnSubTab === 'kits' ? null : spawnSubTab === 'creatures' ? (
                   <>
                     <div className="gm-section">
                       <div className="gm-section-title">Encounter</div>
@@ -1633,9 +1430,6 @@ export const GMPanel: React.FC = () => {
                     <div className="gm-section">
                       <div className="gm-section-title">
                         <span>Objects</span>
-                        <button className="gm-btn small" onClick={() => setDrawerTab('builder')}>
-                          Scene Blueprints (Office/Temple) →
-                        </button>
                       </div>
 
                       <div className="gm-row" style={{ flexWrap: 'wrap' }}>
@@ -1986,6 +1780,113 @@ export const GMPanel: React.FC = () => {
                   </div>
                 )}
 
+                <div className="gm-section">
+                  <div className="gm-section-title">
+                    <span>In the scene ({KotOR.GameState.PartyManager.party.length})</span>
+                    {GMManager.controlMode === 'POSSESS' && (
+                      <button className="gm-btn small warning" onClick={() => GMManager.enterFreeCamera(true)}>
+                        Stop playing (free camera)
+                      </button>
+                    )}
+                  </div>
+
+                  {KotOR.GameState.PartyManager.party.length === 0 ? (
+                    <div className="gm-hint">
+                      No player characters yet. Add one below: a quick build, your own, or one from a save.
+                    </div>
+                  ) : (
+                    <div className="gm-list">
+                      {KotOR.GameState.PartyManager.party.map((member, i) => {
+                        const isControlled = GMManager.controlMode === 'POSSESS' && currentLeader === member;
+                        return (
+                          <div key={member.id || i} className={`gm-card ${isControlled ? 'selected' : ''}`}>
+                            <div className="gm-card-info">
+                              <div className="gm-card-title">
+                                {member.getName() || member.firstName || 'Player'} {isControlled ? '(Controlling)' : ''}
+                              </div>
+                              <div className="gm-card-sub">
+                                HP {member.getHP()}/{member.getMaxHP()} • FP {member.getFP()}/{member.getMaxFP()}
+                              </div>
+                            </div>
+                            <div className="gm-row">
+                              <button
+                                className="gm-btn small success"
+                                onClick={() => GMManager.possessCharacter(member)}
+                              >
+                                {isControlled ? 'Playing' : 'Play as'}
+                              </button>
+                              <button
+                                className="gm-btn small"
+                                onClick={() => {
+                                  GMManager.selectObject(member);
+                                  setDrawerTab('inspector');
+                                }}
+                              >
+                                Inspect
+                              </button>
+                              <button
+                                className="gm-btn small danger"
+                                onClick={() => GMManager.deleteObject(member)}
+                                title="Remove from the scene"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+
+                {GMNetworkManager.role === 'host' && (
+                  <div className="gm-section">
+                    <div className="gm-section-title">Connected players ({connectedPeers.length})</div>
+                    {connectedPeers.length === 0 ? (
+                      <div className="gm-hint">Nobody has joined yet. Host from the Session tab and share the address.</div>
+                    ) : (
+                      <>
+                        <div className="gm-grid-2">
+                          <div className="gm-field">
+                            <label>XP to give</label>
+                            <input className="gm-input" type="number" min={1} value={rewardXp} onChange={e => setRewardXp(Number(e.target.value))} />
+                          </div>
+                          <div className="gm-field">
+                            <label>Item to give (resref)</label>
+                            <input className="gm-input" value={rewardItem} onChange={e => setRewardItem(e.target.value)} />
+                          </div>
+                        </div>
+                        <div className="gm-list">
+                          {connectedPeers.map(peer => {
+                            const pc = GMManager.getPeerActor(peer.peerId);
+                            return (
+                              <div key={peer.peerId} className="gm-card">
+                                <div className="gm-card-info">
+                                  <div className="gm-card-title">{peer.name}</div>
+                                  <div className="gm-card-sub">
+                                    {pc ? `${pc.getName()} • Level ${pc.classes?.[0]?.level ?? '?'} • HP ${pc.getHP()}/${pc.getMaxHP()} • XP ${pc.experience || 0}` : 'No character yet'}
+                                  </div>
+                                </div>
+                                <div className="gm-row">
+                                  <button className="gm-btn small" disabled={!pc} onClick={() => GMManager.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
+                                    + XP
+                                  </button>
+                                  <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMManager.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
+                                    + Item
+                                  </button>
+                                  <button className="gm-btn small" disabled={!pc} onClick={() => { if (pc) { GMManager.selectObject(pc); setDrawerTab('inspector'); } }} title="Inspect their character">
+                                    Inspect
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
                 {(() => {
                   const players = GMManager.getPlayerCharacters().filter((pc) => !pc.isDead());
                   const targets = (): KotOR.ModuleCreature[] => {
@@ -1999,8 +1900,8 @@ export const GMPanel: React.FC = () => {
                     return kind === 'skill' ? { kind: 'skill', skill: Number(id) } : { kind: 'save', save: id as 'fortitude' | 'reflex' | 'will' };
                   };
                   return (
-                    <div className="gm-section">
-                      <div className="gm-section-title">Call for a check</div>
+                    <details className="gm-section">
+                      <summary>Call for a check <span className="gm-summary-note">skill or save, DC {checkDc}</span></summary>
                       <div className="gm-grid-2">
                         <div className="gm-field">
                           <label>Who</label>
@@ -2042,181 +1943,15 @@ export const GMPanel: React.FC = () => {
                       >
                         Roll
                       </button>
-                    </div>
+                    </details>
                   );
                 })()}
 
-                {GMNetworkManager.role === 'host' && (
-                  <div className="gm-section">
-                    <div className="gm-section-title">Connected Players ({connectedPeers.length})</div>
-                    {connectedPeers.length === 0 ? (
-                      <div className="gm-hint">No players have joined yet. Host from the Session tab and share the address.</div>
-                    ) : (
-                      <>
-                        <div className="gm-grid-2">
-                          <div className="gm-field">
-                            <label>XP to give</label>
-                            <input className="gm-input" type="number" min={1} value={rewardXp} onChange={e => setRewardXp(Number(e.target.value))} />
-                          </div>
-                          <div className="gm-field">
-                            <label>Item to give (resref)</label>
-                            <input className="gm-input" value={rewardItem} onChange={e => setRewardItem(e.target.value)} />
-                          </div>
-                        </div>
-                        <div className="gm-list">
-                          {connectedPeers.map(peer => {
-                            const pc = GMManager.getPeerActor(peer.peerId);
-                            return (
-                              <div key={peer.peerId} className="gm-card">
-                                <div className="gm-card-info">
-                                  <div className="gm-card-title">{peer.name}</div>
-                                  <div className="gm-card-sub">
-                                    {pc ? `${pc.getName()} • Level ${pc.classes?.[0]?.level ?? '?'} • HP ${pc.getHP()}/${pc.getMaxHP()} • XP ${pc.experience || 0}` : 'No character yet'}
-                                  </div>
-                                </div>
-                                <div className="gm-row">
-                                  <button className="gm-btn small" disabled={!pc} onClick={() => GMManager.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
-                                    + XP
-                                  </button>
-                                  <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMManager.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
-                                    + Item
-                                  </button>
-                                  <button className="gm-btn small" disabled={!pc} onClick={() => pc && GMManager.selectObject(pc)} title="Select their character">
-                                    Select
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+
+                <details className="gm-section" open={KotOR.GameState.PartyManager.party.length === 0}>
+                  <summary>Add a character <span className="gm-summary-note">quick build, your own, or from a save</span></summary>
                 <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Loaded Player Characters & Party ({KotOR.GameState.PartyManager.party.length})</span>
-                    {GMManager.controlMode === 'POSSESS' && (
-                      <button className="gm-btn small warning" onClick={() => GMManager.enterFreeCamera(true)}>
-                        Exit Possession (Free Cam)
-                      </button>
-                    )}
-                  </div>
-
-                  {KotOR.GameState.PartyManager.party.length === 0 ? (
-                    <div className="gm-hint">
-                      No Player Character is in the scene yet. Spawn a Player Preset below, load from a Save Game, or import a <code>.utc</code> file!
-                    </div>
-                  ) : (
-                    <div className="gm-list">
-                      {KotOR.GameState.PartyManager.party.map((member, i) => {
-                        const isControlled = GMManager.controlMode === 'POSSESS' && currentLeader === member;
-                        return (
-                          <div key={member.id || i} className={`gm-card ${isControlled ? 'selected' : ''}`}>
-                            <div className="gm-card-info">
-                              <div className="gm-card-title">
-                                {member.getName() || member.firstName || 'Player'} {isControlled ? '(Controlling)' : ''}
-                              </div>
-                              <div className="gm-card-sub">
-                                HP {member.getHP()}/{member.getMaxHP()} • FP {member.getFP()}/{member.getMaxFP()}
-                              </div>
-                            </div>
-                            <div className="gm-row">
-                              <button
-                                className="gm-btn small success"
-                                onClick={() => GMManager.possessCharacter(member)}
-                              >
-                                {isControlled ? 'Active' : 'Possess & Play'}
-                              </button>
-                              <button
-                                className="gm-btn small"
-                                onClick={() => {
-                                  GMManager.selectObject(member);
-                                  setDrawerTab('inspector');
-                                }}
-                              >
-                                Inspect
-                              </button>
-                              <button
-                                className="gm-btn small danger"
-                                onClick={() => GMManager.deleteObject(member)}
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">
-                    <span>Load Player Character from Saved Games ({KotOR.SaveGame.saves.length})</span>
-                    <button
-                      className="gm-btn small"
-                      onClick={async () => {
-                        await KotOR.SaveGame.GetSaveGames();
-                        forceUpdate();
-                      }}
-                    >
-                      Scan Saves
-                    </button>
-                  </div>
-
-                  {KotOR.SaveGame.saves.length === 0 ? (
-                    <div className="gm-row">
-                      <span style={{ fontSize: 11, color: '#8cb0d0' }}>
-                        Click &quot;Scan Saves&quot; to list characters from your KotOR Saves folder, or import a .utc file:
-                      </span>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept=".utc"
-                        style={{ display: 'none' }}
-                        onChange={handleImportUTCFile}
-                      />
-                      <button className="gm-btn small active" onClick={() => fileInputRef.current?.click()}>
-                        Import .UTC File
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="gm-list" style={{ maxHeight: 130 }}>
-                        {KotOR.SaveGame.saves.map((sg, idx) => (
-                          <div key={idx} className="gm-card">
-                            <div className="gm-card-info">
-                              <div className="gm-card-title">{sg.PCNAME || sg.getSaveName() || sg.folderName}</div>
-                              <div className="gm-card-sub">{sg.AREANAME || sg.LASTMODULE} ({sg.folderName})</div>
-                            </div>
-                            <button
-                              className="gm-btn small success"
-                              onClick={() => GMManager.loadPlayerFromSaveGame(sg, true)}
-                            >
-                              Load PC
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="gm-row">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".utc"
-                          style={{ display: 'none' }}
-                          onChange={handleImportUTCFile}
-                        />
-                        <button className="gm-btn small" onClick={() => fileInputRef.current?.click()}>
-                          Import Custom .UTC Character File...
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-
-                <div className="gm-section">
-                  <div className="gm-section-title">Quick Player Character Builds (With Feats, Force Powers & Gear)</div>
+                  <div className="gm-section-title">Quick builds</div>
                   <div className="gm-list" style={{ maxHeight: 155 }}>
                     {GMManager.PLAYER_PRESETS.map((preset, idx) => (
                       <div
@@ -2241,18 +1976,19 @@ export const GMPanel: React.FC = () => {
                             await GMManager.spawnPlayerCharacter({ ...preset, possessImmediately: true });
                           }}
                         >
-                          Spawn & Play
+                          Add & play
                         </button>
                       </div>
                     ))}
                   </div>
                 </div>
 
+
                 <div className="gm-section">
-                  <div className="gm-section-title">Custom Player Character Builder</div>
+                  <div className="gm-section-title">Build your own</div>
                   <div className="gm-grid-2">
                     <div className="gm-field">
-                      <label>Character Name</label>
+                      <label>Name</label>
                       <input
                         className="gm-input"
                         value={playerCfg.name}
@@ -2287,7 +2023,7 @@ export const GMPanel: React.FC = () => {
                       />
                     </div>
                     <div className="gm-field">
-                      <label>HP (blank: from class)</label>
+                      <label title="Leave blank to use the class's">HP</label>
                       <input
                         type="number"
                         className="gm-input"
@@ -2297,7 +2033,7 @@ export const GMPanel: React.FC = () => {
                       />
                     </div>
                     <div className="gm-field">
-                      <label>Force Points (blank: from class)</label>
+                      <label title="Leave blank to use the class's">Force points</label>
                       <input
                         type="number"
                         className="gm-input"
@@ -2310,7 +2046,7 @@ export const GMPanel: React.FC = () => {
 
                   <div className="gm-grid-2">
                     <div className="gm-field">
-                      <label>Right-Hand Weapon</label>
+                      <label>Weapon</label>
                       <select
                         className="gm-select"
                         value={playerCfg.rightHandResRef || ''}
@@ -2322,7 +2058,7 @@ export const GMPanel: React.FC = () => {
                       </select>
                     </div>
                     <div className="gm-field">
-                      <label>Armor / Robes</label>
+                      <label>Armor or robes</label>
                       <select
                         className="gm-select"
                         value={playerCfg.armorResRef || ''}
@@ -2341,18 +2077,84 @@ export const GMPanel: React.FC = () => {
                       style={{ flex: 1 }}
                       onClick={() => GMManager.spawnPlayerCharacter({ ...playerCfg, possessImmediately: true })}
                     >
-                      Spawn & Possess Player
+                      Add & play
                     </button>
                     <button
                       className={`gm-btn warning ${GMManager.activeTool === 'place_player' ? 'active' : ''}`}
                       onClick={() =>
                         GMManager.setToolMode(GMManager.activeTool === 'place_player' ? 'select' : 'place_player')
                       }
+                      title="Click in the scene to put this character there"
                     >
-                      Click-Place in 3D
+                      Place in the scene
                     </button>
                   </div>
                 </div>
+
+                <div className="gm-section">
+                  <div className="gm-section-title">
+                    <span>From a save ({KotOR.SaveGame.saves.length})</span>
+                    <button
+                      className="gm-btn small"
+                      onClick={async () => {
+                        await KotOR.SaveGame.GetSaveGames();
+                        forceUpdate();
+                      }}
+                    >
+                      Find saves
+                    </button>
+                  </div>
+
+                  {KotOR.SaveGame.saves.length === 0 ? (
+                    <div className="gm-row">
+                      <span style={{ fontSize: 11, color: '#8cb0d0' }}>
+                        "Find saves" lists the characters in your saves folder, or open a .utc file:
+                      </span>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".utc"
+                        style={{ display: 'none' }}
+                        onChange={handleImportUTCFile}
+                      />
+                      <button className="gm-btn small active" onClick={() => fileInputRef.current?.click()}>
+                        Open .utc…
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="gm-list" style={{ maxHeight: 130 }}>
+                        {KotOR.SaveGame.saves.map((sg, idx) => (
+                          <div key={idx} className="gm-card">
+                            <div className="gm-card-info">
+                              <div className="gm-card-title">{sg.PCNAME || sg.getSaveName() || sg.folderName}</div>
+                              <div className="gm-card-sub">{sg.AREANAME || sg.LASTMODULE} ({sg.folderName})</div>
+                            </div>
+                            <button
+                              className="gm-btn small success"
+                              onClick={() => GMManager.loadPlayerFromSaveGame(sg, true)}
+                            >
+                              Add
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="gm-row">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".utc"
+                          style={{ display: 'none' }}
+                          onChange={handleImportUTCFile}
+                        />
+                        <button className="gm-btn small" onClick={() => fileInputRef.current?.click()}>
+                          Open .utc…
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+                </details>
               </>
             )}
 
@@ -2361,17 +2163,17 @@ export const GMPanel: React.FC = () => {
               <>
                 <div className="gm-section">
                   <div className="gm-section-title">
-                    <span>Selected World Object</span>
+                    <span>Selected</span>
                     {selectedObj && (
-                      <button className="gm-btn small danger" onClick={() => GMManager.deleteObject(selectedObj)}>
-                        Delete Object
+                      <button className="gm-btn small danger" onClick={() => GMManager.deleteObject(selectedObj)} title="Remove it from the scene">
+                        Delete
                       </button>
                     )}
                   </div>
 
                   {!selectedObj ? (
                     <div className="gm-hint">
-                      Click any Creature, Player, Placeable, or Door in the 3D scene (with <b>Cursor: Select</b> active) or pick one from the World Objects list below.
+                      Click something in the scene, or pick it from the list below.
                     </div>
                   ) : (
                     <>
@@ -2397,50 +2199,87 @@ export const GMPanel: React.FC = () => {
                               className="gm-btn success"
                               style={{ flex: 1 }}
                               onClick={() => GMManager.possessCharacter(selectedObj as KotOR.ModuleCreature)}
+                              title="Take control of it yourself"
                             >
-                              Possess & Control Character
+                              Play as
                             </button>
-                            <button className="gm-btn small" onClick={() => GMManager.healObject(selectedObj)}>
-                              Full Heal
+                            <button className="gm-btn small" onClick={() => GMManager.healObject(selectedObj)} title="Full health">
+                              Heal
                             </button>
                             <button className="gm-btn small danger" onClick={() => GMManager.killObject(selectedObj)}>
                               Kill
                             </button>
                           </div>
 
-                          <div className="gm-field">
-                            <label>Faction Attitude</label>
-                            <div className="gm-row">
+                          <div className="gm-row" title="Who it fights">
+                            <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Side</span>
                               <button
                                 className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 1 ? 'danger' : ''}`}
                                 onClick={() => GMManager.setObjectFaction(selectedObj, 1)}
                               >
-                                Hostile (1)
+                                Hostile
                               </button>
                               <button
                                 className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 2 ? 'success' : ''}`}
                                 onClick={() => GMManager.setObjectFaction(selectedObj, 2)}
                               >
-                                Friendly (2)
+                                Friendly
                               </button>
                               <button
                                 className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 5 ? 'active' : ''}`}
                                 onClick={() => GMManager.setObjectFaction(selectedObj, 5)}
                               >
-                                Neutral (5)
+                                Neutral
                               </button>
                               <button
                                 className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === 0 ? 'active' : ''}`}
                                 onClick={() => GMManager.setObjectFaction(selectedObj, 0)}
                               >
-                                Party (0)
+                                Party
                               </button>
-                            </div>
                           </div>
 
+                          {!(selectedObj as any).gmOwnerPeerId && (() => {
+                            const cre = selectedObj as KotOR.ModuleCreature;
+                            const stances = GMManager.availableAnimations(cre, 'stance');
+                            const gestures = GMManager.availableAnimations(cre, 'gesture');
+                            const current = GMManager.stanceOf(cre);
+                            const groups = (list: typeof stances) => [...new Set(list.map((c) => c.group))];
+                            if (!stances.length && !gestures.length) return null;
+                            return (
+                              <div className="gm-grid-2" title="A stance holds whenever it would just stand: after walking, after a gesture, and after a fight">
+                                <div className="gm-field">
+                                  <label>Stance</label>
+                                  <select className="gm-select" value={current} onChange={(e) => GMManager.setCreatureStance(cre, e.target.value)}>
+                                    <option value="">Standing</option>
+                                    {current && !stances.some((c) => c.id === current) && <option value={current}>{current}</option>}
+                                    {groups(stances).map((g) => (
+                                      <optgroup key={g} label={g}>
+                                        {stances.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                      </optgroup>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div className="gm-field">
+                                  <label>Gesture</label>
+                                  <select className="gm-select" value="" onChange={(e) => { if (e.target.value) GMManager.playGesture(cre, e.target.value); }}>
+                                    <option value="">Play once…</option>
+                                    {groups(gestures).map((g) => (
+                                      <optgroup key={g} label={g}>
+                                        {gestures.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+                                      </optgroup>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          <details className="gm-section">
+                            <summary>Gear</summary>
                           <div className="gm-grid-2">
                             <div className="gm-field">
-                              <label>Equip Right-Hand Weapon</label>
+                              <label>Weapon</label>
                               <select
                                 className="gm-select"
                                 value={(selectedObj as KotOR.ModuleCreature).equipment?.RIGHTHAND?.getEquippedRes() || ''}
@@ -2458,7 +2297,7 @@ export const GMPanel: React.FC = () => {
                               </select>
                             </div>
                             <div className="gm-field">
-                              <label>Equip Armor / Robe</label>
+                              <label>Armor or robes</label>
                               <select
                                 className="gm-select"
                                 value={(selectedObj as KotOR.ModuleCreature).equipment?.ARMOR?.getEquippedRes() || ''}
@@ -2476,6 +2315,7 @@ export const GMPanel: React.FC = () => {
                               </select>
                             </div>
                           </div>
+                          </details>
                         </>
                       )}
 
@@ -2489,14 +2329,14 @@ export const GMPanel: React.FC = () => {
                               style={{ flex: 1 }}
                               onClick={() => GMManager.toggleDoorOrPlaceableOpen(selectedObj)}
                             >
-                              {(selectedObj as any).isOpen?.() ? 'Close Door / Object' : 'Open / Activate'}
+                              {(selectedObj as any).isOpen?.() ? 'Close' : 'Open'}
                             </button>
                             <button
                               className={`gm-btn ${(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'warning' : ''}`}
                               style={{ flex: 1 }}
                               onClick={() => GMManager.toggleDoorOrPlaceableLock(selectedObj)}
                             >
-                              {(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'Locked (Click to Unlock)' : 'Unlocked (Click to Lock)'}
+                              {(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'Unlock' : 'Lock'}
                             </button>
                           </div>
 
@@ -2537,7 +2377,7 @@ export const GMPanel: React.FC = () => {
                           {BitWise.InstanceOf(selectedObj.objectType, KotOR.ModuleObjectType.ModulePlaceable) && (
                             <div className="gm-field">
                               <label>
-                                Stock Container Loot ({(selectedObj as KotOR.ModulePlaceable).inventory?.length || 0} items inside)
+                                Contents ({(selectedObj as KotOR.ModulePlaceable).inventory?.length || 0} items)
                               </label>
                               <div className="gm-row">
                                 <select
@@ -2554,7 +2394,7 @@ export const GMPanel: React.FC = () => {
                                   className="gm-btn small success"
                                   onClick={() => GMManager.addItemToObject(selectedObj, inspectorAddItemResRef)}
                                 >
-                                  + Put Item Inside
+                                  Put inside
                                 </button>
                               </div>
                             </div>
@@ -2562,14 +2402,26 @@ export const GMPanel: React.FC = () => {
                         </>
                       )}
 
-                      {/* Common Transform, Scale, Duplicate & Bark Controls */}
+                      {!(selectedObj as any).gmOwnerPeerId && (
+                        <label className="gm-checkbox" title="Hidden objects stay visible to you but are removed from players' games until revealed">
+                          <input
+                            type="checkbox"
+                            checked={GMManager.isHiddenFromPlayers(selectedObj)}
+                            onChange={e => GMManager.setObjectHidden(selectedObj, e.target.checked)}
+                          />
+                          Hidden from players
+                        </label>
+                      )}
+
+                      <details className="gm-section">
+                        <summary>Position and size <span className="gm-summary-note">{((selectedObj as any).gmScale || 1.0).toFixed(2)}x</span></summary>
                       <div className="gm-row">
                         <button
                           className="gm-btn small success"
                           onClick={() => GMManager.duplicateObject(selectedObj)}
                           title="Spawn an exact duplicate of this Placeable or Creature next to it"
                         >
-                          Duplicate / Clone
+                          Duplicate
                         </button>
                         <button
                           className="gm-btn small"
@@ -2577,25 +2429,27 @@ export const GMPanel: React.FC = () => {
                             const pt = GMManager.getCameraTargetSpawnPoint(3.0);
                             GMManager.teleportObject(selectedObj, pt.position);
                           }}
+                          title="Where the camera looks"
                         >
-                          Move to Camera
+                          Move to camera
                         </button>
                         <button
                           className={`gm-btn small ${GMManager.activeTool === 'teleport' ? 'warning active' : ''}`}
                           onClick={() => GMManager.setToolMode(GMManager.activeTool === 'teleport' ? 'select' : 'teleport')}
+                          title="Click the ground to move it there"
                         >
-                          Click-Teleport
+                          Move to click
                         </button>
                         <button className="gm-btn small" onClick={() => GMManager.rotateObject(selectedObj, -Math.PI / 4)}>
-                          Rotate -45°
+                          ⟲ 45°
                         </button>
                         <button className="gm-btn small" onClick={() => GMManager.rotateObject(selectedObj, Math.PI / 4)}>
-                          Rotate +45°
+                          ⟳ 45°
                         </button>
                       </div>
 
                       <div className="gm-field">
-                        <label>Fine Architectural Nudge (X / Y / Z) &amp; Scale ({((selectedObj as any).gmScale || 1.0).toFixed(2)}x)</label>
+                        <label>Nudge</label>
                         <div className="gm-row">
                           <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, -0.5, 0, 0)}>X -0.5</button>
                           <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0.5, 0, 0)}>X +0.5</button>
@@ -2611,14 +2465,15 @@ export const GMPanel: React.FC = () => {
                               className={`gm-btn small ${Math.abs(((selectedObj as any).gmScale || 1.0) - sc) < 0.05 ? 'active' : ''}`}
                               onClick={() => GMManager.setObjectScale(selectedObj, sc)}
                             >
-                              Scale {sc}x
+                              {sc}x
                             </button>
                           ))}
                         </div>
                       </div>
+                      </details>
 
                       <div className="gm-field">
-                        <label>GM Custom Bark / Dialogue Line</label>
+                        <label title="Said when a player uses it, or now with Say">Line</label>
                         <div className="gm-row">
                           <input
                             className="gm-input"
@@ -2628,35 +2483,24 @@ export const GMPanel: React.FC = () => {
                               setInspectorBarkInput(e.target.value);
                               GMManager.setObjectBark(selectedObj, e.target.value);
                             }}
-                            placeholder="Set text spoken when interacted with..."
+                            placeholder="What it says when used"
                           />
                           <button
                             className="gm-btn small active"
                             onClick={() => GMManager.triggerBarkNow(selectedObj, inspectorBarkInput)}
                           >
-                            Speak Now
+                            Say
                           </button>
                         </div>
                       </div>
-
-                      {!(selectedObj as any).gmOwnerPeerId && (
-                        <label className="gm-checkbox" title="Hidden objects stay visible to you but are removed from players' games until revealed">
-                          <input
-                            type="checkbox"
-                            checked={GMManager.isHiddenFromPlayers(selectedObj)}
-                            onChange={e => GMManager.setObjectHidden(selectedObj, e.target.checked)}
-                          />
-                          Hidden from players
-                        </label>
-                      )}
 
                       {GMManager.canOrder(selectedObj) && (() => {
                         const npc = selectedObj as KotOR.ModuleCreature;
                         const order = GMNpcOrders.getOrder(npc);
                         const players = GMManager.getPlayerCharacters().filter((pc) => !pc.isDead());
                         return (
-                          <div className="gm-field">
-                            <label>Orders: {GMNpcOrders.describe(order)}</label>
+                          <div className="gm-section">
+                            <div className="gm-section-title"><span>Orders</span><span className="gm-summary-note">{GMNpcOrders.describe(order)}</span></div>
                             <div className="gm-row">
                               <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_move', npc)} title="Click the ground: it walks there, then guards the spot">Move here…</button>
                               <button className="gm-btn small" onClick={() => GMManager.startOrderTool('order_attack', npc)} title="Click a creature: it attacks until that one is dead">Attack…</button>
@@ -2694,14 +2538,14 @@ export const GMPanel: React.FC = () => {
                             onClick={() => GMConversationManager.join(selectedObj as KotOR.ModuleCreature, nearby)}
                             title={nearby.length ? 'Open a conversation with the players standing near it' : `No players within ${GMConversationManager.NEARBY_RANGE}m`}
                           >
-                            Talk as {selectedObj.getName() || 'this NPC'} to nearby players ({nearby.length})
+                            Talk to nearby players ({nearby.length})
                           </button>
                         );
                       })()}
 
                       {GMNetworkManager.role === 'host' && (
-                        <div className="gm-field">
-                          <label>Ask players, as {selectedObj.getName() || 'this object'}</label>
+                        <details className="gm-section">
+                          <summary>Ask the players <span className="gm-summary-note">a question with replies</span></summary>
                           <input className="gm-input" value={askText} onChange={e => setAskText(e.target.value)} placeholder="What do you want, stranger?" />
                           <textarea
                             className="gm-input"
@@ -2731,7 +2575,7 @@ export const GMPanel: React.FC = () => {
                               "{prompt.text}": {replies.length ? replies.map(r => `${r.name} → ${prompt.options[r.choice]}`).join(', ') : 'waiting for replies'}
                             </div>
                           ))}
-                        </div>
+                        </details>
                       )}
                     </>
                   )}
@@ -2739,7 +2583,7 @@ export const GMPanel: React.FC = () => {
 
                 <div className="gm-section">
                   <div className="gm-section-title">
-                    <span>World Objects in Scene ({worldObjects.length})</span>
+                    <span>Everything here ({worldObjects.length})</span>
                   </div>
                   <div className="gm-row">
                     {(['all', 'creatures', 'placeables', 'doors'] as const).map(f => (
@@ -2748,7 +2592,7 @@ export const GMPanel: React.FC = () => {
                         className={`gm-btn small ${inspectorFilter === f ? 'active' : ''}`}
                         onClick={() => setInspectorFilter(f)}
                       >
-                        {f.toUpperCase()}
+                        {f === 'all' ? 'All' : f === 'creatures' ? 'Creatures' : f === 'placeables' ? 'Objects' : 'Doors'}
                       </button>
                     ))}
                   </div>
@@ -2789,7 +2633,7 @@ export const GMPanel: React.FC = () => {
                               );
                             }}
                           >
-                            Go To
+                            Go to
                           </button>
                         </div>
                       </div>
@@ -2799,79 +2643,22 @@ export const GMPanel: React.FC = () => {
               </>
             )}
 
-            {/* ==================== TAB 5: MULTIPLAYER (NWN HOST / JOIN) ==================== */}
+            {/* ==================== TAB 5: SESSION ==================== */}
             {drawerTab === 'multiplayer' && (
               <>
-                {!isPlayerView && (
-                  <>
-                  <div className="gm-section">
-                    <div className="gm-section-title">When a player falls</div>
-                    <select className="gm-select" value={GMManager.deathRule} onChange={(e) => GMManager.setDeathRule(e.target.value as KotOR.GMDeathRule)}>
-                      <option value="kotor">KotOR rules: they get up with 1 HP once no enemy is near</option>
-                      <option value="gm">GM decides: they stay down until you revive them</option>
-                      <option value="respawn">Respawn: after {GMManager.RESPAWN_DELAY_SECONDS}s they can respawn at the entrance</option>
-                    </select>
-                    <div className="gm-hint">You can always revive fallen players from the Players tab. Saved with the session.</div>
-                  </div>
-                  <div className="gm-section">
-                    <div className="gm-section-title">Save & Load Session</div>
-                    <div className="gm-row">
-                      <input
-                        className="gm-input"
-                        style={{ flex: 1 }}
-                        value={sessionName}
-                        onChange={e => setSessionName(e.target.value)}
-                        placeholder={`${currentModuleName} session`}
-                      />
-                      <button className="gm-btn small success" onClick={() => { if (GMManager.saveSession(sessionName)) setSessionName(''); }}>
-                        Save
-                      </button>
-                      <button className="gm-btn small" onClick={() => sessionFileRef.current?.click()} title="Add a session exported from another browser">
-                        Import…
-                      </button>
-                      <input ref={sessionFileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={onImportSession} />
-                    </div>
-                    <div className="gm-hint">
-                      Saves the scene, everything you placed, door states and every player character. Players get their saved character back when they join under the same name.
-                    </div>
-                    <div className="gm-list">
-                      {GMManager.getSavedSessions().map(save => (
-                        <div key={save.id} className="gm-card">
-                          <div className="gm-card-info">
-                            <div className="gm-card-title">{save.name}</div>
-                            <div className="gm-card-sub">
-                              {save.scene.module} • {save.objects.length} objects • {save.players.length} characters • {new Date(save.savedAt).toLocaleString()}
-                            </div>
-                          </div>
-                          <div className="gm-row">
-                            <button className="gm-btn small active" onClick={() => GMManager.loadSession(save)}>Load</button>
-                            <button className="gm-btn small" onClick={() => downloadSession(save)}>Export</button>
-                            <button className="gm-btn small danger" onClick={() => GMManager.deleteSavedSession(save.id)}>Delete</button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  </>
-                )}
-                <div className="gm-hint">
-                  <b>Neverwinter Nights-Style GM Hosting:</b> A Game Master can host a live server on port <code>7878</code> (started automatically with <code>npm run dev</code> or standalone via <code>npm run gm:server</code>). Forward TCP port <code>7878</code> (and <code>8080</code> if hosting the web client) on your router so remote players can connect, spawn their Player Characters, and interact with your world in real time!
-                </div>
-
                 {GMNetworkManager.role === 'offline' ? (
-                  <>
                     <div className="gm-section">
-                      <div className="gm-section-title">Host a Game as GM (Dungeon Master)</div>
+                      <div className="gm-section-title">Host a game</div>
                       <div className="gm-field">
-                        <label>Session Title</label>
+                        <label>Name</label>
                         <input
                           className="gm-input"
                           value={hostSessionName}
                           onChange={e => setHostSessionName(e.target.value)}
                         />
                       </div>
-                      <div className="gm-field">
-                        <label>WebSocket Relay Bind URL (Port 7878)</label>
+                      <div className="gm-field" title="The relay starts with npm run dev, or on its own with npm run gm:server. For players outside your network, forward TCP port 7878 (and 8080 for the web client) on your router.">
+                        <label>Relay address</label>
                         <input
                           className="gm-input"
                           value={hostPortUrl}
@@ -2882,52 +2669,13 @@ export const GMPanel: React.FC = () => {
                         className="gm-btn success"
                         onClick={() => GMNetworkManager.hostSession(hostPortUrl, hostSessionName)}
                       >
-                        Start Hosting GM Server
+                        Start hosting
                       </button>
                     </div>
-
-                    <div className="gm-section">
-                      <div className="gm-section-title">Join a Hosted GM Game as a Player</div>
-                      <div className="gm-field">
-                        <label>GM Host Address (ws://IP:7878)</label>
-                        <input
-                          className="gm-input"
-                          value={joinUrl}
-                          onChange={e => setJoinUrl(e.target.value)}
-                          placeholder="ws://192.168.1.50:7878"
-                        />
-                      </div>
-                      <div className="gm-grid-2">
-                        <div className="gm-field">
-                          <label>Your Character Name</label>
-                          <input
-                            className="gm-input"
-                            value={joinPlayerName}
-                            onChange={e => setJoinPlayerName(e.target.value)}
-                          />
-                        </div>
-                        <div className="gm-field">
-                          <label>Character Build</label>
-                          <select
-                            className="gm-select"
-                            value={joinPresetIdx}
-                            onChange={e => setJoinPresetIdx(Number(e.target.value))}
-                          >
-                            {GMManager.PLAYER_PRESETS.map((p, i) => (
-                              <option key={i} value={i}>{p.name}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <button className="gm-btn active" onClick={startJoin}>
-                        Connect to GM Host & Spawn Player
-                      </button>
-                    </div>
-                  </>
                 ) : (
                   <div className="gm-section">
                     <div className="gm-section-title">
-                      <span>Active Session: {GMNetworkManager.role.toUpperCase()}</span>
+                      <span>{GMNetworkManager.role === 'host' ? 'Hosting' : 'In a game'}</span>
                       {isPlayerView ? (
                         // A player who leaves goes back to the main menu; staying in the scene offline would hand them the GM tools
                         <button className="gm-btn small danger" onClick={() => KotOR.GameState.ReturnToMainMenu()}>
@@ -2945,39 +2693,16 @@ export const GMPanel: React.FC = () => {
                     {GMNetworkManager.role === 'host' && (
                       <>
                         <div className="gm-row">
+                          <span className="gm-hint" style={{ flex: 1 }}>
+                            {GMNetworkManager.peers.size} connected. <a href="#" onClick={(e) => { e.preventDefault(); setDrawerTab('players'); }}>See them on Players</a>
+                          </span>
                           <button
-                            className="gm-btn small active"
+                            className="gm-btn small"
                             onClick={() => GMNetworkManager.sendWorldSnapshot()}
+                            title="If a player's scene looks wrong, send them the whole world again"
                           >
-                            Resync Full World Snapshot to Players
+                            Resend the world
                           </button>
-                        </div>
-                        <div className="gm-field">
-                          <label>Connected Players ({GMNetworkManager.peers.size})</label>
-                          <div className="gm-list" style={{ maxHeight: 100 }}>
-                            {Array.from(GMNetworkManager.peers.values()).map(peer => (
-                              <div key={peer.peerId} className="gm-card">
-                                <div className="gm-card-info">
-                                  <div className="gm-card-title">{peer.name}</div>
-                                  <div className="gm-card-sub">Peer ID: {peer.peerId} • Actor: {peer.controlledNetId || 'Spawning'}</div>
-                                </div>
-                                {peer.controlledNetId && GMManager.netIdMap.get(peer.controlledNetId) && (
-                                  <button
-                                    className="gm-btn small"
-                                    onClick={() => {
-                                      const obj = GMManager.netIdMap.get(peer.controlledNetId!);
-                                      if (obj) {
-                                        GMManager.selectObject(obj);
-                                        setDrawerTab('inspector');
-                                      }
-                                    }}
-                                  >
-                                    Inspect PC
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
                         </div>
                       </>
                     )}
@@ -2985,7 +2710,7 @@ export const GMPanel: React.FC = () => {
                 )}
 
                 <div className="gm-section">
-                  <div className="gm-section-title">Session Chat & DM Broadcast Log</div>
+                  <div className="gm-section-title">Chat</div>
                   <div className="gm-chat-box">
                     {GMNetworkManager.chatLog.length === 0 ? (
                       <div style={{ color: '#6c8dab' }}>No messages yet.</div>
@@ -3002,7 +2727,7 @@ export const GMPanel: React.FC = () => {
                     <input
                       className="gm-input"
                       style={{ flex: 1 }}
-                      placeholder="Send message / DM announcement..."
+                      placeholder="Say something to everyone"
                       value={chatInput}
                       onChange={e => setChatInput(e.target.value)}
                       onKeyDown={e => {
@@ -3030,6 +2755,99 @@ export const GMPanel: React.FC = () => {
                     </button>
                   </div>
                 </div>
+
+                {!isPlayerView && (
+                  <>
+                  <div className="gm-section">
+                    <div className="gm-section-title">When a player falls</div>
+                    <select className="gm-select" value={GMManager.deathRule} onChange={(e) => GMManager.setDeathRule(e.target.value as KotOR.GMDeathRule)}>
+                      <option value="kotor">KotOR rules: they get up with 1 HP once no enemy is near</option>
+                      <option value="gm">GM decides: they stay down until you revive them</option>
+                      <option value="respawn">Respawn: after {GMManager.RESPAWN_DELAY_SECONDS}s they can respawn at the entrance</option>
+                    </select>
+                    <div className="gm-hint">You can always revive them from the Players tab.</div>
+                  </div>
+                  <details className="gm-section" open={GMManager.getSavedSessions().length > 0}>
+                    <summary>Saved sessions <span className="gm-summary-note">{GMManager.getSavedSessions().length} saved</span></summary>
+                    <div className="gm-row">
+                      <input
+                        className="gm-input"
+                        style={{ flex: 1 }}
+                        value={sessionName}
+                        onChange={e => setSessionName(e.target.value)}
+                        placeholder={`${currentModuleName} session`}
+                      />
+                      <button className="gm-btn small success" onClick={() => { if (GMManager.saveSession(sessionName)) setSessionName(''); }}>
+                        Save
+                      </button>
+                      <button className="gm-btn small" onClick={() => sessionFileRef.current?.click()} title="Add a session exported from another browser">
+                        Import…
+                      </button>
+                      <input ref={sessionFileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={onImportSession} />
+                    </div>
+                    <div className="gm-hint">
+                      Keeps the scene, what you placed, doors and every player character. Players get theirs back by joining under the same name.
+                    </div>
+                    <div className="gm-list">
+                      {GMManager.getSavedSessions().map(save => (
+                        <div key={save.id} className="gm-card">
+                          <div className="gm-card-info">
+                            <div className="gm-card-title">{save.name}</div>
+                            <div className="gm-card-sub">
+                              {save.scene.module} • {save.objects.length} objects • {save.players.length} characters • {new Date(save.savedAt).toLocaleString()}
+                            </div>
+                          </div>
+                          <div className="gm-row">
+                            <button className="gm-btn small active" onClick={() => GMManager.loadSession(save)}>Load</button>
+                            <button className="gm-btn small" onClick={() => downloadSession(save)}>Export</button>
+                            <button className="gm-btn small danger" onClick={() => GMManager.deleteSavedSession(save.id)}>Delete</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+
+                  </>
+                )}
+                {GMNetworkManager.role === 'offline' && (
+                    <details className="gm-section">
+                      <summary>Join someone else's game <span className="gm-summary-note">as a player</span></summary>
+                      <div className="gm-field">
+                        <label>Their address</label>
+                        <input
+                          className="gm-input"
+                          value={joinUrl}
+                          onChange={e => setJoinUrl(e.target.value)}
+                          placeholder="ws://192.168.1.50:7878"
+                        />
+                      </div>
+                      <div className="gm-grid-2">
+                        <div className="gm-field">
+                          <label>Your name</label>
+                          <input
+                            className="gm-input"
+                            value={joinPlayerName}
+                            onChange={e => setJoinPlayerName(e.target.value)}
+                          />
+                        </div>
+                        <div className="gm-field">
+                          <label>Character</label>
+                          <select
+                            className="gm-select"
+                            value={joinPresetIdx}
+                            onChange={e => setJoinPresetIdx(Number(e.target.value))}
+                          >
+                            {GMManager.PLAYER_PRESETS.map((p, i) => (
+                              <option key={i} value={i}>{p.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <button className="gm-btn active" onClick={startJoin}>
+                        Join
+                      </button>
+                    </details>
+                )}
               </>
             )}
           </div>

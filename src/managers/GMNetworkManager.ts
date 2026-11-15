@@ -164,6 +164,8 @@ export interface GMSerializedActor {
   leftHandResRef?: string;
   armorResRef?: string;
   barkText?: string;
+  /** A held stance: a looping animations.2da name ('' standing) */
+  stance?: string;
   hasInventory?: boolean;
   locked?: boolean;
   openState?: number;

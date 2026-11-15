@@ -35,7 +35,8 @@
       "faction": "friendly",
       "count": 4,
       "at": { "spot": "room:m13aa_02a", "offset": [-2, 0], "formation": "ring", "spacing": 2.5 },
-      "customize": { "hp": 40 }
+      "customize": { "hp": 40 },
+      "stance": "meditate"
     },
     {
       "id": "padawans",
@@ -43,7 +44,8 @@
       "template": "n_jedicounf",
       "faction": "friendly",
       "count": 3,
-      "at": { "spot": "room:m13aa_02a", "offset": [-10, 6], "formation": "line", "spacing": 2 }
+      "at": { "spot": "room:m13aa_02a", "offset": [-10, 6], "formation": "line", "spacing": 2 },
+      "stance": "listen"
     },
     {
       "id": "dark_jedi",
@@ -73,6 +75,7 @@
       "faction": "neutral",
       "hidden": true,
       "at": { "spot": "room:m13aa_02a", "offset": [-14, -10] },
+      "stance": "kneel_sad",
       "bark": "They took the holocrons... they're going to Dxun."
     }
   ],
@@ -116,7 +119,9 @@
       "notes": "Reveals the dark Jedi; they attack at once.",
       "actions": [
         { "do": "reveal", "ids": ["dark_jedi", "dark_master", "rubble"] },
-        { "do": "say", "id": "dark_master", "text": "Leave none of them alive." }
+        { "do": "animate", "ids": ["jedi", "padawans"], "stance": "" },
+        { "do": "say", "id": "dark_master", "text": "Leave none of them alive." },
+        { "do": "animate", "ids": ["dark_master"], "gesture": "point" }
       ]
     },
     {

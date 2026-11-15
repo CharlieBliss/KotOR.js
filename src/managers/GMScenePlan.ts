@@ -66,6 +66,8 @@ export interface GMPlanActor {
   /** Placed but hidden from players and inert until a beat reveals it */
   hidden?: boolean;
   bark?: string;
+  /** A stance they hold (a GMManager.STANCES id, e.g. "meditate", "kneel_sad", "dead") */
+  stance?: string;
   order?: GMPlanOrder;
   customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string };
   loot?: string[];
@@ -96,6 +98,7 @@ export type GMPlanAction =
   | { do: 'order'; ids: string[]; order: GMPlanOrder | null }
   | { do: 'faction'; ids: string[]; faction: GMPlanFaction }
   | { do: 'say'; id: string; text: string }
+  | { do: 'animate'; ids: string[]; stance?: string; gesture?: string }
   | { do: 'narrate'; text: string }
   | { do: 'freezePlayers'; on: boolean }
   | { do: 'movePlayers'; to: GMPlanPlacement }
@@ -239,8 +242,16 @@ export class GMScenePlan {
       if (order.kind === 'patrol') (order.points || []).forEach((p: any) => spotOk(p?.spot, where));
       if (!['attack', 'follow', 'move', 'guard', 'patrol', 'flee', 'standDown'].includes(order.kind)) error(where, `Unknown order "${order.kind}".`);
     };
+    // An empty stance means standing normally
+    const stanceOk = (stance: any, where: string) => {
+      if (stance && !GMManager.findAnimationChoice('stance', stance)) warn(where, `Unknown stance "${stance}".`);
+    };
     spotOk(plan.players?.at?.spot, 'players.at');
-    (plan.actors || []).forEach((a: any, i: number) => { spotOk(a?.at?.spot, `actors[${i}].at`); orderOk(a?.order, `actors[${i}].order`); });
+    (plan.actors || []).forEach((a: any, i: number) => {
+      spotOk(a?.at?.spot, `actors[${i}].at`);
+      orderOk(a?.order, `actors[${i}].order`);
+      stanceOk(a?.stance, `actors[${i}].stance`);
+    });
     (plan.props || []).forEach((p: any, i: number) => spotOk(p?.at?.spot, `props[${i}].at`));
     (plan.beats || []).forEach((beat: any, b: number) => {
       if (!beat?.title) warn(`beats[${b}]`, 'A beat should have a title.');
@@ -251,7 +262,12 @@ export class GMScenePlan {
         }
         if (action?.do === 'order') orderOk(action.order, where);
         if (action?.do === 'movePlayers') spotOk(action.to?.spot, where);
-        if (!['reveal', 'hide', 'order', 'faction', 'say', 'narrate', 'freezePlayers', 'movePlayers', 'check'].includes(action?.do)) error(where, `Unknown action "${action?.do}".`);
+        if (action?.do === 'animate') {
+          if (action.stance === undefined && !action.gesture) error(where, 'Give a stance or a gesture.');
+          stanceOk(action.stance, where);
+          if (action.gesture && !GMManager.findAnimationChoice('gesture', action.gesture)) warn(where, `Unknown gesture "${action.gesture}".`);
+        }
+        if (!['reveal', 'hide', 'order', 'faction', 'say', 'animate', 'narrate', 'freezePlayers', 'movePlayers', 'check'].includes(action?.do)) error(where, `Unknown action "${action?.do}".`);
       });
     });
     return problems;
@@ -430,6 +446,8 @@ export class GMScenePlan {
       const name = count > 1 && actor.name ? `${actor.name} ${i + 1}` : config.name;
       const cre = await GMManager.spawnCreature({ ...config, name }, points[i], this.facingFrom(points[i], actor.facing));
       if (!cre) continue;
+      // Each model picks its own take on the stance (a droid lies dead differently)
+      if (actor.stance && !GMManager.setCreatureStance(cre, actor.stance)) this.note(`Actor "${actor.id}": its model can't take the stance "${actor.stance}".`);
       if (actor.hidden) this.setHidden(cre, true);
       placed.push(cre);
     }
@@ -582,6 +600,14 @@ export class GMScenePlan {
         if (obj) GMManager.triggerBarkNow(obj, `${obj.getName()}: ${action.text}`);
         break;
       }
+      case 'animate':
+        for (const obj of this.objectsFor(action.ids)) {
+          if (action.stance !== undefined && !GMManager.setCreatureStance(obj, action.stance)) {
+            this.note(`${obj.getName()} can't take the stance "${action.stance}".`);
+          }
+          if (action.gesture) GMManager.playGesture(obj, action.gesture);
+        }
+        break;
       case 'narrate':
         this.narrate(action.text);
         break;

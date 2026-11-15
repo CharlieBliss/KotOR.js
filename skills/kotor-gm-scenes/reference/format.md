@@ -80,6 +80,7 @@ Every point is snapped to the nearest walkable floor, so a slightly-off offset i
   "facing": "toward:room:m13aa_01a",
   "hidden": true,                         // placed now, invisible and inert until a beat reveals it
   "bark": "Line spoken when a player clicks them.",
+  "stance": "meditate",                   // optional: held while idle (see Stances and gestures)
   "order": { "kind": "attack", "target": "jedi" },   // optional standing order (see Orders)
   "customize": { "hp": 150, "rightHand": "g_w_lghtsbr02", "appearance": "Dark_Jedi_Male_01" },  // optional
   "loot": ["g_i_credits001"]              // optional items from catalog/<content>/items.tsv
@@ -153,10 +154,103 @@ Beats are the scene's script: steps the GM runs in order, at their own pace.
 | `{ "do": "order", "ids": [...], "order": <order> }` | A new order; `"order": null` hands them back to their own judgement |
 | `{ "do": "faction", "ids": [...], "faction": "hostile" }` | Change sides (an ally turns) |
 | `{ "do": "say", "id": "<id>", "text": "..." }` | The actor speaks (shown over the scene and in chat) |
+| `{ "do": "animate", "ids": [...], "stance": "kneel_sad", "gesture": "bow" }` | A new stance (`""` stands them up) and/or a one-off gesture; either is optional |
 | `{ "do": "narrate", "text": "..." }` | GM narration in chat |
 | `{ "do": "freezePlayers", "on": true }` | Players watch only (`false`: they're free again) |
 | `{ "do": "movePlayers", "to": <placement> }` | Move every player's character |
 | `{ "do": "check", "check": "awareness", "dc": 15, "secret": false }` | Every player rolls a skill (`computer use`, `demolitions`, `stealth`, `awareness`, `persuade`, `repair`, `security`, `treat injury`) or a save (`fortitude`, `reflex`, `will`) |
+
+## Stances and gestures
+
+A **stance** is held whenever the actor would otherwise just stand: after walking somewhere, after a gesture. Combat interrupts it, and it comes back afterwards. A **gesture** plays once.
+
+Each creature's model has its own set of animations. When an actor's model lacks a stance, it just stands, and the importer notes it. "Both" means both games' human models have it; "KotOR II" means only KotOR II's do; "some models" means a few creatures have it, so check in the game.
+
+**Stances**
+
+| id | Looks like | Models |
+|---|---|---|
+| `listen` | Listening | both |
+| `talk` | Talking | both |
+| `talk_forceful` | Talking, forceful | both |
+| `talk_pleading` | Pleading | both |
+| `talk_sad` | Talking, sad | both |
+| `laugh` | Laughing | both |
+| `kneel_angry` | Kneeling, angry | KotOR II |
+| `kneel_sad` | Kneeling, sad | KotOR II |
+| `attention` | At attention | KotOR II |
+| `pointing` | Pointing | KotOR II |
+| `injured` | Injured | both |
+| `tired` | Tired | both |
+| `sick` | Sick or poisoned | both |
+| `crouched` | Crouched (sneaking) | both |
+| `meditate` | Meditating | both |
+| `meditate_sit` | Meditating, seated | KotOR II |
+| `meditate_stand` | Meditating, standing | KotOR II |
+| `sit` | Sitting on the ground | KotOR II |
+| `chair` | Sitting in a chair | both |
+| `chair_drunk` | Slumped in a chair | both |
+| `chair_pazaak` | Playing pazaak at a table | both |
+| `computer` | Using a computer | both |
+| `datapad` | Reading a datapad | some models |
+| `weld` | Welding | some models |
+| `treat` | Tending the wounded | both |
+| `cards` | Playing cards | some models |
+| `dance` | Dancing | both |
+| `dance2` | Dancing (other) | both |
+| `flirt` | Flirting | both |
+| `horror` | Horrified | both |
+| `fear` | Cowering | some models |
+| `choke` | Choking | both |
+| `spasm` | Convulsing | both |
+| `paralyzed` | Paralyzed | both |
+| `collapsed` | Collapsed | some models |
+| `sleep` | Asleep | both |
+| `prone` | Lying down | both |
+| `prone_talk` | Lying wounded, talking | KotOR II |
+| `dead` | Lying dead | both |
+| `dead_back` | Lying dead (other) | both |
+| `dead_face` | Lying dead, face down | both |
+| `shut_down` | Shut down | some models |
+
+**Gestures**
+
+| id | Looks like | Models |
+|---|---|---|
+| `bow` | Bow | both |
+| `salute` | Salute | both |
+| `greet` | Wave | both |
+| `nod` | Nod | KotOR II |
+| `shake` | Shake head | KotOR II |
+| `shrug` | Shrug | KotOR II |
+| `heart` | Hand on heart | KotOR II |
+| `roll_eyes` | Roll eyes | KotOR II |
+| `persuade` | Persuade | both |
+| `cheer` | Cheer | both |
+| `taunt` | Taunt | both |
+| `point` | Point | KotOR II |
+| `point_up` | Point up | KotOR II |
+| `point_down` | Point down | some models |
+| `look_left` | Look left | both |
+| `look_right` | Look right | both |
+| `look_around` | Look around | KotOR II |
+| `scratch` | Scratch head | KotOR II |
+| `bored` | Bored | KotOR II |
+| `pick_up` | Pick up from the ground | both |
+| `take_table` | Take from a table | both |
+| `console` | Work a console | both |
+| `activate` | Use an item | both |
+| `inject` | Use a medpac | both |
+| `drink` | Drink | some models |
+| `lock` | Pick a lock | both |
+| `throw` | Throw | both |
+| `kneel` | Kneel | both |
+| `sit_down` | Sit down | both |
+| `stand_up` | Stand up | both |
+| `power` | Use a Force power | some models |
+| `roll` | Dive roll | KotOR II |
+
+Droids and beasts: `spasm`, `dead` and `shut_down` (droids), and the gestures `cheer`, `taunt`, `look_left` and `look_right`, use their own versions.
 
 ## What the importer can't do (yet)
 

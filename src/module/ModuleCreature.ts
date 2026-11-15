@@ -1144,6 +1144,9 @@ export class ModuleCreature extends ModuleObject {
     if((GameState.Mode == EngineMode.DIALOG) && this.dialogAnimation && !this.speed && !this.isDead())
       return;
 
+    this.holdStance();
+    this.refreshIdleStance();
+
     if(this.animationState.animation){
       if(currentAnimation != this.animationState.animation.name?.toLowerCase()){
         if(!this.animationState.started){
@@ -1486,6 +1489,75 @@ export class ModuleCreature extends ModuleObject {
       }
     }
     return action;
+  }
+
+  /** The idle states whose stance depends on condition: standing, injured (HP at or below 20%) or sick */
+  static readonly IDLE_STATES = new Set<number>([
+    ModuleCreatureAnimState.PAUSE, ModuleCreatureAnimState.PAUSE_ALT, ModuleCreatureAnimState.PAUSE2,
+    ModuleCreatureAnimState.PAUSE3, ModuleCreatureAnimState.PAUSE4,
+  ]);
+  /** animations.2da rows of those stances: pause1, pause2, pauseinj, pausetired (sick), pause3, pause4 */
+  static readonly IDLE_STANCE_ROWS = [6, 7, 8, 15, 357, 359];
+
+  /**
+   * An idle stance loops until something else plays, so it was only ever chosen once. Pick it again when the
+   * creature's condition changes: one healed (or spawned before its HP was set) stops limping, one badly hurt starts.
+   */
+  refreshIdleStance(){
+    const state = this.animationState;
+    if(this.heldStance || !state.animation || !ModuleCreature.IDLE_STATES.has(state.index) || this.isSimpleCreature()) return;
+    // Something else is playing in the idle state (a scripted animation, say): leave it
+    if(!this.isIdleStanceAnimation(state.animation)) return;
+    const wanted = this.animationConstantToAnimation(state.index);
+    if(this.isIdleStanceAnimation(wanted) && wanted.name !== state.animation.name) this.setAnimationState(state.index);
+  }
+
+  /** Whether an animation is one of the plain idle stances the engine picks by itself */
+  isIdleStanceAnimation(anim?: ITwoDAAnimation): boolean {
+    if(!anim) return false;
+    const table = GameState.TwoDAManager?.datatables.get('animations');
+    if(!table) return false;
+    if(ModuleCreature.IDLE_STANCE_ROWS.some((row) => table.rows[row]?.name === anim.name)) return true;
+    // Beasts and droids idle on their own rows
+    return this.isSimpleCreature() && (anim.name === table.rows[256]?.name || anim.name === table.rows[257]?.name);
+  }
+
+  /**
+   * A looping animation (an animations.2da name) the creature holds whenever it would otherwise just stand idle:
+   * sitting, meditating, lying wounded... It survives walking somewhere and gestures, and gives way to combat.
+   */
+  heldStance: string = '';
+
+  setHeldStance(name: string = ''){
+    const previous = this.heldStance;
+    this.heldStance = String(name || '').trim().toLowerCase();
+    if(previous && previous !== this.heldStance && this.animationState.animation?.name?.toLowerCase() === previous){
+      // Back to standing (or straight into the new stance)
+      this.setAnimationState(ModuleCreatureAnimState.PAUSE);
+    }
+    this.holdStance();
+  }
+
+  /** Put the held stance back once the creature is just standing again */
+  holdStance(){
+    if(!this.heldStance || this.isDead() || this.combatData?.combatState) return;
+    const state = this.animationState;
+    if(state.index !== ModuleCreatureAnimState.PAUSE) return;
+    const current = state.animation?.name?.toLowerCase();
+    if(current === this.heldStance) return;
+    // Let a gesture or scripted animation finish first
+    if(state.animation && !this.isIdleStanceAnimation(state.animation)) return;
+    // A model without it would fall straight back to idle and try again every frame
+    if(!this.hasModelAnimation(this.heldStance)) return;
+    const anim = OdysseyModelAnimation.GetAnimation2DA(this.heldStance);
+    if(!anim) return;
+    this.playTwoDAAnimation(anim);
+  }
+
+  /** Whether the creature's loaded model has an animation of this name */
+  hasModelAnimation(name: string = ''): boolean {
+    const model = this.model as any;
+    return !!model?.odysseyAnimationMap?.has?.(String(name).toLowerCase().trim());
   }
 
   setAnimationState(animState: ModuleCreatureAnimState){

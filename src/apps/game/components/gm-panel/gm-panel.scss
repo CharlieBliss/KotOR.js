@@ -501,6 +501,15 @@
     gap: 7px;
   }
 
+  // A section inside a section: just a divider, not another box
+  .gm-section .gm-section {
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(66, 139, 202, 0.2);
+    border-radius: 0;
+    padding: 8px 0 0;
+  }
+
   .gm-section-title {
     font-size: 11px;
     font-weight: 700;
@@ -510,6 +519,51 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+  }
+
+  .gm-section-title .gm-summary-note {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #8aa4bd;
+  }
+
+  // A section that opens on demand: rarely used controls stay out of the way until wanted
+  details.gm-section {
+    gap: 0;
+
+    > summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #6bc5ff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      &::-webkit-details-marker { display: none; }
+      &::before {
+        content: '▸';
+        font-size: 10px;
+        transition: transform 0.15s;
+      }
+      .gm-summary-note {
+        margin-left: auto;
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #8aa4bd;
+      }
+    }
+
+    &[open] {
+      gap: 7px;
+      > summary::before { transform: rotate(90deg); }
+    }
   }
 
   .gm-row {

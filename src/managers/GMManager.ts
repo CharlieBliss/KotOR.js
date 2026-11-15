@@ -70,6 +70,15 @@ export interface GMModuleEntry {
   description: string;
 }
 
+/** A stance or gesture the GM can give a creature */
+export interface GMAnimationChoice {
+  id: string;
+  label: string;
+  group: string;
+  /** animations.2da names, best first */
+  anims: string[];
+}
+
 export interface GMCreatureSpawnConfig {
   name: string;
   /** A game template (.utc). Without customized, the creature keeps the template's own look, stats and gear */
@@ -90,6 +99,8 @@ export interface GMCreatureSpawnConfig {
   leftHandResRef?: string;
   armorResRef?: string;
   barkText?: string;
+  /** A held stance (a looping animations.2da name) */
+  stance?: string;
   aiDisabled?: boolean;
   /** A preset only one game has the template for */
   onlyIn?: 'kotor' | 'tsl';
@@ -238,6 +249,7 @@ export interface GMSavedObject {
   hidden?: boolean;
   loot: string[];
   barkText: string;
+  stance?: string;
 }
 
 /** A player character as saved in a session; network players are matched back by name */
@@ -2282,8 +2294,12 @@ export class GMManager {
     return tool === 'order_move' || tool === 'order_attack' || tool === 'order_follow' || tool === 'order_patrol';
   }
 
+  /** The placement tool the toolbar's Place button turns on: the last one used */
+  static lastPlacementTool: GMToolMode = 'place_creature';
+
   static setToolMode(tool: GMToolMode) {
     const previous = this.activeTool;
+    if (this.isPlacementTool(tool)) this.lastPlacementTool = tool;
     if (previous === 'order_patrol' && tool !== 'order_patrol') this.finishPatrolOrder();
     if (this.isOrderTool(previous) && !this.isOrderTool(tool)) this.orderSubject = null;
     this.activeTool = tool;
@@ -2915,6 +2931,7 @@ export class GMManager {
     if (config.barkText) {
       (creature as any).gmBarkText = config.barkText;
     }
+    if (config.stance) creature.setHeldStance(config.stance);
 
     area.attachObject(creature);
     creature.load();
@@ -3674,6 +3691,165 @@ export class GMManager {
       GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(obj));
     }
     this.notifyChange();
+  }
+
+  // =========================================================================
+  // Stances and gestures
+  // =========================================================================
+
+  /**
+   * Stances a creature can hold: looping animations.2da names. A model offers those it has; several names
+   * mean "the first one it has" (droids and beasts name theirs differently).
+   */
+  static STANCES: GMAnimationChoice[] = [
+    { id: 'listen', label: 'Listening', group: 'Talking', anims: ['listen'] },
+    { id: 'talk', label: 'Talking', group: 'Talking', anims: ['tlknorm'] },
+    { id: 'talk_forceful', label: 'Talking, forceful', group: 'Talking', anims: ['tlkforce'] },
+    { id: 'talk_pleading', label: 'Pleading', group: 'Talking', anims: ['tlkplead'] },
+    { id: 'talk_sad', label: 'Talking, sad', group: 'Talking', anims: ['tlksad'] },
+    { id: 'laugh', label: 'Laughing', group: 'Talking', anims: ['tlklaugh'] },
+    { id: 'kneel_angry', label: 'Kneeling, angry', group: 'Talking', anims: ['kdtlkangry'] },
+    { id: 'kneel_sad', label: 'Kneeling, sad', group: 'Talking', anims: ['kdtlksad'] },
+    { id: 'attention', label: 'At attention', group: 'Standing', anims: ['standstill'] },
+    { id: 'pointing', label: 'Pointing', group: 'Standing', anims: ['pointloop'] },
+    { id: 'injured', label: 'Injured', group: 'Standing', anims: ['pauseinj'] },
+    { id: 'tired', label: 'Tired', group: 'Standing', anims: ['pausetrd'] },
+    { id: 'sick', label: 'Sick or poisoned', group: 'Standing', anims: ['pausepsn'] },
+    { id: 'crouched', label: 'Crouched (sneaking)', group: 'Standing', anims: ['pausestl'] },
+    { id: 'meditate', label: 'Meditating', group: 'Jedi', anims: ['meditate'] },
+    { id: 'meditate_sit', label: 'Meditating, seated', group: 'Jedi', anims: ['meditatesit'] },
+    { id: 'meditate_stand', label: 'Meditating, standing', group: 'Jedi', anims: ['meditatestand'] },
+    { id: 'sit', label: 'Sitting on the ground', group: 'Sitting', anims: ['sit'] },
+    { id: 'chair', label: 'Sitting in a chair', group: 'Sitting', anims: ['animloop01'] },
+    { id: 'chair_drunk', label: 'Slumped in a chair', group: 'Sitting', anims: ['animloop02'] },
+    { id: 'chair_pazaak', label: 'Playing pazaak at a table', group: 'Sitting', anims: ['animloop03'] },
+    { id: 'computer', label: 'Using a computer', group: 'Working', anims: ['usecomplp'] },
+    { id: 'datapad', label: 'Reading a datapad', group: 'Working', anims: ['handheldlp'] },
+    { id: 'weld', label: 'Welding', group: 'Working', anims: ['weld'] },
+    { id: 'treat', label: 'Tending the wounded', group: 'Working', anims: ['treatinjlp'] },
+    { id: 'cards', label: 'Playing cards', group: 'Working', anims: ['cardplay'] },
+    { id: 'dance', label: 'Dancing', group: 'Fun', anims: ['dance'] },
+    { id: 'dance2', label: 'Dancing (other)', group: 'Fun', anims: ['dance1'] },
+    { id: 'flirt', label: 'Flirting', group: 'Fun', anims: ['flirt'] },
+    { id: 'horror', label: 'Horrified', group: 'Distress', anims: ['horror'] },
+    { id: 'fear', label: 'Cowering', group: 'Distress', anims: ['fear'] },
+    { id: 'choke', label: 'Choking', group: 'Distress', anims: ['choke'] },
+    { id: 'spasm', label: 'Convulsing', group: 'Distress', anims: ['spasm', 'cspasm'] },
+    { id: 'paralyzed', label: 'Paralyzed', group: 'Distress', anims: ['paralyzed'] },
+    { id: 'collapsed', label: 'Collapsed', group: 'Distress', anims: ['collapselp'] },
+    { id: 'sleep', label: 'Asleep', group: 'Lying down', anims: ['sleep'] },
+    { id: 'prone', label: 'Lying down', group: 'Lying down', anims: ['prone'] },
+    { id: 'prone_talk', label: 'Lying wounded, talking', group: 'Lying down', anims: ['talkprone'] },
+    { id: 'dead', label: 'Lying dead', group: 'Lying down', anims: ['dead', 'cdead'] },
+    { id: 'dead_back', label: 'Lying dead (other)', group: 'Lying down', anims: ['dead1'] },
+    { id: 'dead_face', label: 'Lying dead, face down', group: 'Lying down', anims: ['dead3'] },
+    { id: 'shut_down', label: 'Shut down', group: 'Droid', anims: ['disabled'] },
+  ];
+
+  /** One-off gestures: the creature does it once, then goes back to its stance */
+  static GESTURES: GMAnimationChoice[] = [
+    { id: 'bow', label: 'Bow', group: 'Social', anims: ['bow'] },
+    { id: 'salute', label: 'Salute', group: 'Social', anims: ['salute'] },
+    { id: 'greet', label: 'Wave', group: 'Social', anims: ['greeting'] },
+    { id: 'nod', label: 'Nod', group: 'Social', anims: ['nodyes'] },
+    { id: 'shake', label: 'Shake head', group: 'Social', anims: ['nodno'] },
+    { id: 'shrug', label: 'Shrug', group: 'Social', anims: ['shrug'] },
+    { id: 'heart', label: 'Hand on heart', group: 'Social', anims: ['touchheart'] },
+    { id: 'roll_eyes', label: 'Roll eyes', group: 'Social', anims: ['rolleyes'] },
+    { id: 'persuade', label: 'Persuade', group: 'Social', anims: ['persuade'] },
+    { id: 'cheer', label: 'Cheer', group: 'Social', anims: ['victory', 'cvictory'] },
+    { id: 'taunt', label: 'Taunt', group: 'Social', anims: ['taunt', 'ctaunt'] },
+    { id: 'point', label: 'Point', group: 'Look', anims: ['point'] },
+    { id: 'point_up', label: 'Point up', group: 'Look', anims: ['uppoint'] },
+    { id: 'point_down', label: 'Point down', group: 'Look', anims: ['pointdown'] },
+    { id: 'look_left', label: 'Look left', group: 'Look', anims: ['hturnl', 'chturnl'] },
+    { id: 'look_right', label: 'Look right', group: 'Look', anims: ['hturnr', 'chturnr'] },
+    { id: 'look_around', label: 'Look around', group: 'Look', anims: ['scanning'] },
+    { id: 'scratch', label: 'Scratch head', group: 'Look', anims: ['pausesh'] },
+    { id: 'bored', label: 'Bored', group: 'Look', anims: ['pausebrd'] },
+    { id: 'pick_up', label: 'Pick up from the ground', group: 'Hands', anims: ['getfromgnd'] },
+    { id: 'take_table', label: 'Take from a table', group: 'Hands', anims: ['getfromtbl'] },
+    { id: 'console', label: 'Work a console', group: 'Hands', anims: ['usecomp'] },
+    { id: 'activate', label: 'Use an item', group: 'Hands', anims: ['activate'] },
+    { id: 'inject', label: 'Use a medpac', group: 'Hands', anims: ['inject'] },
+    { id: 'drink', label: 'Drink', group: 'Hands', anims: ['drink'] },
+    { id: 'lock', label: 'Pick a lock', group: 'Hands', anims: ['unlockdr'] },
+    { id: 'throw', label: 'Throw', group: 'Hands', anims: ['throwgren'] },
+    { id: 'kneel', label: 'Kneel', group: 'Body', anims: ['kneel'] },
+    { id: 'sit_down', label: 'Sit down', group: 'Body', anims: ['sitdown'] },
+    { id: 'stand_up', label: 'Stand up', group: 'Body', anims: ['standup'] },
+    { id: 'power', label: 'Use a Force power', group: 'Body', anims: ['castout1'] },
+    { id: 'roll', label: 'Dive roll', group: 'Body', anims: ['diveroll'] },
+  ];
+
+  /** The animation a creature would play for a choice, or '' when its model has none of them */
+  static animationFor(cre: ModuleCreature, choice: GMAnimationChoice, looping: boolean): string {
+    for (const name of choice.anims) {
+      if (!cre.hasModelAnimation?.(name)) continue;
+      const row = OdysseyModelAnimation.GetAnimation2DA(name);
+      if (!row) continue;
+      if (looping && String(row.looping) !== '1') continue;
+      return name;
+    }
+    return '';
+  }
+
+  /** The choices this creature's model can do */
+  static availableAnimations(cre: ModuleCreature, kind: 'stance' | 'gesture'): GMAnimationChoice[] {
+    const list = kind === 'stance' ? this.STANCES : this.GESTURES;
+    return list.filter((choice) => !!this.animationFor(cre, choice, kind === 'stance'));
+  }
+
+  /** Find a choice by id, label or animation name */
+  static findAnimationChoice(kind: 'stance' | 'gesture', key: string): GMAnimationChoice | undefined {
+    const k = String(key || '').trim().toLowerCase();
+    if (!k) return undefined;
+    const list = kind === 'stance' ? this.STANCES : this.GESTURES;
+    return list.find((c) => c.id === k || c.label.toLowerCase() === k || c.anims.includes(k));
+  }
+
+  /** The id of the stance a creature holds ('' standing) */
+  static stanceOf(cre: ModuleCreature): string {
+    const held = cre?.heldStance || '';
+    if (!held) return '';
+    return this.STANCES.find((c) => c.anims.includes(held))?.id || held;
+  }
+
+  /**
+   * Hold a creature in a stance until changed ('' to stand normally). Returns false when its model can't do it.
+   * Takes a stance id, its label or an animations.2da name.
+   */
+  static setCreatureStance(obj: ModuleObject, stance: string): boolean {
+    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
+    const cre = obj as ModuleCreature;
+    let anim = '';
+    if (stance) {
+      const choice = this.findAnimationChoice('stance', stance) || { id: stance, label: stance, group: '', anims: [String(stance).toLowerCase()] };
+      anim = this.animationFor(cre, choice, true);
+      if (!anim) return false;
+    }
+    cre.setHeldStance(anim);
+    if ((cre as any).gmSpawnConfig) (cre as any).gmSpawnConfig.stance = anim || undefined;
+    if (GMNetworkManager.role === 'host') {
+      GMNetworkManager.broadcastActorUpdate(this.serializeSingleActor(cre));
+    }
+    this.notifyChange();
+    return true;
+  }
+
+  /** Play a gesture once (an id, label or animations.2da name). Players see it too. */
+  static playGesture(obj: ModuleObject, gesture: string): boolean {
+    if (!obj || !BitWise.InstanceOf(obj.objectType, ModuleObjectType.ModuleCreature)) return false;
+    const cre = obj as ModuleCreature;
+    if (cre.isDead()) return false;
+    const choice = this.findAnimationChoice('gesture', gesture) || { id: gesture, label: gesture, group: '', anims: [String(gesture).toLowerCase()] };
+    const anim = this.animationFor(cre, choice, false);
+    const row = anim && OdysseyModelAnimation.GetAnimation2DA(anim);
+    if (!row) return false;
+    // From a held stance (or just standing): play it in the idle slot, and the stance comes back after
+    if (cre.animationState.index !== ModuleCreatureAnimState.PAUSE) cre.setAnimationState(ModuleCreatureAnimState.PAUSE);
+    cre.playTwoDAAnimation(row);
+    return true;
   }
 
   static setObjectBark(obj: ModuleObject, barkText: string) {
@@ -4687,6 +4863,7 @@ export class GMManager {
       leftHandResRef,
       armorResRef,
       barkText: (obj as any).gmBarkText || '',
+      stance: isPlaceable ? undefined : ((obj as ModuleCreature).heldStance || ''),
       hasInventory: isPlaceable ? (obj as ModulePlaceable).hasInventory : false,
       locked: isPlaceable ? (obj as ModulePlaceable).isLocked() : false,
       openState: isPlaceable ? (obj as ModulePlaceable).state : 0,
@@ -4874,6 +5051,7 @@ export class GMManager {
         const cre = existing as ModuleCreature;
         cre.setFacing(actor.facing, false);
         if (!!cre.stealthMode !== !!actor.stealth) cre.setStealthMode(!!actor.stealth, true);
+        if (actor.stance !== undefined && (cre.heldStance || '') !== actor.stance) cre.setHeldStance(actor.stance);
         if (cre.factionId !== actor.factionId) {
           this.assignFaction(cre, actor.factionId);
         }
@@ -4958,7 +5136,8 @@ export class GMManager {
           rightHandResRef: actor.rightHandResRef,
           leftHandResRef: actor.leftHandResRef,
           armorResRef: actor.armorResRef,
-          barkText: actor.barkText
+          barkText: actor.barkText,
+          stance: actor.stance
         },
         pos,
         actor.facing,
@@ -5404,6 +5583,7 @@ export class GMManager {
         hidden: !!(cre as any).gmHidden,
         loot: this.toLootItems(cre.inventory).map((e) => e.resRef),
         barkText: (cre as any).gmBarkText || '',
+        stance: cre.heldStance || undefined,
       });
     }
 
@@ -5560,7 +5740,7 @@ export class GMManager {
       if (saved.kind === 'creature') {
         const cfg = saved.config as GMCreatureSpawnConfig;
         const cre = await this.spawnCreature(
-          { ...cfg, factionId: saved.factionId ?? cfg.factionId, hp: saved.maxHp ?? cfg.hp, barkText: saved.barkText, lootResRefs: saved.loot },
+          { ...cfg, factionId: saved.factionId ?? cfg.factionId, hp: saved.maxHp ?? cfg.hp, barkText: saved.barkText, stance: saved.stance, lootResRefs: saved.loot },
           pos,
           saved.facing
         );
