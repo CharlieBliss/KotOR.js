@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import type { GMCharacter } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
-import { GMManager } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { ModelList } from "@/apps/game/components/gm-panel/creator/ModelList";
 import { GameImage } from "@/apps/game/components/gm-panel/creator/GameImage";
 import { ABILITY_NAMES, creatorModels, creatorPortraits, portraitForModel } from "@/apps/game/components/gm-panel/creator/creatorData";
@@ -244,6 +243,7 @@ export const SkillsSection: React.FC<{ c: GMCharacter; update: Update; recommend
 export const GearSection: React.FC<{ c: GMCharacter; update: Update; limits: ICharacterLimits }> = React.memo(({ c, update, limits }) => {
   if (limits.gear === false) return <Panel title="Equipment"><span className="cc-hint">The GM chooses starting equipment in this session.</span></Panel>;
   const gear = c.gear || {};
+  const options = useMemo(() => KotOR.GMCharacters.gearOptions(), []);
   const slot = (key: 'rightHand' | 'leftHand' | 'armor', label: string, items: { resRef: string; label: string }[]) => (
     <label className="cc-field">
       <span>{label}</span>
@@ -257,9 +257,9 @@ export const GearSection: React.FC<{ c: GMCharacter; update: Update; limits: ICh
   return (
     <Panel title="Equipment">
       <div className="cc-gear">
-        {slot('rightHand', 'Right hand', GMManager.WEAPON_OPTIONS)}
-        {slot('leftHand', 'Left hand', GMManager.WEAPON_OPTIONS)}
-        {slot('armor', 'Armour', GMManager.ARMOR_OPTIONS)}
+        {slot('rightHand', 'Right hand', options.weapons)}
+        {slot('leftHand', 'Left hand', options.weapons)}
+        {slot('armor', 'Armour', options.armor)}
       </div>
     </Panel>
   );

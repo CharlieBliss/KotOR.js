@@ -4,6 +4,7 @@ import type { GMCharacter } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { GMManager, GMNetworkManager, GMPlayers } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { GameImage } from "@/apps/game/components/gm-panel/creator/GameImage";
+import { ModelPreview } from "@/apps/game/components/gm-panel/creator/ModelPreview";
 import { ABILITY_NAMES, creatorPortraits, portraitForModel } from "@/apps/game/components/gm-panel/creator/creatorData";
 import {
   AttributesSection, ClassSection, FeatsSection, GearSection, LookSection, Panel, PowersSection, SkillsSection,
@@ -176,6 +177,7 @@ export const CharacterCreator: React.FC<{
             {section === 'gear' && <GearSection c={draft} update={update} limits={limits} />}
           </div>
           <aside className="cc-side" aria-label="Summary">
+            <ModelPreview character={draft} />
             <Panel title={draft.name || 'Unnamed'}>
               <div className="cc-summary-head">
                 <GameImage texture={portraitTexture(draft.portraitId)} alt="Portrait" className="cc-summary-portrait" />

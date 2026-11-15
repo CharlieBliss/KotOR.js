@@ -3,6 +3,12 @@ import { GameEngineType } from "@/enums/engine/GameEngineType";
 import { CharacterBuilder } from "@/engine/rules/CharacterBuilder";
 import { ABILITIES } from "@/engine/rules/CharacterRules";
 import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
+import { GMTemplates } from "@/managers/gm/GMTemplates";
+import { GFFObject } from "@/resource/GFFObject";
+import { GFFDataType } from "@/enums/resource/GFFDataType";
+import { ResourceTypes } from "@/resource/ResourceTypes";
+import { KEYManager } from "@/managers/KEYManager";
+import { WEAPON_OPTIONS, ARMOR_OPTIONS } from "@/managers/gm/data/itemOptions";
 
 const STORAGE_PREFIX = 'kotorjs.gm.characters.';
 
@@ -135,6 +141,37 @@ export class GMCharacters {
       spellIds: character.powers,
       skillRanks: character.skillRanks,
     };
+  }
+
+  /**
+   * The weapons and armour a character can start with in the running game: the GM lists' items that this
+   * game's files have (the lists name KotOR's items, and KotOR II lacks some)
+   */
+  static gearOptions(): { weapons: { resRef: string; label: string }[]; armor: { resRef: string; label: string }[] } {
+    const exists = (resRef: string) => {
+      try { return !!KEYManager.Key?.getFileKey(resRef, ResourceTypes.uti); } catch (e) { return false; }
+    };
+    const available = (items: { resRef: string; label: string }[]) => items.filter((i) => i.resRef && exists(i.resRef));
+    return { weapons: available(WEAPON_OPTIONS), armor: available(ARMOR_OPTIONS) };
+  }
+
+  /**
+   * A creature template with just what shows: the body, portrait (for player heads), alignment (light or dark
+   * head textures) and gear. For previewing a character's model without putting it in the world.
+   */
+  static previewTemplate(character: Pick<GMCharacter, 'appearanceId' | 'appearanceLabel' | 'portraitId' | 'gender' | 'alignment' | 'gear'>): GFFObject {
+    const template = new GFFObject();
+    const root = template.RootNode;
+    GMTemplates.set(root, GFFDataType.WORD, 'Appearance_Type', this.resolveAppearance(character));
+    GMTemplates.set(root, GFFDataType.WORD, 'PortraitId', character.portraitId);
+    GMTemplates.set(root, GFFDataType.BYTE, 'Gender', character.gender);
+    GMTemplates.set(root, GFFDataType.BYTE, 'GoodEvil', character.alignment === 'dark' ? 0 : 100);
+    GMTemplates.writeGear(root, {
+      rightHandResRef: character.gear?.rightHand || '',
+      leftHandResRef: character.gear?.leftHand || '',
+      armorResRef: character.gear?.armor || '',
+    }, true);
+    return template;
   }
 
   /** A new character to start editing from: a preset if given, else a level-1 soldier */
