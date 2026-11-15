@@ -35,7 +35,6 @@ const TLK_TOOLTIP_FRIENDLY_NON_MEDICAL_ITEM = 48299;
 const TLK_TOOLTIP_FRIENDLY_MINE = 48295;
 
 const preloadTextures = ['enemy_bar', 'hostilearrow', 'friend_bar', 'friendlyarrow'];
-const preloadTexturesMap = new Map<string, OdysseyTexture>();
 
 const ARROW_SCALE = 32;
 const ARROW_SCALE_HALF = ARROW_SCALE / 2;
@@ -167,6 +166,8 @@ export class InGameOverlay extends GameMenu {
 
   namePlateArrow: THREE.Mesh;
   namePlateArrowMaterial: THREE.MeshBasicMaterial;
+  /** The target bars' and arrows' textures (preloadTextures), loaded once the menu is built */
+  preloadedTextures = new Map<string, OdysseyTexture>();
 
   constructor(){
     super();
@@ -449,22 +450,7 @@ export class InGameOverlay extends GameMenu {
         GameState.TLKManager.TLKStrings[TLK_TOOLTIP_MAP].Value
       );
 
-      for(const texture of preloadTextures){
-        const tex = await TextureLoader.Load(texture);
-        preloadTexturesMap.set(texture, tex);
-      }
-
-      const arrowGeometry = new THREE.PlaneGeometry( 1, 1, 1 );
-      const arrowMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff, transparent: false, blending: THREE.AdditiveBlending } );
-      arrowMaterial.map = preloadTexturesMap.get('friendlyarrow');
-      this.namePlateArrowMaterial = arrowMaterial;
-      this.namePlateArrow = new THREE.Mesh( arrowGeometry, arrowMaterial );
-      this.namePlateArrow.scale.x = 32;
-      this.namePlateArrow.scale.y = 32;
-      this.namePlateArrow.position.z = 5;
-      this.namePlateArrow.renderOrder = 5;
-      this.namePlateArrow.visible = true;
-      this.tGuiPanel.widget.add(this.namePlateArrow);
+      await this.buildNamePlateArrow();
 
       // this.LBL_COMBATBG2.visible = false;
       resolve();
@@ -665,6 +651,37 @@ export class InGameOverlay extends GameMenu {
     this.namePlateArrow.renderOrder = 5;
   }
 
+  /**
+   * Load the target bar and arrow textures, and add the arrow that points at the target. Both games' overlays
+   * build it here, so the code that recolours it (UpdateTargetUIPanels) finds what it needs in either.
+   */
+  async buildNamePlateArrow() {
+    for(const texture of preloadTextures){
+      this.preloadedTextures.set(texture, await TextureLoader.Load(texture));
+    }
+    const arrowGeometry = new THREE.PlaneGeometry( 1, 1, 1 );
+    const arrowMaterial = new THREE.MeshBasicMaterial( { color: 0xffffff, transparent: false, blending: THREE.AdditiveBlending } );
+    arrowMaterial.map = this.preloadedTextures.get('friendlyarrow');
+    this.namePlateArrowMaterial = arrowMaterial;
+    this.namePlateArrow = new THREE.Mesh( arrowGeometry, arrowMaterial );
+    this.namePlateArrow.scale.x = 32;
+    this.namePlateArrow.scale.y = 32;
+    this.namePlateArrow.position.z = 5;
+    this.namePlateArrow.renderOrder = 5;
+    this.namePlateArrow.visible = true;
+    this.tGuiPanel.widget.add(this.namePlateArrow);
+  }
+
+  /** Colour the target bar and arrow for a friend or an enemy (until buildNamePlateArrow has run, there are none) */
+  setTargetBar(hostile: boolean) {
+    const bar = hostile ? 'enemy_bar' : 'friend_bar';
+    this.PB_HEALTH.setFillTextureName(bar);
+    this.PB_HEALTH.setFillTexture(this.preloadedTextures.get(bar));
+    if (this.namePlateArrowMaterial) {
+      this.namePlateArrowMaterial.map = this.preloadedTextures.get(hostile ? 'hostilearrow' : 'friendlyarrow');
+    }
+  }
+
   UpdateTargetUIPanels() {
     if (!this._canShowTargetUI()) {
       GameState.ActionMenuManager.SetTarget(undefined);
@@ -682,22 +699,11 @@ export class InGameOverlay extends GameMenu {
       return;
     }
 
-    if (BitWise.InstanceOfObject(GameState.CursorManager.selectedObject, ModuleObjectType.ModuleCreature)) {
-      if (GameState.CursorManager.selectedObject.isHostile(GameState.getCurrentPlayer()) && this.PB_HEALTH.getFillTextureName() == 'friend_bar') {
-        this.PB_HEALTH.setFillTextureName('enemy_bar');
-        this.PB_HEALTH.setFillTexture(preloadTexturesMap.get('enemy_bar'));
-        this.namePlateArrowMaterial.map = preloadTexturesMap.get('hostilearrow');
-      } else if (!GameState.CursorManager.selectedObject.isHostile(GameState.getCurrentPlayer()) && this.PB_HEALTH.getFillTextureName() == 'enemy_bar') {
-        this.PB_HEALTH.setFillTextureName('friend_bar');
-        this.PB_HEALTH.setFillTexture(preloadTexturesMap.get('friend_bar'));
-        this.namePlateArrowMaterial.map = preloadTexturesMap.get('friendlyarrow');
-      }
-    } else {
-      if (this.PB_HEALTH.getFillTextureName() != 'friend_bar') {
-        this.PB_HEALTH.setFillTextureName('friend_bar');
-        this.PB_HEALTH.setFillTexture(preloadTexturesMap.get('friend_bar'));
-        this.namePlateArrowMaterial.map = preloadTexturesMap.get('friendlyarrow');
-      }
+    // Red for a hostile creature, blue for anything else; changed only when the target needs the other colour
+    const hostile = BitWise.InstanceOfObject(GameState.CursorManager.selectedObject, ModuleObjectType.ModuleCreature) &&
+      !!GameState.CursorManager.selectedObject.isHostile(GameState.getCurrentPlayer());
+    if (this.PB_HEALTH.getFillTextureName() != (hostile ? 'enemy_bar' : 'friend_bar')) {
+      this.setTargetBar(hostile);
     }
     if (this.manager.InGameOverlay.LBL_NAME.text.text != GameState.CursorManager.selectedObject.getName()) {
       this.LBL_NAME.setText(GameState.CursorManager.selectedObject.getName(), 25);
