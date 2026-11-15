@@ -11,7 +11,8 @@
  * Usage:  npx electron scripts/engine-golden.js <output folder> [module ...]
  * Environment: GM_E2E_URL (default http://localhost:8080). Needs the dev server (`npm run dev`) running.
  */
-const { app, BrowserWindow } = require('electron');
+const { app } = require('electron');
+const { configureApp, createGameWindow, evalIn, waitFor, bootToMenu } = require('./lib/game-window');
 const fs = require('fs');
 const path = require('path');
 
@@ -19,37 +20,12 @@ const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/
 const args = process.argv.slice(2).filter((a) => !a.startsWith('--') && !a.endsWith('.js') && a !== '.');
 const OUT_DIR = path.resolve(args[0] || 'engine-golden');
 const MODULES = args.length > 1 ? args.slice(1) : ['danm13', 'danm14aa', 'danm14ab', 'danm15'];
-const BOOT_TIMEOUT = 180000;
-const LOAD_TIMEOUT = 180000;
+const LOAD_TIMEOUT = 90000;
 
 // Its own browser profile, so it can run beside other game windows
-app.setPath('userData', path.join(require('os').tmpdir(), 'kotor-engine-golden'));
-app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
+configureApp(app, 'kotor-engine-golden');
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (msg) => console.log(msg);
-
-async function evalIn(win, fn, ...fnArgs) {
-  const src = `(async () => { const KotOR = window.KotOR; return await (${fn.toString()})(KotOR, ...${JSON.stringify(fnArgs)}); })()`;
-  return win.webContents.executeJavaScript(src, true);
-}
-
-async function waitFor(win, description, fn, timeout, ...fnArgs) {
-  const deadline = Date.now() + timeout;
-  let last;
-  while (Date.now() < deadline) {
-    try {
-      last = await evalIn(win, fn, ...fnArgs);
-      if (last) return last;
-    } catch (e) {
-      last = e.message;
-    }
-    await sleep(250);
-  }
-  throw new Error(`timed out waiting for ${description}${last ? ` (last: ${JSON.stringify(last)})` : ''}`);
-}
 
 /** Runs in the page: hook ModuleArea.initAreaObjects so the dump is taken before spawn scripts run */
 const installDumpHook = (KotOR) => {
@@ -118,23 +94,8 @@ const installDumpHook = (KotOR) => {
 
 async function run() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
-  const win = new BrowserWindow({ width: 1280, height: 800, show: false, webPreferences: { backgroundThrottling: false, offscreen: true } });
-  win.webContents.setFrameRate(30);
-
-  await win.loadURL(`${BASE_URL}/game/`);
-  const accepted = await waitFor(win, 'the EULA state', () => {
-    const raw = localStorage.getItem('acceptEULA');
-    if (!raw) return false;
-    const state = JSON.parse(raw);
-    const keys = Object.keys(state);
-    if (!keys.length) return false;
-    if (keys.every((k) => state[k].accepted)) return 'already';
-    for (const k of keys) state[k].accepted = true;
-    localStorage.setItem('acceptEULA', JSON.stringify(state));
-    return 'set';
-  }, BOOT_TIMEOUT);
-  if (accepted === 'set') await win.loadURL(`${BASE_URL}/game/`);
-  await waitFor(win, 'the main menu', (KotOR) => !!(KotOR && KotOR.GameState && KotOR.GameState.Ready && KotOR.GameState.MenuManager.MainMenu), BOOT_TIMEOUT);
+  const win = createGameWindow({ title: 'Engine golden' });
+  await bootToMenu(win, `${BASE_URL}/game/`);
   await evalIn(win, installDumpHook);
 
   let failed = 0;

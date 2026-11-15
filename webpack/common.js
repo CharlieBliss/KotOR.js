@@ -137,7 +137,9 @@ function makeDevServer() {
       watch: false,
     },
     devMiddleware: {
-      writeToDisk: true,
+      // The build goes to dist/ (Electron and the check scripts load it from there); hot updates are served from
+      // memory and only piled up on disk
+      writeToDisk: (filePath) => !/\.hot-update\.(js|json)$/.test(filePath),
     },
     historyApiFallback: {
       rewrites: [

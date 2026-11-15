@@ -12,7 +12,8 @@
  * Usage:  npm run catalog:scenes -- --game=kotor   (or --game=tsl; default: both)
  * Output: skills/kotor-gm-scenes/reference/catalog/<game>/
  */
-const { app, BrowserWindow } = require('electron');
+const { app } = require('electron');
+const { configureApp, createGameWindow, bootToMenu } = require('./lib/game-window');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -21,10 +22,8 @@ const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || '
 const GAMES = (arg('game') || 'kotor,tsl').split(',').map((s) => s.trim()).filter(Boolean);
 const BASE = 'http://localhost:8080';
 const OUT = path.join(__dirname, '..', 'skills', 'kotor-gm-scenes', 'reference', 'catalog');
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-app.setPath('userData', path.join(require('os').tmpdir(), 'kotor-catalog-profile'));
-app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+configureApp(app, 'kotor-catalog-profile');
 app.on('window-all-closed', () => {});
 
 /** Runs in the game page: everything the skill needs from this game */
@@ -253,24 +252,9 @@ function writeCatalog(game, data) {
 }
 
 async function exportGame(game) {
-  const win = new BrowserWindow({ width: 1280, height: 800, show: false, webPreferences: { offscreen: true, backgroundThrottling: false } });
-  const url = `${BASE}/game/?key=${game}`;
-  const ev = (s) => win.webContents.executeJavaScript(s, true);
-  await win.loadURL(url);
-  // The game won't start until its licence is accepted (this profile only). Wait for this game's own entry:
-  // the other game's may already be there, accepted.
-  const eulaKey = game === 'tsl' ? 'TSL' : 'KOTOR';
-  for (let i = 0; i < 600; i++) {
-    const r = await ev(`(() => { const raw = localStorage.getItem('acceptEULA'); if(!raw) return 0; const s = JSON.parse(raw); if(!s['${eulaKey}']) return 0; if(s['${eulaKey}'].accepted) return 1; s['${eulaKey}'].accepted = true; localStorage.setItem('acceptEULA', JSON.stringify(s)); return 2; })()`).catch(() => 0);
-    if (r === 2) { await win.loadURL(url); break; }
-    if (r === 1) break;
-    await sleep(300);
-  }
-  for (let i = 0; i < 900; i++) {
-    const ok = await ev(`!!(window.KotOR && KotOR.GameState.Ready && KotOR.GameState.MenuManager && KotOR.GameState.MenuManager.MainMenu)`).catch(() => false);
-    if (ok) break;
-    await sleep(300);
-  }
+  const win = createGameWindow({ title: `Scene catalog (${game})` });
+  const ev = (src) => win.webContents.executeJavaScript(src, true);
+  await bootToMenu(win, `${BASE}/game/?key=${game}`, { timeout: 120000 });
   const json = await ev(`(${exportCatalog.toString()})()`);
   writeCatalog(game, JSON.parse(json));
   win.destroy();

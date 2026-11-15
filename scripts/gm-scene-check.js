@@ -10,10 +10,13 @@
  *   visible, alive and under which order, whether attackers closed in and movers arrived, plus screenshots.
  * It writes report.md and the screenshots to the output folder.
  *
- * Usage:  npm run scene:check -- <plan.json> [--out <folder>] [--beat-seconds 8] [--no-beats]
+ * Usage:  npm run scene:check -- <plan.json> [--out <folder>] [--beat-seconds 15] [--speed 3] [--no-beats]
+ *   --beat-seconds  game seconds to let each beat play (default 15)
+ *   --speed         how much faster than real time the game runs during the check (default 3, at most 4)
  * Needs the dev server (npm run dev) with the game files, like scripts/gm-e2e.js.
  */
-const { app, BrowserWindow } = require('electron');
+const { app } = require('electron');
+const { configureApp, createGameWindow, bootToMenu, setGameSpeed } = require('./lib/game-window');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -22,19 +25,17 @@ const path = require('path');
 const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/$/, '');
 const argv = process.argv.slice(2).filter((a) => !a.endsWith('gm-scene-check.js') && a !== '.');
 const opt = (name, fallback) => { const i = argv.indexOf(name); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : fallback; };
-const PLAN_FILE = argv.find((a, i) => !a.startsWith('--') && !['--out', '--beat-seconds'].includes(argv[i - 1]));
-const BEAT_SECONDS = Number(opt('--beat-seconds', 8));
+const PLAN_FILE = argv.find((a, i) => !a.startsWith('--') && !['--out', '--beat-seconds', '--speed'].includes(argv[i - 1]));
+/** Game seconds each beat is given; the wait is shorter by the game speed */
+const BEAT_SECONDS = Number(opt('--beat-seconds', 15));
+const SPEED = Math.max(1, Math.min(4, Number(opt('--speed', 3)) || 3));
 const RUN_BEATS = !argv.includes('--no-beats');
 const ROOT = path.resolve(__dirname, '..');
 const CHECKER = path.join(ROOT, 'skills', 'kotor-gm-scenes', 'scripts', 'check_plan.py');
-const BOOT_TIMEOUT = 180000;
-const SCENE_TIMEOUT = 180000;
+const SCENE_TIMEOUT = 90000;
 const PARITY_LIMIT = 1.0;
 
-app.setPath('userData', path.join(os.tmpdir(), 'kotor-scene-check'));
-app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
+configureApp(app, 'kotor-scene-check');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (msg) => console.log(msg);
@@ -252,8 +253,7 @@ async function run() {
   const offline = offlinePrediction(path.resolve(PLAN_FILE), OUT);
   if (!offline) findings.push('Python not found: no comparison with the offline check.');
 
-  const win = new BrowserWindow({ width: 1280, height: 800, show: false, webPreferences: { backgroundThrottling: false, offscreen: true } });
-  win.webContents.setFrameRate(30);
+  const win = createGameWindow({ title: 'Scene check' });
   win.webContents.on('console-message', (event) => {
     const message = String(event.message || '');
     if ((event.level === 'error' || event.level === 3) && /Uncaught|Unhandled|TypeError|ReferenceError/i.test(message)) errors.push(message.split('\n')[0].slice(0, 240));
@@ -262,20 +262,7 @@ async function run() {
   const key = plan.content === 'tsl' ? 'tsl' : 'kotor';
   const url = `${BASE_URL}/game/?key=${key}`;
   log(`Booting ${key}...`);
-  await win.loadURL(url);
-  const eulaKey = key === 'tsl' ? 'TSL' : 'KOTOR';
-  const accepted = await waitFor(win, 'the EULA state', (K, k) => {
-    const raw = localStorage.getItem('acceptEULA');
-    if (!raw) return false;
-    const s = JSON.parse(raw);
-    if (!s[k]) return false;
-    if (s[k].accepted) return 'already';
-    s[k].accepted = true;
-    localStorage.setItem('acceptEULA', JSON.stringify(s));
-    return 'set';
-  }, BOOT_TIMEOUT, eulaKey);
-  if (accepted === 'set') await win.loadURL(url);
-  await waitFor(win, 'the main menu', (K) => !!(K && K.GameState && K.GameState.Ready && K.GameState.MenuManager.MainMenu), BOOT_TIMEOUT);
+  await bootToMenu(win, url);
 
   log(`Importing "${plan.title}"...`);
   await evalIn(win, (K) => { K.GameState.EnterGMMode(); return true; });
@@ -287,6 +274,8 @@ async function run() {
   // Where the importer put everything, before anyone with an order has moved
   await evalIn(win, installHelpers);
   const placed = await evalIn(win, () => window.__sceneCheck.objects());
+  // Faster game time only from here: the snapshot above is where the importer put everyone
+  await setGameSpeed(win, SPEED);
   await waitFor(win, 'the scene to settle', (K) => !!(K.GameState.module && K.GameState.module.readyToProcessEvents && !K.GameState.loadingTextures), SCENE_TIMEOUT);
   await sleep(2000);
 
@@ -397,14 +386,14 @@ async function run() {
       } catch (e) {
         findings.push(`Beat ${b + 1} "${beat.title || ''}" threw: ${e.message}`);
       }
-      await sleep(BEAT_SECONDS * 1000);
+      await sleep((BEAT_SECONDS / SPEED) * 1000);
       const after = await evalIn(win, () => window.__sceneCheck.objects());
       if (process.env.SCENE_CHECK_DEBUG) for (const [id, objs] of Object.entries(after)) log(`  ${id}: ` + objs.map((o) => `${o.x},${o.y} q[${o.queue}] path ${JSON.stringify(o.path)}`).join(' | '));
       const newNotes = await evalIn(win, (K, n) => K.GMScenePlan.active.log.slice(n), logBefore);
       for (const n of newNotes) findings.push(`Beat ${b + 1}: importer: ${n}`);
       for (const e of errors.slice(errorsBefore)) findings.push(`Beat ${b + 1}: error in the game: ${e}`);
 
-      beatLines.push(`### ${b + 1}. ${beat.title || '(untitled)'}`, '', `After ${BEAT_SECONDS} s:`, '');
+      beatLines.push(`### ${b + 1}. ${beat.title || '(untitled)'}`, '', `After ${BEAT_SECONDS} s of game time:`, '');
       for (const g of plan.actors || []) {
         const now = after[g.id] || [];
         const was = before[g.id] || [];

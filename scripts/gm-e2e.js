@@ -19,14 +19,16 @@
  *
  * Each step uses the same calls the GM panel and main-menu buttons make. Exits non-zero on any failure.
  *
- * Usage:  npm run test:gm-e2e [-- --show] [-- --keep-open]
- *   --show       show the three game windows instead of rendering offscreen
+ * Usage:  npm run test:gm-e2e [-- --show] [-- --keep-open] [-- --speed 2]
+ *   --show       show the three game windows (otherwise they sit off the edge of the desktop)
+ *   --speed      how much faster than real time the game runs (default 2, at most 4)
  *   --keep-open  leave the windows open after the run (with --show)
  *
  * Environment: GM_E2E_URL (default http://localhost:8080), GM_E2E_WS (default ws://localhost:7878).
  * If nothing is serving GM_E2E_URL, `npm run dev` is started for the run and stopped afterwards.
  */
-const { app, BrowserWindow } = require('electron');
+const { app } = require('electron');
+const { configureApp, createGameWindow, evalIn, bootToMenu, setGameSpeed, sleep } = require('./lib/game-window');
 const { spawn, execSync } = require('child_process');
 const path = require('path');
 
@@ -34,6 +36,8 @@ const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/
 const WS_URL = process.env.GM_E2E_WS || 'ws://localhost:7878';
 const SHOW = process.argv.includes('--show');
 const KEEP_OPEN = process.argv.includes('--keep-open');
+const speedArg = process.argv.indexOf('--speed');
+const SPEED = Math.max(1, Math.min(4, Number(speedArg >= 0 ? process.argv[speedArg + 1] : 2) || 2));
 
 const START_SCENE = 'danm14aa';
 const SECOND_SCENE = 'danm14ab';
@@ -52,20 +56,16 @@ const MADE_CHARACTER = { level: 6, attributes: { str: 16, dex: 14, con: 14, int:
 const REWARD_XP = 500;
 const REWARD_ITEM = 'g_i_medeqpmnt03';
 
-const BOOT_TIMEOUT = 180000;
-const SCENE_TIMEOUT = 120000;
+// The game boots in about 5 s and loads a scene in about 5 s; starting the dev server takes longer
+const DEV_SERVER_TIMEOUT = 180000;
+const BOOT_TIMEOUT = 60000;
+const SCENE_TIMEOUT = 60000;
 const SYNC_TIMEOUT = 20000;
-// Fights have taken 30-100s: players can be held up getting around each other to reach the target
-const COMBAT_TIMEOUT = 180000;
+// Fights have taken 30-100 s of game time: players can be held up getting around each other to reach the target
+const COMBAT_TIMEOUT = 180000 / SPEED;
 
 // Its own browser profile, so a run is not blocked by other game windows holding the default one
-app.setPath('userData', path.join(require('os').tmpdir(), 'kotor-gm-e2e'));
-
-// Keep game windows simulating at full speed even when hidden or unfocused
-app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+configureApp(app, 'kotor-gm-e2e');
 
 // ---------------------------------------------------------------------------
 // Reporting
@@ -131,7 +131,7 @@ async function ensureDevServer() {
     stdio: 'ignore',
     detached: process.platform !== 'win32',
   });
-  const deadline = Date.now() + BOOT_TIMEOUT;
+  const deadline = Date.now() + DEV_SERVER_TIMEOUT;
   while (Date.now() < deadline) {
     if (await isServing()) {
       // The game bundle is built alongside the engine library; wait until it is served too
@@ -161,37 +161,17 @@ function stopDevServer() {
 // Game windows
 // ---------------------------------------------------------------------------
 
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
 class GameWindow {
   constructor(label) {
     this.label = label;
-    this.uncaughtErrors = [];
-    this.win = new BrowserWindow({
-      width: 1280,
-      height: 800,
-      show: SHOW,
-      title: `GM e2e — ${label}`,
-      webPreferences: {
-        backgroundThrottling: false,
-        // Hidden windows still need to render frames for the game loop to run
-        offscreen: !SHOW,
-      },
-    });
-    if (!SHOW) this.win.webContents.setFrameRate(30);
-    this.win.webContents.on('console-message', (event) => {
-      const message = String(event.message || '');
-      const isError = event.level === 'error' || event.level === 3;
-      if (isError && /Uncaught|Unhandled/i.test(message)) {
-        this.uncaughtErrors.push(message.split('\n')[0].slice(0, 200));
-      }
-    });
+    this.win = createGameWindow({ show: SHOW, title: `GM e2e — ${label}` });
+    // Collected by the window; reported at the end of the run
+    this.uncaughtErrors = this.win.pageErrors;
   }
 
   /** Run a function inside the page. It receives KotOR and the given args. */
   async eval(fn, ...args) {
-    const src = `(async () => { const KotOR = window.KotOR; return await (${fn.toString()})(KotOR, ...${JSON.stringify(args)}); })()`;
-    return this.win.webContents.executeJavaScript(src, true);
+    return evalIn(this.win, fn, ...args);
   }
 
   /** Poll until fn(KotOR, ...args) returns something truthy */
@@ -205,31 +185,18 @@ class GameWindow {
       } catch (e) {
         last = e.message;
       }
-      await sleep(250);
+      await sleep(200);
     }
     throw new CheckFailed(`${this.label}: timed out after ${timeout / 1000}s waiting for ${description}${last ? ` (last: ${JSON.stringify(last)})` : ''}`);
   }
 
   async boot() {
-    await this.win.loadURL(`${BASE_URL}/game/`);
-    // Accept the EULA once for this browser profile, then reload so the game starts straight away
-    const accepted = await this.waitFor('the EULA state', () => {
-      const raw = localStorage.getItem('acceptEULA');
-      if (!raw) return false;
-      const state = JSON.parse(raw);
-      const keys = Object.keys(state);
-      if (!keys.length) return false;
-      if (keys.every((k) => state[k].accepted)) return 'already';
-      for (const k of keys) state[k].accepted = true;
-      localStorage.setItem('acceptEULA', JSON.stringify(state));
-      return 'set';
-    }, BOOT_TIMEOUT);
-    if (accepted === 'set') await this.win.loadURL(`${BASE_URL}/game/`);
-
-    await this.waitFor('the main menu', (KotOR) => {
-      const GS = KotOR && KotOR.GameState;
-      return !!(GS && GS.Ready && GS.MenuManager && GS.MenuManager.MainMenu);
-    }, BOOT_TIMEOUT);
+    try {
+      await bootToMenu(this.win, `${BASE_URL}/game/`, { timeout: BOOT_TIMEOUT });
+    } catch (e) {
+      throw new CheckFailed(`${this.label}: ${e.message}`);
+    }
+    await setGameSpeed(this.win, SPEED);
   }
 
   close() {

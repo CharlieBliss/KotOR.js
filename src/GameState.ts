@@ -172,6 +172,16 @@ export class GameState implements EngineContext {
   static isLoadingSave = false;
   static gmMode = false;
 
+  /**
+   * How fast game time runs against real time (1: normal). Checks run the game faster to wait less; kept to
+   * 4 at most, past which a frame's step is long enough for movement and collisions to misbehave.
+   */
+  static timeScale = 1;
+
+  static setTimeScale(scale: number){
+    GameState.timeScale = Math.max(0.25, Math.min(4, Number(scale) || 1));
+  }
+
   /** Where the engine lets the active game mode step in (see EngineHooks): GM mode's while it's on */
   static get hooks(): EngineHooks {
     return GameState.gmMode ? GameState.GMManager.engineHooks : DEFAULT_ENGINE_HOOKS;
@@ -1431,7 +1441,7 @@ export class GameState implements EngineContext {
 
     GameState.forwardVector.set(0, 0, -1);
 
-    const delta = GameState.clock.getDelta();
+    const delta = GameState.clock.getDelta() * GameState.timeScale;
     GameState.processEventListener('beforeRender', [delta]);
     GameState.delta = delta;
     GameState.deltaTime += delta;
