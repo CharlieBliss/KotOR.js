@@ -79,6 +79,8 @@ export interface EngineHooks {
   onUseBlocked(obj: ModuleObject, user: ModuleObject | undefined, reason: 'locked' | 'skill'): void;
   /** A click in the world and what came of it, for the console */
   traceInteraction(message: string, data?: unknown): void;
+  /** Level the character up elsewhere (the machine that owns it); true when that was asked for instead */
+  requestNetworkLevelUp(creature: ModuleObject): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -114,4 +116,5 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   notifyLocalMovement: () => {},
   onUseBlocked: () => {},
   traceInteraction: () => {},
+  requestNetworkLevelUp: () => false,
 };

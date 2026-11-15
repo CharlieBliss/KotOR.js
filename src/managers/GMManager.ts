@@ -1246,6 +1246,7 @@ export class GMManager {
     notifyLocalMovement: () => GMNetworkManager.notifyLocalMovement(),
     onUseBlocked: (obj, user, reason) => GMPlayers.onUseBlocked(obj, user, reason),
     traceInteraction: (message, data) => GMLog.info('click', message, data),
+    requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
   };
 }
 

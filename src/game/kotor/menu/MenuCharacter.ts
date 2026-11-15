@@ -111,10 +111,15 @@ export class MenuCharacter extends GameMenu {
 
       this.BTN_AUTO.addEventListener('click', (e) => {
         e.stopPropagation();
-        if(GameState.getCurrentPlayer().canLevelUp()){
-          GameState.getCurrentPlayer().autoLevelUp();
-          this.updateCharacterStats(GameState.getCurrentPlayer());
+        const pc = GameState.getCurrentPlayer();
+        if(!pc?.canLevelUp()) return;
+        // A GM session player's character levels up on the GM's machine; the new sheet comes back
+        if(GameState.hooks.requestNetworkLevelUp(pc)){
+          this.BTN_AUTO.hide();
+          return;
         }
+        pc.autoLevelUp();
+        this.updateCharacterStats(pc);
       });
       this._button_y = this.BTN_AUTO;
 
@@ -253,6 +258,8 @@ export class MenuCharacter extends GameMenu {
     } else {
       this.BTN_AUTO?.hide();
     }
+    // Choosing a level-up step by step (MenuLevelUp) isn't built yet: Auto Level-Up is the way to level
+    this.BTN_LEVELUP?.hide();
   }
 
   /**

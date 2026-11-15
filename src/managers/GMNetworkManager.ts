@@ -44,7 +44,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -250,6 +250,7 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   equip: { hostDriven: false, interrupts: false },
   unequip: { hostDriven: false, interrupts: false },
   stealth: { hostDriven: false, interrupts: false },
+  levelup: { hostDriven: false, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */

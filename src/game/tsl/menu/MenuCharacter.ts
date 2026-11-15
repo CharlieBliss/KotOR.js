@@ -92,10 +92,15 @@ export class MenuCharacter extends K1_MenuCharacter {
 
       this.BTN_AUTO.addEventListener('click', (e) => {
         e.stopPropagation();
-        if(GameState.getCurrentPlayer().canLevelUp()){
-          GameState.getCurrentPlayer().autoLevelUp();
-          this.updateCharacterStats(GameState.getCurrentPlayer());
+        const pc = GameState.getCurrentPlayer();
+        if(!pc?.canLevelUp()) return;
+        // A GM session player's character levels up on the GM's machine; the new sheet comes back
+        if(GameState.hooks.requestNetworkLevelUp(pc)){
+          this.BTN_AUTO.hide();
+          return;
         }
+        pc.autoLevelUp();
+        this.updateCharacterStats(pc);
       });
       this._button_y = this.BTN_AUTO;
 

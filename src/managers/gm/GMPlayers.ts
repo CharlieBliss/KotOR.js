@@ -562,6 +562,7 @@ export class GMPlayers {
     },
     unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
+    levelup: (actor) => GMPlayers.levelUpOnHost(actor),
     cancel: () => false,
     mine: (actor, intent) => {
       actor.gmNetTarget = undefined;
@@ -811,6 +812,32 @@ export class GMPlayers {
   }
 
   /**
+   * Client: level our character up on the host, which owns it (levelling up only here would be undone by the
+   * next sheet, and the host's fights would use the old level). Returns true when asked for.
+   */
+  static requestNetworkLevelUp(creature: ModuleObject): boolean {
+    if (GMNetworkManager.role !== 'client') return false;
+    if (!creature || creature.gmNetId !== GMNetworkManager.assignedActorNetId) return false;
+    GMNetworkManager.sendIntent('levelup');
+    GMLog.info('click', 'Asked the host to level our character up');
+    return true;
+  }
+
+  /** Host: level a player's character up, if they have the XP. Their next sheet carries the new level. */
+  static levelUpOnHost(actor: ModuleCreature): boolean {
+    if (!actor?.canLevelUp?.()) {
+      GMLog.warn('host', `${GMLog.describe(actor)} asked to level up without the XP for it`);
+      return false;
+    }
+    const before = actor.getTotalClassLevel();
+    actor.autoLevelUp();
+    const after = actor.getTotalClassLevel();
+    GMLog.info('host', `${GMLog.describe(actor)} levelled up: ${before} → ${after}`);
+    if (after > before) GMNetworkManager.appendChat('System', `${actor.getName()} reached level ${after}.`);
+    return after > before;
+  }
+
+  /**
    * Host: a player's character tried to use something and couldn't. They don't hear the "locked" sound on
    * the GM's machine, so tell them.
    */
@@ -936,7 +963,11 @@ GMNetworkManager.on('container.open', 'client', async (packet) => {
   await GMPlayers.openNetworkContainer(packet.payload.containerNetId, packet.payload.items || []);
 }, 'to-me');
 GMNetworkManager.on('player.sheet', 'client', async (packet) => {
-  if (packet.payload) await GMPlayers.applyPlayerSheetOnClient(packet.payload);
+  if (!packet.payload) return;
+  await GMPlayers.applyPlayerSheetOnClient(packet.payload);
+  // An open character screen shows it (a level-up the host just did, new XP...)
+  const characterMenu = GameState.MenuManager?.MenuCharacter;
+  if (characterMenu?.bVisible) characterMenu.updateCharacterStats(GameState.getCurrentPlayer());
 }, 'to-me');
 GMNetworkManager.on('container.loot', 'client', async (packet) => {
   if (packet.payload) await GMPlayers.receiveNetworkLoot(packet.payload.items || []);

@@ -253,3 +253,25 @@ describe("the action queue", () => {
     expect(error).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("levelling up a player's character", () => {
+  test("a player's Auto Level-Up is asked of the host, for their own character only", () => {
+    const { GMPlayers } = jest.requireActual("@/managers/gm/GMPlayers") as any;
+    GMNetworkManager.role = "client";
+    GMNetworkManager.assignedActorNetId = "pc_a";
+    expect(GMPlayers.requestNetworkLevelUp(mockCreature("pc_a", 0))).toBe(true);
+    expect(GMPlayers.requestNetworkLevelUp(mockCreature("pc_b", 0))).toBe(false);
+    expect(sent.filter((p) => p.type === "client.intent").map((p) => p.payload.kind)).toEqual(["levelup"]);
+  });
+
+  test("the host levels them up only with the XP for it", () => {
+    const { GMPlayers } = jest.requireActual("@/managers/gm/GMPlayers") as any;
+    let level = 2;
+    const ready = mockCreature("pc_a", 0, { canLevelUp: () => level < 3, autoLevelUp: () => { level++; }, getTotalClassLevel: () => level });
+    expect(GMPlayers.levelUpOnHost(ready)).toBe(true);
+    expect(level).toBe(3);
+    jest.spyOn(console, "warn").mockImplementation(() => {});
+    expect(GMPlayers.levelUpOnHost(ready)).toBe(false);
+    expect(level).toBe(3);
+  });
+});
