@@ -46,3 +46,4 @@ export * from "@/managers/gm/GMPlayers";
 export * from "@/managers/gm/GMMines";
 export * from "@/managers/gm/GMChecks";
 export * from "@/managers/gm/GMSessions";
+export * from "@/managers/gm/GMCharacters";

@@ -1,3 +1,4 @@
+import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { gmItemResRef } from "@/managers/gm/GMVocab";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import * as THREE from "three";
@@ -75,6 +76,15 @@ export class GMPlayers {
   static pendingPlayerSheet: GMPlayerSheet | null = null;
 
   static lastAppliedInventoryJson: string = '';
+
+  /** How far players' characters may go beyond the game's rules; sent to players with the session rules */
+  static creationLimits: ICharacterLimits = {};
+
+  static setCreationLimits(limits: ICharacterLimits) {
+    this.creationLimits = { ...limits };
+    GMNetworkManager.broadcastSessionRules(GMManager.sessionRules());
+    GMManager.notifyChange();
+  }
 
   static setDeathRule(rule: GMDeathRule) {
     if (!['kotor', 'gm', 'respawn'].includes(rule)) return;

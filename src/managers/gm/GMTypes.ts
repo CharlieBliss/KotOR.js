@@ -1,4 +1,5 @@
 import type { GMPlayerSheet, GMSessionRules } from "@/managers/GMNetworkManager";
+import type { ICharacterAttributes } from "@/engine/rules/CharacterBuilder";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
 export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine'
@@ -172,6 +173,8 @@ export interface GMPlayerSpawnConfig {
   featIds?: number[];
   /** Override the class's Force powers (CharacterBuilder): spells.2da rows */
   spellIds?: number[];
+  /** Override the class's skill ranks (CharacterBuilder): skills.2da row -> rank */
+  skillRanks?: number[];
   possessImmediately?: boolean;
   ownerPeerId?: string;
 }
@@ -220,4 +223,33 @@ export interface GMSessionSave {
   players: GMSavedPlayer[];
   /** Added later; older saves use the default rules */
   rules?: GMSessionRules;
+}
+
+/**
+ * A character a player made (GMCharacters keeps them; they join a session with one). The model is kept by
+ * appearance label so it means the same thing on every machine; the id is the fallback.
+ */
+export interface GMCharacter {
+  id: string;
+  version: 1;
+  /** The game it was made for */
+  game: 'kotor' | 'tsl';
+  name: string;
+  appearanceLabel: string;
+  appearanceId: number;
+  portraitId: number;
+  gender: number;
+  classId: number;
+  level: number;
+  attributes: ICharacterAttributes;
+  alignment?: 'light' | 'dark';
+  /** feat.2da rows, automatic ones included; left out: the class's recommended feats */
+  feats?: number[];
+  /** spells.2da rows; left out: the class's recommended powers */
+  powers?: number[];
+  /** skills.2da row -> rank; left out: the class's recommended ranks */
+  skillRanks?: number[];
+  gear?: { rightHand?: string; leftHand?: string; armor?: string };
+  /** When it was last saved (ms) */
+  updated: number;
 }

@@ -103,7 +103,7 @@ export class GMManager {
   static sceneStartPoint: THREE.Vector3 | null = null;
 
   static sessionRules(): GMSessionRules {
-    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen };
+    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits };
   }
 
   static setPlayersFrozen(on: boolean) {

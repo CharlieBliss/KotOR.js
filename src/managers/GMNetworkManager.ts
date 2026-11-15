@@ -1,3 +1,4 @@
+import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { GameState } from "@/GameState";
 
 export class GMEventEmitter {
@@ -194,6 +195,8 @@ export interface GMSessionRules {
   deathRule: GMDeathRule;
   /** Players can only watch: no moving or acting, and NPCs leave them alone */
   frozen?: boolean;
+  /** How far character creation may go beyond the game's rules (CharacterRules) */
+  creation?: ICharacterLimits;
 }
 
 export interface GMWorldSnapshot {
