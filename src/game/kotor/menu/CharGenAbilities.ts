@@ -1,4 +1,5 @@
 import type { GUIListBox, GUILabel, GUIButton } from "@/gui";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
 import type { ModuleCreature } from "@/module";
 import { CharGenAttribute } from "@/enums/chargen/CharGenAttribute";
 import { GameMenu } from "@/gui";
@@ -307,30 +308,17 @@ export class CharGenAbilities extends GameMenu {
     this.REMAINING_SELECTIONS_LBL.setText(GameState.CharGenManager.availPoints);
   }
 
+  /** Points the next point in this ability costs (CharacterRules: the score it is raised to sets the cost) */
   getAttributeCost(index = 0){
-    let mod = 0;
-    switch(index){
-      case CharGenAttribute.STR:
-        mod = Math.floor((GameState.CharGenManager.str - 10)/2);
-      break;
-      case CharGenAttribute.DEX:
-        mod = Math.floor((GameState.CharGenManager.dex - 10)/2);
-      break;
-      case CharGenAttribute.CON:
-        mod = Math.floor((GameState.CharGenManager.con - 10)/2);
-      break;
-      case CharGenAttribute.WIS:
-        mod = Math.floor((GameState.CharGenManager.wis - 10)/2);
-      break;
-      case CharGenAttribute.INT:
-        mod = Math.floor((GameState.CharGenManager.int - 10)/2);
-      break;
-      case CharGenAttribute.CHA:
-        mod = Math.floor((GameState.CharGenManager.cha - 10)/2);
-      break;
-    }
-    return Math.max(1, mod);
+    const scores = [
+      GameState.CharGenManager.str, GameState.CharGenManager.dex, GameState.CharGenManager.con,
+      GameState.CharGenManager.wis, GameState.CharGenManager.int, GameState.CharGenManager.cha,
+    ];
+    const order = [CharGenAttribute.STR, CharGenAttribute.DEX, CharGenAttribute.CON, CharGenAttribute.WIS, CharGenAttribute.INT, CharGenAttribute.CHA];
+    const at = order.indexOf(index);
+    return at < 0 ? 1 : CharacterRules.raiseCost(scores[at]);
   }
+
 
   reset(){
     GameState.CharGenManager.availPoints = 30;

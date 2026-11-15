@@ -11,6 +11,7 @@ import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { SkillType } from "@/enums/nwscript/SkillType";
 import { CharacterBuilder } from "@/engine/rules/CharacterBuilder";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
 import { GameState } from "@/GameState";
 
 /** A creature stand-in using ModuleCreature's own rules, with these feats */
@@ -112,7 +113,7 @@ describe("Jedi Defense", () => {
 
 describe("Toughness and Force Sensitive", () => {
   test("Toughness adds 1 vitality per level, Master Toughness another, Force Sensitive 40 Force points", () => {
-    jest.spyOn(CharacterBuilder, "classRow").mockReturnValue({ hitdie: 8, forcedie: 4 } as any);
+    jest.spyOn(CharacterRules, "classRow").mockReturnValue({ hitdie: 8, forcedie: 4 } as any);
     jest.spyOn(CharacterBuilder, "buildPowers").mockReturnValue([]);
     jest.spyOn(CharacterBuilder, "buildSkills").mockReturnValue([]);
     const attributes = { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 };

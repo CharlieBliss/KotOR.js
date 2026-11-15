@@ -1,8 +1,8 @@
 import { GameState } from "@/GameState";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
 
 const valid = (v: any) => v !== undefined && v !== null && v !== '' && v !== '****';
 const num = (v: any, d = -1) => (valid(v) && Number.isFinite(Number(v)) ? Number(v) : d);
-const mod = (score: number) => Math.floor((score - 10) / 2);
 
 export interface ICharacterAttributes {
   str: number;
@@ -35,9 +35,6 @@ export interface ICharacterBuild {
   maxFp: number;
 }
 
-/** spells.2da's per-class minimum level column, by class power-gain code */
-const POWER_LEVEL_COLUMNS: Record<string, string> = { jgd: 'guardian', jcn: 'consular', jsn: 'sentinel' };
-
 /**
  * CharacterBuilder class.
  *
@@ -61,65 +58,33 @@ const POWER_LEVEL_COLUMNS: Record<string, string> = { jgd: 'guardian', jcn: 'con
  */
 export class CharacterBuilder {
 
-  static table(name: string): any[] {
-    return Object.values(GameState.TwoDAManager.datatables.get(name)?.rows || {});
-  }
-
-  static classRow(classId: number): any {
-    return GameState.TwoDAManager.datatables.get('classes')?.rows[classId];
-  }
-
   static build(options: ICharacterBuildOptions): ICharacterBuild {
     const level = Math.max(1, Math.floor(options.level || 1));
-    const cls = this.classRow(options.classId);
+    const classId = options.classId;
     const attributes = options.attributes;
-    const build: ICharacterBuild = { classId: options.classId, level, feats: [], powers: [], skillRanks: [], maxHp: 1, maxFp: 0 };
-    if (!cls) return build;
+    const build: ICharacterBuild = { classId, level, feats: [], powers: [], skillRanks: [], maxHp: 1, maxFp: 0 };
+    if (!CharacterRules.classRow(classId)) return build;
 
-    const hitDie = num(cls.hitdie, 8);
-    const forceDie = num(cls.forcedie, 0);
-    build.maxHp = Math.max(level, level * (hitDie + mod(attributes.con)));
-    build.maxFp = forceDie > 0 ? Math.max(0, level * (forceDie + mod(attributes.wis))) : 0;
-    build.feats = this.buildFeats(cls, level);
+    const vitality = CharacterRules.vitality(classId, level, attributes);
+    build.maxHp = vitality.maxHp;
+    build.maxFp = vitality.maxFp;
+    build.feats = this.buildFeats(classId, level);
     // Toughness and Master Toughness: +1 vitality per level each; Wookiee Toughness +2; Force Sensitive +40 FP
     const has = (feat: number) => build.feats.includes(feat);
     build.maxHp += level * ((has(84) ? 1 : 0) + (has(124) ? 1 : 0) + (has(95) ? 2 : 0));
     if (has(116)) build.maxFp += 40;
-    build.powers = this.buildPowers(cls, level, options.alignment || 'light');
-    build.skillRanks = this.buildSkills(cls, level, attributes);
+    build.powers = this.buildPowers(classId, level, options.alignment || 'light');
+    build.skillRanks = this.buildSkills(classId, level, attributes);
     return build;
   }
 
-  /** How many of something a class gains over levels 1..level, from a per-level gain table column */
-  static gainedBy(tableName: string, column: string, level: number): number {
-    const rows = this.table(tableName);
-    let total = 0;
-    for (let i = 0; i < level && i < rows.length; i++) total += Math.max(0, num(rows[i][column], 0));
-    return total;
-  }
-
-  static buildFeats(cls: any, level: number): number[] {
-    const code = String(cls.featstable || '').toLowerCase();
-    const gainCode = String(cls.featgain || cls.featstable || '').toLowerCase();
+  /** The class's automatic feats, then its picks: recommended first, then any it can take, prerequisites allowing */
+  static buildFeats(classId: number, level: number): number[] {
+    const { code } = CharacterRules.featCodes(classId);
     if (!code) return [];
-    const rows = this.table('feat');
-    const has = new Set<number>();
-
-    // Automatic feats
-    for (const row of rows) {
-      if (num(row[`${code}_list`]) === 3 && level >= num(row[`${code}_granted`], 1)) has.add(num(row.__index));
-    }
-
-    // Picks, recommended first, as prerequisites allow
-    let picks = this.gainedBy('featgain', `${gainCode}_reg`, level);
-    const meetsPrereqs = (row: any) => {
-      const p1 = num(row.prereqfeat1);
-      const p2 = num(row.prereqfeat2);
-      return (p1 < 0 || has.has(p1)) && (p2 < 0 || has.has(p2)) && level >= num(row.mincharlevel, 1);
-    };
-    const choosable = rows
-      .filter((row) => [0, 1].includes(num(row[`${code}_list`])) && !String(row.label).startsWith('XXXX'))
-      .sort((a, b) => num(a[`${code}_recom`], 9999) - num(b[`${code}_recom`], 9999));
+    const has = new Set<number>(CharacterRules.automaticFeats(classId, level));
+    let picks = CharacterRules.featGain(classId, level);
+    const choosable = CharacterRules.featPool(classId);
     const recommended = choosable.filter((row) => num(row[`${code}_recom`]) >= 0);
     for (const pool of [recommended, choosable]) {
       let progressed = true;
@@ -128,7 +93,7 @@ export class CharacterBuilder {
         for (const row of pool) {
           if (picks <= 0) break;
           const id = num(row.__index);
-          if (has.has(id) || !meetsPrereqs(row)) continue;
+          if (has.has(id) || !CharacterRules.featPrereqsMet(row, has, level)) continue;
           has.add(id);
           picks--;
           progressed = true;
@@ -138,19 +103,15 @@ export class CharacterBuilder {
     return [...has].sort((a, b) => a - b);
   }
 
-  static buildPowers(cls: any, level: number, alignment: 'light' | 'dark'): number[] {
-    const code = String(cls.spellgaintable || '').toLowerCase();
-    const levelColumn = POWER_LEVEL_COLUMNS[code];
-    if (!valid(cls.spellgaintable) || !levelColumn) return [];
-    let picks = this.gainedBy('classpowergain', code, level);
+  /** The class's Force powers by level, in the light- or dark-side recommended order, prerequisites first */
+  static buildPowers(classId: number, level: number, alignment: 'light' | 'dark'): number[] {
+    let picks = CharacterRules.powerGain(classId, level);
     const recomColumn = alignment === 'dark' ? 'dark_recom' : 'light_recom';
     const otherColumn = alignment === 'dark' ? 'light_recom' : 'dark_recom';
-
-    const rows = this.table('spells').filter((row) => num(row.usertype) === 1 && num(row[levelColumn]) >= 0 && num(row[levelColumn]) <= level);
+    const rows = CharacterRules.powerPool(classId, level);
     const order = (row: any) => num(row[recomColumn], 1000 + num(row[otherColumn], 1000));
     rows.sort((a, b) => order(a) - order(b));
     const known = new Set<number>();
-    const prereqsMet = (row: any) => String(row.prerequisites || '').split('_').map((s) => num(s)).filter((n) => n >= 0).every((n) => known.has(n));
 
     let progressed = true;
     while (picks > 0 && progressed) {
@@ -158,7 +119,7 @@ export class CharacterBuilder {
       for (const row of rows) {
         if (picks <= 0) break;
         const id = num(row.__index);
-        if (known.has(id) || !prereqsMet(row)) continue;
+        if (known.has(id) || !CharacterRules.powerPrereqsMet(row, known)) continue;
         known.add(id);
         picks--;
         progressed = true;
@@ -168,23 +129,21 @@ export class CharacterBuilder {
     return [...known].sort((a, b) => a - b);
   }
 
-  static buildSkills(cls: any, level: number, attributes: ICharacterAttributes): number[] {
-    const code = String(cls.skillstable || '').toLowerCase();
-    const skills = this.table('skills');
+  /** Skill points spent in the class's recommended order, each skill up to its most ranks */
+  static buildSkills(classId: number, level: number, attributes: ICharacterAttributes): number[] {
+    const code = CharacterRules.skillCode(classId);
+    const skills = CharacterRules.table('skills');
     const ranks = skills.map(() => 0);
     if (!code) return ranks;
 
-    const perLevel = Math.max(1, num(cls.skillpointbase, 1) + mod(attributes.int));
-    let points = perLevel * 4 + perLevel * (level - 1);
-    const classMax = level + 3;
-
+    let points = CharacterRules.skillPoints(classId, level, attributes.int);
     const order = skills
-      .map((row, i) => ({ i, reco: num(row[`${code}_reco`]), classSkill: num(row[`${code}_class`], 0) === 1 }))
+      .map((row, i) => ({ i, reco: num(row[`${code}_reco`]) }))
       .filter((s) => s.reco >= 0)
       .sort((a, b) => a.reco - b.reco);
     for (const skill of order) {
-      const max = skill.classSkill ? classMax : Math.floor(classMax / 2);
-      const cost = skill.classSkill ? 1 : 2;
+      const max = CharacterRules.skillMax(classId, skill.i, level);
+      const cost = CharacterRules.skillCost(classId, skill.i);
       while (ranks[skill.i] < max && points >= cost) {
         ranks[skill.i]++;
         points -= cost;
