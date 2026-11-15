@@ -9,6 +9,7 @@ import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMLog } from "@/managers/gm/GMLog";
 import { DLGCameraAngle } from "@/enums/dialog/DLGCameraAngle";
 import { EngineMode } from "@/enums/engine/EngineMode";
 import * as THREE from "three";
@@ -126,8 +127,11 @@ export class GMConversationManager {
   }
 
   /** A creature the GM can speak for: alive, not hostile to the player, not a player's character */
-  static canTalkTo(npc: ModuleObject | undefined, pc?: ModuleObject | null): npc is ModuleCreature {
-    if (!npc || !GMObjectKind.isCreature(npc)) return false;
+  static canTalkTo(npc: ModuleObject | undefined, pc?: ModuleObject | null): npc is ModuleObject {
+    if (!npc || npc.gmHidden) return false;
+    // A computer or other object with a conversation (not a container): the GM speaks for it
+    if (GMObjectKind.isPlaceable(npc)) return !!(npc as any).conversation && !(npc as any).hasInventory;
+    if (!GMObjectKind.isCreature(npc)) return false;
     const cre = npc as ModuleCreature;
     if (cre.isDead() || cre.gmOwnerPeerId || cre.gmPlayerConfig) return false;
     if (pc && cre.isHostile(pc)) return false;
@@ -142,15 +146,23 @@ export class GMConversationManager {
     if (GMNetworkManager.role !== 'host' || !payload?.npcNetId) return;
     const pc = GMPlayers.getPeerActor(peerId);
     const npc = GMManager.netIdMap.get(payload.npcNetId);
-    if (!pc || !this.canTalkTo(npc, pc)) return;
-    if (pc.position.distanceTo(npc.position) > this.TALK_RANGE * 3) return;
+    const request = `${GMNetworkManager.peers.get(peerId)?.name || peerId} wants to talk to ${npc ? GMLog.describe(npc) : payload.npcNetId}`;
+    if (!pc || !this.canTalkTo(npc, pc)) {
+      GMLog.warn('talk', `${request}: refused, ${!pc ? 'they have no character' : !npc ? "it isn't in this scene" : "it can't be talked to (hostile, dead, a player, or nothing to say)"}`);
+      return;
+    }
+    if (pc.position.distanceTo(npc.position) > this.TALK_RANGE * 3) {
+      GMLog.warn('talk', `${request}: refused, they're ${pc.position.distanceTo(npc.position).toFixed(1)} m away`);
+      return;
+    }
+    GMLog.info('talk', request);
     this.join(npc, [peerId]);
   }
 
   /**
    * Host: start talking as an NPC with the given players, or bring them into its conversation
    */
-  static join(npc: ModuleCreature, peerIds: string[]): GMConversation | null {
+  static join(npc: ModuleObject, peerIds: string[]): GMConversation | null {
     const npcNetId = npc.gmNetId as string | undefined;
     if (!npcNetId || !peerIds.length) return null;
     let conv = this.getConversationForNpc(npcNetId);
@@ -175,7 +187,8 @@ export class GMConversationManager {
       const pc = GMPlayers.getPeerActor(peerId);
       if (pc) {
         npc.clearAllActions();
-        npc.setFacingObject?.(pc);
+        // A creature turns to them; a computer stays where it is
+        if (GMObjectKind.isCreature(npc)) (npc as ModuleCreature).setFacingObject?.(pc);
       }
       GMNetworkManager.appendChat('System', `${GMNetworkManager.peers.get(peerId)?.name || 'A player'} is talking to ${conv.npcName}.`);
     }

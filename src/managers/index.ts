@@ -48,3 +48,4 @@ export * from "@/managers/gm/GMChecks";
 export * from "@/managers/gm/GMSessions";
 export * from "@/managers/gm/GMCharacters";
 export * from "@/managers/gm/GMItems";
+export * from "@/managers/gm/GMLog";

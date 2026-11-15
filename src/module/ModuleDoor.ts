@@ -348,6 +348,7 @@ export class ModuleDoor extends ModuleLockable {
       }
 
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'locked');
       return;
     }
     

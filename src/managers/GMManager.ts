@@ -35,6 +35,7 @@ import { PLACEABLE_PRESETS, CATEGORIZED_PROPS, PLACEABLE_KEYWORD_LABELS } from "
 import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
+import { GMLog } from "@/managers/gm/GMLog";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -1243,6 +1244,8 @@ export class GMManager {
     onMineRemoved: (mine) => GMMines.onMineRemoved(mine),
     announceSkillRoll: (owner, label, roll, bonus, dc, success) => GMMines.announceSkillRoll(owner, label, roll, bonus, dc, success),
     notifyLocalMovement: () => GMNetworkManager.notifyLocalMovement(),
+    onUseBlocked: (obj, user, reason) => GMPlayers.onUseBlocked(obj, user, reason),
+    traceInteraction: (message, data) => GMLog.info('click', message, data),
   };
 }
 

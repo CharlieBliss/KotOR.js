@@ -357,12 +357,21 @@ export class IngameControls {
           if(GameState.Mode == EngineMode.INGAME && GameState.MenuManager.GetCurrentMenu() == GameState.MenuManager.InGameOverlay){
             const moduleObject = GameState.CursorManager.onMouseHitInteractive();
             if(BitWise.InstanceOf(moduleObject?.objectType, ModuleObjectType.ModuleObject)){
+              if(!moduleObject.isUseable() && moduleObject != GameState.getCurrentPlayer()){
+                GameState.hooks.traceInteraction(`Clicked ${moduleObject.getName?.() || moduleObject.getTag?.() || 'an object'}: it isn't usable (its template says so), so nothing happens`, moduleObject);
+              }
               if(moduleObject.isUseable() && moduleObject != GameState.getCurrentPlayer()){
 
                 selectedObject = true;
 
                 const distance = GameState.getCurrentPlayer().position.distanceTo(moduleObject.position);
                 const distanceThreshold = 20;
+
+                if(GameState.CursorManager.selectedObject != moduleObject){
+                  GameState.hooks.traceInteraction(`Selected ${moduleObject.getName?.() || 'an object'}; click it again to use it`);
+                }else if(distance > distanceThreshold){
+                  GameState.hooks.traceInteraction(`${moduleObject.getName?.() || 'That'} is ${distance.toFixed(1)} m away; get within ${distanceThreshold} m to use it`);
+                }
 
                 if(GameState.CursorManager.selectedObject == moduleObject && distance <= distanceThreshold){
                   if(GameState.hooks.interceptInteraction(GameState.getCurrentPlayer(), moduleObject)){

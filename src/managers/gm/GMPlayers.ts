@@ -36,6 +36,7 @@ import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSessions } from "@/managers/gm/GMSessions";
+import { GMLog } from "@/managers/gm/GMLog";
 
 /** Players in a GM session: their characters' sheets and inventories (kept by the host), what they ask the host to do, looting, rewards, questions from the GM, and what happens when they fall. */
 export class GMPlayers {
@@ -219,7 +220,9 @@ export class GMPlayers {
     const peerId = user?.gmOwnerPeerId;
     const containerNetId = container?.gmNetId;
     if (!peerId || !containerNetId) return false;
-    GMNetworkManager.send('container.open', { containerNetId, items: this.toLootItems((container as any).inventory) }, peerId);
+    const items = this.toLootItems((container as any).inventory);
+    GMLog.info('host', `Showing ${GMLog.describe(user)} what's in ${GMLog.describe(container)} (${items.length} item${items.length === 1 ? '' : 's'})`);
+    GMNetworkManager.send('container.open', { containerNetId, items }, peerId);
     return true;
   }
 
@@ -595,22 +598,42 @@ export class GMPlayers {
 
   static applyClientIntentOnHost(peerId: string, intent: GMClientIntent) {
     if (!intent) return;
+    const who = GMNetworkManager.peers.get(peerId)?.name || peerId;
+    const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : undefined;
+    const request = `${who} asks to ${intent.kind}${intent.targetNetId ? ` ${target ? GMLog.describe(target) : `${intent.targetNetId} (not in this scene)`}` : ''}`;
     const actor = GMReplication.getOwnedActor(peerId, intent.netId);
-    if (!actor) return;
+    if (!actor) {
+      GMLog.warn('host', `${request}: refused, ${intent.netId} isn't their character`);
+      return;
+    }
     actor.gmIntentSeq = intent.seq;
     // A watching player can't act (a late request from before the freeze is dropped too)
-    if (GMManager.playersFrozen && intent.kind !== 'cancel') return;
+    if (GMManager.playersFrozen && intent.kind !== 'cancel') {
+      GMLog.info('host', `${request}: ignored, players are watching (frozen)`);
+      return;
+    }
     const meta = GM_INTENTS[intent.kind];
     const handler = this.INTENT_HANDLERS[intent.kind];
-    if (!meta || !handler) return;
+    if (!meta || !handler) {
+      GMLog.warn('host', `${request}: refused, the host doesn't know that request`);
+      return;
+    }
 
     if (meta.interrupts) actor.clearAllActions();
     const result = handler(actor, intent, peerId);
-    if (!meta.interrupts) return;
+    if (!meta.interrupts) {
+      GMLog.info('host', request);
+      return;
+    }
+    const report = (ok: boolean) => {
+      actor.gmHostDriven = ok;
+      if (ok) GMLog.info('host', `${request}: on it`);
+      else GMLog.warn('host', `${request}: can't be done`);
+    };
     if (result instanceof Promise) {
-      result.then((ok) => { actor.gmHostDriven = ok; }).catch((e) => console.warn(`[GMPlayers] ${intent.kind} failed`, e));
+      result.then(report).catch((e) => console.warn(`[GM host] ${request}: failed`, e));
     } else {
-      actor.gmHostDriven = !!result;
+      report(!!result);
     }
   }
 
@@ -744,33 +767,63 @@ export class GMPlayers {
    */
   static interceptInteraction(pc: ModuleObject, target: ModuleObject): boolean {
     if (GMNetworkManager.role !== 'client' || !target) return false;
-    if (!pc || pc.gmNetId !== GMNetworkManager.assignedActorNetId) return false;
-    if (GMManager.isPlayerFrozen(pc)) return true;
-    const targetNetId = target.gmNetId as string | undefined;
-    if (!targetNetId) return false;
-
-    if (GMObjectKind.isDoor(target)) {
-      GMNetworkManager.sendIntent('open', targetNetId);
+    const what = GMLog.describe(target);
+    if (!pc || pc.gmNetId !== GMNetworkManager.assignedActorNetId) {
+      GMLog.warn('click', `Not sent: the character clicking ${what} isn't the one this player was given (${GMNetworkManager.assignedActorNetId || 'none yet'})`);
+      return false;
+    }
+    if (GMManager.isPlayerFrozen(pc)) {
+      GMLog.warn('click', `Not sent: the GM has players watching (frozen), so ${what} can't be used now`);
       return true;
     }
-    if (GMObjectKind.isPlaceable(target)) {
-      GMNetworkManager.sendIntent('use', targetNetId);
+    const targetNetId = target.gmNetId as string | undefined;
+    if (!targetNetId) {
+      GMLog.warn('click', `Not sent: ${what} has no net id, so the host can't tell which object it is; it's handled locally`);
+      return false;
+    }
+    const send = (kind: 'open' | 'use' | 'attack') => {
+      GMNetworkManager.sendIntent(kind, targetNetId);
+      GMLog.info('click', `Asked the host to ${kind} ${what}`);
       return true;
+    };
+
+    if (GMObjectKind.isDoor(target)) return send('open');
+    if (GMObjectKind.isPlaceable(target)) {
+      // A computer or other object with a conversation: the GM speaks for it, as for an NPC
+      if (GameState.GMConversationManager?.canTalkTo(target, pc) && GameState.GMConversationManager.requestTalk(target)) {
+        GMLog.info('click', `${what} has a conversation; walking over to talk (the GM speaks for it)`);
+        return true;
+      }
+      return send('use');
     }
     if (GMObjectKind.isCreature(target)) {
       const cre = target as ModuleCreature;
-      if (cre.isHostile(pc) && !cre.isDead()) {
-        GMNetworkManager.sendIntent('attack', targetNetId);
-        return true;
-      }
-      if (cre.isDead()) {
-        GMNetworkManager.sendIntent('use', targetNetId);
-        return true;
-      }
+      if (cre.isHostile(pc) && !cre.isDead()) return send('attack');
+      if (cre.isDead()) return send('use');
     }
     // Anyone else: walk over and talk; the GM speaks for them
-    if (GameState.GMConversationManager?.requestTalk(target)) return true;
+    if (GameState.GMConversationManager?.requestTalk(target)) {
+      GMLog.info('click', `Walking over to talk to ${what}`);
+      return true;
+    }
+    GMLog.warn('click', `Not sent: ${what} isn't something a player can use, open, attack or talk to`);
     return false;
+  }
+
+  /**
+   * Host: a player's character tried to use something and couldn't. They don't hear the "locked" sound on
+   * the GM's machine, so tell them.
+   */
+  static onUseBlocked(obj: ModuleObject, user: ModuleObject | undefined, reason: 'locked' | 'skill') {
+    if (!GameState.gmMode || GMNetworkManager.role !== 'host') return;
+    const peerId = user?.gmOwnerPeerId as string | undefined;
+    const name = obj?.getName?.() || 'It';
+    GMLog.info('host', `${GMLog.describe(user)} couldn't use ${GMLog.describe(obj)}: ${reason === 'locked' ? 'it is locked' : 'they failed its skill check'}`);
+    if (!peerId) return;
+    const text = reason === 'locked'
+      ? `${name} is locked. Pick Security (or a security spike) from its action menu to open it.`
+      : `You couldn't work out how to use ${name}.`;
+    GMNetworkManager.sendChatTo(peerId, 'System', text);
   }
 
   /**
@@ -878,7 +931,9 @@ GMNetworkManager.on('dm.reply', 'host', (packet) => {
   if (packet.payload) GMPlayers.onDmReply(packet.senderId, packet.payload);
 });
 GMNetworkManager.on('container.open', 'client', async (packet) => {
-  if (packet.payload) await GMPlayers.openNetworkContainer(packet.payload.containerNetId, packet.payload.items || []);
+  if (!packet.payload) return;
+  GMLog.info('net', `The host opened ${packet.payload.containerNetId} for us (${(packet.payload.items || []).length} items)`);
+  await GMPlayers.openNetworkContainer(packet.payload.containerNetId, packet.payload.items || []);
 }, 'to-me');
 GMNetworkManager.on('player.sheet', 'client', async (packet) => {
   if (packet.payload) await GMPlayers.applyPlayerSheetOnClient(packet.payload);

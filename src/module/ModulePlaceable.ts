@@ -404,6 +404,7 @@ export class ModulePlaceable extends ModuleLockable {
     // A GM can put a skill check in front of an object (Computer Use for a terminal, Repair for a panel...)
     if(!GameState.hooks.skillGatePasses(this, object)){
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'skill');
       return;
     }
 
@@ -413,6 +414,7 @@ export class ModulePlaceable extends ModuleLockable {
 
     if(this.isLocked()){
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'locked');
     }else{
       if(!this.isOpen() && (this.state == ModulePlaceableState.CLOSED || this.state == ModulePlaceableState.DEFAULT)){
         this.setAnimationState(ModulePlaceableAnimState.CLOSE_OPEN);

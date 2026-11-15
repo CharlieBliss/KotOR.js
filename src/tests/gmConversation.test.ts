@@ -201,3 +201,55 @@ describe("directing a conversation's camera", () => {
     expect(GMConversationManager.watching).toBeNull();
   });
 });
+
+describe("using objects in a GM session", () => {
+  const placeable = (netId: string, overrides: Record<string, any> = {}) => mockCreature(netId, 0, {
+    objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModulePlaceable,
+    ...overrides,
+  });
+
+  test("a computer (an object with a conversation) is talked to; a container or plain object isn't", () => {
+    const pc = mockCreature("pc_a", 1);
+    expect(GMConversationManager.canTalkTo(placeable("plc_comp", { conversation: { resref: "comp" } }), pc)).toBe(true);
+    expect(GMConversationManager.canTalkTo(placeable("plc_box", { conversation: { resref: "box" }, hasInventory: true }), pc)).toBe(false);
+    expect(GMConversationManager.canTalkTo(placeable("plc_chair"), pc)).toBe(false);
+  });
+
+  test("a player who reaches a computer opens a conversation the GM voices", () => {
+    mockCreature("pc_a", 1);
+    placeable("plc_comp", { name: "TRAINING COMPUTER", conversation: { resref: "comp" } });
+    GMConversationManager.onTalkRequest("peer_a", { npcNetId: "plc_comp" });
+    expect(GMConversationManager.getConversationForNpc("plc_comp")?.npcName).toBe("TRAINING COMPUTER");
+  });
+
+  test("a player who tries a locked object is told so", () => {
+    const { GMPlayers } = jest.requireActual("@/managers/gm/GMPlayers") as any;
+    const chest = placeable("plc_chest", { name: "Chest" });
+    const pc = mockCreature("pc_a", 1, { gmOwnerPeerId: "peer_a" });
+    (GameState as any).gmMode = true;
+    GMPlayers.onUseBlocked(chest, pc, "locked");
+    const told = sent.find((p) => p.type === "chat.message" && p.targetPeerId === "peer_a");
+    expect(told?.payload.text).toMatch(/Chest is locked/);
+  });
+});
+
+describe("the action queue", () => {
+  test("an action that throws is dropped, not run again every frame", () => {
+    const { ActionQueue } = jest.requireActual("@/actions/ActionQueue") as any;
+    const queue = new ActionQueue();
+    queue.setOwner?.({ getName: () => "User" });
+    let calls = 0;
+    const broken = { type: 40, update: () => { calls++; throw new Error("no listener"); }, dispose: () => {} };
+    let nextCalls = 0;
+    const next = { type: 1, update: () => { nextCalls++; return 2; }, dispose: () => {} };
+    queue.push(broken);
+    queue.push(next);
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    queue.process(0);
+    queue.process(0);
+    expect(calls).toBe(1);
+    expect(nextCalls).toBe(1);
+    expect(queue.length).toBe(0);
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+});

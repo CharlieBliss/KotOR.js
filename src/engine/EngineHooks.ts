@@ -75,6 +75,10 @@ export interface EngineHooks {
   announceSkillRoll(owner: ModuleObject, label: string, roll: number, bonus: number, dc: number, success: boolean): void;
   /** The player moved their character */
   notifyLocalMovement(): void;
+  /** user tried to use obj and couldn't: it's locked, or they failed the skill check in front of it */
+  onUseBlocked(obj: ModuleObject, user: ModuleObject | undefined, reason: 'locked' | 'skill'): void;
+  /** A click in the world and what came of it, for the console */
+  traceInteraction(message: string, data?: unknown): void;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -108,4 +112,6 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   onMineRemoved: () => {},
   announceSkillRoll: () => {},
   notifyLocalMovement: () => {},
+  onUseBlocked: () => {},
+  traceInteraction: () => {},
 };
