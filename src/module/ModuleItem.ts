@@ -139,7 +139,7 @@ export class ModuleItem extends ModuleObject {
   }
 
   getBodyVariation(){
-    return this.baseItem.bodyVar;
+    return this.baseItem?.bodyVar;
   }
 
   getModelVariation(){
@@ -155,15 +155,15 @@ export class ModuleItem extends ModuleObject {
   }
 
   getWeaponWield(): WeaponWield{
-    return this.baseItem.weaponWield;
+    return this.baseItem?.weaponWield ?? 0; // an item whose base item the game lacks (KotOR II's T3-M4 holds one) is no weapon
   }
 
   getWeaponType(): WeaponType {
-    return this.baseItem.weaponType;
+    return this.baseItem?.weaponType ?? 0;
   }
 
   isRangedWeapon(){
-    return this.baseItem.rangedWeapon;
+    return !!this.baseItem?.rangedWeapon;
   }
 
   isStolen(){
