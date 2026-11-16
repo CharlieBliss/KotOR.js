@@ -523,11 +523,13 @@ export class ModuleCreature extends ModuleObject {
 
   /** Get up when revived, apply queued damage, and play the dialog or death animations */
   private updateLifeState(delta: number, netReplica: boolean){
+    // From lying dead (or still falling) only: getting up was in the list too, so a creature getting up started
+    // getting up again every frame, never finished, and couldn't move or act until something else played
     if(!this.isDead() && (
         this.animationState.index == ModuleCreatureAnimState.DEAD ||
         this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
-        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
-        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
+        this.animationState.index == ModuleCreatureAnimState.DIE ||
+        this.animationState.index == ModuleCreatureAnimState.DIE1
       )
     ){
       this.deathAnimationPlayed = false;

@@ -15,6 +15,7 @@ const EDIT_LABELS: Record<string, string> = {
 import { ItemOptions, PlayerOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
 import { SelectionGroup } from "@/apps/game/components/gm-panel/tabs/SelectionGroup";
 import { GearEditor } from "@/apps/game/components/gm-panel/controls/GearEditor";
+import { StatusSection } from "@/apps/game/components/gm-panel/controls/StatusSection";
 
 /** Inspect tab: edit the selected object, or browse everything in the scene */
 export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active }) => {
@@ -220,6 +221,8 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     </div>
                   );
                 })()}
+
+                <StatusSection creature={selectedObj as KotOR.ModuleCreature} />
 
                 <details className="gm-section" open>
                   <summary>Gear</summary>

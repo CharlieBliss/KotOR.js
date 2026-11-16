@@ -240,6 +240,8 @@ export class GMReplication {
             if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
             // Fights happen on the host: under attack there, our character takes its combat stance here too
             if (actor.combat) own.resetExcitedDuration();
+            // Our character fights on the host: its weapons light up here when it does
+            if (actor.combat !== undefined) this.syncWeaponPower(own, !!actor.combat || !!own.combatData?.combatState);
           } else {
             localObj.setMaxHP(actor.maxHp);
             localObj.currentHP = actor.hp;
@@ -646,6 +648,19 @@ export class GMReplication {
     if (combat === undefined || !cre.combatData) return;
     if (combat) cre.resetExcitedDuration();
     else if (cre.combatData.combatState) cre.cancelExcitedDuration();
+    this.syncWeaponPower(cre, combat);
+  }
+
+  /**
+   * Weapons light up (a lightsaber ignites) when their owner fights: the combat round powers them when it works
+   * out an attack, and that runs only on the host. Here they power up and down with the host's combat state,
+   * once each way (powering again restarts the "powered" loop).
+   */
+  static syncWeaponPower(cre: ModuleCreature, combat: boolean) {
+    // While fighting, keep asking (the weapon goes from igniting to its lit loop); powering down, once
+    if (!combat && !cre.gmNetPowered) return;
+    cre.gmNetPowered = combat;
+    cre.weaponPowered?.(combat);
   }
 
   /**

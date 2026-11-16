@@ -586,34 +586,43 @@ export class ModuleItem extends ModuleObject {
    * Set the weapon powered state and update the powered animation
    * @param powered - Whether the weapon should be powered
    */
-  setPowered(powered: boolean){
-    const currentAnimL = this.model?.animationManager?.currentAnimation || this.model?.odysseyAnimationMap?.get('off');
-    if(!currentAnimL){ return; }
+  /** Whether the weapon has been powered up (and not down since): a lightsaber's blade is out */
+  isPowered: boolean = false;
 
-    //power up
+  setPowered(powered: boolean){
+    const model = this.model;
+    if(!model?.odysseyAnimationMap?.get?.('off')){ return; }
+    const current: string | undefined = model.animationManager?.currentAnimation?.name;
+
+    //power up: ignite once, then hold the lit loop. When the ignition ends no animation is left playing, which
+    //looked like "off" and ignited it again (or, called only once, left the blade dark)
     if(powered){
-      switch(currentAnimL.name){
-        case 'off':
-          this.model.playAnimation('powerup');
-        break;
-        case 'powerup':
-        break;
-        default:
-          this.model.playAnimation('powered', true);
-        break;
+      if(current === 'powered' || current === 'powerup'){
+        this.isPowered = true;
+        return;
       }
+      if(this.isPowered){
+        model.playAnimation('powered', true);
+      }else{
+        model.playAnimation('powerup');
+      }
+      this.isPowered = true;
       return;
     }
-    
+
     //power down
-    switch(currentAnimL.name){
+    const wasPowered = this.isPowered;
+    this.isPowered = false;
+    switch(current){
       case 'powered':
-        this.model.playAnimation('powerdown');
+      case 'powerup':
+        model.playAnimation('powerdown');
       break;
       case 'powerdown':
       break;
       default:
-        this.model.playAnimation('off', true);
+        if(wasPowered && !current) model.playAnimation('powerdown');
+        else model.playAnimation('off', true);
       break;
     }
   }

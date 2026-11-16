@@ -45,6 +45,8 @@ export interface GMObjectState {
   gmTeleportSeq?: number;
   /** Replica: where the host says it is; it moves there smoothly */
   gmNetTarget?: THREE.Vector3;
+  /** Client: whether this creature's weapons were last powered up (with the host's combat state) */
+  gmNetPowered?: boolean;
   /** When this player character last rolled a skill (performance clock, ms), for GMChecks' cooldown */
   gmLastRollAt?: number;
   /** NPC: what it fights with (GMCombatAI): everything it has (default), weapons only, or plain attacks */
