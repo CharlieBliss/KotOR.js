@@ -11,6 +11,7 @@
     "webpack:prod": "cross-env NODE_ENV=production webpack",
     "dev": "cross-env NODE_ENV=development webpack serve",
     "gm:server": "node scripts/gm-server.js",
+    "gm:play": "electron scripts/gm-play.js",
     "test:gm-e2e": "electron scripts/gm-e2e.js",
     "bench:abilities": "electron scripts/gm-ability-bench.js",
     "catalog:scenes": "electron scripts/gm-scene-catalog.js",

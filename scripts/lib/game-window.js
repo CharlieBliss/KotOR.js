@@ -12,6 +12,9 @@ const os = require('os');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** How long one poll of waitFor may take before it's asked again */
+const POLL_LIMIT_MS = 5000;
+
 /** Keep hidden windows running at full speed. Call before app is ready. */
 function configureApp(app, profileName) {
   if (profileName) app.setPath('userData', path.join(os.tmpdir(), profileName));
@@ -59,7 +62,9 @@ async function waitFor(win, description, fn, timeout, ...args) {
   const errorsBefore = (win.pageErrors || []).length;
   while (Date.now() < deadline) {
     try {
-      last = await evalIn(win, fn, ...args);
+      // A poll sent while the page is navigating (it reloads itself once, early on) can go unanswered: give each
+      // one a few seconds, then ask again, rather than letting it hold the whole wait
+      last = await Promise.race([evalIn(win, fn, ...args), sleep(POLL_LIMIT_MS).then(() => undefined)]);
       if (last) return last;
     } catch (e) {
       last = e.message;
@@ -76,7 +81,7 @@ async function waitFor(win, description, fn, timeout, ...args) {
  * game's own licence entry (?key=tsl is KotOR II): the other game's may already be there, accepted.
  */
 async function bootToMenu(win, url, { timeout = 60000 } = {}) {
-  const licence = /[?&]key=tsl/i.test(url) ? 'TSL' : 'KOTOR';
+  const licence = /[?&]key=tsl\b/i.test(url) ? 'TSL' : 'KOTOR';
   await win.loadURL(url);
   const accepted = await waitFor(win, 'the licence state', (KotOR, game) => {
     const raw = localStorage.getItem('acceptEULA');
