@@ -223,8 +223,9 @@ export class VideoManager {
 
       const onReady = (width: number, height: number) => {
         VideoManager.initVideoTextures(width, height);
-        const w = GameState.ResolutionManager?.getViewportWidth?.() ?? window.innerWidth;
-        const h = GameState.ResolutionManager?.getViewportHeight?.() ?? window.innerHeight;
+        // The movie is drawn by the GUI camera, so it fills the GUI's screen
+        const w = GameState.ResolutionManager?.getGUIWidth?.() ?? window.innerWidth;
+        const h = GameState.ResolutionManager?.getGUIHeight?.() ?? window.innerHeight;
         VideoManager.resizeVideo(w, h);
       };
 

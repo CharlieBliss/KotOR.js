@@ -1,0 +1,23 @@
+// The game's cursor over the page's layers (see gameCursor.ts). Until the images are read, the page cursor stays
+// hidden as everywhere else in the game (app.scss).
+
+$clickable: 'button, a, select, summary, label, [role="button"], input[type="checkbox"], input[type="radio"], input[type="range"]';
+
+html.game-cursor {
+  .gm-panel-root,
+  .gm-panel-root *,
+  .cc-backdrop,
+  .cc-backdrop * {
+    cursor: var(--game-cursor) !important;
+  }
+
+  .gm-panel-root :is(#{$clickable}):not(:disabled),
+  .cc-backdrop :is(#{$clickable}):not(:disabled) {
+    cursor: var(--game-cursor-select) !important;
+  }
+
+  .gm-panel-root :active,
+  .cc-backdrop :active {
+    cursor: var(--game-cursor-down) !important;
+  }
+}

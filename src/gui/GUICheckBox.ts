@@ -218,8 +218,7 @@ export class GUICheckBox extends GUIControl{
         this.borderSelected.fillstyle = selected.getFieldByLabel('FILLSTYLE').getValue() || 0;
         this.borderSelected.inneroffset = this.borderSelected.inneroffsety = selected.getFieldByLabel('INNEROFFSET').getValue() || 0;
 
-        if(selected.hasField('INNEROFFSETY'))
-          this.borderSelected.inneroffsety = selected.getFieldByLabel('INNEROFFSETY').getValue();
+        this.borderSelected.inneroffsety = selected.get('INNEROFFSETY', this.borderSelected.inneroffsety);
 
         this.borderSelected.pulsing = selected.getFieldByLabel('PULSING').getValue() || 0;
       }
@@ -245,8 +244,7 @@ export class GUICheckBox extends GUIControl{
         this.highlightSelected.fillstyle = highlightSelected.getFieldByLabel('FILLSTYLE').getValue() || 0;
         this.highlightSelected.inneroffset = this.highlightSelected.inneroffsety = highlightSelected.getFieldByLabel('INNEROFFSET').getValue() || 0;
 
-        if(highlightSelected.hasField('INNEROFFSETY'))
-          this.highlightSelected.inneroffsety = highlightSelected.getFieldByLabel('INNEROFFSETY').getValue();
+        this.highlightSelected.inneroffsety = highlightSelected.get('INNEROFFSETY', this.highlightSelected.inneroffsety);
 
         this.highlightSelected.pulsing = highlightSelected.getFieldByLabel('PULSING').getValue() || 0;
       }

@@ -137,8 +137,13 @@ export class MenuMap extends GameMenu {
       this.LBL_MapNote.setText(this.miniMap.mapNoteSelected.mapNote.getValue());
     }
 
-    this.BTN_PRTYSLCT.disableSelection = (GameState.module.area.unescapable);
-    this.BTN_RETURN.disableSelection = (GameState.module.area.unescapable);
+    // KotOR II's map has no party selection button. In a GM session there is no party to choose.
+    if (this.BTN_PRTYSLCT) {
+      if (GameState.gmMode) this.BTN_PRTYSLCT.hide();
+      else this.BTN_PRTYSLCT.show();
+      this.BTN_PRTYSLCT.disableSelection = (GameState.module.area.unescapable);
+    }
+    if (this.BTN_RETURN) this.BTN_RETURN.disableSelection = (GameState.module.area.unescapable);
   }
 
   triggerControllerBumperLPress() {

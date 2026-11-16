@@ -21,6 +21,11 @@ import { TURN_SPEED_FAST } from "@/engine/TurnSpeeds";
  * @author KobaltBlu <https://github.com/KobaltBlu>
  * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
  */
+/** Move flags (parameter 5) */
+export const MOVE_FLAG_RUN = 0x01;
+/** Keep going when the target creature is dead, e.g. walking over to loot a body */
+export const MOVE_FLAG_TARGET_MAY_BE_DEAD = 0x02;
+
 export class ActionMoveToPoint extends Action {
 
   target_position: THREE.Vector3 = new THREE.Vector3();
@@ -62,7 +67,7 @@ export class ActionMoveToPoint extends Action {
     this.target = this.getParameter<ModuleObject>(4);
     if(this.target){
       this.real_target_position.copy(this.target.position);
-      if( BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) && this.target.isDead() ){
+      if( BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) && this.target.isDead() && !(moveFlags & MOVE_FLAG_TARGET_MAY_BE_DEAD) ){
         this.setComputedPath(undefined);
         return ActionStatus.FAILED;
       }

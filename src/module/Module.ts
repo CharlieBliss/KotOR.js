@@ -329,21 +329,16 @@ export class Module {
 
     this.tag = ifo.getFieldByLabel('Mod_Tag').getValue();
 
-    if(ifo.RootNode.hasField('Mod_VO_ID')){
-      this.voId = ifo.getFieldByLabel('Mod_VO_ID').getValue();
-    }
+    this.voId = ifo.RootNode.get('Mod_VO_ID', this.voId);
 
     this.version = ifo.getFieldByLabel('Mod_Version').getValue();
     this.xpScale = ifo.getFieldByLabel('Mod_XPScale').getValue();
 
-    if(ifo.RootNode.hasField('Mod_NextCharId0'))
-      this.nextCharId0 = ifo.getFieldByLabel('Mod_NextCharId0').getValue();
+    this.nextCharId0 = ifo.RootNode.get('Mod_NextCharId0', this.nextCharId0);
 
-    if(ifo.RootNode.hasField('Mod_NextCharId1'))
-      this.nextCharId1 = ifo.getFieldByLabel('Mod_NextCharId1').getValue();
+    this.nextCharId1 = ifo.RootNode.get('Mod_NextCharId1', this.nextCharId1);
 
-    if(ifo.RootNode.hasField('Mod_NextObjId0'))
-      this.nextObjId0 = ifo.getFieldByLabel('Mod_NextObjId0').getValue();
+    this.nextObjId0 = ifo.RootNode.get('Mod_NextObjId0', this.nextObjId0);
 
     if(ifo.RootNode.hasField('Mod_NextObjId1'))
       this.nextObjId1 = ifo.getFieldByLabel('Mod_NextObjId1').getValue();
@@ -385,6 +380,12 @@ export class Module {
     GameState.group.effects.add(object.model);
   }
 
+  removeEffect(effect: GameEffect){
+    if(!effect) return;
+    const idx = this.effects.indexOf(effect);
+    if(idx >= 0) this.effects.splice(idx, 1)[0]?.onRemove();
+  }
+
   addEvent(event: GameEvent){
     if(this.eventQueue.indexOf(event) >= 0){ return; }
     this.eventQueue.push(event);
@@ -408,7 +409,7 @@ export class Module {
       //Process EffectList
       let elLen = this.effects.length - 1;
       for(let i = elLen; i >= 0; i--){
-        this.effects[i].update(delta);
+        this.effects[i]?.update(delta);
       }
 
       if(this.area){
@@ -454,7 +455,8 @@ export class Module {
       GameState.camera.position.setX(this.entryX);
       GameState.camera.position.setY(this.entryY);
       GameState.camera.position.setZ(this.entryZ + 2);
-      GameState.camera.rotation.set(Math.PI / 2, -Math.atan2(this.entryDirectionX, this.entryDirectionY), 0);
+      GameState.camera.rotation.order = 'YZX';
+      GameState.camera.rotation.set(Math.PI / 2, 0, -Math.atan2(this.entryDirectionX, this.entryDirectionY));
 
       //this.camera.pitch = THREE.MathUtils.radToDeg(this.camera.rotation.y) * -1;
       //this.camera.yaw = THREE.MathUtils.radToDeg(this.camera.rotation.x);
@@ -581,45 +583,45 @@ export class Module {
       this.area.save();
     }
 
-    ifo.RootNode.addField( new GFFField(GFFDataType.INT, 'Mod_Creator_ID') ).setValue(this.creatorId);
+    ifo.RootNode.addInt('Mod_Creator_ID', this.creatorId);
     ifo.RootNode.addField( new GFFField(GFFDataType.LIST, 'Mod_CutSceneList') );
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_DawnHour') ).setValue(this.timeManager.dawnHour);
+    ifo.RootNode.addByte('Mod_DawnHour', this.timeManager.dawnHour);
     ifo.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_Description') ).setValue( this.description );
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_DuskHour') ).setValue(this.timeManager.duskHour);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD64, 'Mod_Effect_NxtId') ).setValue(this.effectNextId);
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_Entry_Area') ).setValue(this.entryArea);
-    ifo.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Mod_Entry_Dir_X') ).setValue(this.entryDirectionX);
-    ifo.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Mod_Entry_Dir_Y') ).setValue(this.entryDirectionY);
-    ifo.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Mod_Entry_X') ).setValue(this.entryX);
-    ifo.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Mod_Entry_Y') ).setValue(this.entryY);
-    ifo.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Mod_Entry_Z') ).setValue(this.entryZ);
+    ifo.RootNode.addByte('Mod_DuskHour', this.timeManager.duskHour);
+    ifo.RootNode.addDWord64('Mod_Effect_NxtId', this.effectNextId);
+    ifo.RootNode.addRESREF('Mod_Entry_Area', this.entryArea);
+    ifo.RootNode.addFloat('Mod_Entry_Dir_X', this.entryDirectionX);
+    ifo.RootNode.addFloat('Mod_Entry_Dir_Y', this.entryDirectionY);
+    ifo.RootNode.addFloat('Mod_Entry_X', this.entryX);
+    ifo.RootNode.addFloat('Mod_Entry_Y', this.entryY);
+    ifo.RootNode.addFloat('Mod_Entry_Z', this.entryZ);
     ifo.RootNode.addField( new GFFField(GFFDataType.LIST, 'Mod_Expan_List') );
-    ifo.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Mod_Hak') ).setValue(this.hak);
+    ifo.RootNode.addCExoString('Mod_Hak', this.hak);
     ifo.RootNode.addField( new GFFField(GFFDataType.VOID, 'Mod_ID') );
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_IsNWMFile') ).setValue(0);
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_IsSaveGame') ).setValue( isSaveGame ? 1 : 0);
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_MinPerHour') ).setValue(this.timeManager.minutesPerHour);
+    ifo.RootNode.addByte('Mod_IsNWMFile', 0);
+    ifo.RootNode.addByte('Mod_IsSaveGame',  isSaveGame ? 1 : 0);
+    ifo.RootNode.addByte('Mod_MinPerHour', this.timeManager.minutesPerHour);
     ifo.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_Name') ).setValue( this.name );
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_NextCharId0') ).setValue(this.nextCharId0);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_NextCharId1') ).setValue(this.nextCharId1);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_NextObjId0') ).setValue(this.nextObjId0);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_NextObjId1') ).setValue(this.nextObjId1);
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnAcquirItem') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerAcquireItem]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnActvtItem') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerActivateItem]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnClientEntr') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerClientEnter]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnClientLeav') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerClientLeave]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnHeartbeat') ).setValue(this.scripts[ModuleObjectScript.ModuleOnHeartbeat]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnModLoad') ).setValue(this.scripts[ModuleObjectScript.ModuleOnLoad]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnModStart') ).setValue(this.scripts[ModuleObjectScript.ModuleOnStart]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnPlrDeath') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerDeath]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnPlrDying') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerDying]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnPlrLvlUp') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerLevelUp]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnPlrRest') ).setValue(this.scripts[ModuleObjectScript.ModuleOnPlayerRest]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnSpawnBtnDn') ).setValue(this.scripts[ModuleObjectScript.ModuleOnSpawnButtonDown]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnUnAqreItem') ).setValue(this.scripts[ModuleObjectScript.ModuleOnUnAcquireItem]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Mod_OnUsrDefined') ).setValue(this.scripts[ModuleObjectScript.ModuleOnUserDefined]?.name || '');
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_PauseDay') ).setValue(this.timeManager.pauseDay);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_PauseTime') ).setValue(this.timeManager.pauseTime);
+    ifo.RootNode.addDWord('Mod_NextCharId0', this.nextCharId0);
+    ifo.RootNode.addDWord('Mod_NextCharId1', this.nextCharId1);
+    ifo.RootNode.addDWord('Mod_NextObjId0', this.nextObjId0);
+    ifo.RootNode.addDWord('Mod_NextObjId1', this.nextObjId1);
+    ifo.RootNode.addRESREF('Mod_OnAcquirItem', this.scripts[ModuleObjectScript.ModuleOnPlayerAcquireItem]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnActvtItem', this.scripts[ModuleObjectScript.ModuleOnPlayerActivateItem]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnClientEntr', this.scripts[ModuleObjectScript.ModuleOnPlayerClientEnter]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnClientLeav', this.scripts[ModuleObjectScript.ModuleOnPlayerClientLeave]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnHeartbeat', this.scripts[ModuleObjectScript.ModuleOnHeartbeat]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnModLoad', this.scripts[ModuleObjectScript.ModuleOnLoad]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnModStart', this.scripts[ModuleObjectScript.ModuleOnStart]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnPlrDeath', this.scripts[ModuleObjectScript.ModuleOnPlayerDeath]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnPlrDying', this.scripts[ModuleObjectScript.ModuleOnPlayerDying]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnPlrLvlUp', this.scripts[ModuleObjectScript.ModuleOnPlayerLevelUp]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnPlrRest', this.scripts[ModuleObjectScript.ModuleOnPlayerRest]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnSpawnBtnDn', this.scripts[ModuleObjectScript.ModuleOnSpawnButtonDown]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnUnAqreItem', this.scripts[ModuleObjectScript.ModuleOnUnAcquireItem]?.name || '');
+    ifo.RootNode.addRESREF('Mod_OnUsrDefined', this.scripts[ModuleObjectScript.ModuleOnUserDefined]?.name || '');
+    ifo.RootNode.addDWord('Mod_PauseDay', this.timeManager.pauseDay);
+    ifo.RootNode.addDWord('Mod_PauseTime', this.timeManager.pauseTime);
 
     //Player
     const playerList = ifo.RootNode.addField( new GFFField(GFFDataType.LIST, 'Mod_PlayerList') );
@@ -627,17 +629,17 @@ export class Module {
       playerList.addChildStruct( GameState.PartyManager.Player.save().RootNode );
     }
 
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_StartDay') ).setValue(this.timeManager.day);
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_StartHour') ).setValue(this.timeManager.hour);
-    ifo.RootNode.addField( new GFFField(GFFDataType.WORD, 'Mod_StartMiliSec') ).setValue(this.timeManager.milisecond);
-    ifo.RootNode.addField( new GFFField(GFFDataType.WORD, 'Mod_StartMinute') ).setValue(this.timeManager.minute);
-    ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_StartMonth') ).setValue(this.timeManager.month);
-    ifo.RootNode.addField( new GFFField(GFFDataType.WORD, 'Mod_StartSecond') ).setValue(this.timeManager.second);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_StartYear') ).setValue(this.timeManager.year);
-    ifo.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Mod_Tag') ).setValue(this.tag);
+    ifo.RootNode.addByte('Mod_StartDay', this.timeManager.day);
+    ifo.RootNode.addByte('Mod_StartHour', this.timeManager.hour);
+    ifo.RootNode.addWord('Mod_StartMiliSec', this.timeManager.milisecond);
+    ifo.RootNode.addWord('Mod_StartMinute', this.timeManager.minute);
+    ifo.RootNode.addByte('Mod_StartMonth', this.timeManager.month);
+    ifo.RootNode.addWord('Mod_StartSecond', this.timeManager.second);
+    ifo.RootNode.addDWord('Mod_StartYear', this.timeManager.year);
+    ifo.RootNode.addCExoString('Mod_Tag', this.tag);
     ifo.RootNode.addField( new GFFField(GFFDataType.LIST, 'Mod_Tokens') );
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_Transition') ).setValue(this.transition);
-    ifo.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Mod_Version') ).setValue(this.version);
+    ifo.RootNode.addDWord('Mod_Transition', this.transition);
+    ifo.RootNode.addDWord('Mod_Version', this.version);
     ifo.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_XPScale') .setValue(this.xpScale));
     ifo.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     ifo.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
@@ -754,7 +756,17 @@ export class Module {
     }
   }
 
+  /** Modules from elsewhere: returns their archives, or undefined when a name isn't theirs */
+  static ArchiveSources: ((modName: string) => Promise<(RIMObject|ERFObject)[] | undefined>)[] = [];
+
+  /** A scene borrowed from the other game: only its area (rooms, walkmesh, sky) is used */
+  static IsBorrowedModule: (modName: string) => boolean = () => false;
+
   static async GetModuleArchives(modName = ''): Promise<(RIMObject|ERFObject)[]> {
+    for(const source of Module.ArchiveSources){
+      const borrowed = await source(modName);
+      if(borrowed) return borrowed;
+    }
     const archives: any[] = [];
     let archive = undefined;
 

@@ -325,9 +325,9 @@ export class Faction {
   toStruct(structIdx: number){
     let struct = new GFFStruct(structIdx);
 
-    struct.addField( new GFFField(GFFDataType.WORD, 'FactionGlobal') ).setValue(this.global);
-    struct.addField( new GFFField(GFFDataType.CEXOSTRING, 'FactionName') ).setValue(this.label);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'FactionParentID') ).setValue(this.parentId);
+    struct.addWord('FactionGlobal', this.global);
+    struct.addCExoString('FactionName', this.label);
+    struct.addDWord('FactionParentID', this.parentId);
 
     return struct;
   }
@@ -352,14 +352,11 @@ export class Faction {
 
       faction.id = struct.getType();
 
-      if(struct.hasField('FactionGlobal'))
-        faction.global = struct.getFieldByLabel('FactionGlobal').getValue();
+      faction.global = struct.get('FactionGlobal', faction.global);
 
-      if(struct.hasField('FactionName'))
-        faction.label = struct.getFieldByLabel('FactionName').getValue();
+      faction.label = struct.get('FactionName', faction.label);
 
-      if(struct.hasField('FactionParentID'))
-        faction.parentId = struct.getFieldByLabel('FactionParentID').getValue();
+      faction.parentId = struct.get('FactionParentID', faction.parentId);
 
       return faction;
     }

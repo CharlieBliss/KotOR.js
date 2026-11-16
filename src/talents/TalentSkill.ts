@@ -117,7 +117,7 @@ export class TalentSkill extends TalentObject {
 
   save(){
     let skillStruct = new GFFStruct();
-    skillStruct.addField( new GFFField(GFFDataType.BYTE, 'Rank') ).setValue(this.getRank());
+    skillStruct.addByte('Rank', this.getRank());
     return skillStruct;
   }
 
@@ -171,8 +171,9 @@ export class TalentSkill extends TalentObject {
 
         const classCodeLower = classCode.toLowerCase();
 
-        const isClassSkill = TwoDAObject.normalizeValue(`${classCodeLower}_class`, 'boolean', false);
-        const recommendedLevel = TwoDAObject.normalizeValue(`${classCodeLower}_reco`, 'number', 0);
+        // The skill row's columns for this class (e.g. jgd_class, jgd_reco)
+        const isClassSkill = TwoDAObject.normalizeValue(row[`${classCodeLower}_class`], 'boolean', false);
+        const recommendedLevel = TwoDAObject.normalizeValue(row[`${classCodeLower}_reco`], 'number', 0);
 
         const skillClass: SkillClass = {
           class: classCode,

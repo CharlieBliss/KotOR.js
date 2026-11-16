@@ -8,7 +8,7 @@ import type { EventTimedEvent } from "@/events";
 import { GameState } from "@/GameState";
 import type { IPerceptionInfo } from "@/interface/engine/IPerceptionInfo";
 import type { INWScriptStoreState } from "@/interface/nwscript/INWScriptStoreState";
-import type { ModuleObject } from "@/module";
+import type { ModuleObject, ModuleItem } from "@/module";
 import type { DLGObject } from "@/resource/DLGObject";
 import { GFFField } from "@/resource/GFFField";
 import { GFFStruct } from "@/resource/GFFStruct";
@@ -80,6 +80,8 @@ export class NWScriptInstance {
   lastSpellAttacker: ModuleObject;
   lastSpell: TalentSpell;
   lastSpellHarmful: boolean;
+  spellTarget: ModuleObject;
+  spellItem: ModuleItem;
   healTarget: ModuleObject;
 
   lastDisturbed: ModuleObject;
@@ -498,12 +500,12 @@ export class NWScriptInstance {
     //STORE_STATE
     let scriptSituation = new GFFStruct(0x7777);
 
-    scriptSituation.addField( new GFFField(GFFDataType.DWORD, 'CRC' ) ).setValue(0);
+    scriptSituation.addDWord('CRC', 0);
     scriptSituation.addField( new GFFField(GFFDataType.VOID, 'Code' ) ).setData( this.nwscript.code );
-    scriptSituation.addField( new GFFField(GFFDataType.INT, 'CodeSize' ) ).setValue( this.nwscript.progSize );
-    scriptSituation.addField( new GFFField(GFFDataType.INT, 'InstructionPtr' ) ).setValue(this.address);
-    scriptSituation.addField( new GFFField(GFFDataType.CEXOSTRING, 'Name' ) ).setValue( this.name );
-    scriptSituation.addField( new GFFField(GFFDataType.INT, 'SecondaryPtr' ) ).setValue(0);
+    scriptSituation.addInt('CodeSize',  this.nwscript.progSize );
+    scriptSituation.addInt('InstructionPtr', this.address);
+    scriptSituation.addCExoString('Name',  this.name );
+    scriptSituation.addInt('SecondaryPtr', 0);
 
     let stack = scriptSituation.addField( new GFFField(GFFDataType.STRUCT, 'Stack') );
     stack.addChildStruct( this.stack.saveForEventSituation() );

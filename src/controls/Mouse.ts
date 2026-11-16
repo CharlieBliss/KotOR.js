@@ -85,22 +85,27 @@ export class Mouse {
       return;
     }
 
+    // The GUI's positions (positionViewport, positionUI) are in GUI pixels: screen pixels over the UI scale
+    // (ResolutionManager.uiScale). position (-1..1) is for the 3D view and doesn't change.
+    const ui = ResolutionManager.uiScale || 1;
     if(res.isDynamicRes){
-      Mouse.positionViewport.x = x;
-      Mouse.positionViewport.y = y;
+      Mouse.positionViewport.x = x / ui;
+      Mouse.positionViewport.y = y / ui;
 
       Mouse.position.x = Mouse.Vector.x = ( x / window.innerWidth ) * 2 - 1;
       Mouse.position.y = Mouse.Vector.y = - ( y / window.innerHeight ) * 2 + 1; 
-      Mouse.positionUI.x = Mouse.Vector.x = ( x - (window.innerWidth/2) );
-      Mouse.positionUI.y = Mouse.Vector.y = - ( y -(window.innerHeight/2) ); 
+      Mouse.positionUI.x = ( x - (window.innerWidth/2) ) / ui;
+      Mouse.positionUI.y = - ( y -(window.innerHeight/2) ) / ui;
     }else{
-      Mouse.positionViewport.x = x - ((ResolutionManager.windowResolution.width/2) - ((res.width)/2));
-      Mouse.positionViewport.y = y - ((ResolutionManager.windowResolution.height/2) - ((res.height)/2));
+      const vx = x - ((ResolutionManager.windowResolution.width/2) - ((res.width)/2));
+      const vy = y - ((ResolutionManager.windowResolution.height/2) - ((res.height)/2));
 
-      Mouse.position.x = Mouse.Vector.x = ( Mouse.positionViewport.x / res.width ) * 2 - 1;
-      Mouse.position.y = Mouse.Vector.y = - ( Mouse.positionViewport.y / res.height ) * 2 + 1; 
-      Mouse.positionUI.x = Mouse.Vector.x = ( Mouse.positionViewport.x - (res.width/2) );
-      Mouse.positionUI.y = Mouse.Vector.y = - ( Mouse.positionViewport.y -(res.height/2) ); 
+      Mouse.position.x = Mouse.Vector.x = ( vx / res.width ) * 2 - 1;
+      Mouse.position.y = Mouse.Vector.y = - ( vy / res.height ) * 2 + 1;
+      Mouse.positionViewport.x = vx / ui;
+      Mouse.positionViewport.y = vy / ui;
+      Mouse.positionUI.x = ( vx - (res.width/2) ) / ui;
+      Mouse.positionUI.y = - ( vy -(res.height/2) ) / ui;
     }
   }
 

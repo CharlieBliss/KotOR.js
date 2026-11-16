@@ -90,10 +90,12 @@ export class InventoryManager {
 
     let droidorhuman = item.baseItem.droidOrHuman;
     
-    return !droidorhuman || (
+    const raceOk = !droidorhuman || (
       (droidorhuman == 1 && creature.getRace() == 6) ||
       (droidorhuman == 2 && creature.getRace() == 5)
     );
+    // And every feat its base item requires (proficiencies, implant levels, Jedi Defense for robes)
+    return raceOk && (typeof creature.canUseItem !== 'function' || creature.canUseItem(item));
     
   }
 

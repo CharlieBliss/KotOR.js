@@ -1,0 +1,829 @@
+.gm-panel-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9500;
+  pointer-events: none;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #e4eef7;
+  user-select: none;
+
+  * {
+    box-sizing: border-box;
+  }
+
+  .gm-Menu-Launcher {
+    position: fixed;
+    top: 10px;
+    right: 12px;
+    pointer-events: auto;
+    display: flex;
+    gap: 6px;
+    z-index: 9600;
+  }
+
+  .gm-topbar {
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 6px 12px;
+    background: linear-gradient(180deg, rgba(8, 18, 30, 0.95) 0%, rgba(12, 26, 42, 0.92) 100%);
+    border-bottom: 1px solid rgba(58, 166, 255, 0.45);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.75);
+    font-size: 12px;
+  }
+
+  .gm-topbar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .gm-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    background: rgba(25, 118, 210, 0.28);
+    border: 1px solid rgba(66, 165, 245, 0.5);
+    color: #82cfff;
+
+    &.host {
+      background: rgba(0, 200, 83, 0.22);
+      border-color: rgba(0, 230, 118, 0.55);
+      color: #69f0ae;
+    }
+
+    &.client {
+      background: rgba(255, 171, 0, 0.22);
+      border-color: rgba(255, 215, 64, 0.55);
+      color: #ffd740;
+    }
+  }
+
+  .gm-btn {
+    pointer-events: auto;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(82, 168, 236, 0.4);
+    background: rgba(16, 36, 58, 0.9);
+    color: #d7e9f7;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.14s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+
+    &:hover {
+      background: rgba(28, 64, 102, 0.95);
+      border-color: #5bc0ff;
+      color: #ffffff;
+    }
+
+    &.active {
+      background: linear-gradient(180deg, #1b5e96 0%, #0f3d66 100%);
+      border-color: #6bd0ff;
+      color: #ffffff;
+      box-shadow: 0 0 8px rgba(59, 178, 255, 0.45);
+    }
+
+    &.success {
+      background: rgba(16, 82, 52, 0.9);
+      border-color: rgba(46, 213, 115, 0.55);
+      color: #98ffcb;
+
+      &:hover, &.active {
+        background: rgba(24, 118, 74, 0.95);
+        border-color: #55efc4;
+        color: #ffffff;
+      }
+    }
+
+    &.warning {
+      background: rgba(102, 68, 14, 0.9);
+      border-color: rgba(255, 184, 48, 0.55);
+      color: #ffe082;
+
+      &:hover, &.active {
+        background: rgba(140, 92, 18, 0.95);
+        border-color: #ffd54f;
+        color: #ffffff;
+      }
+    }
+
+    &.danger {
+      background: rgba(102, 24, 24, 0.9);
+      border-color: rgba(255, 82, 82, 0.55);
+      color: #ff9e9e;
+
+      &:hover {
+        background: rgba(145, 32, 32, 0.95);
+        border-color: #ff5252;
+        color: #ffffff;
+      }
+    }
+
+    &.small {
+      padding: 3px 7px;
+      font-size: 11px;
+    }
+
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+
+      &:hover {
+        background: rgba(16, 36, 58, 0.9);
+        border-color: rgba(82, 168, 236, 0.4);
+        color: #d7e9f7;
+      }
+    }
+  }
+
+  // Joined buttons where exactly one option is active (tool, control mode)
+  .gm-segmented {
+    display: inline-flex;
+
+    .gm-btn {
+      border-radius: 0;
+
+      & + .gm-btn {
+        border-left-width: 0;
+      }
+
+      &:first-child {
+        border-radius: 4px 0 0 4px;
+      }
+
+      &:last-child {
+        border-radius: 0 4px 4px 0;
+      }
+    }
+  }
+
+  // A question from the GM, shown to a player until they pick a reply
+  .gm-prompt {
+    position: fixed;
+    left: 50%;
+    bottom: 72px;
+    transform: translateX(-50%);
+    width: min(520px, calc(100vw - 32px));
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: rgba(8, 18, 30, 0.95);
+    border: 1px solid rgba(255, 215, 64, 0.55);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7);
+    pointer-events: auto;
+
+    .gm-prompt-speaker {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #ffd740;
+    }
+
+    .gm-prompt-text {
+      margin: 6px 0 12px;
+      font-size: 14px;
+      line-height: 1.4;
+      color: #e4eef7;
+    }
+
+    .gm-prompt-options {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      .gm-btn {
+        justify-content: flex-start;
+        text-align: left;
+      }
+    }
+  }
+
+  // Joining a GM's game: the form, then live status until the player has their character
+  .gm-join-backdrop {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(2, 6, 12, 0.55);
+    pointer-events: auto;
+  }
+
+  .gm-join {
+    width: min(460px, 100%);
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 20px;
+    border-radius: 8px;
+    background: rgba(9, 19, 32, 0.97);
+    border: 1px solid rgba(68, 162, 240, 0.55);
+    box-shadow: 0 10px 36px rgba(0, 0, 0, 0.85);
+    font-size: 12.5px;
+    user-select: text;
+
+    .gm-join-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #90d5ff;
+    }
+
+    .gm-join-steps {
+      margin: 0;
+      padding-left: 18px;
+      color: #b9d4ea;
+      line-height: 1.5;
+    }
+
+    .gm-join-error {
+      padding: 8px 10px;
+      border-radius: 4px;
+      background: rgba(102, 24, 24, 0.75);
+      border: 1px solid rgba(255, 82, 82, 0.55);
+      color: #ffc4c4;
+      line-height: 1.4;
+    }
+
+    .gm-join-status {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 0;
+    }
+
+    .gm-join-status-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e4eef7;
+    }
+
+    .gm-join-status-text {
+      margin-top: 2px;
+      color: #9ab8d4;
+      line-height: 1.4;
+    }
+
+    .gm-join-spinner {
+      flex: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      border: 3px solid rgba(91, 192, 255, 0.25);
+      border-top-color: #5bc0ff;
+      animation: gm-join-spin 0.9s linear infinite;
+    }
+
+    .gm-btn {
+      padding: 7px 14px;
+      font-size: 12.5px;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .gm-join-spinner {
+        animation: none;
+      }
+    }
+  }
+
+  @keyframes gm-join-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  // In a conversation, KotOR's dialog screen owns the top and bottom of the screen
+  &.in-conversation {
+    .gm-topbar,
+    .gm-controls-strip,
+    .gm-drawer {
+      display: none;
+    }
+  }
+
+  // A player's skills, as buttons that roll them
+  .gm-skills {
+    position: fixed;
+    top: 52px;
+    left: 12px;
+    width: min(300px, calc(100vw - 24px));
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.95);
+    border: 1px solid rgba(107, 197, 255, 0.45);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    pointer-events: auto;
+
+    .gm-skills-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #d7e9f7;
+      font-weight: 600;
+    }
+
+    .gm-skills-list {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .gm-skill {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 10px;
+      text-align: left;
+    }
+
+    .gm-skill-bonus {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #ffe082;
+    }
+  }
+
+  // Players' rolls, on everyone's screen for a few seconds
+  .gm-roll-feed {
+    position: fixed;
+    top: 52px;
+    right: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(240px, calc(100vw - 24px));
+    pointer-events: none;
+  }
+
+  .gm-roll {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "who total" "detail total";
+    align-items: center;
+    column-gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.92);
+    border: 1px solid rgba(255, 215, 64, 0.5);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+    animation: gm-roll-in 0.2s ease-out;
+
+    .gm-roll-who { grid-area: who; color: #d7e9f7; font-size: 12px; }
+    .gm-roll-detail { grid-area: detail; color: #8cb0d0; font-size: 11px; }
+    .gm-roll-total { grid-area: total; color: #ffd740; font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+    &.natural-20 { border-color: #69f0ae; .gm-roll-total { color: #69f0ae; } }
+    &.natural-1 { border-color: #ff5252; .gm-roll-total { color: #ff8a80; } }
+  }
+
+  @keyframes gm-roll-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  // The GM speaking for NPCs players are talking to
+  .gm-conversations {
+    position: fixed;
+    right: 12px;
+    bottom: 64px;
+    width: min(380px, calc(100vw - 24px));
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: auto;
+  }
+
+  .gm-conversation {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background: rgba(9, 19, 32, 0.95);
+    border: 1px solid rgba(255, 215, 64, 0.5);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    font-size: 12px;
+
+    .gm-conversation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      color: #ffe082;
+    }
+
+    .gm-conversation-log {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      max-height: 140px;
+      overflow-y: auto;
+      padding: 6px 8px;
+      border-radius: 4px;
+      background: rgba(5, 11, 19, 0.9);
+      line-height: 1.35;
+      user-select: text;
+
+      .who {
+        font-weight: 600;
+      }
+
+      .npc .who {
+        color: #ffd740;
+      }
+
+      .player .who {
+        color: #6bc5ff;
+      }
+
+      .waiting {
+        color: #8cb0d0;
+        font-style: italic;
+      }
+    }
+
+    .gm-conversation-hint {
+      font-size: 10.5px;
+      color: #8cb0d0;
+    }
+
+    .gm-conversation-camera {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .gm-conversation-camera-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+
+      .gm-segmented {
+        flex-wrap: wrap;
+      }
+    }
+
+    .gm-conversation-camera-label {
+      width: 62px;
+      flex: none;
+      color: #8cb0d0;
+      font-size: 11px;
+    }
+  }
+
+  // Our own character is down
+  .gm-prompt.gm-downed {
+    border-color: rgba(255, 82, 82, 0.6);
+
+    .gm-prompt-speaker {
+      color: #ff8a80;
+    }
+  }
+
+  textarea.gm-input {
+    resize: vertical;
+    font-family: inherit;
+  }
+
+  // What the current mode or tool does, and its keys
+  .gm-controls-strip {
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 24px);
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(8, 18, 30, 0.82);
+    border: 1px solid rgba(58, 166, 255, 0.3);
+    font-size: 11.5px;
+    color: #b9d4ea;
+    pointer-events: none;
+
+    .gm-chip {
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(255, 171, 0, 0.2);
+      border: 1px solid rgba(255, 215, 64, 0.55);
+      color: #ffe082;
+      font-weight: 600;
+    }
+
+    .gm-control-hint {
+      white-space: nowrap;
+    }
+
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      border: 1px solid rgba(130, 200, 255, 0.45);
+      background: rgba(25, 60, 95, 0.75);
+      color: #e4eef7;
+      font-family: inherit;
+      font-size: 10.5px;
+    }
+  }
+
+  .gm-drawer {
+    pointer-events: auto;
+    width: 440px;
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 54px);
+    margin: 8px 0 0 8px;
+    background: rgba(9, 19, 32, 0.94);
+    border: 1px solid rgba(68, 162, 240, 0.45);
+    border-radius: 6px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .gm-drawer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(15, 34, 56, 0.95);
+    border-bottom: 1px solid rgba(68, 162, 240, 0.3);
+    font-weight: 600;
+    font-size: 13px;
+    color: #90d5ff;
+  }
+
+  .gm-drawer-body {
+    padding: 10px 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 12px;
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(82, 168, 236, 0.45);
+      border-radius: 3px;
+    }
+  }
+
+  .gm-section {
+    background: rgba(16, 31, 49, 0.78);
+    border: 1px solid rgba(66, 139, 202, 0.28);
+    border-radius: 5px;
+    padding: 9px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+  }
+
+  // A section inside a section: just a divider, not another box
+  .gm-section .gm-section {
+    background: transparent;
+    border: none;
+    border-top: 1px solid rgba(66, 139, 202, 0.2);
+    border-radius: 0;
+    padding: 8px 0 0;
+  }
+
+  .gm-section-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #6bc5ff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .gm-section-title .gm-summary-note {
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: #8aa4bd;
+  }
+
+  // A section that opens on demand: rarely used controls stay out of the way until wanted
+  details.gm-section {
+    gap: 0;
+
+    > summary {
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #6bc5ff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      &::-webkit-details-marker { display: none; }
+      &::before {
+        content: '▸';
+        font-size: 10px;
+        transition: transform 0.15s;
+      }
+      .gm-summary-note {
+        margin-left: auto;
+        font-weight: 400;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #8aa4bd;
+      }
+    }
+
+    &[open] {
+      gap: 7px;
+      > summary::before { transform: rotate(90deg); }
+    }
+  }
+
+  .gm-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .gm-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .gm-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+  }
+
+  .gm-field {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+
+    label {
+      font-size: 11px;
+      color: #9ab8d4;
+    }
+  }
+
+  .gm-input, .gm-select {
+    width: 100%;
+    padding: 5px 8px;
+    background: rgba(6, 14, 24, 0.92);
+    border: 1px solid rgba(74, 148, 214, 0.45);
+    border-radius: 4px;
+    color: #e8f4ff;
+    font-size: 12px;
+
+    &:focus {
+      outline: none;
+      border-color: #5bc0ff;
+    }
+  }
+
+  .gm-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-size: 11.5px;
+    color: #c5dcf0;
+
+    input {
+      cursor: pointer;
+    }
+  }
+
+  .gm-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 210px;
+    overflow-y: auto;
+    padding-right: 2px;
+
+    &::-webkit-scrollbar {
+      width: 5px;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(82, 168, 236, 0.4);
+      border-radius: 3px;
+    }
+  }
+
+  .gm-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    background: rgba(10, 22, 36, 0.85);
+    border: 1px solid rgba(66, 139, 202, 0.25);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+
+    &:hover {
+      background: rgba(20, 44, 72, 0.9);
+      border-color: rgba(91, 192, 255, 0.55);
+    }
+
+    &.selected {
+      background: rgba(24, 62, 102, 0.95);
+      border-color: #6bd0ff;
+    }
+
+    .gm-card-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .gm-card-title {
+      font-weight: 600;
+      color: #e6f3ff;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .gm-card-sub {
+      font-size: 10.5px;
+      color: #8cb0d0;
+    }
+  }
+
+  .gm-hint {
+    font-size: 11px;
+    color: #8cb2d4;
+    line-height: 1.35;
+    background: rgba(14, 38, 64, 0.55);
+    border-left: 3px solid #3fa9f5;
+    padding: 5px 8px;
+    border-radius: 3px;
+  }
+
+  .gm-chat-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    height: 120px;
+    overflow-y: auto;
+    background: rgba(5, 11, 19, 0.9);
+    border: 1px solid rgba(66, 139, 202, 0.3);
+    border-radius: 4px;
+    padding: 6px 8px;
+    font-size: 11.5px;
+
+    .gm-chat-line {
+      line-height: 1.35;
+      word-break: break-word;
+
+      .sender {
+        font-weight: 600;
+        color: #6bc5ff;
+        margin-right: 5px;
+      }
+    }
+  }
+}

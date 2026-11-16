@@ -418,53 +418,29 @@ export class DLGNode {
     let node = new DLGNode(dialog);
     node.setDialog(dialog);
 
-    if(struct.hasField('Quest')){
-      node.quest = struct.getFieldByLabel('Quest').getValue();
-    }
+    node.quest = struct.get('Quest', node.quest);
 
-    if(struct.hasField('QuestEntry')){
-      node.questEntry = struct.getFieldByLabel('QuestEntry').getValue();
-    }
+    node.questEntry = struct.get('QuestEntry', node.questEntry);
 
-    if(struct.hasField('PlotXPPercentage')){
-      node.plotXPPercentage = struct.getFieldByLabel('PlotXPPercentage').getValue();
-    }
+    node.plotXPPercentage = struct.get('PlotXPPercentage', node.plotXPPercentage);
 
-    if(struct.hasField('PlotIndex')){
-      node.plotIndex = struct.getFieldByLabel('PlotIndex').getValue();
-    }
+    node.plotIndex = struct.get('PlotIndex', node.plotIndex);
 
-    if(struct.hasField('Listener')){
-      node.listenerTag = struct.getFieldByLabel('Listener').getValue();
-    }
+    node.listenerTag = struct.get('Listener', node.listenerTag);
 
-    if(struct.hasField('Speaker')){
-      node.speakerTag = struct.getFieldByLabel('Speaker').getValue();
-    }
+    node.speakerTag = struct.get('Speaker', node.speakerTag);
 
-    if(struct.hasField('VO_ResRef')){
-      node.vo_resref = struct.getFieldByLabel('VO_ResRef').getValue();
-    }
+    node.vo_resref = struct.get('VO_ResRef', node.vo_resref);
 
-    if(struct.hasField('Sound')){
-      node.sound = struct.getFieldByLabel('Sound').getValue();
-    }
+    node.sound = struct.get('Sound', node.sound);
 
-    if(struct.hasField('CameraID')){
-      node.cameraID = struct.getFieldByLabel('CameraID').getValue();
-    }
+    node.cameraID = struct.get('CameraID', node.cameraID);
 
-    if(struct.hasField('CameraAnimation')){
-      node.cameraAnimation = struct.getFieldByLabel('CameraAnimation').getValue();
-    }
+    node.cameraAnimation = struct.get('CameraAnimation', node.cameraAnimation);
 
-    if(struct.hasField('CameraAngle')){
-      node.cameraAngle = struct.getFieldByLabel('CameraAngle').getValue();
-    }
+    node.cameraAngle = struct.get('CameraAngle', node.cameraAngle);
 
-    if(struct.hasField('CamVidEffect')){
-      node.camVidEffect = struct.getFieldByLabel('CamVidEffect').getValue();
-    }
+    node.camVidEffect = struct.get('CamVidEffect', node.camVidEffect);
 
     if(struct.hasField('Script')){
       const resref = struct.getFieldByLabel('Script').getValue();
@@ -489,60 +465,34 @@ export class DLGNode {
       }
 
       //k2 MODE
-      if(struct.hasField('ActionParam1')){
-        node.scriptParams.Param1 = struct.getFieldByLabel('ActionParam1').getValue();
-      }
+      node.scriptParams.Param1 = struct.get('ActionParam1', node.scriptParams.Param1);
 
-      if(struct.hasField('ActionParam2')){
-        node.scriptParams.Param2 = struct.getFieldByLabel('ActionParam2').getValue();
-      }
+      node.scriptParams.Param2 = struct.get('ActionParam2', node.scriptParams.Param2);
 
-      if(struct.hasField('ActionParam3')){
-        node.scriptParams.Param3 = struct.getFieldByLabel('ActionParam3').getValue();
-      }
+      node.scriptParams.Param3 = struct.get('ActionParam3', node.scriptParams.Param3);
 
-      if(struct.hasField('ActionParam4')){
-        node.scriptParams.Param4 = struct.getFieldByLabel('ActionParam4').getValue();
-      }
+      node.scriptParams.Param4 = struct.get('ActionParam4', node.scriptParams.Param4);
 
-      if(struct.hasField('ActionParam5')){
-        node.scriptParams.Param5 = struct.getFieldByLabel('ActionParam5').getValue();
-      }
+      node.scriptParams.Param5 = struct.get('ActionParam5', node.scriptParams.Param5);
 
-      if(struct.hasField('ActionParamStrA')){
-        node.scriptParams.String = struct.getFieldByLabel('ActionParamStrA').getValue();
-      }
+      node.scriptParams.String = struct.get('ActionParamStrA', node.scriptParams.String);
 
       //k2 MODE
-      if(struct.hasField('ActionParam1b')){
-        node.script2Params.Param1 = struct.getFieldByLabel('ActionParam1b').getValue();
-      }
+      node.script2Params.Param1 = struct.get('ActionParam1b', node.script2Params.Param1);
 
-      if(struct.hasField('ActionParam2b')){
-        node.script2Params.Param2 = struct.getFieldByLabel('ActionParam2b').getValue();
-      }
+      node.script2Params.Param2 = struct.get('ActionParam2b', node.script2Params.Param2);
 
-      if(struct.hasField('ActionParam3b')){
-        node.script2Params.Param3 = struct.getFieldByLabel('ActionParam3b').getValue();
-      }
+      node.script2Params.Param3 = struct.get('ActionParam3b', node.script2Params.Param3);
 
-      if(struct.hasField('ActionParam4b')){
-        node.script2Params.Param4 = struct.getFieldByLabel('ActionParam4b').getValue();
-      }
+      node.script2Params.Param4 = struct.get('ActionParam4b', node.script2Params.Param4);
 
-      if(struct.hasField('ActionParam5b')){
-        node.script2Params.Param5 = struct.getFieldByLabel('ActionParam5b').getValue();
-      }
+      node.script2Params.Param5 = struct.get('ActionParam5b', node.script2Params.Param5);
 
-      if(struct.hasField('ActionParamStrB')){
-        node.script2Params.String = struct.getFieldByLabel('ActionParamStrB').getValue();
-      }
+      node.script2Params.String = struct.get('ActionParamStrB', node.script2Params.String);
 
     }
 
-    if(struct.hasField('CamFieldOfView')){
-      node.camFieldOfView = struct.getFieldByLabel('CamFieldOfView').getValue();
-    }
+    node.camFieldOfView = struct.get('CamFieldOfView', node.camFieldOfView);
 
     if(struct.hasField('RepliesList')){
       const structs = struct.getFieldByLabel('RepliesList').getChildStructs();
@@ -551,61 +501,33 @@ export class DLGNode {
         let replyStruct = structs[i];
         let linkNode = new DLGNode(dialog);
 
-        if(replyStruct.hasField('Not')){
-          linkNode.isActiveParams.Not = replyStruct.getFieldByLabel('Not').getValue();
-        }
+        linkNode.isActiveParams.Not = replyStruct.get('Not', linkNode.isActiveParams.Not);
 
-        if(replyStruct.hasField('Param1')){
-          linkNode.isActiveParams.Param1 = replyStruct.getFieldByLabel('Param1').getValue();
-        }
+        linkNode.isActiveParams.Param1 = replyStruct.get('Param1', linkNode.isActiveParams.Param1);
 
-        if(replyStruct.hasField('Param2')){
-          linkNode.isActiveParams.Param2 = replyStruct.getFieldByLabel('Param2').getValue();
-        }
+        linkNode.isActiveParams.Param2 = replyStruct.get('Param2', linkNode.isActiveParams.Param2);
 
-        if(replyStruct.hasField('Param3')){
-          linkNode.isActiveParams.Param3 = replyStruct.getFieldByLabel('Param3').getValue();
-        }
+        linkNode.isActiveParams.Param3 = replyStruct.get('Param3', linkNode.isActiveParams.Param3);
 
-        if(replyStruct.hasField('Param4')){
-          linkNode.isActiveParams.Param4 = replyStruct.getFieldByLabel('Param4').getValue();
-        }
+        linkNode.isActiveParams.Param4 = replyStruct.get('Param4', linkNode.isActiveParams.Param4);
 
-        if(replyStruct.hasField('Param5')){
-          linkNode.isActiveParams.Param5 = replyStruct.getFieldByLabel('Param5').getValue();
-        }
+        linkNode.isActiveParams.Param5 = replyStruct.get('Param5', linkNode.isActiveParams.Param5);
 
-        if(replyStruct.hasField('ParamStrA')){
-          linkNode.isActiveParams.String = replyStruct.getFieldByLabel('ParamStrA').getValue();
-        }
+        linkNode.isActiveParams.String = replyStruct.get('ParamStrA', linkNode.isActiveParams.String);
 
-        if(replyStruct.hasField('Not2')){
-          linkNode.isActive2Params.Not = replyStruct.getFieldByLabel('Not2').getValue();
-        }
+        linkNode.isActive2Params.Not = replyStruct.get('Not2', linkNode.isActive2Params.Not);
 
-        if(replyStruct.hasField('Param1b')){
-          linkNode.isActive2Params.Param1 = replyStruct.getFieldByLabel('Param1b').getValue();
-        }
+        linkNode.isActive2Params.Param1 = replyStruct.get('Param1b', linkNode.isActive2Params.Param1);
 
-        if(replyStruct.hasField('Param2b')){
-          linkNode.isActive2Params.Param2 = replyStruct.getFieldByLabel('Param2b').getValue();
-        }
+        linkNode.isActive2Params.Param2 = replyStruct.get('Param2b', linkNode.isActive2Params.Param2);
 
-        if(replyStruct.hasField('Param3b')){
-          linkNode.isActive2Params.Param3 = replyStruct.getFieldByLabel('Param3b').getValue();
-        }
+        linkNode.isActive2Params.Param3 = replyStruct.get('Param3b', linkNode.isActive2Params.Param3);
 
-        if(replyStruct.hasField('Param4b')){
-          linkNode.isActive2Params.Param4 = replyStruct.getFieldByLabel('Param4b').getValue();
-        }
+        linkNode.isActive2Params.Param4 = replyStruct.get('Param4b', linkNode.isActive2Params.Param4);
 
-        if(replyStruct.hasField('Param5b')){
-          linkNode.isActive2Params.Param5 = replyStruct.getFieldByLabel('Param5b').getValue();
-        }
+        linkNode.isActive2Params.Param5 = replyStruct.get('Param5b', linkNode.isActive2Params.Param5);
 
-        if(replyStruct.hasField('ParamStrB')){
-          linkNode.isActive2Params.String = replyStruct.getFieldByLabel('ParamStrB').getValue();
-        }
+        linkNode.isActive2Params.String = replyStruct.get('ParamStrB', linkNode.isActive2Params.String);
 
         if(replyStruct.hasField('Logic')){
           linkNode.Logic = !!replyStruct.getFieldByLabel('Logic').getValue();
@@ -631,9 +553,7 @@ export class DLGNode {
           }
         }
 
-        if(replyStruct.hasField('Index')){
-          linkNode.index = replyStruct.getFieldByLabel('Index').getValue();
-        }
+        linkNode.index = replyStruct.get('Index', linkNode.index);
 
         node.replies.push(linkNode);
 
@@ -647,61 +567,33 @@ export class DLGNode {
         let entryStruct = structs[i];
         let linkNode = new DLGNode(dialog);
         
-        if(entryStruct.hasField('Not')){
-          linkNode.isActiveParams.Not = entryStruct.getFieldByLabel('Not').getValue();
-        }
+        linkNode.isActiveParams.Not = entryStruct.get('Not', linkNode.isActiveParams.Not);
 
-        if(entryStruct.hasField('Param1')){
-          linkNode.isActiveParams.Param1 = entryStruct.getFieldByLabel('Param1').getValue();
-        }
+        linkNode.isActiveParams.Param1 = entryStruct.get('Param1', linkNode.isActiveParams.Param1);
 
-        if(entryStruct.hasField('Param2')){
-          linkNode.isActiveParams.Param2 = entryStruct.getFieldByLabel('Param2').getValue();
-        }
+        linkNode.isActiveParams.Param2 = entryStruct.get('Param2', linkNode.isActiveParams.Param2);
 
-        if(entryStruct.hasField('Param3')){
-          linkNode.isActiveParams.Param3 = entryStruct.getFieldByLabel('Param3').getValue();
-        }
+        linkNode.isActiveParams.Param3 = entryStruct.get('Param3', linkNode.isActiveParams.Param3);
 
-        if(entryStruct.hasField('Param4')){
-          linkNode.isActiveParams.Param4 = entryStruct.getFieldByLabel('Param4').getValue();
-        }
+        linkNode.isActiveParams.Param4 = entryStruct.get('Param4', linkNode.isActiveParams.Param4);
 
-        if(entryStruct.hasField('Param5')){
-          linkNode.isActiveParams.Param5 = entryStruct.getFieldByLabel('Param5').getValue();
-        }
+        linkNode.isActiveParams.Param5 = entryStruct.get('Param5', linkNode.isActiveParams.Param5);
 
-        if(entryStruct.hasField('ParamStrA')){
-          linkNode.isActiveParams.String = entryStruct.getFieldByLabel('ParamStrA').getValue();
-        }
+        linkNode.isActiveParams.String = entryStruct.get('ParamStrA', linkNode.isActiveParams.String);
 
-        if(entryStruct.hasField('Not2')){
-          linkNode.isActive2Params.Not = entryStruct.getFieldByLabel('Not2').getValue();
-        }
+        linkNode.isActive2Params.Not = entryStruct.get('Not2', linkNode.isActive2Params.Not);
 
-        if(entryStruct.hasField('Param1b')){
-          linkNode.isActive2Params.Param1 = entryStruct.getFieldByLabel('Param1b').getValue();
-        }
+        linkNode.isActive2Params.Param1 = entryStruct.get('Param1b', linkNode.isActive2Params.Param1);
 
-        if(entryStruct.hasField('Param2b')){
-          linkNode.isActive2Params.Param2 = entryStruct.getFieldByLabel('Param2b').getValue();
-        }
+        linkNode.isActive2Params.Param2 = entryStruct.get('Param2b', linkNode.isActive2Params.Param2);
 
-        if(entryStruct.hasField('Param3b')){
-          linkNode.isActive2Params.Param3 = entryStruct.getFieldByLabel('Param3b').getValue();
-        }
+        linkNode.isActive2Params.Param3 = entryStruct.get('Param3b', linkNode.isActive2Params.Param3);
 
-        if(entryStruct.hasField('Param4b')){
-          linkNode.isActive2Params.Param4 = entryStruct.getFieldByLabel('Param4b').getValue();
-        }
+        linkNode.isActive2Params.Param4 = entryStruct.get('Param4b', linkNode.isActive2Params.Param4);
 
-        if(entryStruct.hasField('Param5b')){
-          linkNode.isActive2Params.Param5 = entryStruct.getFieldByLabel('Param5b').getValue();
-        }
+        linkNode.isActive2Params.Param5 = entryStruct.get('Param5b', linkNode.isActive2Params.Param5);
 
-        if(entryStruct.hasField('ParamStrB')){
-          linkNode.isActive2Params.String = entryStruct.getFieldByLabel('ParamStrB').getValue();
-        }
+        linkNode.isActive2Params.String = entryStruct.get('ParamStrB', linkNode.isActive2Params.String);
 
         if(entryStruct.hasField('Logic')){
           linkNode.Logic = !!entryStruct.getFieldByLabel('Logic').getValue();
@@ -727,9 +619,7 @@ export class DLGNode {
           }
         }
 
-        if(entryStruct.hasField('Index')){
-          linkNode.index = entryStruct.getFieldByLabel('Index').getValue();
-        }
+        linkNode.index = entryStruct.get('Index', linkNode.index);
 
         node.entries.push(linkNode);
 
@@ -745,9 +635,7 @@ export class DLGNode {
           participant: '',
         };
         
-        if(childStruct.hasField('Animation')){
-          animation.animation = childStruct.getFieldByLabel('Animation').getValue();
-        }
+        animation.animation = childStruct.get('Animation', animation.animation);
         
         if(childStruct.hasField('Participant')){
           animation.participant = childStruct.getFieldByLabel('Participant').getValue().toLocaleLowerCase();
@@ -757,25 +645,17 @@ export class DLGNode {
       }
     }
 
-    if(struct.hasField('Text')){
-      node.text = struct.getFieldByLabel('Text').getValue();
-    }
+    node.text = struct.get('Text', node.text);
 
     if(struct.hasField('Delay')){
       node.delay = struct.getFieldByLabel('Delay').getValue() & 0xFFFFFFFF;
     }
 
-    if(struct.hasField('FadeType')){
-      node.fade.type = struct.getFieldByLabel('FadeType').getValue();
-    }
+    node.fade.type = struct.get('FadeType', node.fade.type);
 
-    if(struct.hasField('FadeLength')){
-      node.fade.length = struct.getFieldByLabel('FadeLength').getValue();
-    }
+    node.fade.length = struct.get('FadeLength', node.fade.length);
 
-    if(struct.hasField('FadeDelay')){
-      node.fade.delay = struct.getFieldByLabel('FadeDelay').getValue();
-    }
+    node.fade.delay = struct.get('FadeDelay', node.fade.delay);
 
     if(struct.hasField('NodeUnskippable')){
       node.skippable = !struct.getFieldByLabel('NodeUnskippable').getValue();
@@ -783,29 +663,17 @@ export class DLGNode {
       node.skippable = true;
     }
 
-    if(struct.hasField('AlienRaceNode')){
-      node.alienRaceNode = struct.getFieldByLabel('AlienRaceNode').getValue();
-    }
+    node.alienRaceNode = struct.get('AlienRaceNode', node.alienRaceNode);
 
-    if(struct.hasField('Emotion')){
-      node.emotion = struct.getFieldByLabel('Emotion').getValue();
-    }
+    node.emotion = struct.get('Emotion', node.emotion);
 
-    if(struct.hasField('FacialAnim')){
-      node.facialAnimation = struct.getFieldByLabel('FacialAnim').getValue();
-    }
+    node.facialAnimation = struct.get('FacialAnim', node.facialAnimation);
 
-    if(struct.hasField('PostProcNode')){
-      node.postProcessNode = struct.getFieldByLabel('PostProcNode').getValue();
-    }
+    node.postProcessNode = struct.get('PostProcNode', node.postProcessNode);
 
-    if(struct.hasField('RecordNoVOOverri')){
-      node.recordNoVOOverride = struct.getFieldByLabel('RecordNoVOOverri').getValue();
-    }
+    node.recordNoVOOverride = struct.get('RecordNoVOOverri', node.recordNoVOOverride);
 
-    if(struct.hasField('RecordVO')){
-      node.recordVO = struct.getFieldByLabel('RecordVO').getValue();
-    }
+    node.recordVO = struct.get('RecordVO', node.recordVO);
 
     if(struct.hasField('VOTextChanged')){
       node.voTextChanged = !!struct.getFieldByLabel('VOTextChanged').getValue();

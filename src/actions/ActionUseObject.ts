@@ -5,6 +5,11 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { GameState } from "@/GameState";
 import type { ModuleObject } from "@/module/ModuleObject";
+import type { ModuleCreature } from "@/module/ModuleCreature";
+import { MOVE_FLAG_RUN, MOVE_FLAG_TARGET_MAY_BE_DEAD } from "@/actions/ActionMoveToPoint";
+
+/** How close (in metres) to an object, or to a creature's edge, a character must be to use it */
+const USE_RANGE = 1.5;
 import { BitWise } from "@/utility/BitWise";
 import { Utility } from "@/utility/Utility";
 import { Action } from "@/actions/Action";
@@ -37,8 +42,10 @@ export class ActionUseObject extends Action {
       return ActionStatus.FAILED;
     }
 
+    // Within reach of a creature means of its edge, not its centre: someone else may be standing on a body
+    const useRange = USE_RANGE + (BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) ? this.target.getHitDistance() : 0);
     let distance = Utility.Distance2D(this.owner.position, this.target.position);
-    if(distance > 1.5){
+    if(distance > useRange){
         
       // this.owner.openSpot = undefined;
       let actionMoveToTarget = new GameState.ActionFactory.ActionMoveToPoint();
@@ -47,8 +54,11 @@ export class ActionUseObject extends Action {
       actionMoveToTarget.setParameter(2, ActionParameterType.FLOAT, this.target.position.z);
       actionMoveToTarget.setParameter(3, ActionParameterType.DWORD, GameState.module.area.id);
       actionMoveToTarget.setParameter(4, ActionParameterType.DWORD, this.target.id);
-      actionMoveToTarget.setParameter(5, ActionParameterType.INT, 1);
-      actionMoveToTarget.setParameter(6, ActionParameterType.FLOAT, 1.5 );
+      // Moving to a dead creature normally fails at once (so combat doesn't chase the dead);
+      // using a body (looting it) has to be able to walk over to it
+      const targetIsBody = BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) && (this.target as ModuleCreature).isDead();
+      actionMoveToTarget.setParameter(5, ActionParameterType.INT, MOVE_FLAG_RUN | (targetIsBody ? MOVE_FLAG_TARGET_MAY_BE_DEAD : 0));
+      actionMoveToTarget.setParameter(6, ActionParameterType.FLOAT, useRange );
       actionMoveToTarget.setParameter(7, ActionParameterType.INT, 0);
       actionMoveToTarget.setParameter(8, ActionParameterType.FLOAT, 30.0);
       this.owner.actionQueue.addFront(actionMoveToTarget);

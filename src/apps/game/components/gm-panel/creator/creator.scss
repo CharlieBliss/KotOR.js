@@ -1,0 +1,414 @@
+// The character creator, styled after the games' own character generation screens:
+// KotOR: deep navy panels with thin bright-blue frames and blue lettering, on gunmetal;
+// KotOR II: near-black panels with teal-green frames and lettering, in a brass frame.
+
+.cc-backdrop {
+  // KotOR (default)
+  --cc-page: radial-gradient(ellipse at center, #1b1f26 0%, #0b0d11 70%);
+  --cc-frame-bg: linear-gradient(180deg, #2a2f38 0%, #1a1d24 100%);
+  --cc-frame-edge: #4a525e;
+  --cc-panel: #05081c;
+  --cc-panel-2: #0a0f2e;
+  --cc-line: #1f6fd1;
+  --cc-line-bright: #3aa0ff;
+  --cc-text: #45a8ff;
+  --cc-text-dim: #2d6fb5;
+  --cc-text-strong: #9fd2ff;
+  --cc-on: #0f3a7a;
+  --cc-bad: #ff6a5c;
+  --cc-radius: 14px;
+
+  &[data-game="tsl"] {
+    --cc-page: #000;
+    --cc-frame-bg: linear-gradient(135deg, #8a6a38 0%, #c9a463 22%, #6e5229 48%, #b48d4f 74%, #5a4220 100%);
+    --cc-frame-edge: #3a2a12;
+    --cc-panel: #020807;
+    --cc-panel-2: #061411;
+    --cc-line: #1d6b57;
+    --cc-line-bright: #2fc39b;
+    --cc-text: #34b893;
+    --cc-text-dim: #1f7a63;
+    --cc-text-strong: #9ef0d6;
+    --cc-on: #0c3a2f;
+    --cc-radius: 10px;
+  }
+
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--cc-page);
+  // The games letter their menus in wide small capitals
+  font-family: "Eurostile", "Microgramma", "Bank Gothic", "Arial Narrow", "Segoe UI", sans-serif;
+  font-variant: small-caps;
+  letter-spacing: 0.06em;
+  color: var(--cc-text);
+  contain: layout paint;
+}
+
+.cc-frame {
+  width: min(760px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px 14px;
+  background: var(--cc-frame-bg);
+  border: 2px solid var(--cc-frame-edge);
+  border-radius: 28px;
+  box-shadow: inset 0 0 0 6px rgba(0, 0, 0, 0.35), 0 10px 40px rgba(0, 0, 0, 0.6);
+
+  // The editor keeps one size whichever section is open, so the frame doesn't jump between tabs
+  &.wide { width: min(1100px, 100%); height: min(760px, 100%); }
+
+  [data-game="tsl"] & { border-radius: 12px; border-width: 3px; }
+}
+
+// Title bars, as the game's rounded "Character Generation" banners
+.cc-titlebar, .cc-subtitle {
+  text-align: center;
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line-bright);
+  border-radius: 0 0 var(--cc-radius) var(--cc-radius);
+  color: var(--cc-text);
+  padding: 4px 12px;
+  text-transform: lowercase;
+  font-size: 15px;
+}
+.cc-titlebar {
+  border-radius: var(--cc-radius) var(--cc-radius) 0 0;
+  margin: 0 12%;
+  font-size: 16px;
+  [data-game="tsl"] & { margin: 0; border-radius: var(--cc-radius); color: #cfe9e0; }
+}
+
+.cc-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: 0 0 var(--cc-radius) var(--cc-radius);
+  padding: 4px;
+}
+.cc-tab {
+  flex: 1 1 auto;
+  min-width: 84px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--cc-text-dim);
+  font: inherit;
+  padding: 4px 8px;
+  cursor: pointer;
+  &:hover { color: var(--cc-text); border-color: var(--cc-line); }
+  &.on { color: var(--cc-text-strong); background: var(--cc-on); border-color: var(--cc-line-bright); }
+}
+
+.cc-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+  // Narrow: one column, and the whole body scrolls rather than squeezing its sections
+  @media (max-width: 760px) { display: flex; flex-direction: column; overflow: auto; }
+}
+.cc-main, .cc-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  // Sections keep their own height; the column scrolls
+  > * { flex-shrink: 0; }
+  @media (max-width: 760px) { overflow: visible; min-height: auto; flex-shrink: 0; }
+}
+
+.cc-panel {
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  overflow: hidden;
+}
+.cc-panel-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 12px;
+  background: var(--cc-panel-2);
+  border-bottom: 1px solid var(--cc-line);
+  color: var(--cc-text);
+  text-transform: lowercase;
+}
+.cc-panel-body { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.cc-hint { color: var(--cc-text-dim); font-size: 12px; }
+.cc-big { color: var(--cc-text-strong); font-size: 18px; }
+.cc-points { font-size: 13px; b { color: var(--cc-text-strong); font-size: 15px; margin-left: 4px; } &.over b { color: var(--cc-bad); } }
+
+.cc-input {
+  width: 100%;
+  background: #000;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  color: var(--cc-text-strong);
+  font: inherit;
+  font-variant: normal;
+  letter-spacing: normal;
+  padding: 5px 8px;
+  &:focus { outline: none; border-color: var(--cc-line-bright); box-shadow: 0 0 0 1px var(--cc-line-bright); }
+}
+.cc-name { font-size: 16px; }
+
+.cc-toggle, .cc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-chip {
+  background: transparent;
+  border: 1px solid var(--cc-line);
+  border-radius: 999px;
+  color: var(--cc-text-dim);
+  font: inherit;
+  padding: 2px 12px;
+  cursor: pointer;
+  &.on, &:hover { color: var(--cc-text-strong); border-color: var(--cc-line-bright); }
+  &.on { background: var(--cc-on); }
+}
+
+// Portraits, as the class screen's framed figures
+.cc-portraits {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: 6px;
+  max-height: 190px;
+  overflow: auto;
+}
+.cc-portrait {
+  padding: 0;
+  aspect-ratio: 1;
+  background: #000;
+  border: 1px solid var(--cc-line);
+  border-radius: 4px;
+  cursor: pointer;
+  &.on { border-color: var(--cc-line-bright); box-shadow: 0 0 0 2px var(--cc-line-bright); }
+}
+.cc-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cc-image-empty { display: block; width: 100%; height: 100%; background: linear-gradient(135deg, var(--cc-panel-2), #000); }
+}
+
+// The model list: only rows in view are drawn
+.cc-models { display: flex; flex-direction: column; gap: 6px; }
+.cc-models-filters { display: flex; flex-direction: column; gap: 6px; }
+.cc-models-list {
+  position: relative;
+  overflow-y: auto;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: #000;
+  contain: strict;
+}
+.cc-model-row {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  font-variant: normal;
+  letter-spacing: normal;
+  &:hover { background: var(--cc-panel-2); }
+  &.on { background: var(--cc-on); color: var(--cc-text-strong); }
+}
+.cc-model-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cc-model-group { color: var(--cc-text-dim); font-size: 11px; flex: none; }
+.cc-notes { margin: 0; padding-left: 18px; color: var(--cc-text-dim); font-size: 12px; font-variant: normal; letter-spacing: normal; }
+
+.cc-classes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.cc-class {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--cc-panel-2);
+  border: 1px solid var(--cc-line);
+  border-radius: 8px;
+  color: var(--cc-text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  &:hover { border-color: var(--cc-line-bright); }
+  &.on { background: var(--cc-on); border-color: var(--cc-line-bright); color: var(--cc-text-strong); }
+}
+.cc-class-name { font-size: 15px; }
+.cc-class-sub { font-size: 11px; color: var(--cc-text-dim); }
+
+.cc-level { display: flex; align-items: center; gap: 12px; input { flex: 1; accent-color: var(--cc-line-bright); } }
+
+// Ability rows, as the game's: name, value and arrows, with cost and modifier
+.cc-abilities { display: flex; flex-direction: column; gap: 4px; }
+.cc-ability {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px auto 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  background: var(--cc-panel-2);
+}
+.cc-ability-name { color: var(--cc-text); }
+.cc-ability-mod, .cc-ability-cost { color: var(--cc-text-dim); font-size: 12px; text-align: right; }
+
+.cc-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.cc-stepper-value { min-width: 34px; text-align: center; color: var(--cc-text-strong); font-variant: normal; }
+.cc-arrow {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: var(--cc-line);
+  color: #000;
+  font-weight: bold;
+  cursor: pointer;
+  clip-path: polygon(0 0, 70% 0, 100% 50%, 70% 100%, 0 100%);
+  &:first-child { clip-path: polygon(30% 0, 100% 0, 100% 100%, 30% 100%, 0 50%); }
+  &:hover:not(:disabled) { background: var(--cc-line-bright); }
+  &:disabled { opacity: 0.3; cursor: default; }
+}
+
+.cc-picks { display: flex; flex-wrap: wrap; gap: 6px; }
+.cc-pick {
+  border: 1px solid var(--cc-line);
+  border-radius: 999px;
+  background: var(--cc-panel-2);
+  color: var(--cc-text-strong);
+  font: inherit;
+  font-size: 13px;
+  padding: 2px 10px;
+  cursor: pointer;
+  &:hover:not(.locked) { border-color: var(--cc-bad); }
+  &.locked { color: var(--cc-text-dim); cursor: default; }
+}
+
+.cc-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px; }
+.cc-skill { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 8px; border: 1px solid var(--cc-line); border-radius: 6px; background: var(--cc-panel-2); }
+.cc-tag { margin-left: 6px; font-size: 10px; color: var(--cc-text-dim); border: 1px solid var(--cc-line); border-radius: 4px; padding: 0 4px; }
+
+.cc-gear { display: grid; gap: 8px; }
+.cc-field { display: flex; flex-direction: column; gap: 4px; }
+
+// Summary, down the side as the game's stat block
+.cc-summary-head { display: flex; align-items: center; gap: 10px; }
+.cc-summary-portrait { width: 64px; height: 64px; flex: none; border: 1px solid var(--cc-line-bright); border-radius: 4px; }
+.cc-stats {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 10px;
+  margin: 0;
+  dt { color: var(--cc-text-dim); }
+  dd { margin: 0; text-align: right; color: var(--cc-text-strong); font-variant: normal; }
+}
+.cc-problems {
+  border: 1px solid var(--cc-bad);
+  border-radius: var(--cc-radius);
+  padding: 8px 10px;
+  color: var(--cc-bad);
+  font-size: 12px;
+  font-variant: normal;
+  letter-spacing: normal;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+// The saved list
+.cc-list { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; }
+.cc-empty { padding: 24px; text-align: center; color: var(--cc-text-dim); }
+.cc-card {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  @media (max-width: 640px) { grid-template-columns: 52px 1fr; .cc-card-actions { grid-column: 1 / -1; } }
+}
+.cc-card-portrait { width: 52px; height: 52px; border: 1px solid var(--cc-line); border-radius: 4px; }
+.cc-card-name { color: var(--cc-text-strong); font-size: 15px; }
+.cc-card-sub { color: var(--cc-text-dim); font-size: 12px; font-variant: normal; letter-spacing: normal; }
+.cc-card-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
+
+.cc-message { text-align: center; color: var(--cc-text-strong); font-size: 13px; }
+
+// Bottom buttons: Back / Recommended / Save, as the game's button row
+.cc-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+}
+.cc-button {
+  min-width: 120px;
+  padding: 5px 14px;
+  background: var(--cc-panel-2);
+  border: 1px solid var(--cc-line);
+  border-radius: 6px;
+  color: var(--cc-text);
+  font: inherit;
+  text-transform: lowercase;
+  cursor: pointer;
+  &:hover:not(:disabled) { color: var(--cc-text-strong); border-color: var(--cc-line-bright); }
+  &.primary { background: var(--cc-on); border-color: var(--cc-line-bright); color: var(--cc-text-strong); }
+  &.danger:hover { border-color: var(--cc-bad); color: var(--cc-bad); }
+  &:disabled { opacity: 0.4; cursor: default; }
+  .cc-card-actions & { min-width: 0; padding: 3px 10px; font-size: 13px; }
+}
+
+// The 3D model, in a framed well like the game's character view
+.cc-preview {
+  position: relative;
+  flex-shrink: 0;
+  height: 190px;
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  background: radial-gradient(ellipse at 50% 70%, var(--cc-panel-2) 0%, #000 75%);
+  overflow: hidden;
+}
+.cc-preview-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+  &:active { cursor: grabbing; }
+  &:focus-visible { outline: 1px solid var(--cc-line-bright); outline-offset: -2px; }
+}
+.cc-preview-note {
+  position: absolute;
+  inset: auto 0 8px;
+  text-align: center;
+  color: var(--cc-text-dim);
+  font-size: 12px;
+  pointer-events: none;
+}

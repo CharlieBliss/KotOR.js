@@ -202,6 +202,12 @@ export class MenuAbilities extends K1_MenuAbilities {
     return groups;
   }
 
+  /** TSL lays the screen out differently; keep its own list-building */
+  setFilter(filter: any){
+    this.filter = filter;
+    this.updateFilter();
+  }
+
   updateFilter(){
     console.log('updateFilter');
 

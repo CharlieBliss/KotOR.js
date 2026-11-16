@@ -1,3 +1,4 @@
+import type { GMObjectState } from "@/managers/gm/GMObjectState";
 import * as THREE from "three";
 import type { Action } from "@/actions/Action";
 import { ActionQueue } from "@/actions/ActionQueue";
@@ -22,6 +23,8 @@ import { OdysseyModel, OdysseyModelAnimation, OdysseyWalkMesh } from "@/odyssey"
 import { CExoLocString } from "@/resource/CExoLocString";
 import { GFFField } from "@/resource/GFFField";
 import { GFFObject } from "@/resource/GFFObject";
+import { ANIMATION_ID_STATES, CREATURE_ANIMATION_ROWS } from "@/module/data/animations";
+import { ResourceLoader } from "@/loaders";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { LIPObject } from "@/resource/LIPObject";
 import { OdysseyModel3D, OdysseyObject3D } from "@/three/odyssey";
@@ -52,7 +55,6 @@ import type { SWPortrait } from "@/engine/rules/SWPortrait";
 import type { IHeardString } from "@/interface/dialog/IHeardString";
 import type { SWRange } from "@/engine/rules/SWRange";
 import { TURN_SPEED_SLOW } from "@/engine/TurnSpeeds";
-
 
 /**
 * ModuleObject class.
@@ -378,6 +380,47 @@ export class ModuleObject {
 
   }
 
+  /** The template fields naming this object type's event scripts; loadScripts() and saveScripts() use them */
+  static SCRIPT_KEYS: ModuleObjectScript[] = [];
+
+  /**
+   * Merge this object's template (its blueprint in the game files) under the data it was placed with.
+   * Returns false when the object names a template that can't be found; with no resref there is nothing to merge.
+   */
+  mergeTemplate(resType: number, resRef: string = this.getTemplateResRef()): boolean {
+    if(!resRef){ return true; }
+    const buffer = ResourceLoader.loadCachedResource(resType, resRef);
+    if(!buffer){
+      console.error(`Failed to load ${this.constructor.name} template ${resRef}`);
+      return false;
+    }
+    this.template.merge(new GFFObject(buffer));
+    return true;
+  }
+
+  /** Load the scripts named in scriptsNode (by default the template's root) for this type's SCRIPT_KEYS */
+  loadScripts(scriptsNode: GFFStruct | undefined = this.template?.RootNode){
+    if(!scriptsNode){ return; }
+    for(const scriptKey of (this.constructor as typeof ModuleObject).SCRIPT_KEYS){
+      const resRef = scriptsNode.get(scriptKey, '');
+      if(!resRef){ continue; }
+      const nwscript = GameState.NWScript.Load(resRef);
+      if(!nwscript){
+        console.warn(`${this.constructor.name}.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
+        continue;
+      }
+      nwscript.caller = this;
+      this.scripts[scriptKey] = nwscript;
+    }
+  }
+
+  /** Write this type's SCRIPT_KEYS fields: each script's resref, or '' */
+  saveScripts(root: GFFStruct){
+    for(const scriptKey of (this.constructor as typeof ModuleObject).SCRIPT_KEYS){
+      root.addRESREF(scriptKey, this.scripts[scriptKey]?.name || '');
+    }
+  }
+
   getScriptInstance(scriptKey: ModuleObjectScript): NWScriptInstance | undefined {
     const script = this.scripts[scriptKey];
     if(!script || !script.nwscript){ return undefined; }
@@ -452,7 +495,7 @@ export class ModuleObject {
 
     for(let i = 0, len = this.effects.length; i < len; i++){
       const effect = this.effects[i];
-      let rate = 0;
+      if(!effect) continue; let rate = 0;
       if(effect.type == GameEffectType.EffectMovementSpeedIncrease){
         rate = (effect.getInt(0) / 100);
       }else if(effect.type == GameEffectType.EffectMovementSpeedDecrease){
@@ -491,7 +534,7 @@ export class ModuleObject {
     //Loop through and update the effects
     if(!this.deferEventUpdate){
       for(let i = 0, len = this.effects.length; i < len; i++){
-        this.effects[i].update(delta);
+        const lenBefore = this.effects.length; this.effects[i]?.update(delta); if(this.effects.length < lenBefore){ i -= (lenBefore - this.effects.length); len = this.effects.length; }
       }
     }
 
@@ -502,7 +545,6 @@ export class ModuleObject {
     if(this.spawned){
       this.collisionManager.roomCheck(delta);
     }
-
 
     this.sphere.center.copy(this.position);
     this.sphere.radius = this.getHitDistance() * 2;
@@ -785,147 +827,8 @@ export class ModuleObject {
     if(id >= 10000)
       return id;
 
-    switch(id){
-      case 0:  //PAUSE
-        return ModuleCreatureAnimState.PAUSE;
-      case 1:  //PAUSE2
-        return ModuleCreatureAnimState.PAUSE2;
-      case 2:  //LISTEN
-        return ModuleCreatureAnimState.LISTEN;
-      case 3:  //MEDITATE
-        return ModuleCreatureAnimState.MEDITATE;
-      case 4:  //WORSHIP
-        return ModuleCreatureAnimState.WORSHIP;
-      case 5:  //TALK_NORMAL
-        return ModuleCreatureAnimState.TALK_NORMAL;
-      case 6:  //TALK_PLEADING
-        return ModuleCreatureAnimState.TALK_PLEADING;
-      case 7:  //TALK_FORCEFUL
-        return ModuleCreatureAnimState.TALK_FORCEFUL;
-      case 8:  //TALK_LAUGHING
-        return ModuleCreatureAnimState.TALK_LAUGHING;
-      case 9:  //TALK_SAD
-        return ModuleCreatureAnimState.TALK_SAD;
-      case 10: //GET_LOW
-        return ModuleCreatureAnimState.GET_LOW;
-      case 11: //GET_MID
-        return ModuleCreatureAnimState.GET_MID;
-      case 12: //PAUSE_TIRED
-        return ModuleCreatureAnimState.PAUSE_TIRED;
-      case 13: //PAUSE_DRUNK
-        return ModuleCreatureAnimState.PAUSE_DRUNK;
-      case 14: //FLIRT
-        return ModuleCreatureAnimState.FLIRT;
-      case 15: //USE_COMPUTER
-        return ModuleCreatureAnimState.USE_COMPUTER;
-      case 16: //DANCE
-        return ModuleCreatureAnimState.DANCE;
-      case 17: //DANCE1
-        return ModuleCreatureAnimState.DANCE1;
-      case 18: //HORROR
-        return ModuleCreatureAnimState.HORROR;
-      case 19: //READY
-        return ModuleCreatureAnimState.READY;
-      case 20: //DEACTIVATE
-        return ModuleCreatureAnimState.DEACTIVATE;
-      case 21: //SPASM
-        return ModuleCreatureAnimState.SPASM;
-      case 22: //SLEEP
-        return ModuleCreatureAnimState.SLEEP;
-      case 23: //PRONE
-        return ModuleCreatureAnimState.PRONE;
-      case 24: //PAUSE3
-        return ModuleCreatureAnimState.PAUSE3;
-      case 25: //WELD
-        return ModuleCreatureAnimState.WELD;
-      case 26: //DEAD
-        return ModuleCreatureAnimState.DEAD;
-      case 27: //TALK_INJURED
-        return ModuleCreatureAnimState.TALK_INJURED;
-      case 28: //LISTEN_INJURED
-        return ModuleCreatureAnimState.LISTEN_INJURED;
-      case 29: //TREAT_INJURED
-        return ModuleCreatureAnimState.TREAT_INJURED_LP;
-      case 30: //DEAD_PRONE
-        return ModuleCreatureAnimState.DEAD_PRONE;
-      case 31: //KNEEL_TALK_ANGRY
-        return ModuleCreatureAnimState.KNEEL_TALK_ANGRY;
-      case 32: //KNEEL_TALK_SAD
-        return ModuleCreatureAnimState.KNEEL_TALK_SAD;
-      case 35: //MEDITATE LOOP
-        return ModuleCreatureAnimState.MEDITATE;
-      case 100: //HEAD_TURN_LEFT
-        return ModuleCreatureAnimState.HEAD_TURN_LEFT;
-      case 101: //HEAD_TURN_RIGHT
-        return ModuleCreatureAnimState.HEAD_TURN_RIGHT;
-      case 102: //PAUSE_SCRATCH_HEAD
-        return ModuleCreatureAnimState.PAUSE_SCRATCH_HEAD;
-      case 103: //PAUSE_BORED
-        return ModuleCreatureAnimState.PAUSE_BORED;
-      case 104: //SALUTE
-        return ModuleCreatureAnimState.SALUTE;
-      case 105: //BOW
-        return ModuleCreatureAnimState.BOW;
-      case 106: //GREETING
-        return ModuleCreatureAnimState.GREETING;
-      case 107: //TAUNT
-        return ModuleCreatureAnimState.TAUNT;
-      case 108: //VICTORY1
-        return ModuleCreatureAnimState.VICTORY;
-      case 109: //VICTORY2
-        return ModuleCreatureAnimState.VICTORY;
-      case 110: //VICTORY3
-        return ModuleCreatureAnimState.VICTORY;
-      case 112: //INJECT
-        return ModuleCreatureAnimState.INJECT;
-      case 113: //USE_COMPUTER
-        return ModuleCreatureAnimState.USE_COMPUTER;
-      case 114: //PERSUADE
-        return ModuleCreatureAnimState.PERSUADE;
-      case 115: //ACTIVATE
-        return ModuleCreatureAnimState.ACTIVATE_ITEM;
-      case 116: //CHOKE
-        return ModuleCreatureAnimState.CHOKE;
-      case 117: //THROW_HIGH
-        return ModuleCreatureAnimState.THROW_HIGH;
-      case 118: //THROW_LOW
-        return ModuleCreatureAnimState.THROW_LOW;
-      case 119: //CUSTOM01
-        return ModuleCreatureAnimState.CUSTOM01;
-      case 120: //TREAT_INJURED
-        return ModuleCreatureAnimState.TREAT_INJURED;
-      case 123: //DIVE_ROLL
-        return ModuleCreatureAnimState.DIVE_ROLL;
-
-      // Placeable animation constants
-      case 200: 
-        return ModulePlaceableAnimState.ACTIVATE;
-      case 201: 
-        return ModulePlaceableAnimState.DEACTIVATE;
-      case 202: 
-        return ModulePlaceableAnimState.OPEN;
-      case 203: 
-        return ModulePlaceableAnimState.CLOSE;
-      case 204: 
-        return ModulePlaceableAnimState.ANIMLOOP01;
-      case 205: 
-        return ModulePlaceableAnimState.ANIMLOOP02;
-      case 206: 
-        return ModulePlaceableAnimState.ANIMLOOP03;
-      case 207: 
-        return ModulePlaceableAnimState.ANIMLOOP04;
-      case 208: 
-        return ModulePlaceableAnimState.ANIMLOOP05;
-      case 209: 
-        return ModulePlaceableAnimState.ANIMLOOP06;
-      case 210: 
-        return ModulePlaceableAnimState.ANIMLOOP07;
-      case 211: 
-        return ModulePlaceableAnimState.ANIMLOOP08;
-      case 212: 
-        return ModulePlaceableAnimState.ANIMLOOP09;
-      case 213: 
-        return ModulePlaceableAnimState.ANIMLOOP10;
+    if(id in ANIMATION_ID_STATES){
+      return ANIMATION_ID_STATES[id];
     }
 
     //console.error('Animation case missing', id);
@@ -979,6 +882,11 @@ export class ModuleObject {
         }
       }
       
+      const row = CREATURE_ANIMATION_ROWS[animation_constant];
+      if(row){
+        return animations2DA.rows[row.simple !== undefined && this.isSimpleCreature() ? row.simple : row.row];
+      }
+
       switch( animation_constant ){
         case ModuleCreatureAnimState.PAUSE:
         case ModuleCreatureAnimState.PAUSE_ALT:
@@ -1031,55 +939,6 @@ export class ModuleObject {
             }else{
               return animations2DA.rows[8];
             }
-          }
-        break;
-        case ModuleCreatureAnimState.PAUSE_BORED:
-          return animations2DA.rows[13];
-        break;
-        case ModuleCreatureAnimState.PAUSE_TIRED:
-          return animations2DA.rows[14];
-        break;
-        case ModuleCreatureAnimState.PAUSE_DRUNK:
-          return animations2DA.rows[15];
-        break;
-        case ModuleCreatureAnimState.PAUSE_INJ:
-          return animations2DA.rows[8];
-        break;
-        case ModuleCreatureAnimState.DEAD:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[275];
-          }else{
-            return animations2DA.rows[81];
-          }
-        break;
-        case ModuleCreatureAnimState.DEAD1:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[275];
-          }else{
-            return animations2DA.rows[83];
-          }
-        break;
-        case ModuleCreatureAnimState.DIE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[274];
-          }else{
-            return animations2DA.rows[80];
-          }
-        break;
-        case ModuleCreatureAnimState.DIE1:
-          return animations2DA.rows[82];
-        break;
-        case ModuleCreatureAnimState.GET_UP_DEAD:
-          return animations2DA.rows[381];
-        break;
-        case ModuleCreatureAnimState.GET_UP_DEAD1:
-          return animations2DA.rows[382];
-        break;
-        case ModuleCreatureAnimState.WALK_INJ:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[254];
-          }else{
-            return animations2DA.rows[1];
           }
         break;
         case ModuleCreatureAnimState.WALKING:
@@ -1136,10 +995,6 @@ export class ModuleObject {
             }
           }
         break;
-        case ModuleCreatureAnimState.RUN_INJ:
-          return animations2DA.rows[4];
-        break;
-        //COMBAT READY
         case ModuleCreatureAnimState.READY:
         case ModuleCreatureAnimState.READY_ALT:
           if(this.isSimpleCreature()){
@@ -1167,234 +1022,6 @@ export class ModuleObject {
             }
           }
         break;
-        case ModuleCreatureAnimState.DODGE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[281];
-          }else{
-            return animations2DA.rows[302];
-          }
-        break;
-        case ModuleCreatureAnimState.SPASM:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[268];
-          }else{
-            return animations2DA.rows[77];
-          }
-        break;
-        case ModuleCreatureAnimState.TAUNT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[263];
-          }else{
-            return animations2DA.rows[33];
-          }
-        break;
-        case ModuleCreatureAnimState.GREETING:
-          return animations2DA.rows[31];
-        break;
-        case ModuleCreatureAnimState.LISTEN:
-          return animations2DA.rows[18];
-        break;
-        case ModuleCreatureAnimState.LISTEN_INJURED:
-          return animations2DA.rows[371];
-        break;
-        case ModuleCreatureAnimState.TALK_NORMAL:
-          return animations2DA.rows[25];
-        break;
-        case ModuleCreatureAnimState.TALK_PLEADING:
-          return animations2DA.rows[27];
-        break;
-        case ModuleCreatureAnimState.TALK_FORCEFUL:
-          return animations2DA.rows[26];
-        break;
-        case ModuleCreatureAnimState.TALK_LAUGHING:
-          return animations2DA.rows[29];
-        break;
-        case ModuleCreatureAnimState.TALK_SAD:
-          return animations2DA.rows[28];
-        break;
-        case ModuleCreatureAnimState.TALK_INJURED:
-          return animations2DA.rows[370];
-        break;
-        case ModuleCreatureAnimState.SALUTE:
-          return animations2DA.rows[16];
-        break;
-        case ModuleCreatureAnimState.BOW:
-          return animations2DA.rows[19];
-        break;
-        case ModuleCreatureAnimState.VICTORY:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[260];
-          }else{
-            return animations2DA.rows[17];
-          }
-        break;
-        case ModuleCreatureAnimState.HEAD_TURN_LEFT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[258];
-          }else{
-            return animations2DA.rows[11];
-          }
-        break;
-        case ModuleCreatureAnimState.HEAD_TURN_RIGHT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[259];
-          }else{
-            return animations2DA.rows[10];
-          }
-        break;
-        case ModuleCreatureAnimState.TURN_LEFT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[253];
-          }else{
-            return animations2DA.rows[290];
-          }
-        break;
-        case ModuleCreatureAnimState.TURN_RIGHT:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[253];
-          }else{
-            return animations2DA.rows[291];
-          }
-        break;
-        case ModuleCreatureAnimState.GET_LOW:
-          return animations2DA.rows[40];
-        break;
-        case ModuleCreatureAnimState.GET_MID:
-          return animations2DA.rows[41];
-        break;
-        case ModuleCreatureAnimState.INJECT:
-          return animations2DA.rows[37];
-        break;
-        case ModuleCreatureAnimState.DAMAGE:
-          return animations2DA.rows[303];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER_LP:
-          return animations2DA.rows[44];
-        break;
-        case ModuleCreatureAnimState.WHIRLWIND:
-          return animations2DA.rows[75];
-        break;
-        case ModuleCreatureAnimState.DEACTIVATE:
-          return animations2DA.rows[270];
-        break;
-        case ModuleCreatureAnimState.FLIRT:
-          return animations2DA.rows[32];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER:
-          return animations2DA.rows[43];
-        break;
-        case ModuleCreatureAnimState.DANCE:
-          return animations2DA.rows[53];
-        break;
-        case ModuleCreatureAnimState.DANCE1:
-          return animations2DA.rows[54];
-        break;
-        case ModuleCreatureAnimState.HORROR:
-          return animations2DA.rows[74];
-        break;
-        case ModuleCreatureAnimState.USE_COMPUTER2:
-          return animations2DA.rows[43];
-        break;
-        case ModuleCreatureAnimState.PERSUADE:
-          return animations2DA.rows[68];
-        break;
-        case ModuleCreatureAnimState.ACTIVATE_ITEM:
-          return animations2DA.rows[38];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_DOOR:
-          return animations2DA.rows[47];
-        break;
-        case ModuleCreatureAnimState.THROW_HIGH:
-          return animations2DA.rows[57];
-        break;
-        case ModuleCreatureAnimState.THROW_LOW:
-          return animations2DA.rows[58];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_CONTAINER:
-          return animations2DA.rows[48];
-        break;
-        case ModuleCreatureAnimState.DISABLE_MINE:
-          return animations2DA.rows[51];
-        break;
-        case ModuleCreatureAnimState.WALK_STEALTH:
-          return animations2DA.rows[5];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_DOOR2:
-          return animations2DA.rows[47];
-        break;
-        case ModuleCreatureAnimState.UNLOCK_CONTAINER2:
-          return animations2DA.rows[48];
-        break;
-        case ModuleCreatureAnimState.ACTIVATE_ITEM2:
-          return animations2DA.rows[38];
-        break;
-        case ModuleCreatureAnimState.SLEEP:
-          return animations2DA.rows[76];
-        break;
-        case ModuleCreatureAnimState.PARALYZED:
-          return animations2DA.rows[78];
-        break;
-        case ModuleCreatureAnimState.PRONE:
-          return animations2DA.rows[79];
-        break;
-        case ModuleCreatureAnimState.SET_MINE:
-          return animations2DA.rows[52];
-        break;
-        case ModuleCreatureAnimState.DISABLE_MINE2:
-          return animations2DA.rows[51];
-        break;
-        case ModuleCreatureAnimState.CUSTOM01:
-          return animations2DA.rows[346];
-        break;
-        case ModuleCreatureAnimState.FBLOCK:
-          return animations2DA.rows[355];
-        break;
-        case ModuleCreatureAnimState.CHOKE:
-          if(this.isSimpleCreature()){
-            return animations2DA.rows[264];
-          }else{
-            return animations2DA.rows[72];
-          }
-        break;
-        case ModuleCreatureAnimState.WELD:
-          return animations2DA.rows[360];
-        break;
-        case ModuleCreatureAnimState.TREAT_INJURED:
-          return animations2DA.rows[34];
-        break;
-        case ModuleCreatureAnimState.TREAT_INJURED_LP:
-          return animations2DA.rows[35];
-        break;
-        case ModuleCreatureAnimState.CATCH_SABER:
-          return animations2DA.rows[71];
-        break;
-        case ModuleCreatureAnimState.THROW_SABER_LP:
-          return animations2DA.rows[70];
-        break;
-        case ModuleCreatureAnimState.THROW_SABER:
-          return animations2DA.rows[69];
-        break;
-        case ModuleCreatureAnimState.KNEEL_TALK_ANGRY:
-          return animations2DA.rows[384];
-        break;
-        case ModuleCreatureAnimState.KNEEL_TALK_SAD:
-          return animations2DA.rows[385];
-        break;
-        case ModuleCreatureAnimState.KNOCKED_DOWN:
-          return animations2DA.rows[85];
-        break;
-        case ModuleCreatureAnimState.KNOCKED_DOWN2:
-          return animations2DA.rows[85];
-        break;
-        case ModuleCreatureAnimState.DEAD_PRONE:
-          return animations2DA.rows[375];
-        break;
-        case ModuleCreatureAnimState.KNEEL:
-          return animations2DA.rows[23];
-        break;
-        case ModuleCreatureAnimState.KNEEL1:
-          return animations2DA.rows[23];
-        break;
         case ModuleCreatureAnimState.FLOURISH:
           switch( this.getCombatAnimationWeaponType() ){
             case 1:
@@ -1421,89 +1048,6 @@ export class ModuleObject {
         break;
         
         //BEGIN TSL ANIMATIONS
-        case ModuleCreatureAnimState.TOUCH_HEART:
-          return animations2DA.rows[462];
-        break;
-        case ModuleCreatureAnimState.ROLL_EYES:
-          return animations2DA.rows[463];
-        break;
-        case ModuleCreatureAnimState.USE_ITEM_ON_OTHER:
-          return animations2DA.rows[464];
-        break;
-        case ModuleCreatureAnimState.STAND_ATTENTION:
-          return animations2DA.rows[465];
-        break;
-        case ModuleCreatureAnimState.NOD_YES:
-          return animations2DA.rows[466];
-        break;
-        case ModuleCreatureAnimState.NOD_NO:
-          return animations2DA.rows[467];
-        break;
-        case ModuleCreatureAnimState.POINT:
-          return animations2DA.rows[468];
-        break;
-        case ModuleCreatureAnimState.POINT_LP:
-          return animations2DA.rows[469];
-        break;
-        case ModuleCreatureAnimState.POINT_DOWN:
-          return animations2DA.rows[470];
-        break;
-        case ModuleCreatureAnimState.SCANNING:
-          return animations2DA.rows[471];
-        break;
-        case ModuleCreatureAnimState.SHRUG:
-          return animations2DA.rows[472];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_DRUNK:
-          return animations2DA.rows[317];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_PAZAAK:
-          return animations2DA.rows[318];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_COMP1:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.SIT_CHAIR_COMP2:
-          return animations2DA.rows[316];
-        break;
-        case ModuleCreatureAnimState.CUT_HANDS:
-          return animations2DA.rows[557];
-        break;
-        case ModuleCreatureAnimState.L_HAND_CHOP:
-          return animations2DA.rows[558];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE:
-          return animations2DA.rows[559];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE_LP:
-          return animations2DA.rows[560];
-        break;
-        case ModuleCreatureAnimState.COLLAPSE_STAND:
-          return animations2DA.rows[561];
-        break;
-        case ModuleCreatureAnimState.BAO_DUR_POWER_PUNCH:
-          return animations2DA.rows[562];
-        break;
-        case ModuleCreatureAnimState.POINT_UP:
-          return animations2DA.rows[563];
-        break;
-        case ModuleCreatureAnimState.POINT_UP_LOWER:
-          return animations2DA.rows[564];
-        break;
-        case ModuleCreatureAnimState.HOOD_OFF:
-          return animations2DA.rows[565];
-        break;
-        case ModuleCreatureAnimState.HOOD_ON:
-          return animations2DA.rows[566];
-        break;
-        case ModuleCreatureAnimState.DIVE_ROLL:
-          return animations2DA.rows[567];
-        break;
-        //END TSL ANIMATIONS
-
       }
 
     }
@@ -1560,7 +1104,7 @@ export class ModuleObject {
     }
     
     if(!onUserDefined){ return; }
-    onUserDefined.run(this, parseInt(event.getInt(0)));
+    onUserDefined.lastPerceived = (this as any).lastPerceived; onUserDefined.run(this, parseInt(event.getInt(0)));
   }
 
   /**
@@ -1952,6 +1496,13 @@ export class ModuleObject {
    * @returns 
    */
   isDebilitated() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && eff.getInt(0) >= 1 && eff.getInt(0) <= 10){
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -1960,6 +1511,13 @@ export class ModuleObject {
    * @returns 
    */
   isStunned() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && (eff.getInt(0) === 3 || eff.getInt(0) === 4)){
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -1968,6 +1526,13 @@ export class ModuleObject {
    * @returns 
    */
   isParalyzed() {
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(eff && eff.type === GameEffectType.EffectSetState && eff.getInt(0) === 5){
+          return true;
+        }
+      }
+    }
     return false;
   }
 
@@ -1976,7 +1541,7 @@ export class ModuleObject {
    * @returns 
    */
   isPoisoned() {
-    return false;
+    return this.hasEffect(GameEffectType.EffectPoison);
   }
 
   /**
@@ -1984,7 +1549,7 @@ export class ModuleObject {
    * @returns 
    */
   isDiseased(): any {
-    return false;
+    return this.hasEffect(GameEffectType.EffectDisease);
   }
 
   /**
@@ -2466,11 +2031,30 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  fortitudeSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  /** SAVING_THROW_TYPE_* a creature can be immune to, as IMMUNITY_TYPE_* */
+  static SAVE_TYPE_IMMUNITY: Record<number, number> = { 4: 32, 5: 3, 8: 4, 10: 1, 12: 2, 14: 5, 18: 6 };
+
+  /** A save made against an effect it's immune to; and bonuses that depend on what's being saved against */
+  saveImmune(nSaveType: number): boolean {
+    const immunity = ModuleObject.SAVE_TYPE_IMMUNITY[nSaveType];
+    return !!immunity && !!(this as any).isImmune?.(immunity);
+  }
+
+  saveSituationalBonus(fromSpellId: number): number {
+    if(fromSpellId < 0) return 0;
+    const spell = GameState.TwoDAManager?.datatables.get('spells')?.rows[fromSpellId];
+    const grenade = String(spell?.impactscript || '').toLowerCase() === 'k_sup_grenade';
+    return grenade ? ((this as any).getGrenadeSaveBonus?.() || 0) : 0;
+  }
+
+  fortitudeSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getCON());
+    let bonus = CombatRound.GetMod(this.getCON()) + this.saveSituationalBonus(fromSpellId);
     
-    if((roll + this.getFortitudeSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getFortitudeSave() + bonus) >= nDC){
       return 1
     }
 
@@ -2492,11 +2076,14 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  reflexSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  reflexSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getDEX());
+    let bonus = CombatRound.GetMod(this.getDEX()) + this.saveSituationalBonus(fromSpellId);
     
-    if((roll + this.getReflexSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getReflexSave() + bonus) >= nDC){
       return 1
     }
 
@@ -2526,11 +2113,14 @@ export class ModuleObject {
    * @param oVersus 
    * @returns 
    */
-  willSave(nDC = 0, nSaveType = 0, oVersus: any = undefined){
+  willSave(nDC = 0, nSaveType = 0, oVersus: any = undefined, fromSpellId: number = -1){
+    if(this.saveImmune(nSaveType)) return 2;
     let roll = Dice.roll(1, DiceType.d20);
-    let bonus = CombatRound.GetMod(this.getWIS());
+    let bonus = CombatRound.GetMod(this.getWIS()) + this.saveSituationalBonus(fromSpellId);
 
-    if((roll + this.getWillSave() + bonus) > nDC){
+    if(roll === 20) return 1;
+    if(roll === 1) return 0;
+    if((roll + this.getWillSave() + bonus) >= nDC){
       return 1
     }
 
@@ -2560,13 +2150,21 @@ export class ModuleObject {
    * @returns 
    */
   resistForce(oCaster: ModuleObject){
+    // Only a creature with Force resistance can resist: the caster rolls d20 + its level against it (the
+    // Aurora rules KotOR uses; Resist Force, Force Immunity and some beasts give it). Saving throws are separate.
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(oCaster, ModuleObjectType.ModuleCreature)){
-      //https://gamefaqs.gamespot.com/boards/516675-star-wars-knights-of-the-old-republic/62811657
-      //1d20 + their level vs. a DC of your level plus 10
-      let roll = Dice.roll(1, DiceType.d20, (this as any).getTotalClassLevel());
-      return (roll > 10 + (oCaster as any).getTotalClassLevel());
+      if(oCaster === this) return 0;
+      const resistance = (this as any).getForceResistance?.() || 0;
+      if(resistance <= 0) return 0;
+      const casterLevel = (oCaster as any).getTotalClassLevel?.() || 0;
+      return Dice.roll(1, DiceType.d20, casterLevel) < resistance ? 1 : 0;
     }
     return 0;
+  }
+
+  /** Whether an effect can't take hold on it (an immunity); creatures override this */
+  isImmuneToEffect(effect: GameEffect): boolean {
+    return false;
   }
 
   /**
@@ -2614,6 +2212,8 @@ export class ModuleObject {
       }
       return;
     }
+
+    if(this.isImmuneToEffect(effect)) return;
 
     effect.setAttachedObject(this);
     effect.loadModel();
@@ -2852,7 +2452,7 @@ export class ModuleObject {
     if(this.template.RootNode.hasField('TemplateResRef')){
       this.template.RootNode.getFieldByLabel('TemplateResRef').setValue(sRef)
     }else{
-      this.template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'TemplateResRef') ).setValue(sRef)
+      this.template.RootNode.addRESREF('TemplateResRef', sRef)
     }
     
   }
@@ -3187,7 +2787,7 @@ export class ModuleObject {
 
     if(triggerOnNotice && onNotice){
       const instance = onNotice.nwscript.newInstance();
-      instance.lastPerceived = perceptionObject;
+      (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
       return true;
     }
@@ -3236,7 +2836,7 @@ export class ModuleObject {
 
     if(triggerOnNotice && onNotice){
       const instance = onNotice.nwscript.newInstance();
-      instance.lastPerceived = perceptionObject;
+      (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
       return true;
     }
@@ -3415,6 +3015,21 @@ export class ModuleObject {
   /**
    * Initialize the properties
    */
+  /**
+   * Read the fields every object type keeps: tag, template resref, position and orientation.
+   * A field the template doesn't have leaves the current value.
+   */
+  initCommonProperties(){
+    this.tag = this.template.RootNode.get('Tag', this.tag);
+    this.templateResRef = this.template.RootNode.get('TemplateResRef', this.templateResRef);
+    this.position.x = this.template.RootNode.get('XPosition', this.position.x);
+    this.position.y = this.template.RootNode.get('YPosition', this.position.y);
+    this.position.z = this.template.RootNode.get('ZPosition', this.position.z);
+    this.xOrientation = this.template.RootNode.get('XOrientation', this.xOrientation);
+    this.yOrientation = this.template.RootNode.get('YOrientation', this.yOrientation);
+    this.zOrientation = this.template.RootNode.get('ZOrientation', this.zOrientation);
+  }
+
   initProperties(){
 
     if(!this.initialized){
@@ -3427,27 +3042,20 @@ export class ModuleObject {
       GameState.ModuleObjectManager.AddObjectById(this);
     }
     
-    if(this.template.RootNode.hasField('Animation'))
-      this.animState = this.template.getFieldByLabel('Animation').getValue();
+    this.animState = this.template.RootNode.get('Animation', this.animState);
     
-    if(this.template.RootNode.hasField('Appearance')){
-      this.appearance = this.template.getFieldByLabel('Appearance').getValue();
-    }
+    this.appearance = this.template.RootNode.get('Appearance', this.appearance);
     
     if(this.template.RootNode.hasField('Description'))
       this.description = this.template.getFieldByLabel('Description').getCExoLocString();
     
-    if(this.template.RootNode.hasField('ObjectId'))
-      this.id = this.template.getFieldByLabel('ObjectId').getValue();
+    this.id = this.template.RootNode.get('ObjectId', this.id);
 
-    if(this.template.RootNode.hasField('AutoRemoveKey'))
-      this.autoRemoveKey = this.template.getFieldByLabel('AutoRemoveKey').getValue();
+    this.autoRemoveKey = this.template.RootNode.get('AutoRemoveKey', this.autoRemoveKey);
 
-    if(this.template.RootNode.hasField('Commandable'))
-      this.commandable = this.template.getFieldByLabel('Commandable').getValue();
+    this.commandable = this.template.RootNode.get('Commandable', this.commandable);
 
-    if(this.template.RootNode.hasField('Cursor'))
-      this.cursor = this.template.getFieldByLabel('Cursor').getValue();
+    this.cursor = this.template.RootNode.get('Cursor', this.cursor);
 
     if(this.template.RootNode.hasField('Faction')){
       this.factionId = this.template.getFieldByLabel('Faction').getValue();
@@ -3471,26 +3079,19 @@ export class ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('HasMapNote'))
-      this.hasMapNote = this.template.getFieldByLabel('HasMapNote').getValue();
+    this.hasMapNote = this.template.RootNode.get('HasMapNote', this.hasMapNote);
 
-    if(this.template.RootNode.hasField('HighlightHeight'))
-      this.highlightHeight = this.template.getFieldByLabel('HighlightHeight').getValue();
+    this.highlightHeight = this.template.RootNode.get('HighlightHeight', this.highlightHeight);
 
-    if(this.template.RootNode.hasField('KeyName'))
-      this.keyName = this.template.getFieldByLabel('KeyName').getValue();
+    this.keyName = this.template.RootNode.get('KeyName', this.keyName);
 
-    if(this.template.RootNode.hasField('LinkedTo'))
-      this.linkedTo = this.template.getFieldByLabel('LinkedTo').getValue();
+    this.linkedTo = this.template.RootNode.get('LinkedTo', this.linkedTo);
 
-    if(this.template.RootNode.hasField('LinkedToFlags'))
-      this.linkedToFlags = this.template.getFieldByLabel('LinkedToFlags').getValue();
+    this.linkedToFlags = this.template.RootNode.get('LinkedToFlags', this.linkedToFlags);
   
-    if(this.template.RootNode.hasField('LinkedToModule'))
-      this.linkedToModule = this.template.RootNode.getFieldByLabel('LinkedToModule').getValue();
+    this.linkedToModule = this.template.RootNode.get('LinkedToModule', this.linkedToModule);
         
-    if(this.template.RootNode.hasField('LoadScreenID'))
-      this.loadScreenID = this.template.getFieldByLabel('LoadScreenID').getValue();
+    this.loadScreenID = this.template.RootNode.get('LoadScreenID', this.loadScreenID);
 
     if(this.template.RootNode.hasField('LocName'))
       this.locName = this.template.getFieldByLabel('LocName').getCExoLocString();
@@ -3501,67 +3102,35 @@ export class ModuleObject {
     if(this.template.RootNode.hasField('MapNote'))
       this.mapNote = this.template.getFieldByLabel('MapNote').getCExoLocString();
 
-    if(this.template.RootNode.hasField('MapNoteEnabled'))
-      this.mapNoteEnabled = this.template.getFieldByLabel('MapNoteEnabled').getValue();
+    this.mapNoteEnabled = this.template.RootNode.get('MapNoteEnabled', this.mapNoteEnabled);
 
     if(this.template.RootNode.hasField('PortraidId')){
       this.portraitId = this.template.getFieldByLabel('PortraidId').getValue();
       this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
     }
 
-    if(this.template.RootNode.hasField('SetByPlayerParty'))
-      this.setByPlayerParty = this.template.getFieldByLabel('SetByPlayerParty').getValue();
+    this.setByPlayerParty = this.template.RootNode.get('SetByPlayerParty', this.setByPlayerParty);
 
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue();
-
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
+    this.initCommonProperties();
 
     if(this.template.RootNode.hasField('TransitionDestin'))
       this.transitionDestin = this.template.getFieldByLabel('TransitionDestin').getCExoLocString();
 
-    if(this.template.RootNode.hasField('TrapDetectable'))
-      this.trapDetectable = this.template.RootNode.getFieldByLabel('TrapDetectable').getValue();
+    this.trapDetectable = this.template.RootNode.get('TrapDetectable', this.trapDetectable);
 
-    if(this.template.RootNode.hasField('TrapDisarmable'))
-      this.trapDisarmable = this.template.RootNode.getFieldByLabel('TrapDisarmable').getValue();
+    this.trapDisarmable = this.template.RootNode.get('TrapDisarmable', this.trapDisarmable);
 
-    if(this.template.RootNode.hasField('TrapOneShot'))
-      this.trapOneShot = this.template.getFieldByLabel('TrapOneShot').getValue();
+    this.trapOneShot = this.template.RootNode.get('TrapOneShot', this.trapOneShot);
 
-    if(this.template.RootNode.hasField('TrapType'))
-      this.trapType = this.template.getFieldByLabel('TrapType').getValue();
+    this.trapType = this.template.RootNode.get('TrapType', this.trapType);
 
-    if(this.template.RootNode.hasField('Type'))
-      this.type = this.template.getFieldByLabel('Type').getValue();
+    this.type = this.template.RootNode.get('Type', this.type);
 
-    if(this.template.RootNode.hasField('XPosition'))
-      this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
+    this.fortitudeSaveThrow = this.template.RootNode.get('FortSaveThrow', this.fortitudeSaveThrow);
 
-    if(this.template.RootNode.hasField('YPosition'))
-      this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
+    this.reflexSaveThrow = this.template.RootNode.get('RefSaveThrow', this.reflexSaveThrow);
 
-    if(this.template.RootNode.hasField('ZPosition'))
-      this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
-
-    if(this.template.RootNode.hasField('XOrientation'))
-      this.xOrientation = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
-
-    if(this.template.RootNode.hasField('YOrientation'))
-      this.yOrientation = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
-
-    if(this.template.RootNode.hasField('ZOrientation'))
-      this.zOrientation = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
-      
-    if(this.template.RootNode.hasField('FortSaveThrow'))
-      this.fortitudeSaveThrow = this.template.RootNode.getFieldByLabel('FortSaveThrow').getValue();
-
-    if(this.template.RootNode.hasField('RefSaveThrow'))
-      this.reflexSaveThrow = this.template.RootNode.getFieldByLabel('RefSaveThrow').getValue();
-
-    if(this.template.RootNode.hasField('WillSaveThrow'))
-      this.willSaveThrow = this.template.RootNode.getFieldByLabel('WillSaveThrow').getValue();
+    this.willSaveThrow = this.template.RootNode.get('WillSaveThrow', this.willSaveThrow);
 
     if(this.template.RootNode.hasField('SWVarTable')){
       let swVarTableStruct = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0];
@@ -3621,7 +3190,7 @@ export class ModuleObject {
         }
       }
       value = value >>> 0;
-      varStruct.addField( new GFFField(GFFDataType.DWORD, 'Variable') ).setValue( value );
+      varStruct.addDWord('Variable',  value );
       swVarTableBitArray.addChildStruct(varStruct);
     }
 
@@ -3629,7 +3198,7 @@ export class ModuleObject {
 
     for(let i = 0; i < 8; i++){
       let varStruct = new GFFStruct();
-      varStruct.addField( new GFFField(GFFDataType.BYTE, 'Variable') ).setValue( Number(this.getLocalNumber(i)) );
+      varStruct.addByte('Variable',  Number(this.getLocalNumber(i)) );
       swVarTableByteArray.addChildStruct(varStruct);
     }
     return swVarTableStruct;
@@ -3875,3 +3444,6 @@ export class ModuleObject {
   }
 
 }
+
+// GM mode's per-object state (GMObjectState): typed fields, unset outside GM sessions
+export interface ModuleObject extends GMObjectState {}

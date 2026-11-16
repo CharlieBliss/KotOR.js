@@ -75,6 +75,35 @@ export class ActionSetMine extends Action {
         return ActionStatus.IN_PROGRESS;
       }
 
+      // Targeting yourself lays the mine on the ground in front of you, after a Demolitions check against its
+      // set DC (15 / 20 / 25); a failed check keeps the mine
+      if(this.oItem && !this.usedItem && this.target === this.owner){
+        this.usedItem = true;
+        const property = this.oItem.properties.find((p) => p.is(ModuleItemProperty.Trap));
+        const row = property ? GameState.TwoDAManager.datatables.get('traps')?.rows[property.subType] : undefined;
+        if(!row){ return ActionStatus.FAILED; }
+        const dc = parseInt(row.setdc) || 15;
+        const roll = 1 + Math.floor(Math.random() * 20);
+        const skill = (this.owner as any).getSkillLevel?.(1) || 0;
+        const success = roll + skill >= dc;
+        GameState.hooks.announceSkillRoll(this.owner, 'Set mine', roll, skill, dc, success);
+        if(!success){ return ActionStatus.COMPLETE; }
+        const facing = (this.owner as any).getFacing?.() ?? 0;
+        const spot = this.owner.position.clone();
+        spot.x += -Math.sin(facing) * 1.5;
+        spot.y += Math.cos(facing) * 1.5;
+        GameState.Module.ModuleArea.ModuleTrigger.CreateMine(this.owner.area || GameState.module.area, spot, property.subType, this.owner);
+        // A GM session player's mine comes out of their inventory on the GM's machine
+        if(!GameState.hooks.consumePlayerItem(this.owner, this.oItem)){
+          if(this.oItem.charges > 1){
+            this.oItem.charges -= 1;
+          }else{
+            this.owner.removeItem(this.oItem, 1);
+          }
+        }
+        return ActionStatus.COMPLETE;
+      }
+
       if(this.oItem && !this.usedItem){
         for(let i = 0, len = this.oItem.properties.length; i < len; i++){
           let property = this.oItem.properties[i];

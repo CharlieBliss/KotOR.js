@@ -20,6 +20,26 @@ export class AudioLoader {
 
   constructor () { }
 
+  /**
+   * Other folders loose sound files can come from, after this game's own: the other game's ("@othergame"),
+   * when one of its scenes is borrowed (OtherGameManager)
+   */
+  static OtherRoots: string[] = [];
+
+  /** Read a loose file from this game's folder, then the other roots */
+  static async readFromRoots(relative: string): Promise<Uint8Array> {
+    let lastError: any;
+    for (const root of ['', ...AudioLoader.OtherRoots]) {
+      try {
+        const buffer = await GameFileSystem.readFile(root ? path.join(root, relative) : relative);
+        if (buffer?.length) return buffer;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    throw lastError || new Error('Not found: ' + relative);
+  }
+
   static toArrayBuffer(buffer: Uint8Array) {
     let ab = new ArrayBuffer(buffer.length);
     let view = new Uint8Array(ab);
@@ -53,6 +73,14 @@ export class AudioLoader {
           throw e;
         }
       }else{
+        // A sound only the other game has (a borrowed scene's), from its archives
+        for (const source of ResourceLoader.FallbackSources) {
+          const buffer = await source(ResourceTypes['wav'], resRef);
+          if (buffer?.length) {
+            const data = await new AudioFile(buffer).getPlayableByteStream();
+            return data.byteLength ? data : buffer;
+          }
+        }
         const fromDisk = await AudioLoader.loadWavFromGamePaths(resRef);
         if (fromDisk) {
           return fromDisk;
@@ -75,8 +103,7 @@ export class AudioLoader {
     const subdirs = ["streamsounds", "streamwaves", "streamvoice"];
     for (const sub of subdirs) {
       try {
-        const file = path.join(sub, `${ref}.wav`);
-        const buffer = await GameFileSystem.readFile(file);
+        const buffer = await AudioLoader.readFromRoots(path.join(sub, `${ref}.wav`));
         if (!buffer?.length) continue;
         const af = new AudioFile(buffer);
         return await af.getPlayableByteStream();
@@ -130,8 +157,7 @@ export class AudioLoader {
 
   static async LoadAmbientSound (resRef: string): Promise<Uint8Array> {
     try{
-      const file = path.join('streammusic', resRef+'.wav');
-      const buffer = await GameFileSystem.readFile(file);
+      const buffer = await AudioLoader.readFromRoots(path.join('streammusic', resRef+'.wav'));
       const af = new AudioFile(buffer);
       return await af.getPlayableByteStream();
     }catch(e){

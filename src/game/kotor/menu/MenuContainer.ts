@@ -95,6 +95,8 @@ export class MenuContainer extends GameMenu {
 
       this.BTN_GIVEITEMS.addEventListener('click', (e) => {
         e.stopPropagation();
+        // The host owns networked container contents; giving items isn't synced yet
+        if(GameState.hooks.isNetworkContainer(this.container)) return;
 
         switch(this.mode){
           case MenuContainerMode.TAKE_ITEMS:

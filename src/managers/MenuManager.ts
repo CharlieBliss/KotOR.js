@@ -254,103 +254,105 @@ export class MenuManager {
     return menu;
   }  
   
+  /**
+   * The menus MenuManager loads at each stage, by name: the ones both games have and each game's own.
+   * Each is loaded from the current game's menu class of that name (game/kotor or game/tsl) onto
+   * MenuManager[name].
+   */
+  static readonly MENUS: Record<'main' | 'chargen' | 'ingame', { both: string[], kotor: string[], tsl: string[] }> = {
+    main: {
+      both: [
+        'LoadScreen',
+        'MainMenu',
+        'MainMovies',
+        'MainOptions',
+        'MenuResolutions',
+        'MenuSaveLoad',
+        'MenuSaveName',
+        'MenuGameplay',
+        'MenuGraphics',
+        'MenuGraphicsAdvanced',
+        'MenuAutoPause',
+        'MenuToolTip',
+        'MenuSound',
+        'MenuSoundAdvanced',
+        'MenuMouse',
+        'MenuKeyboardMapping',
+        'MenuKeyboardEntry',
+        'InGameConfirm',
+      ],
+      kotor: [],
+      tsl: [
+        'MainMusic',
+      ],
+    },
+    chargen: {
+      both: [
+        'CharGenMain',
+        'CharGenAbilities',
+        'CharGenClass',
+        'CharGenCustomPanel',
+        'CharGenFeats',
+        'CharGenName',
+        'CharGenPortCust',
+        'CharGenQuickOrCustom',
+        'CharGenQuickPanel',
+        'CharGenSkills',
+      ],
+      kotor: [],
+      tsl: [],
+    },
+    ingame: {
+      both: [
+        'InGameAreaTransition',
+        'InGameBark',
+        'InGameComputer',
+        'InGameComputerCam',
+        'InGameDialog',
+        'InGameOverlay',
+        'InGamePause',
+        'MenuAbilities',
+        'MenuCharacter',
+        'MenuContainer',
+        'MenuEquipment',
+        'MenuGalaxyMap',
+        'MenuInventory',
+        'MenuJournal',
+        'MenuLevelUp',
+        'MenuMap',
+        'MenuMessages',
+        'MenuOptions',
+        'MenuFeedback',
+        'MenuPartySelection',
+        'MenuStore',
+        'MenuTop',
+        'MenuUpgrade',
+        'MenuUpgradeItems',
+        'MenuUpgradeSelect',
+        'MenuPazaakWager',
+        'MenuPazaakGame',
+        'MenuPazaakSetup',
+      ],
+      kotor: [],
+      tsl: [
+        'MenuChemicals',
+      ],
+    },
+  };
+
+  /** Load a stage's menus (from MENUS) for the current game, in parallel */
+  private static async loadMenus(menus: { both: string[], kotor: string[], tsl: string[] }){
+    const isTSL = GameState.GameKey == GameEngineType.TSL;
+    if(!isTSL && GameState.GameKey != GameEngineType.KOTOR){ return; }
+    const classes: Record<string, any> = isTSL ? TSL : KOTOR;
+    const names = [...menus.both, ...(isTSL ? menus.tsl : menus.kotor)];
+    const loaded = await Promise.all(names.map((name) => MenuManager.GameMenuLoader(classes[name])));
+    names.forEach((name, i) => { (MenuManager as any)[name] = loaded[i]; });
+  }
+
   static async LoadMainGameMenus(){
     try{
-      if(GameState.GameKey == GameEngineType.KOTOR){
-        [
-          MenuManager.LoadScreen,
-          MenuManager.MainMenu,
-          MenuManager.MainMovies,
-          MenuManager.MainOptions,
-          MenuManager.MenuResolutions,
-          MenuManager.MenuSaveLoad,
-          MenuManager.MenuSaveName,
-          MenuManager.MenuGameplay,
-          MenuManager.MenuGraphics,
-          MenuManager.MenuGraphicsAdvanced,
-          MenuManager.MenuAutoPause,
-          MenuManager.MenuToolTip,
-          MenuManager.MenuSound,
-          MenuManager.MenuSoundAdvanced,
-          MenuManager.MenuMouse,
-          MenuManager.MenuKeyboardMapping,
-          MenuManager.MenuKeyboardEntry,
-          MenuManager.InGameConfirm,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(KOTOR.LoadScreen),
-          MenuManager.GameMenuLoader(KOTOR.MainMenu),
-          MenuManager.GameMenuLoader(KOTOR.MainMovies),
-          MenuManager.GameMenuLoader(KOTOR.MainOptions),
-          MenuManager.GameMenuLoader(KOTOR.MenuResolutions),
-          MenuManager.GameMenuLoader(KOTOR.MenuSaveLoad),
-          MenuManager.GameMenuLoader(KOTOR.MenuSaveName),
-          MenuManager.GameMenuLoader(KOTOR.MenuGameplay),
-          MenuManager.GameMenuLoader(KOTOR.MenuGraphics),
-          MenuManager.GameMenuLoader(KOTOR.MenuGraphicsAdvanced),
-          MenuManager.GameMenuLoader(KOTOR.MenuAutoPause),
-          MenuManager.GameMenuLoader(KOTOR.MenuToolTip),
-          MenuManager.GameMenuLoader(KOTOR.MenuSound),
-          MenuManager.GameMenuLoader(KOTOR.MenuSoundAdvanced),
-          MenuManager.GameMenuLoader(KOTOR.MenuMouse),
-          MenuManager.GameMenuLoader(KOTOR.MenuKeyboardMapping),
-          MenuManager.GameMenuLoader(KOTOR.MenuKeyboardEntry),
-          MenuManager.GameMenuLoader(KOTOR.InGameConfirm),
-        ]) as [
-          KOTOR.LoadScreen, KOTOR.MainMenu, KOTOR.MainMovies, KOTOR.MainOptions,
-          KOTOR.MenuResolutions, KOTOR.MenuSaveLoad, KOTOR.MenuSaveName, KOTOR.MenuGameplay,
-          KOTOR.MenuGraphics, KOTOR.MenuGraphicsAdvanced, KOTOR.MenuAutoPause, KOTOR.MenuToolTip,
-          KOTOR.MenuSound, KOTOR.MenuSoundAdvanced, KOTOR.MenuMouse, KOTOR.MenuKeyboardMapping,
-          KOTOR.MenuKeyboardEntry, KOTOR.InGameConfirm,
-        ];
-      }else if(GameState.GameKey == GameEngineType.TSL){
-        [
-          MenuManager.LoadScreen,
-          MenuManager.MainMenu,
-          MenuManager.MainMovies,
-          MenuManager.MainMusic,
-          MenuManager.MainOptions,
-          MenuManager.MenuResolutions,
-          MenuManager.MenuSaveLoad,
-          MenuManager.MenuSaveName,
-          MenuManager.MenuGameplay,
-          MenuManager.MenuGraphics,
-          MenuManager.MenuGraphicsAdvanced,
-          MenuManager.MenuAutoPause,
-          MenuManager.MenuToolTip,
-          MenuManager.MenuSound,
-          MenuManager.MenuSoundAdvanced,
-          MenuManager.MenuMouse,
-          MenuManager.MenuKeyboardMapping,
-          MenuManager.MenuKeyboardEntry,
-          MenuManager.InGameConfirm,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(TSL.LoadScreen),
-          MenuManager.GameMenuLoader(TSL.MainMenu),
-          MenuManager.GameMenuLoader(TSL.MainMovies),
-          MenuManager.GameMenuLoader(TSL.MainMusic),
-          MenuManager.GameMenuLoader(TSL.MainOptions),
-          MenuManager.GameMenuLoader(TSL.MenuResolutions),
-          MenuManager.GameMenuLoader(TSL.MenuSaveLoad),
-          MenuManager.GameMenuLoader(TSL.MenuSaveName),
-          MenuManager.GameMenuLoader(TSL.MenuGameplay),
-          MenuManager.GameMenuLoader(TSL.MenuGraphics),
-          MenuManager.GameMenuLoader(TSL.MenuGraphicsAdvanced),
-          MenuManager.GameMenuLoader(TSL.MenuAutoPause),
-          MenuManager.GameMenuLoader(TSL.MenuToolTip),
-          MenuManager.GameMenuLoader(TSL.MenuSound),
-          MenuManager.GameMenuLoader(TSL.MenuSoundAdvanced),
-          MenuManager.GameMenuLoader(TSL.MenuMouse),
-          MenuManager.GameMenuLoader(TSL.MenuKeyboardMapping),
-          MenuManager.GameMenuLoader(TSL.MenuKeyboardEntry),
-          MenuManager.GameMenuLoader(TSL.InGameConfirm),
-        ]) as [
-          KOTOR.LoadScreen, KOTOR.MainMenu, KOTOR.MainMovies, TSL.MainMusic, KOTOR.MainOptions,
-          KOTOR.MenuResolutions, KOTOR.MenuSaveLoad, KOTOR.MenuSaveName, KOTOR.MenuGameplay,
-          KOTOR.MenuGraphics, KOTOR.MenuGraphicsAdvanced, KOTOR.MenuAutoPause, KOTOR.MenuToolTip,
-          KOTOR.MenuSound, KOTOR.MenuSoundAdvanced, KOTOR.MenuMouse, KOTOR.MenuKeyboardMapping,
-          KOTOR.MenuKeyboardEntry, KOTOR.InGameConfirm,
-        ];
-      }
+      await MenuManager.loadMenus(MenuManager.MENUS.main);
     }catch(e){
       console.error(e);
     }
@@ -358,63 +360,7 @@ export class MenuManager {
   
   static async LoadCharGenGameMenus(){
     try{
-      if(GameState.GameKey == GameEngineType.KOTOR){
-        [
-          MenuManager.CharGenMain,
-          MenuManager.CharGenAbilities,
-          MenuManager.CharGenClass,
-          MenuManager.CharGenCustomPanel,
-          MenuManager.CharGenFeats,
-          MenuManager.CharGenName,
-          MenuManager.CharGenPortCust,
-          MenuManager.CharGenQuickOrCustom,
-          MenuManager.CharGenQuickPanel,
-          MenuManager.CharGenSkills,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(KOTOR.CharGenMain),
-          MenuManager.GameMenuLoader(KOTOR.CharGenAbilities),
-          MenuManager.GameMenuLoader(KOTOR.CharGenClass),
-          MenuManager.GameMenuLoader(KOTOR.CharGenCustomPanel),
-          MenuManager.GameMenuLoader(KOTOR.CharGenFeats),
-          MenuManager.GameMenuLoader(KOTOR.CharGenName),
-          MenuManager.GameMenuLoader(KOTOR.CharGenPortCust),
-          MenuManager.GameMenuLoader(KOTOR.CharGenQuickOrCustom),
-          MenuManager.GameMenuLoader(KOTOR.CharGenQuickPanel),
-          MenuManager.GameMenuLoader(KOTOR.CharGenSkills),
-        ]) as [
-          KOTOR.CharGenMain, KOTOR.CharGenAbilities, KOTOR.CharGenClass, KOTOR.CharGenCustomPanel,
-          KOTOR.CharGenFeats, KOTOR.CharGenName, KOTOR.CharGenPortCust, KOTOR.CharGenQuickOrCustom,
-          KOTOR.CharGenQuickPanel, KOTOR.CharGenSkills,
-        ];
-      }else if(GameState.GameKey == GameEngineType.TSL){
-        [
-          MenuManager.CharGenAbilities,
-          MenuManager.CharGenClass,
-          MenuManager.CharGenCustomPanel,
-          MenuManager.CharGenFeats,
-          MenuManager.CharGenMain,
-          MenuManager.CharGenName,
-          MenuManager.CharGenPortCust,
-          MenuManager.CharGenQuickOrCustom,
-          MenuManager.CharGenQuickPanel,
-          MenuManager.CharGenSkills,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(TSL.CharGenAbilities),
-          MenuManager.GameMenuLoader(TSL.CharGenClass),
-          MenuManager.GameMenuLoader(TSL.CharGenCustomPanel),
-          MenuManager.GameMenuLoader(TSL.CharGenFeats),
-          MenuManager.GameMenuLoader(TSL.CharGenMain),
-          MenuManager.GameMenuLoader(TSL.CharGenName),
-          MenuManager.GameMenuLoader(TSL.CharGenPortCust),
-          MenuManager.GameMenuLoader(TSL.CharGenQuickOrCustom),
-          MenuManager.GameMenuLoader(TSL.CharGenQuickPanel),
-          MenuManager.GameMenuLoader(TSL.CharGenSkills),
-        ]) as [
-          KOTOR.CharGenAbilities, KOTOR.CharGenClass, KOTOR.CharGenCustomPanel, KOTOR.CharGenFeats,
-          KOTOR.CharGenMain, KOTOR.CharGenName, KOTOR.CharGenPortCust, KOTOR.CharGenQuickOrCustom,
-          KOTOR.CharGenQuickPanel, KOTOR.CharGenSkills,
-        ];
-      }
+      await MenuManager.loadMenus(MenuManager.MENUS.chargen);
     }catch(e){
       console.error(e);
     }
@@ -426,146 +372,7 @@ export class MenuManager {
     MenuManager.#ingameMenusLoaded = true;
     ActionMenuManager.InitActionMenuPanels();
     try{
-      if(GameState.GameKey == GameEngineType.KOTOR){
-        [
-          MenuManager.InGameAreaTransition,
-          MenuManager.InGameBark,
-          MenuManager.InGameComputer,
-          MenuManager.InGameComputerCam,
-          MenuManager.InGameDialog,
-          MenuManager.InGameOverlay,
-          MenuManager.InGamePause,
-          MenuManager.MenuAbilities,
-          MenuManager.MenuCharacter,
-          MenuManager.MenuContainer,
-          MenuManager.MenuEquipment,
-          MenuManager.MenuGalaxyMap,
-          MenuManager.MenuInventory,
-          MenuManager.MenuJournal,
-          MenuManager.MenuLevelUp,
-          MenuManager.MenuMap,
-          MenuManager.MenuMessages,
-          MenuManager.MenuOptions,
-          MenuManager.MenuFeedback,
-          MenuManager.MenuPartySelection,
-          MenuManager.MenuStore,
-          MenuManager.MenuTop,
-          MenuManager.MenuUpgrade,
-          MenuManager.MenuUpgradeItems,
-          MenuManager.MenuUpgradeSelect,
-          MenuManager.MenuPazaakWager,
-          MenuManager.MenuPazaakGame,
-          MenuManager.MenuPazaakSetup,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(KOTOR.InGameAreaTransition),
-          MenuManager.GameMenuLoader(KOTOR.InGameBark),
-          MenuManager.GameMenuLoader(KOTOR.InGameComputer),
-          MenuManager.GameMenuLoader(KOTOR.InGameComputerCam),
-          MenuManager.GameMenuLoader(KOTOR.InGameDialog),
-          MenuManager.GameMenuLoader(KOTOR.InGameOverlay),
-          MenuManager.GameMenuLoader(KOTOR.InGamePause),
-          MenuManager.GameMenuLoader(KOTOR.MenuAbilities),
-          MenuManager.GameMenuLoader(KOTOR.MenuCharacter),
-          MenuManager.GameMenuLoader(KOTOR.MenuContainer),
-          MenuManager.GameMenuLoader(KOTOR.MenuEquipment),
-          MenuManager.GameMenuLoader(KOTOR.MenuGalaxyMap),
-          MenuManager.GameMenuLoader(KOTOR.MenuInventory),
-          MenuManager.GameMenuLoader(KOTOR.MenuJournal),
-          MenuManager.GameMenuLoader(KOTOR.MenuLevelUp),
-          MenuManager.GameMenuLoader(KOTOR.MenuMap),
-          MenuManager.GameMenuLoader(KOTOR.MenuMessages),
-          MenuManager.GameMenuLoader(KOTOR.MenuOptions),
-          MenuManager.GameMenuLoader(KOTOR.MenuFeedback),
-          MenuManager.GameMenuLoader(KOTOR.MenuPartySelection),
-          MenuManager.GameMenuLoader(KOTOR.MenuStore),
-          MenuManager.GameMenuLoader(KOTOR.MenuTop),
-          MenuManager.GameMenuLoader(KOTOR.MenuUpgrade),
-          MenuManager.GameMenuLoader(KOTOR.MenuUpgradeItems),
-          MenuManager.GameMenuLoader(KOTOR.MenuUpgradeSelect),
-          MenuManager.GameMenuLoader(KOTOR.MenuPazaakWager),
-          MenuManager.GameMenuLoader(KOTOR.MenuPazaakGame),
-          MenuManager.GameMenuLoader(KOTOR.MenuPazaakSetup),
-        ]) as [
-          KOTOR.InGameAreaTransition, KOTOR.InGameBark, KOTOR.InGameComputer, KOTOR.InGameComputerCam,
-          KOTOR.InGameDialog, KOTOR.InGameOverlay, KOTOR.InGamePause, KOTOR.MenuAbilities,
-          KOTOR.MenuCharacter, KOTOR.MenuContainer, KOTOR.MenuEquipment, KOTOR.MenuGalaxyMap,
-          KOTOR.MenuInventory, KOTOR.MenuJournal, KOTOR.MenuLevelUp, KOTOR.MenuMap,
-          KOTOR.MenuMessages, KOTOR.MenuOptions, KOTOR.MenuFeedback, KOTOR.MenuPartySelection,
-          KOTOR.MenuStore, KOTOR.MenuTop, KOTOR.MenuUpgrade, KOTOR.MenuUpgradeItems,
-          KOTOR.MenuUpgradeSelect, KOTOR.MenuPazaakWager, KOTOR.MenuPazaakGame, KOTOR.MenuPazaakSetup,
-        ];
-      }else if(GameState.GameKey == GameEngineType.TSL){
-        [
-          MenuManager.InGameAreaTransition,
-          MenuManager.InGameBark,
-          MenuManager.InGameComputer,
-          MenuManager.InGameComputerCam,
-          MenuManager.InGameDialog,
-          MenuManager.InGameOverlay,
-          MenuManager.InGamePause,
-          MenuManager.MenuAbilities,
-          MenuManager.MenuCharacter,
-          MenuManager.MenuChemicals,
-          MenuManager.MenuContainer,
-          MenuManager.MenuEquipment,
-          MenuManager.MenuGalaxyMap,
-          MenuManager.MenuInventory,
-          MenuManager.MenuJournal,
-          MenuManager.MenuLevelUp,
-          MenuManager.MenuMap,
-          MenuManager.MenuMessages,
-          MenuManager.MenuOptions,
-          MenuManager.MenuFeedback,
-          MenuManager.MenuPartySelection,
-          MenuManager.MenuStore,
-          MenuManager.MenuTop,
-          MenuManager.MenuUpgrade,
-          MenuManager.MenuUpgradeItems,
-          MenuManager.MenuUpgradeSelect,
-          MenuManager.MenuPazaakWager,
-          MenuManager.MenuPazaakGame,
-          MenuManager.MenuPazaakSetup,
-        ] = await Promise.all([
-          MenuManager.GameMenuLoader(TSL.InGameAreaTransition),
-          MenuManager.GameMenuLoader(TSL.InGameBark),
-          MenuManager.GameMenuLoader(TSL.InGameComputer),
-          MenuManager.GameMenuLoader(TSL.InGameComputerCam),
-          MenuManager.GameMenuLoader(TSL.InGameDialog),
-          MenuManager.GameMenuLoader(TSL.InGameOverlay),
-          MenuManager.GameMenuLoader(TSL.InGamePause),
-          MenuManager.GameMenuLoader(TSL.MenuAbilities),
-          MenuManager.GameMenuLoader(TSL.MenuCharacter),
-          MenuManager.GameMenuLoader(TSL.MenuChemicals),
-          MenuManager.GameMenuLoader(TSL.MenuContainer),
-          MenuManager.GameMenuLoader(TSL.MenuEquipment),
-          MenuManager.GameMenuLoader(TSL.MenuGalaxyMap),
-          MenuManager.GameMenuLoader(TSL.MenuInventory),
-          MenuManager.GameMenuLoader(TSL.MenuJournal),
-          MenuManager.GameMenuLoader(TSL.MenuLevelUp),
-          MenuManager.GameMenuLoader(TSL.MenuMap),
-          MenuManager.GameMenuLoader(TSL.MenuMessages),
-          MenuManager.GameMenuLoader(TSL.MenuOptions),
-          MenuManager.GameMenuLoader(TSL.MenuFeedback),
-          MenuManager.GameMenuLoader(TSL.MenuPartySelection),
-          MenuManager.GameMenuLoader(TSL.MenuStore),
-          MenuManager.GameMenuLoader(TSL.MenuTop),
-          MenuManager.GameMenuLoader(TSL.MenuUpgrade),
-          MenuManager.GameMenuLoader(TSL.MenuUpgradeItems),
-          MenuManager.GameMenuLoader(TSL.MenuUpgradeSelect),
-          MenuManager.GameMenuLoader(TSL.MenuPazaakWager),
-          MenuManager.GameMenuLoader(TSL.MenuPazaakGame),
-          MenuManager.GameMenuLoader(TSL.MenuPazaakSetup),
-        ]) as [
-          KOTOR.InGameAreaTransition, KOTOR.InGameBark, KOTOR.InGameComputer, KOTOR.InGameComputerCam,
-          KOTOR.InGameDialog, KOTOR.InGameOverlay, KOTOR.InGamePause, KOTOR.MenuAbilities,
-          KOTOR.MenuCharacter, TSL.MenuChemicals, KOTOR.MenuContainer, KOTOR.MenuEquipment,
-          KOTOR.MenuGalaxyMap, KOTOR.MenuInventory, KOTOR.MenuJournal, KOTOR.MenuLevelUp,
-          KOTOR.MenuMap, KOTOR.MenuMessages, KOTOR.MenuOptions, KOTOR.MenuFeedback,
-          KOTOR.MenuPartySelection, KOTOR.MenuStore, KOTOR.MenuTop, KOTOR.MenuUpgrade,
-          KOTOR.MenuUpgradeItems, KOTOR.MenuUpgradeSelect, KOTOR.MenuPazaakWager,
-          KOTOR.MenuPazaakGame, KOTOR.MenuPazaakSetup,
-        ];
-      }
+      await MenuManager.loadMenus(MenuManager.MENUS.ingame);
 
       MenuManager.MenuJournal.childMenu = GameState.MenuManager.MenuTop;
       MenuManager.MenuInventory.childMenu = GameState.MenuManager.MenuTop;

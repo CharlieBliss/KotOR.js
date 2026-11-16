@@ -192,8 +192,8 @@ export class ModuleRoom extends ModuleObject {
       this.grass.material.uniforms.time.value += delta;
       
       // Update camera position for distance fade and player position for trample
-      if(GameState.getCurrentPlayer()?.position){
-        this.grass.material.uniforms.playerPosition.value.copy(GameState.getCurrentPlayer()?.position);
+      if(GameState.getCurrentPlayer()?.position || GameState.currentCamera?.position){
+        this.grass.material.uniforms.playerPosition.value.copy(GameState.getCurrentPlayer()?.position || GameState.currentCamera.position);
         this.grass.material.uniforms.useDistanceFade.value = (GameState.Mode == EngineMode.DIALOG) ? false : true;
       }
       

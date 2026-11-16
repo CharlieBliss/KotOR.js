@@ -58,6 +58,37 @@ export class GameFileSystem {
     return this.normalizePath(filepath).split('/').filter(Boolean).map((part) => this.decodePathSegment(part));
   }
 
+  /**
+   * The other KotOR game's folder, mounted read-only under this prefix (`@othergame/modules/danm13.rim`), so
+   * one game can borrow the other's scenes. Set by OtherGameResources.
+   */
+  static OTHER_GAME_PREFIX = '@othergame';
+  static otherGameDirectory: string | undefined;
+  static otherGameDirectoryHandle: FileSystemDirectoryHandle | undefined;
+
+  static isOtherGamePath(filepath: string): boolean {
+    return this.splitRelativePath(filepath)[0] === this.OTHER_GAME_PREFIX;
+  }
+
+  /** Electron: the absolute path of a game file (this game's, or the other game's under the prefix) */
+  private static fsPath(filepath: string): string {
+    const parts = this.splitRelativePath(filepath);
+    if(parts[0] === this.OTHER_GAME_PREFIX){
+      return path.join(this.otherGameDirectory || '', ...parts.slice(1));
+    }
+    return path.join(ApplicationProfile.directory, filepath);
+  }
+
+  /** Browser: which folder handle a path starts from, the path's folders within it, and a cache key prefix */
+  private static rootFor(filepath: string): { root: FileSystemDirectoryHandle | undefined; dirs: string[]; keyPrefix: string } {
+    const parts = this.splitRelativePath(filepath);
+    if(parts[0] === this.OTHER_GAME_PREFIX){
+      const handle = isUsableDirectoryHandle(this.otherGameDirectoryHandle) ? this.otherGameDirectoryHandle : undefined;
+      return { root: handle, dirs: parts.slice(1), keyPrefix: this.OTHER_GAME_PREFIX + '/' };
+    }
+    return { root: this.getRootDirectoryHandle(), dirs: parts, keyPrefix: '' };
+  }
+
   private static getRootDirectoryHandle(): FileSystemDirectoryHandle | undefined {
     const candidates = [
       ApplicationProfile.directoryHandle,
@@ -75,7 +106,7 @@ export class GameFileSystem {
   static async open(filepath: string, mode: 'r'|'w' = 'r'): Promise<any> {
     if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
       return new Promise<number>( (resolve, reject) => {
-        fs.open(path.join(ApplicationProfile.directory, filepath), (err, fd) => {
+        fs.open(this.fsPath(filepath), (err, fd) => {
           if(err){
             console.error(err);
             reject(err);
@@ -126,15 +157,17 @@ export class GameFileSystem {
     }else{
       if(!(handle)) throw new Error('No file handle supplied!');
       
-      if(!(handle instanceof FileSystemFileHandle)) throw new Error('FileSystemFileHandle expected but one was not supplied!');
-      
+      // Duck-typed so non-native handles (e.g. DevGameDirectory in development) work too
+      const fileHandle = handle as FileSystemFileHandle;
+      if(typeof fileHandle.getFile !== 'function') throw new Error('FileSystemFileHandle expected but one was not supplied!');
+
       if(!(output instanceof Uint8Array)) throw new Error('No output buffer supplied!');
 
-      let file = GameFileSystem.fileSnapshotCache.get(handle);
+      let file = GameFileSystem.fileSnapshotCache.get(fileHandle);
       if(!file){
-        file = await handle.getFile();
+        file = await fileHandle.getFile();
         if(file){
-          GameFileSystem.fileSnapshotCache.set(handle, file);
+          GameFileSystem.fileSnapshotCache.set(fileHandle, file);
         }
       }
       if(!file) throw new Error('Failed to read file from handle!');
@@ -163,7 +196,7 @@ export class GameFileSystem {
     // console.log('readFile', filepath);
     if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
       return new Promise<Uint8Array>( (resolve, reject) => {
-        fs.readFile(path.join(ApplicationProfile.directory, filepath), options, (err, buffer) => {
+        fs.readFile(this.fsPath(filepath), options, (err, buffer) => {
           if(err){
             reject(err);
             return;
@@ -184,7 +217,7 @@ export class GameFileSystem {
   static async writeFile(filepath: string, data: Uint8Array): Promise<boolean> {
     if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
       return new Promise<boolean>((resolve) => {
-        fs.writeFile(path.join(ApplicationProfile.directory, filepath), data, (err) => {
+        fs.writeFile(this.fsPath(filepath), data, (err) => {
           resolve(!err);
         });
       });
@@ -330,7 +363,7 @@ export class GameFileSystem {
 
   private static async isFSDirectory(resource_path: string = ''): Promise<boolean> {
     return new Promise<boolean>( (resolve, reject) => {
-      fs.stat(path.join(ApplicationProfile.directory, resource_path), (err, stats) => {
+      fs.stat(this.fsPath(resource_path), (err, stats) => {
         if(err){
           console.error(err);
           reject();
@@ -346,7 +379,7 @@ export class GameFileSystem {
       depthState = { folder: resource_path, depth: 0 };
     }
     const currentDepth: number = depthState.depth;
-    const dir_path = path.join(ApplicationProfile.directory, resource_path);
+    const dir_path = this.fsPath(resource_path);
 
     return new Promise<string[]>((resolve, reject) => {
       fs.readdir(dir_path, { withFileTypes: true }, async (err, dir_files: fs.Dirent[]) => {
@@ -395,7 +428,7 @@ export class GameFileSystem {
     return new Promise<boolean>( async (resolve, reject) => {
       dirPath = dirPath.trim();
       if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
-        fs.mkdir(path.join(ApplicationProfile.directory, dirPath), { recursive: !!opts.recursive }, (err) => {
+        fs.mkdir(this.fsPath(dirPath), { recursive: !!opts.recursive }, (err) => {
           if(err){
             console.error(err);
             resolve(false);
@@ -441,9 +474,9 @@ export class GameFileSystem {
     return new Promise<boolean>( async (resolve, reject) => {
       dirPath = dirPath.trim();
       if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
-        console.log(`fs.rmdir`, path.join(ApplicationProfile.directory, dirPath));
+        console.log(`fs.rmdir`, this.fsPath(dirPath));
         fs.rmdir(
-          path.join(ApplicationProfile.directory, dirPath), 
+          this.fsPath(dirPath), 
           {
             recursive: opts.recursive
           } as fs.RmDirOptions, 
@@ -495,7 +528,7 @@ export class GameFileSystem {
   static exists(dirOrFilePath: string): Promise<boolean> {
     return new Promise<boolean>( async (resolve, reject) => {
       if(ApplicationProfile.ENV == ApplicationEnvironment.ELECTRON){
-        fs.stat(path.join(ApplicationProfile.directory, dirOrFilePath), (err, stats) => {
+        fs.stat(this.fsPath(dirOrFilePath), (err, stats) => {
           if(err){
             console.log(dirOrFilePath);
             console.error(err);
@@ -604,10 +637,9 @@ export class GameFileSystem {
   }
 
   private static async resolvePathDirectoryHandle(filepath: string, parent = false): Promise<FileSystemDirectoryHandle> {
-    const root = this.getRootDirectoryHandle();
+    const { root, dirs, keyPrefix } = this.rootFor(filepath);
     if(root){
-      const dirs = this.splitRelativePath(filepath);
-      const cacheKey = dirs.join('/');
+      const cacheKey = keyPrefix + dirs.join('/');
       if(this.directoryCache.has(cacheKey)){
         const cached = this.directoryCache.get(cacheKey)!;
         if(!parent) return cached;
@@ -621,7 +653,7 @@ export class GameFileSystem {
         let currentDirHandle = root;
         for(let i = 0, len = dirs.length; i < len; i++){
           lastDirectoryHandle = currentDirHandle;
-          const partialKey = dirs.slice(0, i + 1).join('/');
+          const partialKey = keyPrefix + dirs.slice(0, i + 1).join('/');
           if(this.directoryCache.has(partialKey)){
             currentDirHandle = this.directoryCache.get(partialKey)!;
             continue;
@@ -662,11 +694,10 @@ export class GameFileSystem {
   private static fileSnapshotCache = new WeakMap<FileSystemFileHandle, File>();
 
   private static async resolveFilePathDirectoryHandle(filepath: string): Promise<FileSystemDirectoryHandle> {
-    const root = this.getRootDirectoryHandle();
+    const { root, dirs, keyPrefix } = this.rootFor(filepath);
     if(root){
-      const dirs = this.splitRelativePath(filepath);
       dirs.pop(); // remove filename
-      const cacheKey = dirs.join('/');
+      const cacheKey = keyPrefix + dirs.join('/');
       if(this.directoryCache.has(cacheKey)){
         return this.directoryCache.get(cacheKey)!;
       }
@@ -676,7 +707,7 @@ export class GameFileSystem {
       const promise = (async () => {
         let currentDirHandle = root;
         for(let i = 0, len = dirs.length; i < len; i++){
-          const partialKey = dirs.slice(0, i + 1).join('/');
+          const partialKey = keyPrefix + dirs.slice(0, i + 1).join('/');
           if(this.directoryCache.has(partialKey)){
             currentDirHandle = this.directoryCache.get(partialKey)!;
             continue;

@@ -7,6 +7,10 @@ import { EngineState } from "@/enums/engine/EngineState";
 import { KeyMapAction } from "@/enums/controls/KeyMapAction";
 import { MiniGameType } from "@/enums/engine/MiniGameType";
 import { FollowerCamera } from "@/engine/FollowerCamera";
+import { FreeLookCamera } from "@/engine/FreeLookCamera";
+
+/** Free look: radians of turn per pixel of mouse movement */
+const FREELOOK_MOUSE_SENSITIVITY = 0.005;
 import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { GUIControlTypeMask } from "@/enums/gui/GUIControlTypeMask";
@@ -57,6 +61,8 @@ export class IngameControls {
     this.element.requestPointerLock = this.element.requestPointerLock;
 
     window.addEventListener('keydown', (e: KeyboardEvent) => {
+      // Typing into a page text field (e.g. the GM panel) must not also move the camera or character
+      if(IngameControls.isTypingInPageField(e)) return;
       this.keyboard.onKeyDown(e);
 
       if(GameState.MenuManager.activeGUIElement){
@@ -232,7 +238,7 @@ export class IngameControls {
 
       if(event.button == 0){
         Mouse.leftDown = true;
-      }else if(event.button == 1){
+      }else if(event.button == 1 || event.button == 2){
         Mouse.rightDown = true;
       }
     });
@@ -240,7 +246,11 @@ export class IngameControls {
     window.addEventListener('mousemove', (event: MouseEvent) => {
       // Allow look while pointer-locked; otherwise only track when over the canvas
       // (or while a canvas-started drag is held).
-      if(!this.isGameCanvasMouseTarget(event) && !Mouse.leftDown && !Mouse.rightDown){
+      // Over a page layer the page shows the cursor (as the game's own, see gameCursor.ts): hide the canvas's
+      const overCanvas = this.isGameCanvasMouseTarget(event);
+      GameState.pointerOverPage = !overCanvas && !Mouse.pointerLock && event.target instanceof Element;
+      if(!overCanvas && !Mouse.leftDown && !Mouse.rightDown){
+        GameState.scene_cursor_holder.visible = false;
         return;
       }
 
@@ -351,6 +361,9 @@ export class IngameControls {
           if(GameState.Mode == EngineMode.INGAME && GameState.MenuManager.GetCurrentMenu() == GameState.MenuManager.InGameOverlay){
             const moduleObject = GameState.CursorManager.onMouseHitInteractive();
             if(BitWise.InstanceOf(moduleObject?.objectType, ModuleObjectType.ModuleObject)){
+              if(!moduleObject.isUseable() && moduleObject != GameState.getCurrentPlayer()){
+                GameState.hooks.traceInteraction(`Clicked ${moduleObject.getName?.() || moduleObject.getTag?.() || 'an object'}: it isn't usable (its template says so), so nothing happens`, moduleObject);
+              }
               if(moduleObject.isUseable() && moduleObject != GameState.getCurrentPlayer()){
 
                 selectedObject = true;
@@ -358,8 +371,16 @@ export class IngameControls {
                 const distance = GameState.getCurrentPlayer().position.distanceTo(moduleObject.position);
                 const distanceThreshold = 20;
 
+                if(GameState.CursorManager.selectedObject != moduleObject){
+                  GameState.hooks.traceInteraction(`Selected ${moduleObject.getName?.() || 'an object'}; click it again to use it`);
+                }else if(distance > distanceThreshold){
+                  GameState.hooks.traceInteraction(`${moduleObject.getName?.() || 'That'} is ${distance.toFixed(1)} m away; get within ${distanceThreshold} m to use it`);
+                }
+
                 if(GameState.CursorManager.selectedObject == moduleObject && distance <= distanceThreshold){
-                  if(typeof moduleObject.onClick === 'function'){
+                  if(GameState.hooks.interceptInteraction(GameState.getCurrentPlayer(), moduleObject)){
+                    // GM multiplayer client: the host performs this interaction for us
+                  }else if(typeof moduleObject.onClick === 'function'){
                     GameState.getCurrentPlayer().clearAllActions();
                     moduleObject.onClick(GameState.getCurrentPlayer());
                   }else{
@@ -391,7 +412,7 @@ export class IngameControls {
         Mouse.leftDown = false;
         Mouse.downItem = undefined;
         Mouse.clickItem = undefined;
-      }else if(event.button == 1){
+      }else if(event.button == 1 || event.button == 2){
         Mouse.rightDown = false;
       }
     });
@@ -422,6 +443,20 @@ export class IngameControls {
   }
 
   /**
+   * True when a key event is text entry in a page form field (not the game's own GUI text boxes)
+   */
+  static isTypingInPageField(event: KeyboardEvent): boolean {
+    const target = event.target as HTMLElement | null;
+    if(!target || typeof target.tagName !== 'string') return false;
+    if(target.isContentEditable) return true;
+    const tag = target.tagName.toUpperCase();
+    if(tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if(tag !== 'INPUT') return false;
+    const type = ((target as HTMLInputElement).type || 'text').toLowerCase();
+    return !['checkbox', 'radio', 'button', 'submit', 'reset', 'range', 'file', 'color'].includes(type);
+  }
+
+  /**
    * True when the event landed on the game canvas (or pointer lock owns look input).
    * React chrome overlaying the canvas uses other targets and must not drive game input.
    */
@@ -441,10 +476,13 @@ export class IngameControls {
       if(GameState.State == EngineState.PAUSED) return;
       if(!keymap.keyboardInput?.down) return;
       if(this.gamePadMovement) return;
+      // Free look moves the camera with these keys; it must not move a character as well
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
 
+      GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing + Math.PI/2), false, TURN_SPEED_FAST);
@@ -458,10 +496,13 @@ export class IngameControls {
       if(GameState.State == EngineState.PAUSED) return;
       if(!keymap.keyboardInput?.down) return;
       if(this.gamePadMovement) return;
+      // Free look moves the camera with these keys; it must not move a character as well
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
       
+      GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
       followee.setFacing(Utility.NormalizeRadian(FollowerCamera.facing - Math.PI/2), false, TURN_SPEED_FAST);
@@ -531,11 +572,13 @@ export class IngameControls {
     //ChangeLeader
     KeyMapper.Actions[KeyMapAction.ChangeChar].setProcessor( (keymap) => {
       if(!keymap.keyboardInput?.pressed && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK) return;
       GameState.PartyManager.ShiftLeader();
     });
 
     KeyMapper.Actions[KeyMapAction.Freelook].setProcessor( (keymap) => {
       if(!keymap.keyboardInput?.pressed && !keymap.gamepadInput?.pressed) return;
+      if(GameState.gmMode) return;
       GameState.SetEngineMode(GameState.Mode == EngineMode.FREELOOK ? EngineMode.INGAME : EngineMode.FREELOOK);
     });
 
@@ -748,6 +791,7 @@ export class IngameControls {
 
     KeyMapper.Actions[KeyMapAction.FlyUp].setProcessor( (keymap, delta = 0) => {
       if(!keymap.keyboardInput?.down && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK || GameState.gmMode) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       followee.position.z += 5 * delta;
@@ -755,6 +799,7 @@ export class IngameControls {
 
     KeyMapper.Actions[KeyMapAction.FlyDown].setProcessor( (keymap, delta = 0) => {
       if(!keymap.keyboardInput?.down && !keymap.gamepadInput?.pressed) return;
+      if(GameState.Mode == EngineMode.FREELOOK || GameState.gmMode) return;
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       followee.position.z -= 5 * delta;
@@ -926,6 +971,7 @@ export class IngameControls {
         if(followee){
           if(followee.canMove()){
             if( this.gamePad.stick_l_x.value || this.gamePad.stick_l_y.value ){
+              GameState.hooks.notifyLocalMovement();
               followee.clearAllActions(true);
               followee.force = 1;
               followee.setFacing( Utility.NormalizeRadian( Math.atan2(-this.gamePad.stick_l_x.value, -this.gamePad.stick_l_y.value) + FollowerCamera.facing + Math.PI/2 ) , false, TURN_SPEED_FAST);
@@ -938,6 +984,57 @@ export class IngameControls {
       }
     }
     
+    // The free camera belongs to the GM; a player in a GM session (e.g. before their character arrives) can't fly it
+    if(GameState.Mode == EngineMode.FREELOOK && (!GameState.gmMode || GameState.GMManager.isGMUser())){
+      if(this.keyboard.action.Escape?.pressed){
+        // In GM mode Esc first cancels an active placement/teleport tool, and is consumed so the
+        // GUI key mapping processed below doesn't also open the Options menu this frame
+        if(GameState.gmMode && GameState.GMManager.activeTool !== 'select'){
+          GameState.GMManager.setToolMode('select');
+          this.keyboard.action.Escape.pressed = false;
+        }else{
+          GameState.MenuManager.MenuOptions.open();
+        }
+      }
+      // Turning is rebuilt from heading and tilt every frame, so the camera stays level (and an upside-down
+      // camera, e.g. after something aimed it with lookAt, rights itself)
+      const dx = Mouse.MouseX - Mouse.OldMouseX;
+      const dy = Mouse.MouseY - Mouse.OldMouseY;
+      // Not while the GM drags objects or a selection box with the left button
+      const holding = GameState.gmMode && GameState.GMManager?.viewportDragging && !Mouse.rightDown;
+      const looking = (Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy) && !holding;
+      const turnSpeed = 2.0 * delta;
+      let yawDelta = looking ? -dx * FREELOOK_MOUSE_SENSITIVITY : 0;
+      const pitchDelta = looking ? -dy * FREELOOK_MOUSE_SENSITIVITY : 0;
+      if(this.keyboard.action.LeftArrow?.down) yawDelta += turnSpeed;
+      if(this.keyboard.action.RightArrow?.down) yawDelta -= turnSpeed;
+      FreeLookCamera.turn(GameState.currentCamera, yawDelta, pitchDelta);
+      const fast = this.keyboard.action.ShiftLeft?.down || this.keyboard.action.ShiftRight?.down;
+      const moveSpeed = (fast ? 30.0 : 12.0) * delta;
+      GameState.currentCamera.updateMatrixWorld();
+      const forward = new THREE.Vector3();
+      GameState.currentCamera.getWorldDirection(forward);
+      const right = new THREE.Vector3().crossVectors(forward, GameState.camera.up).normalize();
+      if(this.keyboard.action.KeyW?.down || this.keyboard.action.UpArrow?.down){
+        GameState.currentCamera.position.addScaledVector(forward, moveSpeed);
+      }
+      if(this.keyboard.action.KeyS?.down || this.keyboard.action.DownArrow?.down){
+        GameState.currentCamera.position.addScaledVector(forward, -moveSpeed);
+      }
+      if(this.keyboard.action.KeyA?.down || this.keyboard.action.KeyZ?.down){
+        GameState.currentCamera.position.addScaledVector(right, -moveSpeed);
+      }
+      if(this.keyboard.action.KeyD?.down || this.keyboard.action.KeyC?.down){
+        GameState.currentCamera.position.addScaledVector(right, moveSpeed);
+      }
+      if(this.keyboard.action.KeyE?.down || this.keyboard.action.Space?.down || this.keyboard.action.PageUp?.down || this.keyboard.action.NumpadAdd?.down){
+        GameState.currentCamera.position.z += moveSpeed;
+      }
+      if(this.keyboard.action.KeyQ?.down || this.keyboard.action.PageDown?.down || this.keyboard.action.NumpadSubtract?.down){
+        GameState.currentCamera.position.z -= moveSpeed;
+      }
+    }
+
     KeyMapper.ProcessMappings(GameState.Mode, delta);
 
     //Keyboard: onFrameEnd

@@ -67,46 +67,33 @@ export class ModuleAreaOfEffect extends ModuleObject {
   }
 
   initProperties(): void {
-    if(this.template.RootNode.hasField('AreaEffectId'))
-      this.areaEffectId = this.template.getFieldByLabel('AreaEffectId').getValue();
+    this.areaEffectId = this.template.RootNode.get('AreaEffectId', this.areaEffectId);
 
-    if(this.template.RootNode.hasField('CreatorId'))
-      this.creatorId = this.template.getFieldByLabel('CreatorId').getValue();
+    this.creatorId = this.template.RootNode.get('CreatorId', this.creatorId);
 
-    if(this.template.RootNode.hasField('Commandable'))
-      this.commandable = this.template.getFieldByLabel('Commandable').getValue();
+    this.commandable = this.template.RootNode.get('Commandable', this.commandable);
 
-    if(this.template.RootNode.hasField('Duration'))
-      this.duration = this.template.getFieldByLabel('Duration').getValue();
+    this.duration = this.template.RootNode.get('Duration', this.duration);
 
-    if(this.template.RootNode.hasField('DurationType'))
-      this.durationType = this.template.getFieldByLabel('DurationType').getValue();
+    this.durationType = this.template.RootNode.get('DurationType', this.durationType);
   
-    if(this.template.RootNode.hasField('LastEntered'))
-      this.lastEnteredId = this.template.getFieldByLabel('LastEntered').getValue();
+    this.lastEnteredId = this.template.RootNode.get('LastEntered', this.lastEnteredId);
 
-    if(this.template.RootNode.hasField('LastLeft'))
-      this.lastLeftId = this.template.getFieldByLabel('LastLeft').getValue();
+    this.lastLeftId = this.template.RootNode.get('LastLeft', this.lastLeftId);
 
-    if(this.template.RootNode.hasField('LastHrtbtDay'))
-      this.lastHeartBeatDay = this.template.getFieldByLabel('LastHrtbtDay').getValue();
+    this.lastHeartBeatDay = this.template.RootNode.get('LastHrtbtDay', this.lastHeartBeatDay);
 
-    if(this.template.RootNode.hasField('LastHrtbtTime'))
-      this.lastHeartbeatTime = this.template.getFieldByLabel('LastHrtbtTime').getValue();
+    this.lastHeartbeatTime = this.template.RootNode.get('LastHrtbtTime', this.lastHeartbeatTime);
 
-    if(this.template.RootNode.hasField('LinkedToObject'))
-      this.linkedToObjectId = this.template.getFieldByLabel('LinkedToObject').getValue();
+    this.linkedToObjectId = this.template.RootNode.get('LinkedToObject', this.linkedToObjectId);
   
-    if(this.template.RootNode.hasField('MetaMagicType'))
-      this.metaMagicType = this.template.getFieldByLabel('MetaMagicType').getValue();
+    this.metaMagicType = this.template.RootNode.get('MetaMagicType', this.metaMagicType);
 
-    if(this.template.RootNode.hasField('Shape'))
-      this.shape = this.template.getFieldByLabel('Shape').getValue();
+    this.shape = this.template.RootNode.get('Shape', this.shape);
 
     //RECT
     if(this.shape == AreaOfEffectShape.RECTANGLE){
-      if(this.template.RootNode.hasField('Length'))
-        this.length = this.template.getFieldByLabel('Length').getValue();
+      this.length = this.template.RootNode.get('Length', this.length);
 
       if(this.template.RootNode.hasField('Width'))
         this.width = this.template.getFieldByLabel('Width').getValue();
@@ -118,32 +105,23 @@ export class ModuleAreaOfEffect extends ModuleObject {
         this.radius = this.template.getFieldByLabel('Radius').getValue();
     }
   
-    if(this.template.RootNode.hasField('SpellId'))
-      this.spellId = this.template.getFieldByLabel('SpellId').getValue();
+    this.spellId = this.template.RootNode.get('SpellId', this.spellId);
   
-    if(this.template.RootNode.hasField('SpellLevel'))
-      this.spellLevel = this.template.getFieldByLabel('SpellLevel').getValue();
+    this.spellLevel = this.template.RootNode.get('SpellLevel', this.spellLevel);
   
-    if(this.template.RootNode.hasField('SpellSaveDC'))
-      this.spellSaveDC = this.template.getFieldByLabel('SpellSaveDC').getValue();
+    this.spellSaveDC = this.template.RootNode.get('SpellSaveDC', this.spellSaveDC);
 
-    if(this.template.RootNode.hasField('OrientationX'))
-      this.xOrientation = this.template.getFieldByLabel('OrientationX').getValue();
+    this.xOrientation = this.template.RootNode.get('OrientationX', this.xOrientation);
     
-    if(this.template.RootNode.hasField('OrientationY'))
-      this.yOrientation = this.template.getFieldByLabel('OrientationY').getValue();
+    this.yOrientation = this.template.RootNode.get('OrientationY', this.yOrientation);
     
-    if(this.template.RootNode.hasField('OrientationZ'))
-      this.zOrientation = this.template.getFieldByLabel('OrientationZ').getValue();
+    this.zOrientation = this.template.RootNode.get('OrientationZ', this.zOrientation);
       
-    if(this.template.RootNode.hasField('PositionX'))
-      this.position.x = this.template.getFieldByLabel('PositionX').getValue();
+    this.position.x = this.template.RootNode.get('PositionX', this.position.x);
     
-    if(this.template.RootNode.hasField('PositionY'))
-      this.position.y = this.template.getFieldByLabel('PositionY').getValue();
+    this.position.y = this.template.RootNode.get('PositionY', this.position.y);
     
-    if(this.template.RootNode.hasField('PositionZ'))
-      this.position.z = this.template.getFieldByLabel('PositionZ').getValue();
+    this.position.z = this.template.RootNode.get('PositionZ', this.position.z);
 
     //ActionList
     try{
@@ -193,63 +171,63 @@ export class ModuleAreaOfEffect extends ModuleObject {
     let gff = new GFFObject();
     gff.FileType = 'AOE ';
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    gff.RootNode.addDWord('ObjectId', this.id);
 
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'AreaEffectId') ).setValue(this.areaEffectId); // vfx_persist id
+    gff.RootNode.addInt('AreaEffectId', this.areaEffectId); // vfx_persist id
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'LinkedToObject') ).setValue( this.linkedToObject instanceof ModuleObject ? this.linkedToObject.id : ModuleObjectConstant.OBJECT_INVALID );
+    gff.RootNode.addDWord('LinkedToObject',  this.linkedToObject instanceof ModuleObject ? this.linkedToObject.id : ModuleObjectConstant.OBJECT_INVALID );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'CreatorId') ).setValue( this.creator instanceof ModuleObject ? this.creator.id : ModuleObjectConstant.OBJECT_INVALID );
+    gff.RootNode.addDWord('CreatorId',  this.creator instanceof ModuleObject ? this.creator.id : ModuleObjectConstant.OBJECT_INVALID );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'LastEntered') ).setValue( this.lastEntered instanceof ModuleObject ? this.lastEntered.id : ModuleObjectConstant.OBJECT_INVALID );
+    gff.RootNode.addDWord('LastEntered',  this.lastEntered instanceof ModuleObject ? this.lastEntered.id : ModuleObjectConstant.OBJECT_INVALID );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'LastLeft') ).setValue( this.lastLeft instanceof ModuleObject ? this.lastLeft.id : ModuleObjectConstant.OBJECT_INVALID );
+    gff.RootNode.addDWord('LastLeft',  this.lastLeft instanceof ModuleObject ? this.lastLeft.id : ModuleObjectConstant.OBJECT_INVALID );
 
     
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Duration') ).setValue(this.duration);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE,  'DurationType') ).setValue(this.durationType);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'LastHrtbtDay') ).setValue(this.lastHeartBeatDay);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'LastHrtbtTime') ).setValue(this.lastHeartBeatDay);
+    gff.RootNode.addDWord('Duration', this.duration);
+    gff.RootNode.addByte('DurationType', this.durationType);
+    gff.RootNode.addDWord('LastHrtbtDay', this.lastHeartBeatDay);
+    gff.RootNode.addDWord('LastHrtbtTime', this.lastHeartBeatDay);
 
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnHeartbeat') ).setValue(this.onHeartbeat.name);
+    gff.RootNode.addCExoString('OnHeartbeat', this.onHeartbeat.name);
 
     if(this.onHeartbeat instanceof NWScriptInstance){
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnHeartbeat') ).setValue(this.onHeartbeat.name);
+      gff.RootNode.addCExoString('OnHeartbeat', this.onHeartbeat.name);
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnHeartbeat') ).setValue('');
+      gff.RootNode.addCExoString('OnHeartbeat', '');
     }
 
     if(this.onUserDefined instanceof NWScriptInstance){
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnUserDefined') ).setValue(this.onUserDefined.name);
+      gff.RootNode.addCExoString('OnUserDefined', this.onUserDefined.name);
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnUserDefined') ).setValue('');
+      gff.RootNode.addCExoString('OnUserDefined', '');
     }
 
     if(this.onObjectEnter instanceof NWScriptInstance){
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnObjEnter') ).setValue(this.onObjectEnter.name);
+      gff.RootNode.addCExoString('OnObjEnter', this.onObjectEnter.name);
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnObjEnter') ).setValue('');
+      gff.RootNode.addCExoString('OnObjEnter', '');
     }
 
     if(this.onObjectExit instanceof NWScriptInstance){
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnObjExit') ).setValue(this.onObjectExit.name);
+      gff.RootNode.addCExoString('OnObjExit', this.onObjectExit.name);
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'OnObjExit') ).setValue('');
+      gff.RootNode.addCExoString('OnObjExit', '');
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag); // vfx_persist label
+    gff.RootNode.addCExoString('Tag', this.tag); // vfx_persist label
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'SpellId') ).setValue(this.spellId);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Shape') ).setValue(this.shape);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'MetaMagicType') ).setValue(this.metaMagicType);
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'SpellSaveDC') ).setValue(this.spellSaveDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'SpellLevel') ).setValue(this.spellLevel);
+    gff.RootNode.addDWord('SpellId', this.spellId);
+    gff.RootNode.addByte('Shape', this.shape);
+    gff.RootNode.addByte('MetaMagicType', this.metaMagicType);
+    gff.RootNode.addInt('SpellSaveDC', this.spellSaveDC);
+    gff.RootNode.addInt('SpellLevel', this.spellLevel);
 
     if(this.shape == AreaOfEffectShape.RECTANGLE){ //RECT
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Length') ).setValue(this.length);
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Width') ).setValue(this.width);
+      gff.RootNode.addFloat('Length', this.length);
+      gff.RootNode.addFloat('Width', this.width);
     }else{ // Cricle
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Radius') ).setValue(this.radius);
+      gff.RootNode.addFloat('Radius', this.radius);
     }
     
     gff.RootNode.addField( this.actionQueueToActionList() );
@@ -264,15 +242,15 @@ export class ModuleAreaOfEffect extends ModuleObject {
       effectList.addChildStruct( this.effects[i].save() );
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue( this.position.x );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue( this.position.y );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue( this.position.z );
+    gff.RootNode.addFloat('XPosition',  this.position.x );
+    gff.RootNode.addFloat('YPosition',  this.position.y );
+    gff.RootNode.addFloat('ZPosition',  this.position.z );
 
     let theta = this.rotation.z * Math.PI;
 
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue( 1 * Math.cos(theta) );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue( 1 * Math.sin(theta) );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue( 0 );
+    gff.RootNode.addFloat('XOrientation',  1 * Math.cos(theta) );
+    gff.RootNode.addFloat('YOrientation',  1 * Math.sin(theta) );
+    gff.RootNode.addFloat('ZOrientation',  0 );
     
     return gff;
   }

@@ -57,33 +57,16 @@ export class ModuleStore extends ModuleObject {
   }
 
   load(){
-    if(this.getResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utm'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-      }else{
-        console.error('Failed to load ModuleStore template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-    }
+    // A placed store names its template in ResRef (it has no TemplateResRef)
+    this.mergeTemplate(ResourceTypes['utm'], this.getResRef());
+    this.initProperties();
   }
 
   initProperties(){
     
     if(!this.initialized){
-      if(this.template.RootNode.hasField('ObjectId')){
-        this.id = this.template.getFieldByLabel('ObjectId').getValue();
-      }else if(this.template.RootNode.hasField('ID')){
-        this.id = this.template.getFieldByLabel('ID').getValue();
-      }
+      // A store template's ID is the store's number, not an object id
+      this.id = this.template.RootNode.get('ObjectId', this.id);
       
       GameState.ModuleObjectManager.AddObjectById(this);
     }
@@ -94,35 +77,19 @@ export class ModuleStore extends ModuleObject {
     if(this.template.RootNode.hasField('LocName'))
       this.locName = this.template.getFieldByLabel('LocName').getCExoLocString();
 
-    if(this.template.RootNode.hasField('MarkDown'))
-      this.markDown = this.template.getFieldByLabel('MarkDown').getValue();
+    this.markDown = this.template.RootNode.get('MarkDown', this.markDown);
 
-    if(this.template.RootNode.hasField('MarkUp'))
-      this.markUp = this.template.getFieldByLabel('MarkUp').getValue();
+    this.markUp = this.template.RootNode.get('MarkUp', this.markUp);
 
-    if(this.template.RootNode.hasField('OnOpenStore'))
-      this.onOpenStore = this.template.getFieldByLabel('OnOpenStore').getValue();
+    this.onOpenStore = this.template.RootNode.get('OnOpenStore', this.onOpenStore);
       
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue(); 
-    
-    if(this.template.RootNode.hasField('XPosition'))
-      this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
+    this.initCommonProperties();
 
-    if(this.template.RootNode.hasField('YPosition'))
-      this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
+    this.rotation.x = this.template.RootNode.get('XOrientation', this.rotation.x);
 
-    if(this.template.RootNode.hasField('ZPosition'))
-      this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
-    
-    if(this.template.RootNode.hasField('XOrientation'))
-      this.rotation.x = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
+    this.rotation.y = this.template.RootNode.get('YOrientation', this.rotation.y);
 
-    if(this.template.RootNode.hasField('YOrientation'))
-      this.rotation.y = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
-
-    if(this.template.RootNode.hasField('ZOrientation'))
-      this.rotation.z = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
+    this.rotation.z = this.template.RootNode.get('ZOrientation', this.rotation.z);
 
     if(this.template.RootNode.hasField('SWVarTable')){
       let swVarTableStruct = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0];
@@ -178,32 +145,32 @@ export class ModuleStore extends ModuleObject {
     gff.FileType = 'UTM ';
     gff.RootNode.type = 6;
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
+    gff.RootNode.addDWord('ObjectId', this.id);
+    gff.RootNode.addCExoString('Tag', this.tag);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName') ).setValue(this.locName);
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'MarkDown') ).setValue(this.markDown);
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'MarkUp') ).setValue(this.markUp);
+    gff.RootNode.addInt('MarkDown', this.markDown);
+    gff.RootNode.addInt('MarkUp', this.markUp);
     gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'OnOpenStore') ).setValue (this.onOpenStore instanceof NWScriptInstance ? this.onOpenStore.name : '' );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BuySellFlag') ).setValue(this.buySellFlag);
+    gff.RootNode.addByte('BuySellFlag', this.buySellFlag);
 
     let itemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ItemList') );
     for(let i = 0; i < this.inventory.length; i++){
       itemList.addChildStruct( this.inventory[i].save() );
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue(this.position.x);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue(this.position.y);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue(this.position.z);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue(this.rotation.x);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue(this.rotation.y);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue(this.rotation.z);
+    gff.RootNode.addFloat('XPosition', this.position.x);
+    gff.RootNode.addFloat('YPosition', this.position.y);
+    gff.RootNode.addFloat('ZPosition', this.position.z);
+    gff.RootNode.addFloat('XOrientation', this.rotation.x);
+    gff.RootNode.addFloat('YOrientation', this.rotation.y);
+    gff.RootNode.addFloat('ZOrientation', this.rotation.z);
 
     //SWVarTable
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
     gff.RootNode.addField( this.actionQueueToActionList() );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Commandable') ).setValue(1);
+    gff.RootNode.addByte('Commandable', 1);
 
 
     this.template = gff;

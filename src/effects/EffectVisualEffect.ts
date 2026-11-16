@@ -127,6 +127,8 @@ export class EffectVisualEffect extends GameEffect {
       if(this.object.model && this.model){
         for(let node of this.object.model.nodes){
           let c_node = this.model.nodes.get(node[0]);
+          // The effect's model needn't have every bone the creature's does
+          if(!c_node) continue;
           c_node.position.copy(node[1].position);
           c_node.quaternion.copy(node[1].quaternion);
           c_node.scale.copy(node[1].scale);
@@ -147,6 +149,7 @@ export class EffectVisualEffect extends GameEffect {
       return;
 
     super.onApply();
+    GameState.hooks.onHostVisualEffectApplied(this);
 
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
 
@@ -200,7 +203,7 @@ export class EffectVisualEffect extends GameEffect {
     if(this.visualEffect.imp_impact_node != '****'){
       MDLLoader.loader.load(this.visualEffect.imp_impact_node)
       .then(
-        (mdl: OdysseyModel) => {
+        (mdl: OdysseyModel) => { if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context
           }).then(
@@ -236,7 +239,7 @@ export class EffectVisualEffect extends GameEffect {
   impactRoot(){
     if(this.getImpactRootModel() != '****'){
       MDLLoader.loader.load(this.getImpactRootModel())
-      .then((mdl: OdysseyModel) => {
+      .then((mdl: OdysseyModel) => { if(!mdl) return;
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
         }).then((model: OdysseyModel3D) => {
@@ -255,19 +258,21 @@ export class EffectVisualEffect extends GameEffect {
   impactHead(){
     if(this.visualEffect.imp_headcon_node != '****'){
       MDLLoader.loader.load(this.visualEffect.imp_headcon_node).then(
-        (mdl: OdysseyModel) => {
+        (mdl: OdysseyModel) => { if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context,
           }).then((model: OdysseyModel3D) => {
             this.impact_head_model = model;
-            if(this.object.model.headconjure){
+            if(this.object?.model?.headconjure){
               this.object.model.headconjure.add(this.impact_head_model);
               TextureLoader.LoadQueue();
-            }else if(this.object.model.headhook){
+            }else if(this.object?.model?.headhook){
               this.object.model.headhook.add(this.impact_head_model);
               TextureLoader.LoadQueue();
             }else{
-              this.impact_root_model.dispose();
+              // No head to attach it to (droids and some creatures)
+              this.impact_head_model.dispose();
+              this.impact_head_model = undefined;
             }
           })
         }
@@ -302,7 +307,7 @@ export class EffectVisualEffect extends GameEffect {
         const creature = this.object as ModuleCreature;
         MDLLoader.loader.load(creature.bodyModel)
         .then(
-          (mdl: OdysseyModel) => {
+          (mdl: OdysseyModel) => { if(!mdl) return;
             OdysseyModel3D.FromMDL(mdl, {
               textureVar: fx_tex,
               isForceShield: true,
@@ -317,7 +322,7 @@ export class EffectVisualEffect extends GameEffect {
               
               if(creature.headModel){
                 MDLLoader.loader.load(creature.headModel).then(
-                  (mdl: OdysseyModel) => {
+                  (mdl: OdysseyModel) => { if(!mdl) return;
                   OdysseyModel3D.FromMDL(mdl, {
                     textureVar: fx_tex,
                     context: this.object.context,
@@ -364,7 +369,7 @@ export class EffectVisualEffect extends GameEffect {
               //model.disableMatrixUpdate();
               if(creature.headModel){
                 MDLLoader.loader.load(creature.headModel)
-                .then((mdl: OdysseyModel) => {
+                .then((mdl: OdysseyModel) => { if(!mdl) return;
                   OdysseyModel3D.FromMDL(mdl, {
                     textureVar: fx_tex,
                     context: this.object.context,
@@ -391,6 +396,7 @@ export class EffectVisualEffect extends GameEffect {
   }
 
   onRemove(){
+    GameState.hooks.onHostVisualEffectRemoved(this);
     if(this.model instanceof OdysseyModel3D){
       this.model.dispose();
     }

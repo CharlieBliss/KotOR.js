@@ -5661,9 +5661,10 @@ NWScriptDefK2.Actions = {
     type: NWScriptDataType.VOID,
     args: [ NWScriptDataType.STRING, NWScriptDataType.INTEGER ],
     action: function(this: NWScriptInstance, args: [string, number]){
-      
-      if(typeof GameState.GlobalVariableManager.Globals.Number.has(args[0].toLowerCase()) !== 'undefined')
-      GameState.GlobalVariableManager.Globals.Number.get(args[0].toLowerCase()).value += parseInt(args[1] as any);
+      // Only globals the game defines (globalcat.2da); the total stays within -128..127
+      const global = GameState.GlobalVariableManager.Globals.Number.get(String(args[0] || '').toLowerCase());
+      if(!global){ console.warn('IncrementGlobalNumber: no global number', args[0]); return; }
+      global.value = Math.max(-128, Math.min(127, (Number(global.value) || 0) + (parseInt(args[1] as any) || 0)));
     }	
   },
   800: {
@@ -5672,8 +5673,9 @@ NWScriptDefK2.Actions = {
     type: NWScriptDataType.VOID,
     args: [ NWScriptDataType.STRING, NWScriptDataType.INTEGER ],
     action: function(this: NWScriptInstance, args: [string, number]){
-      if(typeof GameState.GlobalVariableManager.Globals.Number.has(args[0].toLowerCase()) !== 'undefined')
-      GameState.GlobalVariableManager.Globals.Number.get(args[0].toLowerCase()).value -= parseInt(args[1] as any);
+      const global = GameState.GlobalVariableManager.Globals.Number.get(String(args[0] || '').toLowerCase());
+      if(!global){ console.warn('DecrementGlobalNumber: no global number', args[0]); return; }
+      global.value = Math.max(-128, Math.min(127, (Number(global.value) || 0) - (parseInt(args[1] as any) || 0)));
     }	
   },
   801: {

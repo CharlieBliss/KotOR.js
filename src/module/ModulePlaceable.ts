@@ -1,3 +1,4 @@
+import type { GMPlaceableSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ModuleRoom } from "@/module/ModuleRoom";
 import { AudioEmitter } from "@/audio/AudioEmitter";
 import { BinaryReader } from "@/utility/binary/BinaryReader";
@@ -25,6 +26,7 @@ import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { BitWise } from "@/utility/BitWise";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import { ModuleObject } from "@/module/ModuleObject";
+import { ModuleLockable } from "@/module/ModuleLockable";
 import type { ModuleItem } from "@/module/ModuleItem";
 import { DLGConversationType } from "@/enums/dialog/DLGConversationType";
 import { SkillType } from "@/enums/nwscript/SkillType";
@@ -59,23 +61,18 @@ enum ModulePlaceableEvent {
 * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
 * @memberof KotOR
 */
-export class ModulePlaceable extends ModuleObject {
+export class ModulePlaceable extends ModuleLockable {
   openState: boolean;
   _state: ModulePlaceableState;
   lastUsedBy: any;
   state: ModulePlaceableState;
   bodyBag: number;
-  closeLockDC: number;
   disarmDC: number;
   fort: number;
   genericType: number;
   hasInventory: boolean;
   hardness: number;
   interruptable: boolean;
-  keyRequired: boolean;
-  lockable: boolean;
-  locked: boolean;
-  openLockDC: number;
   paletteID: number;
   partyInteract: boolean;
   ref: number;
@@ -233,7 +230,7 @@ export class ModulePlaceable extends ModuleObject {
           if(!this.animStateInfo.started){
             this.animStateInfo.started = true;
             const aLooping = (!parseInt(animation.fireforget) && parseInt(animation.looping) == 1);
-            this.getModel().playAnimation(animation.name?.toLowerCase(), aLooping);
+            this.getModel()?.playAnimation(animation.name?.toLowerCase(), aLooping);
           }else{
             //Animation completed
             switch(this.animStateInfo.currentAnimState){
@@ -252,7 +249,7 @@ export class ModulePlaceable extends ModuleObject {
           }
         }
       }else{
-        console.error('Animation Missing', this.getTag(), this.getName(), this.animState);
+        if(this.animStateInfo.currentAnimState !== ModulePlaceableAnimState.DEFAULT) this.setAnimationState(ModulePlaceableAnimState.DEFAULT); return;
         this.setAnimationState(ModulePlaceableAnimState.DEFAULT);
       }
     }
@@ -289,14 +286,6 @@ export class ModulePlaceable extends ModuleObject {
       return this.template.RootNode.getFieldByLabel('Bearing').getValue();
     }
     return 0;
-  }
-
-  isLocked(){
-    return this.locked;
-  }
-
-  setLocked(value: boolean){
-    this.locked = value ? true : false;
   }
 
   requiresKey(){
@@ -354,58 +343,8 @@ export class ModulePlaceable extends ModuleObject {
     return this.placeableAppearance;
   }
 
-  getObjectSounds(){
-    let result = {"__rowlabel":-1,"label":"","armortype":"","opened":"****","closed":"****","destroyed":"****","used":"****","locked":"****"};
-    const apppearance = this.getAppearance();
-    if(!apppearance) return result;
-
-    const soundIdx = apppearance.soundapptype;
-    if(!isNaN(soundIdx) && soundIdx >= 0){
-      const table = GameState.TwoDAManager.datatables.get('placeableobjsnds');
-      if(table && typeof table.rows[soundIdx] !== 'undefined'){
-        result = table.rows[soundIdx];
-      }
-    }
-    return result;
-  }
-
-  playObjectSound(type: ModulePlaceableObjectSound){
-    const objSounds = this.getObjectSounds();
-
-    if(!this.audioEmitter){
-      return;
-    }
-
-    switch(type){
-      case ModulePlaceableObjectSound.OPENED:
-        if(objSounds?.opened != '****'){
-          this.audioEmitter.playSound(objSounds?.opened);
-        }
-      break;
-      case ModulePlaceableObjectSound.CLOSED:
-        if(objSounds?.closed != '****'){
-          this.audioEmitter.playSound(objSounds?.closed);
-        }
-      break;
-      case ModulePlaceableObjectSound.DESTROYED:
-        if(objSounds?.destroyed != '****'){
-          this.audioEmitter.playSound(objSounds?.destroyed);
-        }
-      break;
-      case ModulePlaceableObjectSound.USED:
-        if(objSounds?.used != '****'){
-          this.audioEmitter.playSound(objSounds?.used);
-        }
-      break;
-      case ModulePlaceableObjectSound.LOCKED:
-        if(objSounds?.locked != '****'){
-          this.audioEmitter.playSound(objSounds?.locked);
-        }
-      break;
-    }
-  }
-
   retrieveInventory(){
+    if(GameState.hooks.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       const item = this.inventory.pop();
       const stackSize = item.getStackSize();
@@ -442,8 +381,10 @@ export class ModulePlaceable extends ModuleObject {
       break;
       case ModulePlaceableEvent.OPEN_END:
         if(this.hasInventory){
-          GameState.MenuManager.MenuContainer.AttachContainer(this);
-          GameState.MenuManager.MenuContainer.open();
+          if(!GameState.hooks.routeContainerOpen(this, this.lastUsedBy)){
+            GameState.MenuManager.MenuContainer.AttachContainer(this);
+            GameState.MenuManager.MenuContainer.open();
+          }
         }
     
         this.scripts[ModuleObjectScript.PlaceableOnOpen]?.run(this)
@@ -460,12 +401,20 @@ export class ModulePlaceable extends ModuleObject {
 
   use(object: ModuleObject){
 
+    // A GM can put a skill check in front of an object (Computer Use for a terminal, Repair for a panel...)
+    if(!GameState.hooks.skillGatePasses(this, object)){
+      this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'skill');
+      return;
+    }
+
     this.lastUsedBy = object;
 
     this.attemptUnlockWithKey(object);
 
     if(this.isLocked()){
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'locked');
     }else{
       if(!this.isOpen() && (this.state == ModulePlaceableState.CLOSED || this.state == ModulePlaceableState.DEFAULT)){
         this.setAnimationState(ModulePlaceableAnimState.CLOSE_OPEN);
@@ -477,6 +426,10 @@ export class ModulePlaceable extends ModuleObject {
     }
   
     const instance = this.scripts[ModuleObjectScript.PlaceableOnUsed];
+    if(this.gmBarkText || (GameState.gmMode && !this.hasInventory && !this.isLocked() && !instance)){
+      this.playObjectSound(ModulePlaceableObjectSound.USED);
+      GameState.MenuManager.InGameBark?.barkFromString(this.gmBarkText || `Used ${this.getName() || 'Object'}.`);
+    }
     if(!instance){ return; }
     instance.run(this);
   }
@@ -498,49 +451,6 @@ export class ModulePlaceable extends ModuleObject {
     }
   }
 
-  lock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = true;
-    
-    const instance = this.scripts[ModuleObjectScript.PlaceableOnLock];
-    if(!instance){ return; }
-    instance.run(this);
-  }
-
-  unlock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = false;
-    
-    const instance = this.scripts[ModuleObjectScript.PlaceableOnUnlock];
-    if(!instance){ return; }
-    instance.run(this);
-  }
-
-  attemptUnlock(object: ModuleObject){
-    if(!BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-      return false;
-    }
-
-    const nSecuritySkill = object.getSkillLevel(SkillType.SECURITY);
-    if(this.isLocked() && !this.keyRequired && nSecuritySkill >= 1){
-      let d20 = 20;//d20 rolls are auto 20's outside of combat
-      let skillCheck = (((object.getWIS()/2) + nSecuritySkill) + d20) - this.openLockDC;
-      if(skillCheck >= 1 && nSecuritySkill >= 1){
-        this.unlock(object);
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_SUCCESS);
-        }
-      }else{
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_FAIL);
-        }
-      }
-    }
-
-    this.use(object);
-    return true;
-  }
-
   close(object: ModuleObject){
     if(this.isOpen() && this.state == ModulePlaceableState.OPEN){
       this.setAnimationState(ModulePlaceableAnimState.OPEN_CLOSE);
@@ -552,33 +462,14 @@ export class ModulePlaceable extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utp'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadInventory();
-        this.loadScripts();
-      }else{
-        console.error('Failed to load ModulePlaceable template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadInventory();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadInventory();
-      this.loadScripts();
-    }
+    this.mergeTemplate(ResourceTypes['utp']);
+    this.initProperties();
+    this.loadInventory();
+    this.loadScripts();
   }
 
   async loadModel(): Promise<OdysseyModel3D> {
-    const modelName = this.getAppearance().modelname.replace(/\0[\s\S]*$/g,'').toLowerCase();
+    const modelName = (this.getAppearance()?.modelname || 'plc_footlker').replace(/\0[\s\S]*$/g,'').toLowerCase();
     try {
       const mdl = await MDLLoader.loader.load(modelName);
       const plc = await OdysseyModel3D.FromMDL(mdl, {
@@ -610,42 +501,23 @@ export class ModulePlaceable extends ModuleObject {
     return this.model;
   }
 
-  loadScripts (){
-    const scriptKeys = [
-      ModuleObjectScript.PlaceableOnClosed,
-      ModuleObjectScript.PlaceableOnDamaged,
-      ModuleObjectScript.PlaceableOnDeath,
-      ModuleObjectScript.PlaceableOnDisarm,
-      ModuleObjectScript.PlaceableOnEndDialogue,
-      ModuleObjectScript.PlaceableOnHeartbeat,
-      ModuleObjectScript.PlaceableOnInvDisturbed,
-      ModuleObjectScript.PlaceableOnLock,
-      ModuleObjectScript.PlaceableOnMeleeAttacked,
-      ModuleObjectScript.PlaceableOnOpen,
-      ModuleObjectScript.PlaceableOnSpellCastAt,
-      ModuleObjectScript.PlaceableOnTrapTriggered,
-      ModuleObjectScript.PlaceableOnUnlock,
-      ModuleObjectScript.PlaceableOnUsed,
-      ModuleObjectScript.PlaceableOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ 
-          console.warn(`ModulePlaceable.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-          continue; 
-        }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.PlaceableOnClosed,
+    ModuleObjectScript.PlaceableOnDamaged,
+    ModuleObjectScript.PlaceableOnDeath,
+    ModuleObjectScript.PlaceableOnDisarm,
+    ModuleObjectScript.PlaceableOnEndDialogue,
+    ModuleObjectScript.PlaceableOnHeartbeat,
+    ModuleObjectScript.PlaceableOnInvDisturbed,
+    ModuleObjectScript.PlaceableOnLock,
+    ModuleObjectScript.PlaceableOnMeleeAttacked,
+    ModuleObjectScript.PlaceableOnOpen,
+    ModuleObjectScript.PlaceableOnSpellCastAt,
+    ModuleObjectScript.PlaceableOnTrapTriggered,
+    ModuleObjectScript.PlaceableOnUnlock,
+    ModuleObjectScript.PlaceableOnUsed,
+    ModuleObjectScript.PlaceableOnUserDefined,
+  ];
 
   loadInventory(){
     let inventory = this.getItemList();
@@ -741,24 +613,19 @@ export class ModulePlaceable extends ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('AutoRemoveKey'))
-      this.autoRemoveKey = this.template.getFieldByLabel('AutoRemoveKey').getValue();
+    this.autoRemoveKey = this.template.RootNode.get('AutoRemoveKey', this.autoRemoveKey);
 
-    if(this.template.RootNode.hasField('BodyBag'))
-      this.bodyBag = this.template.getFieldByLabel('BodyBag').getValue();
+    this.bodyBag = this.template.RootNode.get('BodyBag', this.bodyBag);
 
-    if(this.template.RootNode.hasField('CloseLockDC'))
-      this.closeLockDC = this.template.getFieldByLabel('CloseLockDC').getValue();
+    this.closeLockDC = this.template.RootNode.get('CloseLockDC', this.closeLockDC);
 
     if(this.template.RootNode.hasField('Conversation')){
       this.conversation = DLGObject.FromResRef(this.template.getFieldByLabel('Conversation').getValue());
     }
 
-    if(this.template.RootNode.hasField('CurrentHP'))
-      this.currentHP = this.template.getFieldByLabel('CurrentHP').getValue();
+    this.currentHP = this.template.RootNode.get('CurrentHP', this.currentHP);
 
-    if(this.template.RootNode.hasField('DisarmDC'))
-      this.disarmDC = this.template.getFieldByLabel('DisarmDC').getValue();
+    this.disarmDC = this.template.RootNode.get('DisarmDC', this.disarmDC);
 
     if(this.template.RootNode.hasField('Faction')){
       this.factionId = this.template.getFieldByLabel('Faction').getValue();
@@ -768,70 +635,49 @@ export class ModulePlaceable extends ModuleObject {
     }
     this.faction = GameState.FactionManager.factions.get(this.factionId);
 
-    if(this.template.RootNode.hasField('Fort'))
-      this.fort = this.template.getFieldByLabel('Fort').getValue();
+    this.fort = this.template.RootNode.get('Fort', this.fort);
         
-    if(this.template.RootNode.hasField('HP'))
-      this.hp = this.template.RootNode.getFieldByLabel('HP').getValue();
+    this.hp = this.template.RootNode.get('HP', this.hp);
 
-    if(this.template.RootNode.hasField('Hardness'))
-      this.hardness = this.template.RootNode.getFieldByLabel('Hardness').getValue();
+    this.hardness = this.template.RootNode.get('Hardness', this.hardness);
     
-    if(this.template.RootNode.hasField('HasInventory'))
-      this.hasInventory = this.template.RootNode.getFieldByLabel('HasInventory').getValue();
+    this.hasInventory = this.template.RootNode.get('HasInventory', this.hasInventory);
 
-    if(this.template.RootNode.hasField('Interruptable'))
-      this.interruptable = this.template.RootNode.getFieldByLabel('Interruptable').getValue();
+    this.interruptable = this.template.RootNode.get('Interruptable', this.interruptable);
         
-    if(this.template.RootNode.hasField('KeyName'))
-      this.keyName = this.template.RootNode.getFieldByLabel('KeyName').getValue();
+    this.keyName = this.template.RootNode.get('KeyName', this.keyName);
   
-    if(this.template.RootNode.hasField('KeyRequired'))
-      this.keyRequired = this.template.RootNode.getFieldByLabel('KeyRequired').getValue();
+    this.keyRequired = this.template.RootNode.get('KeyRequired', this.keyRequired);
 
     if(this.template.RootNode.hasField('LocName'))
       this.locName = this.template.getFieldByLabel('LocName').getCExoLocString();
 
-    if(this.template.RootNode.hasField('Locked'))
-      this.locked = this.template.getFieldByLabel('Locked').getValue();
+    this.locked = this.template.RootNode.get('Locked', this.locked);
 
-    if(this.template.RootNode.hasField('Min1HP'))
-      this.min1HP = this.template.getFieldByLabel('Min1HP').getValue();
+    this.min1HP = this.template.RootNode.get('Min1HP', this.min1HP);
 
-    if(this.template.RootNode.hasField('OpenLockDC'))
-      this.openLockDC = this.template.getFieldByLabel('OpenLockDC').getValue();
+    this.openLockDC = this.template.RootNode.get('OpenLockDC', this.openLockDC);
 
-    if(this.template.RootNode.hasField('PaletteID'))
-      this.paletteID = this.template.getFieldByLabel('PaletteID').getValue();
+    this.paletteID = this.template.RootNode.get('PaletteID', this.paletteID);
 
-    if(this.template.RootNode.hasField('Plot'))
-      this.plot = this.template.getFieldByLabel('Plot').getValue();
+    this.plot = this.template.RootNode.get('Plot', this.plot);
 
-    if(this.template.RootNode.hasField('PartyInteract'))
-      this.partyInteract = this.template.getFieldByLabel('PartyInteract').getValue();
+    this.partyInteract = this.template.RootNode.get('PartyInteract', this.partyInteract);
 
-    if(this.template.RootNode.hasField('Plot'))
-      this.plot = this.template.getFieldByLabel('Plot').getValue();
+    this.plot = this.template.RootNode.get('Plot', this.plot);
 
     if(this.template.RootNode.hasField('PortraidId')){
       this.portraitId = this.template.getFieldByLabel('PortraidId').getValue();
       this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
     }
 
-    if(this.template.RootNode.hasField('Ref'))
-      this.ref = this.template.getFieldByLabel('Ref').getValue();
+    this.ref = this.template.RootNode.get('Ref', this.ref);
 
-    if(this.template.RootNode.hasField('Static'))
-      this.static = this.template.getFieldByLabel('Static').getValue();
+    this.static = this.template.RootNode.get('Static', this.static);
 
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue();
+    this.initCommonProperties();
 
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
-
-    if(this.template.RootNode.hasField('TrapDetectDC'))
-      this.trapDetectDC = this.template.getFieldByLabel('TrapDetectDC').getValue();
+    this.trapDetectDC = this.template.RootNode.get('TrapDetectDC', this.trapDetectDC);
   
     if(this.template.RootNode.hasField('TrapDetectable'))
       this.trapDetectable = !!this.template.RootNode.getFieldByLabel('TrapDetectable').getValue();
@@ -845,35 +691,23 @@ export class ModulePlaceable extends ModuleObject {
     if(this.template.RootNode.hasField('TrapOneShot'))
       this.trapOneShot = !!this.template.getFieldByLabel('TrapOneShot').getValue();
 
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
+    this.trapType = this.template.RootNode.get('TrapType', this.trapType);
 
-    if(this.template.RootNode.hasField('TrapType'))
-      this.trapType = this.template.getFieldByLabel('TrapType').getValue();
+    this.useable = this.template.RootNode.get('Useable', this.useable);
 
-    if(this.template.RootNode.hasField('Useable'))
-      this.useable = this.template.getFieldByLabel('Useable').getValue();
+    this.will = this.template.RootNode.get('Will', this.will);
 
-    if(this.template.RootNode.hasField('Will'))
-      this.will = this.template.getFieldByLabel('Will').getValue();
+    this.position.x = this.template.RootNode.get('X', this.position.x);
 
-    if(this.template.RootNode.hasField('X'))
-      this.position.x = this.template.RootNode.getFieldByLabel('X').getValue();
+    this.position.y = this.template.RootNode.get('Y', this.position.y);
 
-    if(this.template.RootNode.hasField('Y'))
-      this.position.y = this.template.RootNode.getFieldByLabel('Y').getValue();
+    this.position.z = this.template.RootNode.get('Z', this.position.z);
 
-    if(this.template.RootNode.hasField('Z'))
-      this.position.z = this.template.RootNode.getFieldByLabel('Z').getValue();
-
-    if(this.template.RootNode.hasField('Bearing'))
-      this.bearing = this.template.RootNode.getFieldByLabel('Bearing').getValue();
+    this.bearing = this.template.RootNode.get('Bearing', this.bearing);
     
-    if(this.template.RootNode.hasField('TweakColor'))
-      this.tweakColor = this.template.getFieldByLabel('TweakColor').getValue();
+    this.tweakColor = this.template.RootNode.get('TweakColor', this.tweakColor);
     
-    if(this.template.RootNode.hasField('UseTweakColor'))
-      this.useTweakColor = this.template.getFieldByLabel('UseTweakColor').getValue();
+    this.useTweakColor = this.template.RootNode.get('UseTweakColor', this.useTweakColor);
 
     if(this.template.RootNode.hasField('NotBlastable'))
       this.notBlastable = !!this.template.getFieldByLabel('NotBlastable').getValue();
@@ -928,18 +762,18 @@ export class ModulePlaceable extends ModuleObject {
     gff.FileType = 'UTP ';
 
     const actionList = gff.RootNode.addField( this.actionQueueToActionList() );
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'Animation') ).setValue(this.animState);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Appearance') ).setValue(this.appearance);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'AutoRemoveKey') ).setValue(this.autoRemoveKey);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Bearing') ).setValue(this.bearing);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') ).setValue(this.bodyBag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'CloseLockDC') ).setValue(this.closeLockDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Commandable') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Conversation') ).setValue(this.conversation ? this.conversation.resref : '');
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentHP') ).setValue(this.currentHP);
+    gff.RootNode.addInt('Animation', this.animState);
+    gff.RootNode.addDWord('Appearance', this.appearance);
+    gff.RootNode.addByte('AutoRemoveKey', this.autoRemoveKey);
+    gff.RootNode.addFloat('Bearing', this.bearing);
+    gff.RootNode.addByte('BodyBag', this.bodyBag);
+    gff.RootNode.addByte('CloseLockDC', this.closeLockDC);
+    gff.RootNode.addByte('Commandable', 0);
+    gff.RootNode.addRESREF('Conversation', this.conversation ? this.conversation.resref : '');
+    gff.RootNode.addShort('CurrentHP', this.currentHP);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') ).setValue('');
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DieWhenEmpty') ).setValue( this.isBodyBag ? 1 : 0 );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DisarmDC') ).setValue(this.disarmDC);
+    gff.RootNode.addByte('DieWhenEmpty',  this.isBodyBag ? 1 : 0 );
+    gff.RootNode.addByte('DisarmDC', this.disarmDC);
 
     //Effects
     const effectList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'EffectList') );
@@ -947,15 +781,15 @@ export class ModulePlaceable extends ModuleObject {
       effectList.addChildStruct( this.effects[i].save() );
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Faction') ).setValue(this.faction ? this.faction.id : this.factionId);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Fort') ).setValue(this.fort);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GroundPile') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'HP') ).setValue(this.hp);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Hardness') ).setValue(this.hardness);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'HasInventory') ).setValue(this.hasInventory ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsBodyBag') ).setValue(this.isBodyBag ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsBodyBagVisible') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsCorpse') ).setValue(0);
+    gff.RootNode.addDWord('Faction', this.faction ? this.faction.id : this.factionId);
+    gff.RootNode.addByte('Fort', this.fort);
+    gff.RootNode.addByte('GroundPile', 0);
+    gff.RootNode.addShort('HP', this.hp);
+    gff.RootNode.addByte('Hardness', this.hardness);
+    gff.RootNode.addByte('HasInventory', this.hasInventory ? 1 : 0);
+    gff.RootNode.addByte('IsBodyBag', this.isBodyBag ? 1 : 0);
+    gff.RootNode.addByte('IsBodyBagVisible', 1);
+    gff.RootNode.addByte('IsCorpse', 0);
 
     const itemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ItemList') );
     //Object Inventory
@@ -966,57 +800,43 @@ export class ModulePlaceable extends ModuleObject {
       }
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'KeyName') ).setValue(this.keyName);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'KeyRequired') ).setValue(this.keyRequired);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'LightState') ).setValue(this.lightState ? 1 : 0);
+    gff.RootNode.addCExoString('KeyName', this.keyName);
+    gff.RootNode.addByte('KeyRequired', this.keyRequired);
+    gff.RootNode.addByte('LightState', this.lightState ? 1 : 0);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName') ).setValue(this.locName);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Lockable') ).setValue(this.lockable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Locked') ).setValue(this.locked);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Min1HP') ).setValue(this.min1HP);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    gff.RootNode.addByte('Lockable', this.lockable);
+    gff.RootNode.addByte('Locked', this.locked);
+    gff.RootNode.addByte('Min1HP', this.min1HP);
+    gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnClosed) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnClosed]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnDamaged) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnDamaged]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnDeath) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnDeath]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnDisarm) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnDisarm]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnEndDialogue) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnEndDialogue]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnHeartbeat) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnHeartbeat]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnInvDisturbed) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnInvDisturbed]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnLock) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnLock]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnMeleeAttacked) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnMeleeAttacked]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnOpen) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnOpen]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnSpellCastAt) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnSpellCastAt]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnTrapTriggered) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnTrapTriggered]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnUnlock) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnUnlock]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnUsed) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnUsed]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.PlaceableOnUserDefined) ).setValue(this.scripts[ModuleObjectScript.PlaceableOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
     
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Open') ).setValue(this.isOpen() ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'OpenLockDC') ).setValue(this.openLockDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PartyInteract') ).setValue(this.partyInteract);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') ).setValue(this.plot);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') ).setValue(this.portraitId);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Ref') ).setValue(this.ref);
+    gff.RootNode.addByte('Open', this.isOpen() ? 1 : 0);
+    gff.RootNode.addByte('OpenLockDC', this.openLockDC);
+    gff.RootNode.addByte('PartyInteract', this.partyInteract);
+    gff.RootNode.addByte('Plot', this.plot);
+    gff.RootNode.addWord('PortraitId', this.portraitId);
+    gff.RootNode.addByte('Ref', this.ref);
 
     //SWVarTable
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Static') ).setValue(this.static);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectDC') ).setValue(this.trapDetectDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectable') ).setValue(this.trapDetectable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDisarmable') ).setValue(this.trapDisarmable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapFlag') ).setValue(this.trapFlag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapOneShot') ).setValue(this.trapOneShot);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapType') ).setValue(this.trapType);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Useable') ).setValue(this.useable);
+    gff.RootNode.addByte('Static', this.static);
+    gff.RootNode.addCExoString('Tag', this.tag);
+    gff.RootNode.addByte('TrapDetectDC', this.trapDetectDC);
+    gff.RootNode.addByte('TrapDetectable', this.trapDetectable);
+    gff.RootNode.addByte('TrapDisarmable', this.trapDisarmable);
+    gff.RootNode.addByte('TrapFlag', this.trapFlag);
+    gff.RootNode.addByte('TrapOneShot', this.trapOneShot);
+    gff.RootNode.addByte('TrapType', this.trapType);
+    gff.RootNode.addByte('Useable', this.useable);
     gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Will') ).setValue(this.will);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'X') ).setValue(this.position.x);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Y') ).setValue(this.position.y);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Z') ).setValue(this.position.z);
+    gff.RootNode.addByte('Will', this.will);
+    gff.RootNode.addFloat('X', this.position.x);
+    gff.RootNode.addFloat('Y', this.position.y);
+    gff.RootNode.addFloat('Z', this.position.z);
 
     this.template = gff;
     return gff;
@@ -1147,4 +967,8 @@ export class ModulePlaceable extends ModuleObject {
     return placeable;
   }
 
+}
+
+export interface ModulePlaceable {
+  gmSpawnConfig?: GMPlaceableSpawnConfig;
 }

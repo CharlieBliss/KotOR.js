@@ -69,23 +69,8 @@ export class ModuleWaypoint extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utw'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-      }else{
-        console.error('Failed to load ModuleWaypoint template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-    }
+    this.mergeTemplate(ResourceTypes['utw']);
+    this.initProperties();
   }
 
   save(){
@@ -94,38 +79,38 @@ export class ModuleWaypoint extends ModuleObject {
     gff.RootNode.type = 5;
 
     gff.RootNode.addField( this.actionQueueToActionList() );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE,  'Commandable') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE,  'HasMapNote') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'LocalizedName') ).setValue(this.locName);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    gff.RootNode.addByte('Commandable', 1);
+    gff.RootNode.addByte('HasMapNote', 1);
+    gff.RootNode.addFloat('LocalizedName', this.locName);
+    gff.RootNode.addDWord('ObjectId', this.id);
 
     //SWVarTable
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
+    gff.RootNode.addCExoString('Tag', this.tag);
     gff.RootNode.addField( new GFFField(GFFDataType.LIST,  'VarTable') );
     
     if(this.template.RootNode.hasField('XOrientation')){
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue(this.template.RootNode.getFieldByLabel('XOrientation').getValue());
+      gff.RootNode.addFloat('XOrientation', this.template.RootNode.getFieldByLabel('XOrientation').getValue());
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue(0);
+      gff.RootNode.addFloat('XOrientation', 0);
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue(this.position.x);
+    gff.RootNode.addFloat('XPosition', this.position.x);
     
     if(this.template.RootNode.hasField('YOrientation')){
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue(this.template.RootNode.getFieldByLabel('YOrientation').getValue());
+      gff.RootNode.addFloat('YOrientation', this.template.RootNode.getFieldByLabel('YOrientation').getValue());
     }else{
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue(0);
+      gff.RootNode.addFloat('YOrientation', 0);
     }
     
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue(this.position.y);
+    gff.RootNode.addFloat('YPosition', this.position.y);
     
     if(this.template.RootNode.hasField('ZOrientation'))
-      gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue(this.template.RootNode.getFieldByLabel('ZOrientation').getValue());
+      gff.RootNode.addFloat('ZOrientation', this.template.RootNode.getFieldByLabel('ZOrientation').getValue());
     
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue(this.position.z);
+    gff.RootNode.addFloat('ZPosition', this.position.z);
 
     this.template = gff;
     return gff;

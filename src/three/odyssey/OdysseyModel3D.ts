@@ -1194,7 +1194,7 @@ export class OdysseyModel3D extends OdysseyObject3D {
         resolve(odysseyModel);
       }else{
         if(typeof _options.onComplete === 'function') _options.onComplete();
-        reject('model is not of type OdysseyModel');
+        resolve(new OdysseyModel3D());
       }
     });
 

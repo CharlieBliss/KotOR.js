@@ -20,10 +20,10 @@ export class EncounterSpawnPointEntry{
   save(){
     let struct = new GFFStruct();
 
-    struct.addField( new GFFField(GFFDataType.FLOAT, 'X') ).setValue(this.position.x);
-    struct.addField( new GFFField(GFFDataType.FLOAT, 'Y') ).setValue(this.position.y);
-    struct.addField( new GFFField(GFFDataType.FLOAT, 'Z') ).setValue(this.position.z);
-    struct.addField( new GFFField(GFFDataType.FLOAT, 'Orientation') ).setValue(this.orientation);
+    struct.addFloat('X', this.position.x);
+    struct.addFloat('Y', this.position.y);
+    struct.addFloat('Z', this.position.z);
+    struct.addFloat('Orientation', this.orientation);
 
     return struct;
   }
@@ -31,17 +31,13 @@ export class EncounterSpawnPointEntry{
   static FromStruct( struct: GFFStruct ){
     if(struct instanceof GFFStruct){
       let entry = new EncounterSpawnPointEntry();
-      if(struct.hasField('X'))
-        entry.position.x = struct.getFieldByLabel('X').getValue();
+      entry.position.x = struct.get('X', entry.position.x);
 
-      if(struct.hasField('Y'))
-        entry.position.y = struct.getFieldByLabel('Y').getValue();
+      entry.position.y = struct.get('Y', entry.position.y);
 
-      if(struct.hasField('Z'))
-        entry.position.z = struct.getFieldByLabel('Z').getValue();
+      entry.position.z = struct.get('Z', entry.position.z);
   
-      if(struct.hasField('Orientation'))
-        entry.orientation = struct.getFieldByLabel('Orientation').getValue();
+      entry.orientation = struct.get('Orientation', entry.orientation);
 
       return entry;
     }

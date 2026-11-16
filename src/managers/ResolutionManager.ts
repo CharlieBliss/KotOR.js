@@ -12,6 +12,17 @@ import { IScreenResolution } from "@/interface/graphics/IScreenResolution";
 export class ResolutionManager {
 
   public static vpScaleFactor: number = 1;
+
+  /**
+   * How much bigger the game's GUI (menus, the HUD) is drawn than its 800x600 layout's pixels. The GUI is laid
+   * out in its own screen (getGUIWidth / getGUIHeight: the viewport divided by this) and the GUI camera spreads
+   * that across the viewport, so on a large screen the HUD isn't left tiny. 'auto' (uiScaleSetting) is 1 up to
+   * a 1080-pixel-tall view and grows in quarter steps above it.
+   */
+  public static uiScale: number = 1;
+  public static uiScaleSetting: 'auto' | number = ResolutionManager.readUIScaleSetting();
+  static UI_SCALE_KEY = 'kotorjs.uiScale';
+  static UI_SCALE_BASE_HEIGHT = 1080;
   public static hpScaleFactor: number = 1;
 
   public static windowResolution: {width: number; height: number;} = {
@@ -153,11 +164,52 @@ export class ResolutionManager {
     return this.windowResolution.height;
   }
 
+  static readUIScaleSetting(): 'auto' | number {
+    try {
+      const raw = globalThis.localStorage?.getItem('kotorjs.uiScale');
+      const n = Number(raw);
+      return raw && Number.isFinite(n) && n >= 0.5 && n <= 4 ? n : 'auto';
+    } catch (e) {
+      return 'auto';
+    }
+  }
+
+  /** Choose the GUI's scale: a number (0.5 - 4), or 'auto'. Remembered in this browser. */
+  static setUIScale(setting: 'auto' | number){
+    this.uiScaleSetting = setting === 'auto' ? 'auto' : Math.max(0.5, Math.min(4, Number(setting) || 1));
+    try { globalThis.localStorage?.setItem(this.UI_SCALE_KEY, String(this.uiScaleSetting)); } catch (e) {}
+    globalThis.dispatchEvent?.(new Event('resize'));
+  }
+
+  /** The scale 'auto' picks for a view this tall */
+  static autoUIScale(height: number): number {
+    return Math.max(1, Math.floor((height / this.UI_SCALE_BASE_HEIGHT) * 4) / 4);
+  }
+
+  /** The GUI's screen: the viewport in GUI pixels (see uiScale) */
+  static getGUIWidth(): number {
+    return this.getViewportWidth() / this.uiScale;
+  }
+
+  static getGUIHeight(): number {
+    return this.getViewportHeight() / this.uiScale;
+  }
+
+  static getGUIWidthScaled(): number {
+    return this.getViewportWidthScaled() / this.uiScale;
+  }
+
+  static getGUIHeightScaled(): number {
+    return this.getViewportHeightScaled() / this.uiScale;
+  }
+
   static recalculate(): void {
     const hostW = this.getHostWidth();
     const hostH = this.getHostHeight();
     this.windowResolution.width = hostW;
     this.windowResolution.height = hostH;
+    // An embedded view (Forge's preview) keeps its GUI at 1:1
+    this.uiScale = this.viewportHost ? 1 : (this.uiScaleSetting === 'auto' ? this.autoUIScale(this.getViewportHeight()) : this.uiScaleSetting);
 
     const scaleX = hostW / this.getViewportWidth();
     const scaleY = hostH / this.getViewportHeight();

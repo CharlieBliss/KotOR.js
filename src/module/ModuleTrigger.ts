@@ -14,6 +14,7 @@ import { EngineMode } from "@/enums/engine/EngineMode";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ActionParameterType, ModuleDoorAnimState, ModuleObjectConstant, SignalEventType } from "@/enums";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
+import { NWScript } from "@/nwscript/NWScript";
 
 
 const OBJECTS_INSIDE_UPDATE_THRESHOLD = 15; // 15 frame ticks
@@ -71,6 +72,67 @@ export class ModuleTrigger extends ModuleObject {
     this.container.add(this.reticleNode);
     this.reticleNode.position.z = this.highlightHeight;
 
+  }
+
+  /** The traps.2da row for this mine */
+  getTrapRow(): any {
+    return GameState.TwoDAManager.datatables.get('traps')?.rows[this.trapType];
+  }
+
+  /**
+   * Demolitions DCs, as the skill's description gives them: setting a mine takes its set DC (15 / 20 / 25),
+   * disarming it +5, recovering it +10. A mine placed with its own disarm DC keeps it.
+   */
+  getSetDC(): number {
+    return parseInt(this.getTrapRow()?.setdc) || 15;
+  }
+
+  getDisarmDC(): number {
+    return Number(this.trapDisarmDC) > 0 ? Number(this.trapDisarmDC) : this.getSetDC() + 5;
+  }
+
+  getRecoverDC(): number {
+    return this.getDisarmDC() + 5;
+  }
+
+  /**
+   * Lay a mine (a traps.2da row) on the ground: a small trap trigger owned by the setter's faction, so it goes
+   * off under their enemies. Its own side knows where it is.
+   */
+  static CreateMine(area: any, position: THREE.Vector3, trapType: number, owner: ModuleObject | undefined, factionId?: number): ModuleTrigger | undefined {
+    const row = GameState.TwoDAManager.datatables.get('traps')?.rows[trapType];
+    if(!row || !area) return undefined;
+    const trigger = new ModuleTrigger();
+    trigger.initialized = true;
+    trigger.type = ModuleTriggerType.TRAP;
+    trigger.trapType = trapType;
+    trigger.factionId = factionId ?? owner?.factionId ?? 1;
+    trigger.faction = GameState.FactionManager.factions.get(trigger.factionId);
+    trigger.setByPlayerParty = owner && (owner as any).isPartyMember?.() ? 1 : 0;
+    trigger.trapOneShot = true;
+    trigger.trapDetectable = true;
+    trigger.trapDisarmable = true;
+    const setterSkill = owner ? ((owner as any).getSkillLevel?.(1) || 0) : 0;
+    // Spotting someone else's mine: its detect DC, plus how well it was hidden
+    trigger.trapDetectDC = (parseInt(row.detectdcmod) || 20) + setterSkill;
+    trigger.trapDisarmDC = (parseInt(row.setdc) || 15) + 5;
+    trigger.trapDetected = !!owner;
+    trigger.position.copy(position);
+    trigger.vertices = [
+      new THREE.Vector3(-1, -1, 0), new THREE.Vector3(1, -1, 0),
+      new THREE.Vector3(1, 1, 0), new THREE.Vector3(-1, 1, 0),
+    ];
+    if(row.trapscript && row.trapscript !== '****'){
+      const script = NWScript.Load(row.trapscript);
+      if(script){
+        script.caller = trigger;
+        trigger.scripts[ModuleObjectScript.TriggerOnTrapTriggered] = script;
+      }
+    }
+    area.attachObject(trigger);
+    trigger.load();
+    GameState.hooks.onMineChanged(trigger);
+    return trigger;
   }
 
   getReticleNode(){
@@ -154,42 +216,18 @@ export class ModuleTrigger extends ModuleObject {
     return trigGeom;
   }
 
-  load( onLoad?: Function ){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utt'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadScripts()
-        this.buildGeometry();
-        this.initObjectsInside();
-        this.loadTrap();
-      }else{
-        console.error('Failed to load ModuleTrigger template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-          this.buildGeometry();
-          this.initObjectsInside();
-          this.loadTrap();
-        }
-      }
-
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts()
-      this.buildGeometry();
-      this.initObjectsInside();
-      this.loadTrap();
-    }
+  load(){
+    this.mergeTemplate(ResourceTypes['utt']);
+    this.initProperties();
+    this.loadScripts();
+    this.buildGeometry();
+    this.initObjectsInside();
+    this.loadTrap();
   }
 
   loadTrap(){
-    if(this.type == 2 && this.trapModelResRef && this.trapModelResRef != '***'){
-      MDLLoader.loader.load(this.trapModelResRef).then( (trapMDL) => {
+    if(this.type == 2 && this.trapModelResRef && this.trapModelResRef != '***' && this.trapModelResRef != '****'){
+      MDLLoader.loader.load(this.trapModelResRef).then( (trapMDL) => { if(!trapMDL) return;
         OdysseyModel3D.FromMDL(trapMDL, {
           context: this.context,
           castShadow: false,
@@ -199,9 +237,9 @@ export class ModuleTrigger extends ModuleObject {
           this.trapModel = model;
           this.container.add(model);
           if(this.trapDetected){
-            this.model.playAnimation('detect', false);
+            this.trapModel?.playAnimation('detect', false);
           }else{
-            this.model.playAnimation('default', false);
+            this.trapModel?.playAnimation('default', false);
           }
         });
       });
@@ -249,11 +287,12 @@ export class ModuleTrigger extends ModuleObject {
   detectTrap(){
     if(this.trapDetected){ return; }
     this.trapDetected = true;
+    GameState.hooks.onMineChanged(this);
 
     if(this.trapDetected){
-      this.model.playAnimation('detect', false);
+      this.trapModel?.playAnimation('detect', false);
     }else{
-      this.model.playAnimation('default', false);
+      this.trapModel?.playAnimation('default', false);
     }
   }
 
@@ -446,6 +485,7 @@ export class ModuleTrigger extends ModuleObject {
     if(!object){ return; }
     console.log('ModuleTrigger.onEnter', this.type,  this.getTag());
     if(this.type == ModuleTriggerType.TRAP && !this.trapTriggered){
+      if(GameState.hooks.isMineReplica(this)){ return; }
       if(object.isHostile(this)){
         this.trapTriggered = true;
         console.log('ModuleTrigger.onEnter', 'Trap Triggered')
@@ -456,6 +496,10 @@ export class ModuleTrigger extends ModuleObject {
         event.setTime(GameState.module.timeManager.pauseTime);
         event.eventType = SignalEventType.OnTrapTriggered;
         GameState.module.addEvent(event);
+        // A mine is used up when it goes off: take it away once its script has run
+        if(this.trapOneShot !== false){
+          setTimeout(() => { if(this.area) this.destroy(); }, 1500);
+        }
       }
     }else if(this.linkedToModule && (GameState.Mode != EngineMode.DIALOG)){
       if(object == GameState.getCurrentPlayer()){
@@ -486,31 +530,15 @@ export class ModuleTrigger extends ModuleObject {
     GameState.module.addEvent(event);
   }
 
-  loadScripts(){
-    const scriptKeys = [
-      ModuleObjectScript.TriggerOnClick,
-      ModuleObjectScript.TriggerOnDisarm,
-      ModuleObjectScript.TriggerOnTrapTriggered,
-      ModuleObjectScript.TriggerOnHeartbeat,
-      ModuleObjectScript.TriggerOnEnter,
-      ModuleObjectScript.TriggerOnExit,
-      ModuleObjectScript.TriggerOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ continue; }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.TriggerOnClick,
+    ModuleObjectScript.TriggerOnDisarm,
+    ModuleObjectScript.TriggerOnTrapTriggered,
+    ModuleObjectScript.TriggerOnHeartbeat,
+    ModuleObjectScript.TriggerOnEnter,
+    ModuleObjectScript.TriggerOnExit,
+    ModuleObjectScript.TriggerOnUserDefined,
+  ];
 
   initProperties(){
     
@@ -524,14 +552,11 @@ export class ModuleTrigger extends ModuleObject {
       GameState.ModuleObjectManager.AddObjectById(this);
     }
 
-    if(this.template.RootNode.hasField('AutoRemoveKey'))
-      this.autoRemoveKey = this.template.getFieldByLabel('AutoRemoveKey').getValue();
+    this.autoRemoveKey = this.template.RootNode.get('AutoRemoveKey', this.autoRemoveKey);
 
-    if(this.template.RootNode.hasField('Commandable'))
-      this.commandable = this.template.getFieldByLabel('Commandable').getValue();
+    this.commandable = this.template.RootNode.get('Commandable', this.commandable);
 
-    if(this.template.RootNode.hasField('Cursor'))
-      this.cursor = this.template.getFieldByLabel('Cursor').getValue();
+    this.cursor = this.template.RootNode.get('Cursor', this.cursor);
 
     if(this.template.RootNode.hasField('Faction')){
       this.factionId = this.template.getFieldByLabel('Faction').getValue();
@@ -555,23 +580,17 @@ export class ModuleTrigger extends ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('HighlightHeight'))
-      this.highlightHeight = this.template.getFieldByLabel('HighlightHeight').getValue();
+    this.highlightHeight = this.template.RootNode.get('HighlightHeight', this.highlightHeight);
 
-    if(this.template.RootNode.hasField('KeyName'))
-      this.keyName = this.template.getFieldByLabel('KeyName').getValue();
+    this.keyName = this.template.RootNode.get('KeyName', this.keyName);
 
-    if(this.template.RootNode.hasField('LinkedTo'))
-      this.linkedTo = this.template.getFieldByLabel('LinkedTo').getValue();
+    this.linkedTo = this.template.RootNode.get('LinkedTo', this.linkedTo);
 
-    if(this.template.RootNode.hasField('LinkedToFlags'))
-      this.linkedToFlags = this.template.getFieldByLabel('LinkedToFlags').getValue();
+    this.linkedToFlags = this.template.RootNode.get('LinkedToFlags', this.linkedToFlags);
   
-    if(this.template.RootNode.hasField('LinkedToModule'))
-      this.linkedToModule = this.template.RootNode.getFieldByLabel('LinkedToModule').getValue();
+    this.linkedToModule = this.template.RootNode.get('LinkedToModule', this.linkedToModule);
         
-    if(this.template.RootNode.hasField('LoadScreenID'))
-      this.loadScreenID = this.template.getFieldByLabel('LoadScreenID').getValue();
+    this.loadScreenID = this.template.RootNode.get('LoadScreenID', this.loadScreenID);
 
     if(this.template.RootNode.hasField('LocalizedName'))
       this.localizedName = this.template.getFieldByLabel('LocalizedName').getCExoLocString();
@@ -581,60 +600,32 @@ export class ModuleTrigger extends ModuleObject {
       this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
     }
 
-    if(this.template.RootNode.hasField('SetByPlayerParty'))
-      this.setByPlayerParty = this.template.getFieldByLabel('SetByPlayerParty').getValue();
+    this.setByPlayerParty = this.template.RootNode.get('SetByPlayerParty', this.setByPlayerParty);
 
     if(this.setByPlayerParty){
       this.trapFlag = this.setByPlayerParty;
     }
 
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue();
-
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
+    this.initCommonProperties();
 
     if(this.template.RootNode.hasField('TransitionDestin'))
       this.transitionDestin = this.template.getFieldByLabel('TransitionDestin').getCExoLocString();
 
-    if(this.template.RootNode.hasField('TrapDetectable'))
-      this.trapDetectable = this.template.RootNode.getFieldByLabel('TrapDetectable').getValue();
+    this.trapDetectable = this.template.RootNode.get('TrapDetectable', this.trapDetectable);
 
-    if(this.template.RootNode.hasField('TrapDisarmable'))
-      this.trapDisarmable = this.template.RootNode.getFieldByLabel('TrapDisarmable').getValue();
+    this.trapDisarmable = this.template.RootNode.get('TrapDisarmable', this.trapDisarmable);
 
-    if(this.template.RootNode.hasField('TrapOneShot'))
-      this.trapOneShot = this.template.getFieldByLabel('TrapOneShot').getValue();
+    this.trapOneShot = this.template.RootNode.get('TrapOneShot', this.trapOneShot);
 
-    if(this.template.RootNode.hasField('TrapDetectDC'))
-      this.trapDetectDC = this.template.getFieldByLabel('TrapDetectDC').getValue();
+    this.trapDetectDC = this.template.RootNode.get('TrapDetectDC', this.trapDetectDC);
 
-    if(this.template.RootNode.hasField('TrapFlag'))
-      this.trapFlag = this.template.getFieldByLabel('TrapFlag').getValue();
+    this.trapFlag = this.template.RootNode.get('TrapFlag', this.trapFlag);
 
-    if(this.template.RootNode.hasField('TrapType'))
-      this.trapType = this.template.getFieldByLabel('TrapType').getValue();
+    this.trapDisarmDC = this.template.RootNode.get('TrapDisarmDC', this.trapDisarmDC);
 
-    if(this.template.RootNode.hasField('Type'))
-      this.type = this.template.getFieldByLabel('Type').getValue();
+    this.trapType = this.template.RootNode.get('TrapType', this.trapType);
 
-    if(this.template.RootNode.hasField('XPosition'))
-      this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
-
-    if(this.template.RootNode.hasField('YPosition'))
-      this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
-
-    if(this.template.RootNode.hasField('ZPosition'))
-      this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
-
-    if(this.template.RootNode.hasField('XOrientation'))
-      this.xOrientation = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
-
-    if(this.template.RootNode.hasField('YOrientation'))
-      this.yOrientation = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
-
-    if(this.template.RootNode.hasField('ZOrientation'))
-      this.zOrientation = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
+    this.type = this.template.RootNode.get('Type', this.type);
 
     if(this.template.RootNode.hasField('SWVarTable')){
       let localBools = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0].getFieldByLabel('BitArray').getChildStructs();
@@ -662,6 +653,7 @@ export class ModuleTrigger extends ModuleObject {
   }
 
   destroy(): void {
+    GameState.hooks.onMineRemoved(this);
     super.destroy();
 
     if(this.trapModel){
@@ -677,64 +669,57 @@ export class ModuleTrigger extends ModuleObject {
     gff.FileType = 'UTT ';
 
     let actionList = gff.RootNode.addField( this.actionQueueToActionList() );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'AutoRemoveKey') ).setValue(this.autoRemoveKey);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Commandable') ).setValue( this.commandable );
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'CreatorId') ).setValue(2130706432);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Cursor') ).setValue(this.cursor);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Faction') ).setValue(this.faction ? this.faction.id : this.factionId);
+    gff.RootNode.addByte('AutoRemoveKey', this.autoRemoveKey);
+    gff.RootNode.addByte('Commandable',  this.commandable );
+    gff.RootNode.addDWord('CreatorId', 2130706432);
+    gff.RootNode.addByte('Cursor', this.cursor);
+    gff.RootNode.addDWord('Faction', this.faction ? this.faction.id : this.factionId);
 
     let geometry = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'Geometry') );
     for(let i = 0; i < this.vertices.length; i++){
       let vertStruct = new GFFStruct();
-      vertStruct.addField( new GFFField(GFFDataType.FLOAT, 'PointX') ).setValue(this.vertices[i].x);
-      vertStruct.addField( new GFFField(GFFDataType.FLOAT, 'PointY') ).setValue(this.vertices[i].y);
-      vertStruct.addField( new GFFField(GFFDataType.FLOAT, 'PointZ') ).setValue(this.vertices[i].z);
+      vertStruct.addFloat('PointX', this.vertices[i].x);
+      vertStruct.addFloat('PointY', this.vertices[i].y);
+      vertStruct.addFloat('PointZ', this.vertices[i].z);
       geometry.addChildStruct(vertStruct);
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'HighlightHeight') ).setValue(this.highlightHeight);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'KeyName') ).setValue(this.keyName);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'LinkedTo') ).setValue(this.linkedTo);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'LinkedToFlags') ).setValue(this.linkedToFlags);
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'LinkedToModule') ).setValue(this.linkedToModule);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'LoadscreenID') ).setValue(this.loadScreenID);
+    gff.RootNode.addFloat('HighlightHeight', this.highlightHeight);
+    gff.RootNode.addCExoString('KeyName', this.keyName);
+    gff.RootNode.addCExoString('LinkedTo', this.linkedTo);
+    gff.RootNode.addByte('LinkedToFlags', this.linkedToFlags);
+    gff.RootNode.addRESREF('LinkedToModule', this.linkedToModule);
+    gff.RootNode.addWord('LoadscreenID', this.loadScreenID);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName') ).setValue(this.locName);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnClick) ).setValue(this.scripts[ModuleObjectScript.TriggerOnClick]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnDisarm) ).setValue(this.scripts[ModuleObjectScript.TriggerOnDisarm]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnTrapTriggered) ).setValue(this.scripts[ModuleObjectScript.TriggerOnTrapTriggered]?.name || '');
+    this.saveScripts(gff.RootNode);
     
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') ).setValue(this.portraitId);
+    gff.RootNode.addWord('PortraitId', this.portraitId);
 
     //SWVarTable
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
-    //Scripts
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnHeartbeat) ).setValue(this.scripts[ModuleObjectScript.TriggerOnHeartbeat]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnEnter) ).setValue(this.scripts[ModuleObjectScript.TriggerOnEnter]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnExit) ).setValue(this.scripts[ModuleObjectScript.TriggerOnExit]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.TriggerOnUserDefined) ).setValue(this.scripts[ModuleObjectScript.TriggerOnUserDefined]?.name || '');
 
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'SetByPartyPlayer') ).setValue(this.setByPlayerParty);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
+    gff.RootNode.addByte('SetByPartyPlayer', this.setByPlayerParty);
+    gff.RootNode.addCExoString('Tag', this.tag);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'TransitionDestin') ).setValue(this.transitionDestin);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectDC') ).setValue(this.trapDetectDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectable') ).setValue(this.trapDetectable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDisarmable') ).setValue(this.trapDisarmable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapFlag') ).setValue(this.trapFlag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapOneShot') ).setValue(this.trapOneShot);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapType') ).setValue(this.trapType);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Type') ).setValue(this.type);
+    gff.RootNode.addByte('TrapDetectDC', this.trapDetectDC);
+    gff.RootNode.addByte('TrapDetectable', this.trapDetectable);
+    gff.RootNode.addByte('TrapDisarmable', this.trapDisarmable);
+    gff.RootNode.addByte('TrapFlag', this.trapFlag);
+    gff.RootNode.addByte('TrapOneShot', this.trapOneShot);
+    gff.RootNode.addByte('TrapType', this.trapType);
+    gff.RootNode.addByte('Type', this.type);
     gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue(this.template.RootNode.getFieldByLabel('XOrientation').getValue());
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue(this.position.x);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue(this.template.RootNode.getFieldByLabel('YOrientation').getValue());
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue(this.position.y);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue(this.template.RootNode.getFieldByLabel('ZOrientation').getValue());
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue(this.position.z);
+    gff.RootNode.addFloat('XOrientation', this.template.RootNode.getFieldByLabel('XOrientation').getValue());
+    gff.RootNode.addFloat('XPosition', this.position.x);
+    gff.RootNode.addFloat('YOrientation', this.template.RootNode.getFieldByLabel('YOrientation').getValue());
+    gff.RootNode.addFloat('YPosition', this.position.y);
+    gff.RootNode.addFloat('ZOrientation', this.template.RootNode.getFieldByLabel('ZOrientation').getValue());
+    gff.RootNode.addFloat('ZPosition', this.position.z);
 
     this.template = gff;
     return gff;

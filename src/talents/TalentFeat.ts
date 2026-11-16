@@ -2,6 +2,7 @@ import { CombatRound } from "@/combat/CombatRound";
 import { type CreatureClass } from "@/combat/CreatureClass";
 import { EffectACDecrease, EffectAttackDecrease } from "@/effects";
 import { ModuleObjectType, TalentObjectType } from "@/enums";
+import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { GameEffectDurationType } from "@/enums/effects";
 import { GFFDataType } from "@/enums/resource/GFFDataType";
 import { TwoDAManager } from "@/managers/TwoDAManager";
@@ -11,8 +12,9 @@ import { GFFStruct } from "@/resource/GFFStruct";
 import { TwoDAObject } from "@/resource/TwoDAObject";
 import { BitWise } from "@/utility/BitWise";
 import { TalentObject } from "@/talents/TalentObject";
+import { GameState } from "@/GameState";
 
-const FEAT_PENALTY_DURATION = CombatRound.ROUND_LENGTH;
+const FEAT_PENALTY_DURATION = CombatRound.ROUND_LENGTH * 0.001;
 
 /**
  * TalentFeat class.
@@ -41,7 +43,7 @@ export class TalentFeat extends TalentObject {
   gainMultiple: number;
   effectsStack: number;
   allClassesCanUse: number;
-  spellId: number;
+  spellId: number = -1;
   successor: number;
   crValue: number;
   usesPerDay: number;
@@ -122,8 +124,9 @@ export class TalentFeat extends TalentObject {
     this.objectType = TalentObjectType.TalentObject | TalentObjectType.TalentFeat;
 
     //Merge the feat properties from the feat.2da row with this feat
-    if(TwoDAManager.datatables.get('feat').rows[this.id]){
-      this.apply2DA(TwoDAManager.datatables.get('feat').rows[this.id]);
+    const featTable = TwoDAManager.datatables?.get('feat');
+    if(featTable && featTable.rows && featTable.rows[this.id]){
+      this.apply2DA(featTable.rows[this.id]);
     }
 
   }
@@ -131,8 +134,9 @@ export class TalentFeat extends TalentObject {
   setId( value = 0 ){
     this.id = value;
     //Merge the feat properties from the feat.2da row with this feat
-    if(TwoDAManager.datatables.get('feat').rows[this.id]){
-      this.apply2DA(TwoDAManager.datatables.get('feat').rows[this.id]);
+    const featTable = TwoDAManager.datatables?.get('feat');
+    if(featTable && featTable.rows && featTable.rows[this.id]){
+      this.apply2DA(featTable.rows[this.id]);
     }
   }
 
@@ -143,26 +147,19 @@ export class TalentFeat extends TalentObject {
     if(this.category == 0x1104){
       oCaster.attackCreature(oTarget, this);
       return;
-      // oCaster.actionQueue.add({
-      //   type: ActionType.ActionPhysicalAttacks,
-      //   object: oTarget,
-      //   feat: this.id
-      // });
-      // oCaster.combatData.lastCombatFeatUsed = this;
     }
 
     //RANGED
     if(this.category == 0x1111){
       oCaster.attackCreature(oTarget, this);
       return;
-      // oCaster.actionQueue.add({
-      //   type: ActionType.ActionPhysicalAttacks,
-      //   object: oTarget,
-      //   feat: this.id
-      // });
-      // oCaster.combatData.lastCombatFeatUsed = this;
     }
 
+    // Active spell-backed feats (e.g. Droid utilities, Wookiee Rage, Knight Valor, etc.)
+    if(typeof this.spellId === 'number' && this.spellId >= 0 && GameState.TalentSpell){
+      const spell = new GameState.TalentSpell(this.spellId);
+      spell.useTalentOnObject(oTarget, oCaster);
+    }
   }
 
   inRange(oTarget: ModuleObject, oCaster: ModuleObject){
@@ -201,18 +198,18 @@ export class TalentFeat extends TalentObject {
 
   getArmorClassPenalty(){
     switch(this.id){
-      case 11: //FLURRY
-      case 30: //RAPID SHOT
+      case CombatFeatType.FLURRY:
+      case CombatFeatType.RAPID_SHOT:
         return 4;
-      case 91: //IMPROVED FLURRY
-      case 92: //IMPROVED RAPID SHOT
+      case CombatFeatType.IMPROVED_FLURRY:
+      case CombatFeatType.IMPROVED_RAPID_SHOT:
         return 2;
-      case 51: //MASTER FLURRY
-      case 21: //MASTER RAPID SHOT
+      case CombatFeatType.MASTER_FLURRY:
+      case CombatFeatType.MASTER_RAPID_SHOT:
         return 1;
-      case 28: //CRITICAL STRIKE
-      case 19: //IMPROVED CRITICAL STRIKE
-      case 81: //MASTER CRITICAL STRIKE
+      case CombatFeatType.CRITICAL_STRIKE:
+      case CombatFeatType.IMPROVED_CRITICAL_STRIKE:
+      case CombatFeatType.MASTER_CRITICAL_STRIKE:
         return 5;
     }
     return 0;
@@ -220,26 +217,21 @@ export class TalentFeat extends TalentObject {
 
   getAttackPenalty(){
     switch(this.id){
-      case 11: //FLURRY
-      case 30: //RAPID SHOT
+      case CombatFeatType.FLURRY:
+      case CombatFeatType.RAPID_SHOT:
         return 4;
-      case 91: //IMPROVED FLURRY
-      case 92: //IMPROVED RAPID SHOT
+      case CombatFeatType.IMPROVED_FLURRY:
+      case CombatFeatType.IMPROVED_RAPID_SHOT:
         return 2;
-      case 51: //MASTER FLURRY
-      case 21: //MASTER RAPID SHOT
+      case CombatFeatType.MASTER_FLURRY:
+      case CombatFeatType.MASTER_RAPID_SHOT:
         return 1;
-      case 8: //POWER ATTACK
-        return 3;
-      case 17: //IMPROVED POWER ATTACK
-        return 3;
-      case 83: //MASTER POWER ATTACK
-        return 3;
-      case 29: //POWER BLAST
-        return 3;
-      case 18: //IMPROVED POWER BLAST
-        return 3;
-      case 82: //MASTER POWER BLAST
+      case CombatFeatType.POWER_ATTACK:
+      case CombatFeatType.IMPROVED_POWER_ATTACK:
+      case CombatFeatType.MASTER_POWER_ATTACK:
+      case CombatFeatType.POWER_BLAST:
+      case CombatFeatType.IMPROVED_POWER_BLAST:
+      case CombatFeatType.MASTER_POWER_BLAST:
         return 3;
     }
     return 0;
@@ -662,15 +654,17 @@ export class TalentFeat extends TalentObject {
       this.pips = TwoDAObject.normalizeValue(row.pips, 'number', -1);
   }
 
+  /** A feat from its feat.2da row (the row's __index is the feat's id) */
   static From2DA(row: any = {}) {
-    const talentFeat = new TalentFeat();
+    const id = Number(row?.__index);
+    const talentFeat = new TalentFeat(Number.isFinite(id) ? id : 0);
     talentFeat.apply2DA(row);
     return talentFeat;
   }
 
   save(){
     let featStruct = new GFFStruct(1);
-    featStruct.addField( new GFFField(GFFDataType.WORD, 'Feat') ).setValue(this.getId());
+    featStruct.addWord('Feat', this.getId());
     return featStruct;
   }
 

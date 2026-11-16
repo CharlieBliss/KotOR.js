@@ -7,7 +7,6 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
 import { GameState } from "@/GameState";
-// import { TalentSpell } from "@/talents/TalentSpell";
 import { BitWise } from "@/utility/BitWise";
 import type { ModuleObject } from "@/module/ModuleObject";
 
@@ -45,14 +44,13 @@ export class ActionCastSpell extends Action {
   }
 
   update(delta: number = 0): ActionStatus {
-    //console.log('ActionCastSpell', this);
-    this.target = this.getParameter<ModuleObject>(5);
-    this.spell = new GameState.TalentSpell( this.getParameter<number>(0));
+    this.target = this.getParameter<ModuleObject>(5) || this.owner?.combatRound?.action?.target || this.owner;
+    const spellId = this.getParameter<number>(0);
+    this.spell = this.owner?.combatRound?.action?.spell || new GameState.TalentSpell(spellId);
 
     if(this.spell){
-      if(!this.spell.inRange(this.target, this.owner)){
+      if(this.target && !this.spell.inRange(this.target, this.owner)){
 
-        // (this.owner as any).openSpot = undefined;
         let actionMoveToTarget = new GameState.ActionFactory.ActionMoveToPoint(this.groupId);
         actionMoveToTarget.setParameter(0, ActionParameterType.FLOAT, this.target.position.x);
         actionMoveToTarget.setParameter(1, ActionParameterType.FLOAT, this.target.position.y);
@@ -71,6 +69,9 @@ export class ActionCastSpell extends Action {
         if(BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)){
           this.owner.force = 0;
           this.owner.speed = 0;
+          if(this.target && this.target != this.owner){
+            this.owner.setFacingObject(this.target);
+          }
         }
 
         if(this.owner.combatRound){
@@ -80,12 +81,16 @@ export class ActionCastSpell extends Action {
             combatRound.beginCombatRound();
             combatRound.pauseRound(this.owner, combatRound.roundLength);
             if(combatRound.action){
-              combatRound.action.animation = ModuleCreatureAnimState.CASTOUT1;
+              combatRound.action.animation = this.target == this.owner ? ModuleCreatureAnimState.CASTOUT2 : ModuleCreatureAnimState.CASTOUT1;
             }
 
             if(combatRound.roundStarted){
-              const spellCastInstance = new SpellCastInstance(this.owner, combatRound.action.target, combatRound.action.spell);
-              this.owner.area.attachSpellInstance(spellCastInstance);
+              const spellTarget = combatRound.action?.target || this.target;
+              const spellTalent = combatRound.action?.spell || this.spell;
+              const spellCastInstance = new SpellCastInstance(this.owner, spellTarget, spellTalent);
+              if(this.owner.area && typeof this.owner.area.attachSpellInstance === 'function'){
+                this.owner.area.attachSpellInstance(spellCastInstance);
+              }
               spellCastInstance.init();
 
               return ActionStatus.COMPLETE;
@@ -94,7 +99,12 @@ export class ActionCastSpell extends Action {
           }
           return ActionStatus.IN_PROGRESS;
         }else{
-          return ActionStatus.FAILED;
+          const spellCastInstance = new SpellCastInstance(this.owner, this.target, this.spell);
+          if(this.owner?.area && typeof this.owner.area.attachSpellInstance === 'function'){
+            this.owner.area.attachSpellInstance(spellCastInstance);
+          }
+          spellCastInstance.init();
+          return ActionStatus.COMPLETE;
         }
       }
     }

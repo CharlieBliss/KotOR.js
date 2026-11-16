@@ -19,6 +19,7 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import { BitWise } from "@/utility/BitWise";
 import { CombatAttackData } from "@/combat/CombatAttackData";
 import type { CombatRoundAction } from "@/combat/CombatRoundAction";
+import type { TalentFeat } from "@/talents/TalentFeat";
 import { GameState } from "@/GameState";
 import { FeedbackMessageEntry } from "@/engine/FeedbackMessageEntry";
 import { FeebackMessageColor } from "@/enums/engine/FeedbackMessageColor";
@@ -137,6 +138,7 @@ export class CombatRound {
 
     this.onHandAttacks = owner.equipment.RIGHTHAND ? 1 : 0;
     this.additionalAttacks = 0;
+    this.effectAttacks = 0;
     this.offHandTaken = false;
     this.extraTaken = false;
 
@@ -149,12 +151,29 @@ export class CombatRound {
     combatData.lastSpellTarget = undefined;
     this.timer = 0;
 
+    // Grant extra attacks from active Haste or ModifyNumAttacks effects (e.g., Force Speed)
+    if(Array.isArray(owner.effects)){
+      for(const eff of owner.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectHaste){
+          this.additionalAttacks += 1;
+          this.effectAttacks += 1;
+        }else if(eff.type === GameEffectType.EffectModifyNumAttacks){
+          const extra = eff.getInt(0) || 0;
+          if(extra > 0){
+            this.additionalAttacks += extra;
+            this.effectAttacks += extra;
+          }
+        }
+      }
+    }
+
     if(this.action){
       const target = this.action.target;
-      const targetCombatRound = target.combatRound;
+      const targetCombatRound = target?.combatRound;
       if(this.action.actionType == CombatActionType.ATTACK){
         combatData.lastAttackTarget = target;
-        if(BitWise.InstanceOfObject(owner, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)){
+        if(target && targetCombatRound && BitWise.InstanceOfObject(owner, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)){
           if(owner.isDuelingObject(target)){
             this.engaged = true;
             if(!this.masterID && !targetCombatRound.masterID){
@@ -166,7 +185,7 @@ export class CombatRound {
               this.master = false;
             }
           }
-        }else if(BitWise.InstanceOfObject(owner, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleObject)){
+        }else if(target && targetCombatRound && BitWise.InstanceOfObject(owner, ModuleObjectType.ModuleCreature) && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleObject)){
           this.master = true;
           targetCombatRound.master = !this.master;
         }
@@ -176,8 +195,11 @@ export class CombatRound {
       ){
         this.spellCastRound = true;
       }else if(this.action.actionType == CombatActionType.ATTACK_USE_FEAT){
-        this.action.feat.impactCaster(owner);
-        this.action.feat.impactTarget(this.action.target);
+        combatData.lastAttackTarget = target;
+        if(this.action.feat){
+          this.action.feat.impactCaster(owner);
+          this.action.feat.impactTarget(this.action.target);
+        }
         switch(this.action.featId){
           case CombatFeatType.FLURRY:
           case CombatFeatType.IMPROVED_FLURRY:
@@ -185,7 +207,7 @@ export class CombatRound {
           case CombatFeatType.RAPID_SHOT:
           case CombatFeatType.IMPROVED_RAPID_SHOT:
           case CombatFeatType.MASTER_RAPID_SHOT:
-            if(owner.equipment.RIGHTHAND){
+            if(owner.equipment.RIGHTHAND || !owner.equipment.LEFTHAND){
               this.additionalAttacks += 1;
             }
           break;
@@ -244,7 +266,7 @@ export class CombatRound {
     this.deflectArrow = true;
     this.action = undefined;
     this.timer = 0;
-    for(let i = 0; i < 5; i++){
+    for(let i = 0; i < this.attackList.length; i++){
       this.attackList[i].reset();
     }
     this.owner.onCombatRoundEnd();
@@ -308,6 +330,10 @@ export class CombatRound {
    */
   addAction(action: CombatRoundAction){
     action.owner = this.owner;
+    if((this.owner as any)?.stealthMode){
+      (this.owner as any).setStealthMode(false);
+      (this.owner as any).sneakAttackFromStealth = true;
+    }
     this.scheduledActionList.push(action);
   }
 
@@ -357,6 +383,7 @@ export class CombatRound {
     for(let i = 0, len = this.scheduledActionList.length; i < len; i++){
       this.scheduledActionList[i].target = target;
     }
+    return true;
   }
 
   /**
@@ -368,7 +395,7 @@ export class CombatRound {
     if(!combatAction || combatAction.resultsCalculated)
       return;
 
-      creature.weaponPowered(true);
+    creature.weaponPowered(true);
 
     combatAction.resultsCalculated = true;
     const hasAssuredHit = creature.hasEffect(GameEffectType.EffectAssuredHit);
@@ -393,22 +420,38 @@ export class CombatRound {
         }
 
         /**
-         * Off Hand Attack
+         * Off Hand Attack (dual-wield or double-bladed weapon)
          */
         if(creature.equipment.LEFTHAND){
           this.calculateWeaponAttack(creature, creature.equipment.LEFTHAND, ModuleCreatureArmorSlot.LEFTHAND, combatAction);
+        }else if(creature.equipment.RIGHTHAND && this.isDoubleWeapon(creature.equipment.RIGHTHAND)){
+          this.calculateWeaponAttack(creature, creature.equipment.RIGHTHAND, ModuleCreatureArmorSlot.LEFTHAND, combatAction);
         }
 
         /**
-         * Additional Attacks
+         * Additional Attacks (Flurry, Rapid Shot, Force Speed / Haste)
          */
         if(this.additionalAttacks > 0){
           for(let i = 0; i < this.additionalAttacks; i++){
-            if(!creature.equipment.RIGHTHAND){ continue; }
+            if(!creature.equipment.RIGHTHAND && creature.equipment.LEFTHAND){ continue; }
             this.calculateWeaponAttack(creature, creature.equipment.RIGHTHAND, ModuleCreatureArmorSlot.RIGHTHAND, combatAction);
           }
         }
       }else if(creature && creature.isSimpleCreature()){
+        /**
+         * Simple-model creatures that hold a weapon and have no claws (war and assassin droids, Gamorreans)
+         * fight with what they hold
+         */
+        const hasClaws = !!(creature.equipment.CLAW1 || creature.equipment.CLAW2 || creature.equipment.CLAW3);
+        if(!hasClaws){
+          if(creature.equipment.RIGHTHAND){
+            this.calculateWeaponAttack(creature, creature.equipment.RIGHTHAND, ModuleCreatureArmorSlot.RIGHTHAND, combatAction);
+          }
+          if(creature.equipment.LEFTHAND){
+            this.calculateWeaponAttack(creature, creature.equipment.LEFTHAND, ModuleCreatureArmorSlot.LEFTHAND, combatAction);
+          }
+        }
+
         if(creature.equipment.CLAW1){
           this.calculateWeaponAttack(creature, creature.equipment.CLAW1, ModuleCreatureArmorSlot.CLAW1, combatAction);
         }
@@ -423,14 +466,19 @@ export class CombatRound {
       }
     }
 
-    combatAction.target.combatData.lastAttacker = creature;
+    if(combatAction.target){
+      combatAction.target.combatData.lastAttacker = creature;
+      combatAction.target.onAttacked(combatAction.actionType);
+    }
     creature.combatData.lastAttackResult = combatAction.attackResult;
-    combatAction.target.onAttacked(combatAction.actionType);
 
     this.calculateRoundAnimations(creature, combatAction);
 
-    let attackAnimation = creature.model.odysseyAnimationMap.get(combatAction.animationName.toLowerCase().trim());
+    const animName = (combatAction.animationName || '').toLowerCase().trim();
+    const attackAnimation = creature.model?.odysseyAnimationMap?.get(animName);
     let attackDamageDelay = attackAnimation?.getDamageDelay() || 0;
+
+    const targetCreature = (this.action?.target || combatAction.target) as ModuleCreature;
 
     if(combatAction.isCutsceneAttack){
       const attack = this.attackList[0];
@@ -442,9 +490,9 @@ export class CombatRound {
           attack.attackResult == AttackResult.AUTOMATIC_HIT
         ){
           attack.attackWeapon = creature.equipment.RIGHTHAND;
-          attack.attackResult = combatAction.attackResult
+          attack.attackResult = combatAction.attackResult;
           attack.damageList[DamageType.BASE].damageValue = combatAction.attackDamage;
-          attack.applyDamageEffectToCreature(creature, this.action.target as ModuleCreature);
+          attack.applyDamageEffectToCreature(creature, targetCreature);
         }
       }
     }else{
@@ -454,19 +502,112 @@ export class CombatRound {
         if(!attack)
           continue;
 
-        if(
+        const landed =
           attack.attackResult == AttackResult.HIT_SUCCESSFUL ||
           attack.attackResult == AttackResult.CRITICAL_HIT ||
-          attack.attackResult == AttackResult.AUTOMATIC_HIT
-        ){
-          attack.applyDamageEffectToCreature(creature, this.action.target as ModuleCreature);
-          TextSprite3D.CreateOnObject(this.action.target, attack.getTotalDamage().toString(), TextSprite3DType.HOSTILE, 1500);
+          attack.attackResult == AttackResult.AUTOMATIC_HIT;
+
+        // Ranged weapons show their shot: a blaster bolt that reaches the target, or flies past on a miss
+        if(targetCreature){
+          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || attack.attackResult == AttackResult.DEFLECTED, attackDamageDelay);
+        }
+
+        if(landed){
+          attack.applyDamageEffectToCreature(creature, targetCreature);
+          if(targetCreature){
+            TextSprite3D.CreateOnObject(targetCreature, attack.getTotalDamage().toString(), TextSprite3DType.HOSTILE, 1500);
+          }
         }else if(attack.attackResult == AttackResult.MISS){
-          TextSprite3D.CreateOnObject(this.action.target, 'miss', TextSprite3DType.NEUTRAL, 1500);
+          if(targetCreature){
+            TextSprite3D.CreateOnObject(targetCreature, 'miss', TextSprite3DType.NEUTRAL, 1500);
+          }
+        }else if(attack.attackResult == AttackResult.DEFLECTED){
+          if(targetCreature){
+            TextSprite3D.CreateOnObject(targetCreature, 'deflected', TextSprite3DType.NEUTRAL, 1500);
+          }
         }
       }
     }
 
+  }
+
+  /**
+   * Calculate the total attack bonus for the given creature and weapon
+   * @param creature - The creature to calculate the attack bonus for
+   * @param weapon - The weapon to calculate the attack bonus for
+   * @returns The attack bonus
+   */
+  calculateAttackBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
+    if(!creature) return 0;
+    let bonus = creature.getBaseAttackBonus() + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0);
+
+    // If weapon.possessor wasn't bound, check Weapon Focus directly on creature
+    if(weapon && weapon.possessor !== creature){
+      bonus += this.calculateWeaponFocusBonus(creature, weapon);
+    }
+
+    // Dueling feat bonus (+1 / +2 / +3 to attack when wielding single one-handed weapon or unarmed)
+    bonus += this.calculateDuelingBonus(creature);
+
+    // Active EffectAttackIncrease / EffectAttackDecrease (including feat attack penalties)
+    if(Array.isArray(creature.effects)){
+      for(const eff of creature.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectAttackIncrease){
+          bonus += (eff.getInt(0) || 0);
+        }else if(eff.type === GameEffectType.EffectAttackDecrease){
+          bonus -= (eff.getInt(0) || 0);
+        }
+      }
+    }
+
+    return bonus;
+  }
+
+  /**
+   * Calculate the Weapon Focus attack bonus for the given creature and weapon
+   */
+  calculateWeaponFocusBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
+    if(!creature || !weapon) return 0;
+    switch(weapon.getWeaponWield()){
+      case WeaponWield.BLASTER_PISTOL:
+        return creature.getHasFeat(CombatFeatType.WEAPON_FOCUS_BLASTER) ? 1 : 0;
+      case WeaponWield.BLASTER_RIFLE:
+        return creature.getHasFeat(CombatFeatType.WEAPON_FOCUS_BLASTER_RIFLE) ? 1 : 0;
+      case WeaponWield.BLASTER_HEAVY:
+        return creature.getHasFeat(CombatFeatType.WEAPON_FOCUS_HEAVY_WEAPONS) ? 1 : 0;
+      case WeaponWield.ONE_HANDED_SWORD:
+      case WeaponWield.TWO_HANDED_SWORD:
+      case WeaponWield.STUN_BATON:
+        if(weapon.baseItemId == 8 || weapon.baseItemId == 9 || weapon.baseItemId == 10){
+          return creature.getHasFeat(CombatFeatType.WEAPON_FOCUS_LIGHTSABER) ? 1 : 0;
+        }
+        return creature.getHasFeat(CombatFeatType.WEAPON_FOCUS_MELEE_WEAPONS) ? 1 : 0;
+    }
+    return 0;
+  }
+
+  /**
+   * Calculate the Dueling feat bonus (+1 / +2 / +3) if creature is using a single one-handed weapon or unarmed
+   */
+  calculateDuelingBonus(creature: ModuleCreature): number {
+    if(!creature || creature.isSimpleCreature()) return 0;
+    if(creature.equipment?.LEFTHAND) return 0;
+    const rightHand = creature.equipment?.RIGHTHAND;
+    if(rightHand){
+      const wield = rightHand.getWeaponWield();
+      if(
+        wield === WeaponWield.TWO_HANDED_SWORD ||
+        wield === WeaponWield.BLASTER_RIFLE ||
+        wield === WeaponWield.BLASTER_HEAVY
+      ){
+        return 0;
+      }
+    }
+    if(creature.getHasFeat(CombatFeatType.MASTER_DUELING)) return 3;
+    if(creature.getHasFeat(CombatFeatType.ADVANCED_DUELING)) return 2;
+    if(creature.getHasFeat(CombatFeatType.DUELING)) return 1;
+    return 0;
   }
 
   /**
@@ -476,18 +617,59 @@ export class CombatRound {
    * @returns The attack roll
    */
   calculateAttackRoll(creature: ModuleCreature, weapon: ModuleItem){
-    return Dice.roll(1, DiceType.d20, creature.getBaseAttackBonus() + (weapon?.getAttackBonus() || 0));
+    return Dice.roll(1, DiceType.d20, this.calculateAttackBonus(creature, weapon));
   }
 
   /**
-   * Check if the attack roll is a critical hit
-   * @param attackRoll - The attack roll to check
+   * Check if the natural d20 attack roll is a critical threat
+   * @param attackRoll - The natural d20 attack roll to check
    * @param weapon - The weapon to check the critical hit for
+   * @param feat - Optional active combat feat (e.g. Critical Strike / Sniper Shot)
    * @returns True if the attack roll is a critical hit, false otherwise
    */
-  isCritical(attackRoll: number, weapon: ModuleItem | undefined = undefined): boolean {
-    if(!weapon) return attackRoll == 20;
-    return (attackRoll > weapon.getCriticalThreatRangeMin() && attackRoll <= 20);
+  isCritical(attackRoll: number, weapon: ModuleItem | undefined = undefined, feat?: TalentFeat): boolean {
+    if(attackRoll > 20 || attackRoll < 1) return false;
+    let threatSpan = 1;
+    if(weapon){
+      if(weapon.baseItem && weapon.baseItem.criticalThreat > 0){
+        threatSpan = weapon.baseItem.criticalThreat;
+      }else{
+        const minThreat = weapon.getCriticalThreatRangeMin();
+        threatSpan = Math.max(1, 20 - minThreat);
+      }
+    }
+
+    let mult = 1;
+    if(feat){
+      switch(feat.id){
+        case CombatFeatType.CRITICAL_STRIKE:
+        case CombatFeatType.SNIPER_SHOT:
+          mult = 2;
+        break;
+        case CombatFeatType.IMPROVED_CRITICAL_STRIKE:
+        case CombatFeatType.IMPROVED_SNIPER_SHOT:
+          mult = 3;
+        break;
+        case CombatFeatType.MASTER_CRITICAL_STRIKE:
+        case CombatFeatType.MASTER_SNIPER_SHOT:
+          mult = 4;
+        break;
+      }
+    }
+
+    const minRoll = 21 - (threatSpan * mult);
+    return (attackRoll >= minRoll && attackRoll <= 20);
+  }
+
+  /**
+   * Check if a weapon is a double-bladed weapon (Quarterstaff, Double-Bladed Lightsaber, Double-Bladed Sword)
+   */
+  isDoubleWeapon(weapon?: ModuleItem): boolean {
+    if(!weapon) return false;
+    return (
+      weapon.getWeaponWield() === WeaponWield.TWO_HANDED_SWORD &&
+      (weapon.baseItemId === 3 || weapon.baseItemId === 10 || weapon.baseItemId === 56)
+    );
   }
 
   /**
@@ -498,9 +680,12 @@ export class CombatRound {
   isDualWielding(creature: ModuleCreature): boolean {
     const rightHand = creature.equipment.RIGHTHAND;
     const leftHand = creature.equipment.LEFTHAND;
-    return (
-      rightHand && ( rightHand.getBaseItem().weaponWield != WeaponWield.STUN_BATON ) &&
-      leftHand && ( leftHand.getBaseItem().weaponWield != WeaponWield.STUN_BATON )
+    if(rightHand && this.isDoubleWeapon(rightHand)){
+      return true;
+    }
+    return Boolean(
+      rightHand && ( rightHand.getBaseItem()?.weaponWield != WeaponWield.STUN_BATON ) &&
+      leftHand && ( leftHand.getBaseItem()?.weaponWield != WeaponWield.STUN_BATON )
     );
   }
 
@@ -527,10 +712,8 @@ export class CombatRound {
       }else if(creature.getHasFeat(CombatFeatType.TWO_WEAPON_ADVANCED)){
         penalty = 4;
       }
-      if(
-        rightHand.getBaseItem().weaponWield == WeaponWield.TWO_HANDED_SWORD ||
-        rightHand.getBaseItem().weaponWield == WeaponWield.BLASTER_PISTOL
-      ){
+      // A "balanced" (small) weapon in the off hand lowers the main-hand penalty by 2 (the feats' text: 2/0)
+      if(leftHand?.getBaseItem()?.weaponSize == WeaponSize.SMALL){
         penalty -= 2;
       }
       return Math.max(penalty, 0);
@@ -548,13 +731,79 @@ export class CombatRound {
       }else if(creature.getHasFeat(CombatFeatType.TWO_WEAPON_FIGHTING)){
         penalty = 6;
       }
-      if(leftHand.getBaseItem().weaponSize == WeaponSize.SMALL){
-        penalty -= 2;
-      }
+      // -10 / -6 / -4 / -2: a double-bladed weapon counts as two weapons, and nothing lowers this further
       return Math.max(penalty, 0);
     }
 
     return 0;
+  }
+
+  /**
+   * Check if target deflects an incoming blaster attack using Jedi Defense
+   */
+  checkBlasterDeflection(target: ModuleObject, weapon: ModuleItem | undefined, attackRoll: number): boolean {
+    if(!target || !weapon) return false;
+    const isRanged = weapon.isRangedWeapon();
+    if(!isRanged) return false;
+    if(!BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)) return false;
+
+    const targetCreature = target as ModuleCreature;
+    const rightHand = targetCreature.equipment?.RIGHTHAND;
+    const hasLightsaber = rightHand && (rightHand.baseItemId === 8 || rightHand.baseItemId === 9 || rightHand.baseItemId === 10);
+    if(!hasLightsaber) return false;
+
+    if(targetCreature.hasEffect(GameEffectType.EffectAssuredDeflection)){
+      return true;
+    }
+
+    if(targetCreature.combatRound && !targetCreature.combatRound.deflectArrow){
+      return false;
+    }
+
+    // Jedi Defense lets a Jedi deflect at all; Advanced and Master add +3 / +6. Deflection effects and items
+    // add to it, and can grant it without the feat.
+    const hasJediDefense = targetCreature.getHasFeat(CombatFeatType.JEDI_DEFENSE) ||
+      targetCreature.getHasFeat(CombatFeatType.ADVANCED_JEDI_DEFENSE) || targetCreature.getHasFeat(CombatFeatType.MASTER_JEDI_DEFENSE);
+    let deflectBonus = 0;
+    if(targetCreature.getHasFeat(CombatFeatType.MASTER_JEDI_DEFENSE)){
+      deflectBonus = 6;
+    }else if(targetCreature.getHasFeat(CombatFeatType.ADVANCED_JEDI_DEFENSE)){
+      deflectBonus = 3;
+    }
+    const itemBonus = targetCreature.getBlasterDeflectionBonus?.() || 0;
+    deflectBonus += itemBonus;
+    if(!hasJediDefense && itemBonus <= 0){
+      return false;
+    }
+
+    if(targetCreature.combatRound){
+      targetCreature.combatRound.deflectArrow = false;
+    }
+
+    // An opposed roll with the lightsaber against the attack roll
+    const deflectRoll = Dice.roll(1, DiceType.d20,
+      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus);
+    if(deflectRoll < attackRoll) return false;
+    // "If the attack is beaten by 10 or more, the bolt is deflected back at the enemy"
+    if(deflectRoll >= attackRoll + 10) this.reflectBolt(targetCreature, weapon);
+    return true;
+  }
+
+  /** A bolt deflected back at whoever fired it: the weapon's damage, on them */
+  reflectBolt(deflector: ModuleCreature, weapon: ModuleItem){
+    const shooter = this.owner as ModuleCreature;
+    if(!shooter || shooter === deflector || shooter.isDead?.()) return;
+    const amount = Math.max(1, (weapon.getBaseDamage?.() || 0) + (weapon.getDamageBonus?.() || 0));
+    const type = weapon.getBaseDamageType?.() ?? 0;
+    const index = type >= 0 && type <= 15 ? type : 14;
+    const damage = new GameState.GameEffectFactory.EffectDamage();
+    damage.setCreator(deflector);
+    damage.setSpellId(-1);
+    damage.setInt(index, amount);
+    damage.setInt(16, 1000);
+    damage.setInt(17, 1 << index);
+    damage.initialize();
+    shooter.addEffect(damage);
   }
 
   /**
@@ -565,24 +814,48 @@ export class CombatRound {
    * @param combatAction - The combat action to calculate the attack for
    */
   calculateWeaponAttack(creature: ModuleCreature, weapon: ModuleItem | undefined = undefined, weaponSlot: ModuleCreatureArmorSlot, combatAction: CombatRoundAction) {
-    //Roll to hit
-    let attackRoll = this.calculateAttackRoll(creature, weapon);
+    while(this.attackList.length <= this.currentAttack){
+      this.attackList.push(new CombatAttackData());
+    }
+
+    const naturalRoll = Dice.roll(1, DiceType.d20);
+    let attackBonus = this.calculateAttackBonus(creature, weapon);
     const isDualWielding = this.isDualWielding(creature);
     const isMainHand = weapon && weaponSlot == ModuleCreatureArmorSlot.RIGHTHAND;
     const isOffHand = weapon && weaponSlot == ModuleCreatureArmorSlot.LEFTHAND;
     if(isDualWielding && (isMainHand || isOffHand)){
       const penalty = this.calculateTwoWeaponPenalty(creature, weaponSlot);
-      attackRoll -= penalty;
+      attackBonus -= penalty;
     }
-    const isCritical = this.isCritical(attackRoll, weapon);
+
+    const attackRoll = naturalRoll + attackBonus;
+    const isCritical = naturalRoll !== 1 && this.isCritical(naturalRoll, weapon, combatAction.feat);
     const hasAssuredHit = creature.hasEffect(GameEffectType.EffectAssuredHit);
     const attack = this.attackList[this.currentAttack];
-    if(hasAssuredHit || isCritical || attackRoll > combatAction.target.getAC()){
-      combatAction.attackResult = (!hasAssuredHit && isCritical) ? AttackResult.CRITICAL_HIT : AttackResult.HIT_SUCCESSFUL;
-      attack.reactObject = combatAction.target;
-      attack.attackWeapon = weapon;
-      attack.attackResult = combatAction.attackResult;
-      attack.calculateDamage(creature, !hasAssuredHit && isCritical, combatAction.feat);
+    const targetAC = combatAction.target ? combatAction.target.getAC() : 10;
+
+    let isHit = hasAssuredHit || naturalRoll === 20 || (naturalRoll !== 1 && (isCritical || attackRoll >= targetAC));
+    // Concealment on the target, or a miss chance on the attacker, can still turn a hit into a miss
+    if(isHit && !hasAssuredHit){
+      const target = combatAction.target as ModuleCreature;
+      const missChance = Math.max(target?.getConcealment?.() || 0, creature.getMissChance?.() || 0);
+      if(missChance > 0 && Math.floor(Math.random() * 100) < missChance) isHit = false;
+    }
+
+    if(isHit){
+      if(this.checkBlasterDeflection(combatAction.target, weapon, attackRoll)){
+        combatAction.attackResult = AttackResult.DEFLECTED;
+        attack.reactObject = combatAction.target;
+        attack.attackWeapon = weapon;
+        attack.attackResult = AttackResult.DEFLECTED;
+        attack.attackDeflected = 1;
+      }else{
+        combatAction.attackResult = (!hasAssuredHit && isCritical) ? AttackResult.CRITICAL_HIT : AttackResult.HIT_SUCCESSFUL;
+        attack.reactObject = combatAction.target;
+        attack.attackWeapon = weapon;
+        attack.attackResult = combatAction.attackResult;
+        attack.calculateDamage(creature, !hasAssuredHit && isCritical, combatAction.feat, Boolean(isOffHand));
+      }
     }else{
       combatAction.attackResult = AttackResult.MISS;
       attack.reactObject = combatAction.target;
@@ -604,20 +877,31 @@ export class CombatRound {
   calculateRoundAnimations(creature: ModuleCreature, combatAction: CombatRoundAction){
     if(!combatAction) return;
 
-    let attackKey = creature.getCombatAnimationAttackType();
-    let weaponWield = creature.getCombatAnimationWeaponType();
-    let attackType = 1;
-
-    //Get random basic melee attack in combat with another melee creature that is targeting you
-    if(attackKey == 'm'){
-      if(this.engaged && !this.attacksIncludeKillingBlow()){
-        attackKey = 'c';
-        attackType = Math.round(Math.random()*4)+1;
-      }
+    if(combatAction.actionType === CombatActionType.ATTACK_USE_FEAT){
+      combatAction.calculateAttackAnimation();
     }
 
-    this.action.animationName = attackKey+weaponWield+'a'+attackType;
-    this.action.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(this.action.animationName);
+    if(!combatAction.animationName){
+      let attackKey = creature.getCombatAnimationAttackType();
+      let weaponWield = creature.getCombatAnimationWeaponType();
+      let attackType = 1;
+
+      //Get random basic melee attack in combat with another melee creature that is targeting you
+      if(attackKey == 'm'){
+        if(this.engaged && !this.attacksIncludeKillingBlow()){
+          attackKey = 'c';
+          attackType = Math.round(Math.random()*4)+1;
+        }
+      }
+
+      combatAction.animationName = attackKey+weaponWield+'a'+attackType;
+      combatAction.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(combatAction.animationName);
+    }
+
+    if(this.action && this.action !== combatAction){
+      this.action.animationName = combatAction.animationName;
+      this.action.twoDAAnimation = combatAction.twoDAAnimation;
+    }
 
     if(combatAction.isCutsceneAttack){
 
@@ -704,8 +988,8 @@ export class CombatRound {
    * @returns True if the attacks include a killing blow, false otherwise
    */
   attacksIncludeKillingBlow(){
-    for(let i = 0; i < 5; i++){
-      if(this.attackList[i].killingBlow) return true;
+    for(let i = 0; i < this.attackList.length; i++){
+      if(this.attackList[i]?.killingBlow) return true;
     }
     return false;
   }
@@ -731,6 +1015,7 @@ export class CombatRound {
    */
   logAttackResult(creature: ModuleCreature, weapon: ModuleItem | undefined, combatAction: CombatRoundAction, isCritical: boolean, hasAssuredHit: boolean) {
     const { FeedbackMessageManager } = GameState;
+    if(!FeedbackMessageManager) return;
 
     let message = '';
     let color = FeebackMessageColor.ATTACK;

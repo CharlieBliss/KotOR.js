@@ -23,3 +23,8 @@ research/
 .vscode/mcp.json
 .vscode/chrome-debug-profile/
 exports/
+.antigravitycli/
+/bench-results/
+/skills/*.zip
+/scene-check/
+__pycache__/

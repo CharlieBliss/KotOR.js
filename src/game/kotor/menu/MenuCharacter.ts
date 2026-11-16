@@ -111,10 +111,15 @@ export class MenuCharacter extends GameMenu {
 
       this.BTN_AUTO.addEventListener('click', (e) => {
         e.stopPropagation();
-        if(GameState.getCurrentPlayer().canLevelUp()){
-          GameState.getCurrentPlayer().autoLevelUp();
-          this.updateCharacterStats(GameState.getCurrentPlayer());
+        const pc = GameState.getCurrentPlayer();
+        if(!pc?.canLevelUp()) return;
+        // A GM session player's character levels up on the GM's machine; the new sheet comes back
+        if(GameState.hooks.requestNetworkLevelUp(pc)){
+          this.BTN_AUTO.hide();
+          return;
         }
+        pc.autoLevelUp();
+        this.updateCharacterStats(pc);
       });
       this._button_y = this.BTN_AUTO;
 
@@ -197,6 +202,12 @@ export class MenuCharacter extends GameMenu {
     });
   }
 
+  /** Every way in (the P key, the overlay's button, the top menu's tab) comes here: a GM session player gets their sheet */
+  open() {
+    if (GameState.hooks.openCharacterSheet('overview')) return;
+    super.open();
+  }
+
   update(delta = 0) {
     super.update(delta);
     if (!this.bVisible)
@@ -253,6 +264,8 @@ export class MenuCharacter extends GameMenu {
     } else {
       this.BTN_AUTO?.hide();
     }
+    // Choosing a level-up step by step (MenuLevelUp) isn't built yet: Auto Level-Up is the way to level
+    this.BTN_LEVELUP?.hide();
   }
 
   /**
@@ -292,7 +305,14 @@ export class MenuCharacter extends GameMenu {
 
     this.SLD_ALIGN?.setValue(creature.getGoodEvil()/100);
 
-    const portraitAttachRoot = this._3dViewModel?.getRootOdysseyNode?.() || this._3dViewModel;
+    // The backdrop's "dummy02" node marks where the character stands; it is rotated and offset so the
+    // character's own rotation below stands them upright facing the camera. The backdrop root has no
+    // such rotation, so attaching there lays the character on its side out of frame.
+    const portraitAttachRoot =
+      this._3dViewModel?.getObjectByName?.('dummy02') ||
+      this._3dViewModel?.children?.[0]?.children?.[0] ||
+      this._3dViewModel?.getRootOdysseyNode?.() ||
+      this._3dViewModel;
 
     if (this.char) {
       this.char.removeFromParent();

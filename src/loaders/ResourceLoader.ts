@@ -105,7 +105,7 @@ export class ResourceLoader {
             buffer
           );
         }
-      }else if(isERFArchive(archive) || archive instanceof ERFObject){
+      }else if(isERFArchive(archive) || (archive as unknown) instanceof ERFObject){
         const keyList = archive.keyList;
         for(let i = 0; i < keyList.length; i++){
           const key = keyList[i];
@@ -132,6 +132,12 @@ export class ResourceLoader {
         cacheType.clear();
       });
   }
+
+  /**
+   * Where to look for a resource this game doesn't have, in order. The other game, when one of its scenes is
+   * borrowed (OtherGameManager).
+   */
+  static FallbackSources: ((resId: number, resRef: string) => Promise<Uint8Array | undefined>)[] = [];
 
   static async loadResource(resId: number, resRef: string): Promise<Uint8Array> {
 
@@ -165,6 +171,14 @@ export class ResourceLoader {
     if(data){
       ResourceLoader.setCache(null, resId, resRef, data);
       return data;
+    }
+
+    for(const source of ResourceLoader.FallbackSources){
+      data = await source(resId, resRef);
+      if(data){
+        ResourceLoader.setCache(null, resId, resRef, data);
+        return data;
+      }
     }
 
     //Resource Not Found
@@ -285,7 +299,7 @@ export class ResourceLoader {
         if(data){
           return data;
         }
-      }else if(isERFArchive(archive) || archive instanceof ERFObject){
+      }else if(isERFArchive(archive) || (archive as unknown) instanceof ERFObject){
         if(!archive.hasResource(resRef, resId)){ continue; }
         const data = await archive.getResourceBufferByResRef(resRef, resId);
         if(data){

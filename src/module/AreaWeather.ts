@@ -37,7 +37,8 @@ export class AreaWeather {
    */
   update(delta: number = 0){
     if(this.model){
-      this.model.position.copy( GameState.getCurrentPlayer().position ).add( new THREE.Vector3(0,0,3) );
+      const targetPos = GameState.getCurrentPlayer()?.position || GameState.currentCamera?.position;
+      if(targetPos) this.model.position.copy( targetPos ).add( new THREE.Vector3(0,0,3) );
       this.model.update(delta);
     }
   }

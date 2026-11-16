@@ -621,6 +621,8 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER],
     action: function(this: NWScriptInstance, args: [ModuleObject, number]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleCreature)){
+        // A GM NPC throwing a grenade or using a medpac: its own AI scripts don't take it back to swinging
+        if(GameState.hooks.holdsScriptAttack(this.caller as any)) return;
         this.caller.attackCreature(args[0]);
       }else{
         console.error('ActionAttack target undefined')
@@ -1155,7 +1157,9 @@ NWScriptDefK1.Actions = {
       let damageTypeIndex = Math.log2(args[1]);
       effect.setInt( damageTypeIndex , args[0]);
 
-      effect.setInt(14, args[0]);
+      if(!Number.isFinite(damageTypeIndex) || damageTypeIndex < 0 || damageTypeIndex > 15){
+        effect.setInt(14, args[0]);
+      }
       effect.setInt(16, 1000);
       effect.setInt(17, args[1]);
       effect.setInt(18, args[2]);
@@ -1478,7 +1482,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].fortitudeSave(args[1], args[2], args[3]);
+        return args[0].fortitudeSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }
@@ -1490,7 +1494,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].reflexSave(args[1], args[2], args[3]);
+        return args[0].reflexSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }
@@ -1502,7 +1506,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, number, number, ModuleObject]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleObject))
-        return args[0].willSave(args[1], args[2], args[3]);
+        return args[0].willSave(args[1], args[2], args[3], this.getSpellId());
 
       return 0;
     }
@@ -1514,7 +1518,7 @@ NWScriptDefK1.Actions = {
     args: [],
     action: function(this: NWScriptInstance, args: []){
       if(BitWise.InstanceOfObject(this.caller, ModuleObjectType.ModuleCreature)){
-        (this.caller as ModuleCreature).getSpellSaveDC();
+        return (this.caller as ModuleCreature).getSpellSaveDC();
       }
 
       return 10;
@@ -2889,6 +2893,10 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.VOID,
     args: [NWScriptDataType.INTEGER, NWScriptDataType.EFFECT, NWScriptDataType.LOCATION, NWScriptDataType.FLOAT],
     action: function(this: NWScriptInstance, args: [number, GameEffect, EngineLocation, number]){
+      if(typeof (args[1] as any)?.setDurationType !== 'function'){
+        console.error(`ApplyEffectAtLocation: expected an effect from ${this.name || 'a script'}, got`, args[1]);
+        return;
+      }
       args[1].setDurationType(args[0]);
       args[1].setDuration(args[3]);
       GameState.module.addEffect(args[1], args[2]);
@@ -2928,7 +2936,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.INTEGER, NWScriptDataType.EFFECT, NWScriptDataType.OBJECT, NWScriptDataType.FLOAT],
     action: function(this: NWScriptInstance, args: [number, GameEffect, ModuleObject, number]){
       if(BitWise.InstanceOfObject(args[2], ModuleObjectType.ModuleObject)){
-        if(args[1]){
+        if(typeof (args[1] as any)?.setDurationType === 'function'){
           args[1].setDurationType(args[0]);
           args[1].setDuration(args[3]);
           if(args[0] == GameEffectDurationType.TEMPORARY){
@@ -2939,7 +2947,7 @@ NWScriptDefK1.Actions = {
           // console.log('ApplyEffectToObject', args[2], args[1], args[0], args[3]);
           args[2].addEffect(args[1], args[0], args[3]);
         }else{
-          console.error('ApplyEffectToObject', 'Expected a GameEffect', args);
+          console.error(`ApplyEffectToObject: expected an effect from ${this.name || 'a script'}, got`, args[1]);
         }
       }else{
         console.error('ApplyEffectToObject', 'GameEffects must be applied to ModuleObjects');
@@ -2966,7 +2974,10 @@ NWScriptDefK1.Actions = {
     args: [],
     action: function(this: NWScriptInstance, args: []){
       if(BitWise.InstanceOfObject(this.talent, TalentObjectType.TalentObject) && BitWise.InstanceOfObject(this.talent.oTarget, ModuleObjectType.ModuleObject)){
-        this.talent.oTarget.getLocation();
+        return this.talent.oTarget.getLocation();
+      }
+      if(BitWise.InstanceOfObject(this.caller?.combatData?.lastSpellTarget, ModuleObjectType.ModuleObject)){
+        return this.caller.combatData.lastSpellTarget.getLocation();
       }
       return new EngineLocation();
     }
@@ -2987,7 +2998,13 @@ NWScriptDefK1.Actions = {
     comment: "224: the effect of body fule.. convers HP -> FP i think\n",
     name: "EffectBodyFuel",
     type: NWScriptDataType.EFFECT,
-    args: []
+    args: [],
+    action: function(this: NWScriptInstance, args: []){
+      const effect = new GameState.GameEffectFactory.EffectBodyFuel();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      return effect.initialize();
+    }
   },
   225:{
     comment: "225: Get the orientation value from lLocation.\n",
@@ -3441,7 +3458,7 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.OBJECT,
     args: [],
     action: function(this: NWScriptInstance, args: []){
-      if(BitWise.InstanceOfObject(this.lastPerceived.object, ModuleObjectType.ModuleCreature)){
+      const lastPerceived = this.lastPerceived || (this.caller as any)?.lastPerceived; if(BitWise.InstanceOfObject(lastPerceived?.object, ModuleObjectType.ModuleCreature)){ return lastPerceived.object; } if(false){
         return this.lastPerceived.object;
       }
       return undefined;
@@ -3453,8 +3470,8 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [],
     action: function(this: NWScriptInstance, args: []){
-      if(BitWise.InstanceOfObject(this.lastPerceived.object, ModuleObjectType.ModuleObject)){
-        return !this.lastPerceived.object.isDead() || !!(this.lastPerceived.data & PerceptionMask.HEARD);
+      if(BitWise.InstanceOfObject((this.lastPerceived || (this.caller as any)?.lastPerceived)?.object, ModuleObjectType.ModuleObject)){
+      return !(this.lastPerceived || (this.caller as any)?.lastPerceived)?.object?.isDead() || !!((this.lastPerceived || (this.caller as any)?.lastPerceived)?.data & PerceptionMask.HEARD);
       }else{
         return 0;
       }
@@ -3466,8 +3483,8 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [],
     action: function(this: NWScriptInstance, args: []){
-      if(BitWise.InstanceOfObject(this.lastPerceived.object, ModuleObjectType.ModuleObject)){
-        return this.lastPerceived.object.isDead() || !!(this.lastPerceived.data & PerceptionMask.INAUDIBLE);
+      if(BitWise.InstanceOfObject((this.lastPerceived || (this.caller as any)?.lastPerceived)?.object, ModuleObjectType.ModuleObject)){
+      return (this.lastPerceived || (this.caller as any)?.lastPerceived)?.object?.isDead() || !!((this.lastPerceived || (this.caller as any)?.lastPerceived)?.data & PerceptionMask.INAUDIBLE);
       }else{
         return 0;
       }
@@ -3479,7 +3496,7 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [],
     action: function(this: NWScriptInstance, args: []){
-      if(BitWise.InstanceOfObject(this.lastPerceived.object, ModuleObjectType.ModuleCreature))
+      if(BitWise.InstanceOfObject((this.lastPerceived || (this.caller as any)?.lastPerceived)?.object, ModuleObjectType.ModuleCreature)) return !(this.lastPerceived || (this.caller as any)?.lastPerceived).object.isDead() || !!((this.lastPerceived || (this.caller as any)?.lastPerceived).data & PerceptionMask.SEEN); if(false)
         return !this.lastPerceived.object.isDead() || !!(this.lastPerceived.data & PerceptionMask.SEEN);
       else
         return 0;
@@ -3497,8 +3514,8 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [],
     action: function(this: NWScriptInstance, args: []){
-      if(BitWise.InstanceOfObject(this.lastPerceived.object, ModuleObjectType.ModuleObject)){
-        return this.lastPerceived.object.isDead() || !!(this.lastPerceived.data & PerceptionMask.INVISIBLE);
+      if(BitWise.InstanceOfObject((this.lastPerceived || (this.caller as any)?.lastPerceived)?.object, ModuleObjectType.ModuleObject)){
+      return (this.lastPerceived || (this.caller as any)?.lastPerceived)?.object?.isDead() || !!((this.lastPerceived || (this.caller as any)?.lastPerceived)?.data & PerceptionMask.INVISIBLE);
       }else{
         return 0;
       }
@@ -3652,7 +3669,11 @@ NWScriptDefK1.Actions = {
     comment: "274: - oCreature\n- nImmunityType: IMMUNITY_TYPE_*\n- oVersus: if this is specified, then we also check for the race and\nalignment of oVersus\n* Returns TRUE if oCreature has immunity of type nImmunity versus oVersus.\n",
     name: "GetIsImmune",
     type: NWScriptDataType.INTEGER,
-    args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT]
+    args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
+    action: function(this: NWScriptInstance, args: [ModuleObject, number, ModuleObject]){
+      if(!BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleCreature)) return NW_FALSE;
+      return (args[0] as ModuleCreature).isImmune(args[1]) ? NW_TRUE : NW_FALSE;
+    }
   },
   275:{
     comment: "275: Creates a Damage Immunity Increase effect.\n- nDamageType: DAMAGE_TYPE_*\n- nPercentImmunity\n",
@@ -3764,8 +3785,12 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [number, ModuleObject]){
-      return 0;
-    }
+      const target = (args[1] || this.caller) as ModuleCreature;
+      if(BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)){
+        return target.getHasFeat(args[0]) ? NW_TRUE : NW_FALSE;
+      }
+      return NW_FALSE;
+    },
   },
   286:{
     comment: "286: Determine whether oCreature has nSkill, and nSkill is useable.\n- nSkill: SKILL_*\n- oCreature\n",
@@ -3773,8 +3798,12 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [number, ModuleObject]){
-      return 0;
-    }
+      const target = (args[1] || this.caller) as ModuleCreature;
+      if(BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)){
+        return target.getHasSkill(args[0]) ? NW_TRUE : NW_FALSE;
+      }
+      return NW_FALSE;
+    },
   },
   287:{
     comment: "287: Use nFeat on oTarget.\n- nFeat: FEAT_*\n- oTarget\n",
@@ -3900,9 +3929,19 @@ NWScriptDefK1.Actions = {
     name: "GetReflexAdjustedDamage",
     type: NWScriptDataType.INTEGER,
     args: [NWScriptDataType.INTEGER, NWScriptDataType.OBJECT, NWScriptDataType.INTEGER, NWScriptDataType.INTEGER, NWScriptDataType.OBJECT],
-    action: function(this: NWScriptInstance, args: [EngineLocation, EngineLocation]){
-      //todo: currently passing back unmodified damage
-      return args[0];
+    action: function(this: NWScriptInstance, args: [number, ModuleObject, number, number, ModuleObject]){
+      const damage = Number(args[0]) || 0;
+      const target = args[1];
+      const dc = Number(args[2]) || 0;
+      const saveType = Number(args[3]) || 0;
+      const saveVersus = args[4];
+      if(BitWise.InstanceOfObject(target, ModuleObjectType.ModuleObject)){
+        const saved = target.reflexSave(dc, saveType, saveVersus);
+        if(saved){
+          return Math.floor(damage * 0.5);
+        }
+      }
+      return damage;
     }
   },
   300:{
@@ -5087,13 +5126,13 @@ NWScriptDefK1.Actions = {
         let item = inventory[i];
         let baseItem = item.baseItem;
         if(
-          baseItem.weaponWield == WeaponWield.STUN_BATON || 
-          baseItem.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
-          baseItem.weaponWield == WeaponWield.TWO_HANDED_SWORD
+          baseItem?.weaponWield == WeaponWield.STUN_BATON || 
+          baseItem?.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
+          baseItem?.weaponWield == WeaponWield.TWO_HANDED_SWORD
         ){
           if(!weapon){
             weapon = item;
-          }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+          }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
             weapon = item;
           }
         }
@@ -5105,13 +5144,13 @@ NWScriptDefK1.Actions = {
           let item = inventory[i];
           let baseItem = item.baseItem;
           if(
-            baseItem.weaponWield == WeaponWield.BLASTER_PISTOL || 
-            baseItem.weaponWield == WeaponWield.BLASTER_RIFLE || 
-            baseItem.weaponWield == WeaponWield.BLASTER_HEAVY
+            baseItem?.weaponWield == WeaponWield.BLASTER_PISTOL || 
+            baseItem?.weaponWield == WeaponWield.BLASTER_RIFLE || 
+            baseItem?.weaponWield == WeaponWield.BLASTER_HEAVY
           ){
             if(!weapon){
               weapon = item;
-            }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+            }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
               weapon = item;
             }
           }
@@ -5157,13 +5196,13 @@ NWScriptDefK1.Actions = {
         const item = inventory[i];
         const baseItem = item.baseItem;
         if(
-          baseItem.weaponWield == WeaponWield.BLASTER_PISTOL || 
-          baseItem.weaponWield == WeaponWield.BLASTER_RIFLE || 
-          baseItem.weaponWield == WeaponWield.BLASTER_HEAVY
+          baseItem?.weaponWield == WeaponWield.BLASTER_PISTOL || 
+          baseItem?.weaponWield == WeaponWield.BLASTER_RIFLE || 
+          baseItem?.weaponWield == WeaponWield.BLASTER_HEAVY
         ){
           if(!weapon){
             weapon = item;
-          }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+          }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
             weapon = item;
           }
         }
@@ -5175,13 +5214,13 @@ NWScriptDefK1.Actions = {
           const item = inventory[i];
           const baseItem = item.baseItem;
           if(
-            baseItem.weaponWield == WeaponWield.STUN_BATON || 
-            baseItem.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
-            baseItem.weaponWield == WeaponWield.TWO_HANDED_SWORD
+            baseItem?.weaponWield == WeaponWield.STUN_BATON || 
+            baseItem?.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
+            baseItem?.weaponWield == WeaponWield.TWO_HANDED_SWORD
           ){
             if(!weapon){
               weapon = item;
-            }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+            }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
               weapon = item;
             }
           }
@@ -5601,7 +5640,10 @@ NWScriptDefK1.Actions = {
     comment: "438: Use this in a spell script to get the item used to cast the spell.\n",
     name: "GetSpellCastItem",
     type: NWScriptDataType.OBJECT,
-    args: []
+    args: [],
+    action: function(this: NWScriptInstance, args: []){
+      return this.spellItem;
+    }
   },
   439:{
     comment: "439: Use this in an OnItemActivated module script to get the item that was activated.\n",
@@ -6044,7 +6086,6 @@ NWScriptDefK1.Actions = {
         if(dx * dx + dy * dy > 100) continue; // 10m radius = 100 sq
         if(creature.isHostile(caller)){
           creature.clearAllActions();
-          creature.clearAllEffects();
           GameState.FactionManager.SetFactionReputation(caller, creature, 50);
         }
       }
@@ -6147,7 +6188,14 @@ NWScriptDefK1.Actions = {
     comment: "485: Create a Modify Attacks effect to add attacks.\n- nAttacks: maximum is 5, even with the effect stacked\n* Returns an effect of type EFFECT_TYPE_INVALIDEFFECT if nAttacks > 5.\n",
     name: "EffectModifyAttacks",
     type: NWScriptDataType.EFFECT,
-    args: [NWScriptDataType.INTEGER]
+    args: [NWScriptDataType.INTEGER],
+    action: function(this: NWScriptInstance, args: [number]){
+      const effect = new GameState.GameEffectFactory.EffectModifyNumAttacks();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, Math.max(0, Math.min(5, args[0] | 0)));
+      return effect.initialize();
+    }
   },
   486:{
     comment: "486: Get the last trap detected by oTarget.\n* Return value on error: OBJECT_INVALID\n",
@@ -8363,7 +8411,18 @@ NWScriptDefK1.Actions = {
     comment: "702. EffectLightsaberThrow\nThis function throws a lightsaber at a target\nIf multiple targets are specified, then the lightsaber travels to them\nsequentially, returning to the first object specified\nThis effect is applied to an object, so an effector is not needed\n",
     name: "EffectLightsaberThrow",
     type: NWScriptDataType.EFFECT,
-    args: [NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.INTEGER]
+    args: [NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.OBJECT, NWScriptDataType.INTEGER],
+    action: function(this: NWScriptInstance, args: [ModuleObject, ModuleObject, ModuleObject, number]){
+      const effect = new GameState.GameEffectFactory.EffectLightSaberThrow();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      for(let i = 0; i < 3; i++){
+        const target = args[i] as ModuleObject;
+        if(BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)) effect.setObject(i, target);
+      }
+      effect.setInt(0, args[3] | 0);
+      return effect.initialize();
+    }
   },
   703:{
     comment: "703.\ncreates the effect of a whirl wind.\n",
@@ -8630,8 +8689,14 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject]){
-      return 0;
-    }
+      const target = args[0] || this.caller;
+      if(!BitWise.InstanceOfObject(target, ModuleObjectType.ModuleObject)) return NW_FALSE;
+      const res = target.combatData?.lastAttackResult;
+      if(res === AttackResult.ATTACK_RESISTED || res === AttackResult.ATTACK_FAILED){
+        return NW_FALSE;
+      }
+      return NW_TRUE;
+    },
   },
   727:{
     comment: "727. GetFirstAttacker\nReturns the first object in the area that is attacking oCreature\n",

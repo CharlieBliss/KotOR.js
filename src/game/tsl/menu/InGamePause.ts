@@ -38,8 +38,8 @@ export class InGamePause extends K1_InGamePause {
 
   update(delta: number = 0) {
     super.update(delta);
-    this.tGuiPanel.extent.left = (GameState.ResolutionManager.getViewportWidth() / 2) - (this.tGuiPanel.extent.width / 2) - 5;
-    this.tGuiPanel.extent.top = (-GameState.ResolutionManager.getViewportHeight() / 2) + (this.tGuiPanel.extent.height / 2) + 45;
+    this.tGuiPanel.extent.left = (GameState.ResolutionManager.getGUIWidth() / 2) - (this.tGuiPanel.extent.width / 2) - 5;
+    this.tGuiPanel.extent.top = (-GameState.ResolutionManager.getGUIHeight() / 2) + (this.tGuiPanel.extent.height / 2) + 45;
     this.recalculatePosition();
   }
   

@@ -43,8 +43,8 @@ export class InGameDialog extends GameMenu {
       this.LBL_MESSAGE.setText('');
       this.LBL_MESSAGE.setTextColor(this.LBL_MESSAGE.defaultColor.r, this.LBL_MESSAGE.defaultColor.g, this.LBL_MESSAGE.defaultColor.b);
 
-      this.LB_REPLIES.extent.left = -(GameState.ResolutionManager.getViewportWidth()/2) + this.LB_REPLIES.extent.width/2 + 16;
-      this.LB_REPLIES.extent.top = (GameState.ResolutionManager.getViewportHeight()/2) - this.LB_REPLIES.extent.height/2;
+      this.LB_REPLIES.extent.left = -(GameState.ResolutionManager.getGUIWidth()/2) + this.LB_REPLIES.extent.width/2 + 16;
+      this.LB_REPLIES.extent.top = (GameState.ResolutionManager.getGUIHeight()/2) - this.LB_REPLIES.extent.height/2;
       this.LB_REPLIES.calculatePosition();
       this.LB_REPLIES.calculateBox();
       this.LB_REPLIES.onSelected = (entry: DLGNode, control: any, index: number) => {
@@ -98,20 +98,20 @@ export class InGameDialog extends GameMenu {
     if(!this.canLetterbox || this.letterBoxed) return;
 
     if (GameState.CutsceneManager.cutsceneMode == CutsceneMode.ANIMATED) {
-      this.bottomBar.position.y = -(GameState.ResolutionManager.getViewportHeight() / 2) + LETTERBOX_HEIGHT / 2;
-      this.topBar.position.y = GameState.ResolutionManager.getViewportHeight() / 2 - LETTERBOX_HEIGHT / 2;
+      this.bottomBar.position.y = -(GameState.ResolutionManager.getGUIHeight() / 2) + LETTERBOX_HEIGHT / 2;
+      this.topBar.position.y = GameState.ResolutionManager.getGUIHeight() / 2 - LETTERBOX_HEIGHT / 2;
       this.letterBoxed = true;
       this.LBL_MESSAGE.show();
       return;
     }
     
-    if (this.bottomBar.position.y < -(GameState.ResolutionManager.getViewportHeight() / 2) + LETTERBOX_HEIGHT / 2) {
+    if (this.bottomBar.position.y < -(GameState.ResolutionManager.getGUIHeight() / 2) + LETTERBOX_HEIGHT / 2) {
       this.bottomBar.position.y += 5;
       this.topBar.position.y -= 5;
       this.LBL_MESSAGE.hide();
     } else {
-      this.bottomBar.position.y = -(GameState.ResolutionManager.getViewportHeight() / 2) + LETTERBOX_HEIGHT / 2;
-      this.topBar.position.y = GameState.ResolutionManager.getViewportHeight() / 2 - LETTERBOX_HEIGHT / 2;
+      this.bottomBar.position.y = -(GameState.ResolutionManager.getGUIHeight() / 2) + LETTERBOX_HEIGHT / 2;
+      this.topBar.position.y = GameState.ResolutionManager.getGUIHeight() / 2 - LETTERBOX_HEIGHT / 2;
       this.letterBoxed = true;
       this.LBL_MESSAGE.show();
     }
@@ -124,9 +124,9 @@ export class InGameDialog extends GameMenu {
       let height = Math.abs(bb.min.y) + Math.abs(bb.max.y);
       let width = Math.abs(bb.min.x) + Math.abs(bb.max.x);
       if (isListening) {
-        this.LBL_MESSAGE.widget.position.y = -GameState.ResolutionManager.getViewportHeight() / 2 + 50;
+        this.LBL_MESSAGE.widget.position.y = -GameState.ResolutionManager.getGUIHeight() / 2 + 50;
       } else {
-        this.LBL_MESSAGE.widget.position.y = GameState.ResolutionManager.getViewportHeight() / 2 - 50;
+        this.LBL_MESSAGE.widget.position.y = GameState.ResolutionManager.getGUIHeight() / 2 - 50;
       }
       this.LBL_MESSAGE.box = new THREE.Box2(new THREE.Vector2(this.LBL_MESSAGE.widget.position.x - width / 2, this.LBL_MESSAGE.widget.position.y - height / 2), new THREE.Vector2(this.LBL_MESSAGE.widget.position.x + width / 2, this.LBL_MESSAGE.widget.position.y + height / 2));
     }
@@ -139,8 +139,8 @@ export class InGameDialog extends GameMenu {
   }
 
   recalculatePosition() {
-    this.LB_REPLIES.extent.left = -(GameState.ResolutionManager.getViewportWidth() / 2) + this.LB_REPLIES.extent.width / 2 + 16;
-    this.LB_REPLIES.extent.top = GameState.ResolutionManager.getViewportHeight() / 2 - this.LB_REPLIES.extent.height / 2;
+    this.LB_REPLIES.extent.left = -(GameState.ResolutionManager.getGUIWidth() / 2) + this.LB_REPLIES.extent.width / 2 + 16;
+    this.LB_REPLIES.extent.top = GameState.ResolutionManager.getGUIHeight() / 2 - this.LB_REPLIES.extent.height / 2;
     this.LB_REPLIES.calculatePosition();
     this.LB_REPLIES.calculateBox();
     this.resetLetterBox();
@@ -148,14 +148,14 @@ export class InGameDialog extends GameMenu {
 
   resetLetterBox() {
     this.letterBoxed = false;
-    this.topBar.scale.x = this.bottomBar.scale.x = GameState.ResolutionManager.getViewportWidth();
+    this.topBar.scale.x = this.bottomBar.scale.x = GameState.ResolutionManager.getGUIWidth();
     this.topBar.scale.y = this.bottomBar.scale.y = LETTERBOX_HEIGHT;
     if (!this.letterBoxed) {
-      this.topBar.position.y = GameState.ResolutionManager.getViewportHeight() / 2 + LETTERBOX_HEIGHT / 2;
+      this.topBar.position.y = GameState.ResolutionManager.getGUIHeight() / 2 + LETTERBOX_HEIGHT / 2;
       this.bottomBar.position.y = -this.topBar.position.y;
     } else {
-      this.bottomBar.position.y = -(GameState.ResolutionManager.getViewportHeight() / 2) + LETTERBOX_HEIGHT / 2;
-      this.topBar.position.y = GameState.ResolutionManager.getViewportHeight() / 2 - LETTERBOX_HEIGHT / 2;
+      this.bottomBar.position.y = -(GameState.ResolutionManager.getGUIHeight() / 2) + LETTERBOX_HEIGHT / 2;
+      this.topBar.position.y = GameState.ResolutionManager.getGUIHeight() / 2 - LETTERBOX_HEIGHT / 2;
     }
   }
 

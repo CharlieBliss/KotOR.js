@@ -4,6 +4,7 @@ import { ModalEULA } from "@/apps/game/components/modal-eula/modalEULA";
 import { ModalGrantAccess } from "@/apps/game/components/modal-grant-access/modalGrantAccess";
 import { ModalClickToBegin } from "@/apps/game/components/modal-click-to-begin/modalClickToBegin";
 import { CheatConsole } from "@/apps/game/components/cheat-console/cheatConsole";
+import { GMPanel } from "@/apps/game/components/gm-panel/GMPanel";
 import { LoadingScreen } from "@/apps/common/components/loadingScreen/LoadingScreen";
 
 export const GameApp = () => {
@@ -32,6 +33,7 @@ export const GameApp = () => {
         <CheatConsole />
       )}
       <LoadingScreen active={showLoadingScreen} message={loadingScreenMessage} backgroundURL={loadingScreenBackgroundURL} logoURL={loadingScreenLogoURL} />
+      {gameLoaded && <GMPanel />}
     </>
   )
 }

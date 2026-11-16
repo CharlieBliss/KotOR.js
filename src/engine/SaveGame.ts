@@ -12,7 +12,7 @@ import { BinaryReader } from "@/utility/binary/BinaryReader";
 import { Utility } from "@/utility/Utility";
 import EngineLocation from "@/engine/EngineLocation";
 import { GameFileSystem } from "@/utility/GameFileSystem";
-import { ResourceTypes } from "@/KotOR";
+import { ResourceTypes } from "@/resource/ResourceTypes";
 import { exists } from "fs";
 
 const winEpoch = new Date("01-01-1601 UTC").getTime();
@@ -993,7 +993,7 @@ export class SaveGame {
       }
 
       let boolStruct = new GFFStruct();
-      boolStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Name') ).setValue(boolean.name);
+      boolStruct.addCExoString('Name', boolean.name);
       catBooleanList.addChildStruct(boolStruct);
       i++;
     });
@@ -1013,7 +1013,7 @@ export class SaveGame {
       locationDataView.setFloat32( (24 * i) + 20, location.value.rotation.z, true );
 
       let locStruct = new GFFStruct();
-      locStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Name') ).setValue(location.name);
+      locStruct.addCExoString('Name', location.name);
       catLocationList.addChildStruct(locStruct);
       i++;
     });
@@ -1027,7 +1027,7 @@ export class SaveGame {
       numberBuffer[i] = (numberObj.value & 0xFF);
 
       const numberStruct = new GFFStruct();
-      numberStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Name') ).setValue(numberObj.name);
+      numberStruct.addCExoString('Name', numberObj.name);
       catNumberList.addChildStruct(numberStruct);
       i++;
     });
@@ -1043,12 +1043,12 @@ export class SaveGame {
     i = 0;
     GameState.GlobalVariableManager.Globals.String.forEach( (stringObj, key: string) => {
       const stringCatStruct = new GFFStruct();
-      stringCatStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'Name') ).setValue(stringObj.name);
+      stringCatStruct.addCExoString('Name', stringObj.name);
       catStringList.addChildStruct(stringCatStruct);
 
 
       const stringValStruct = new GFFStruct();
-      stringValStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'String') ).setValue(stringObj.value);
+      stringValStruct.addCExoString('String', stringObj.value);
       valStringList.addChildStruct(stringValStruct);
       i++;
     });

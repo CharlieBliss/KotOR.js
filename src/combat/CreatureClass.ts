@@ -317,8 +317,8 @@ export class CreatureClass {
 
   save(){
     let _class = new GFFStruct(2);
-    _class.addField( new GFFField(GFFDataType.INT, 'Class') ).setValue(this.id);
-    _class.addField( new GFFField(GFFDataType.SHORT, 'ClassLevel') ).setValue(this.level);
+    _class.addInt('Class', this.id);
+    _class.addShort('ClassLevel', this.level);
 
     //Spell Caster specific data
     if(this.spellcaster){

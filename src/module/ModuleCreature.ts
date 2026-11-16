@@ -1,3 +1,4 @@
+import type { GMCreatureSpawnConfig } from "@/managers/gm/GMTypes";
 import { GFFObject } from "@/resource/GFFObject";
 import * as THREE from "three";
 import { ModuleObject } from "@/module/ModuleObject";
@@ -8,6 +9,7 @@ import { AudioEmitter } from "@/audio/AudioEmitter";
 import { CreatureClass } from "@/combat/CreatureClass";
 import { EffectRacialType } from "@/effects";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { ModuleItemProperty } from "@/enums/module/ModuleItemProperty";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { GFFDataType } from "@/enums/resource/GFFDataType";
 import { GameState } from "@/GameState";
@@ -23,6 +25,9 @@ import { TalentSkill } from "@/talents/TalentSkill";
 import { TalentSpell } from "@/talents/TalentSpell";
 import { OdysseyModel3D, OdysseyObject3D } from "@/three/odyssey";
 import { OdysseyModel, OdysseyModelAnimation } from "@/odyssey";
+import { EquipmentSlots } from "@/module/creature/EquipmentSlots";
+import { CreatureTemplate } from "@/module/creature/CreatureTemplate";
+import type { CreatureEquipment } from "@/module/creature/EquipmentSlots";
 import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot";
 import { LIPObject } from "@/resource/LIPObject";
 import { Utility } from "@/utility/Utility";
@@ -53,11 +58,14 @@ import { CombatRoundAction } from "@/combat";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import type { Action } from "@/actions/Action";
 import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
+import { SkillType } from "@/enums/nwscript/SkillType";
 import { EngineDebugType } from "@/enums/engine/EngineDebugType";
 import { TextSprite3D } from "@/engine/TextSprite3D";
 import { UIIconTimerType } from "@/enums/engine/UIIconTimerType";
 import { ExperienceType } from "@/enums/engine/ExperienceType";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
+import { TalentObjectType } from "@/enums/engine/TalentObjectType";
+import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 
 /**
 * ModuleCreature class.
@@ -148,23 +156,7 @@ export class ModuleCreature extends ModuleObject {
   animationState: ICreatureAnimationState;
   overlayAnimationState: IOverlayAnimationState;
   
-  equipment: { 
-    HEAD: ModuleItem; 
-    ARMOR: ModuleItem; 
-    ARMS: ModuleItem; 
-    RIGHTHAND: ModuleItem; 
-    RIGHTHAND2: ModuleItem; 
-    LEFTHAND: ModuleItem; 
-    LEFTHAND2: ModuleItem; 
-    LEFTARMBAND: ModuleItem; 
-    RIGHTARMBAND: ModuleItem; 
-    IMPLANT: ModuleItem; 
-    BELT: ModuleItem; 
-    CLAW1: ModuleItem; 
-    CLAW2: ModuleItem; 
-    CLAW3: ModuleItem; 
-    HIDE: ModuleItem; 
-  };
+  equipment: CreatureEquipment;
   regenTimer: number;
   regenTimerMax: number;
   excitedDuration: number;
@@ -277,24 +269,7 @@ export class ModuleCreature extends ModuleObject {
     this.resetAnimationState();
     this.resetOverlayAnimationState();
 
-    this.equipment = {
-      HEAD: undefined,
-      ARMOR: undefined,
-      ARMS: undefined,
-      RIGHTHAND: undefined,
-      RIGHTHAND2: undefined,
-      LEFTHAND: undefined,
-      LEFTHAND2: undefined,
-      LEFTARMBAND: undefined,
-      RIGHTARMBAND: undefined,
-      IMPLANT: undefined,
-      BELT: undefined,
-    
-      CLAW1: undefined,
-      CLAW2: undefined,
-      CLAW3: undefined,
-      HIDE:  undefined,
-    };
+    this.equipment = EquipmentSlots.empty();
 
     this.experience = 0;
     this.feats = [];
@@ -416,6 +391,10 @@ export class ModuleCreature extends ModuleObject {
       return;
     }
 
+    // GM multiplayer: replicas are simulated by the host; motion-driven creatures follow streamed positions
+    const netReplica = GameState.hooks.isNetReplica(this);
+    const netMotion = GameState.hooks.isNetMotionDriven(this);
+
     if(this.audioEmitter){
       this.audioEmitter.setPosition(this.position.x, this.position.y, this.position.z + 1.0);
       this.footstepEmitter.setPosition(this.position.x, this.position.y, this.position.z);
@@ -425,7 +404,9 @@ export class ModuleCreature extends ModuleObject {
     this.sphere.center.copy(this.position);
     this.sphere.radius = this.getHitDistance() * 2;
 
-    if(GameState.Mode == EngineMode.INGAME || GameState.Mode == EngineMode.MINIGAME || GameState.Mode == EngineMode.DIALOG){
+    // The GM's free camera still runs the world so player intents and NPCs resolve while the GM is not possessing anyone
+    const gmFreeLook = GameState.gmMode && GameState.Mode == EngineMode.FREELOOK;
+    if(GameState.Mode == EngineMode.INGAME || GameState.Mode == EngineMode.MINIGAME || GameState.Mode == EngineMode.DIALOG || gmFreeLook){
 
       if(this.animationState.index == ModuleCreatureAnimState.IDLE){
         this.footstepEmitter.isLooping = false;
@@ -454,102 +435,7 @@ export class ModuleCreature extends ModuleObject {
         }
       }*/
 
-      if(!this.isDead() && (
-          this.animationState.index == ModuleCreatureAnimState.DEAD ||
-          this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
-        )
-      ){
-        this.deathAnimationPlayed = false;
-        this.setAnimationState(ModuleCreatureAnimState.GET_UP_DEAD);
-      }
-
-      if(!this.isDead()){
-
-        //Process DamageList
-        let elLen = this.damageList.length - 1;
-        for(let i = elLen; i >= 0; i--){
-          this.damageList[i].delay -= delta;
-          if(this.damageList[i].delay <= 0){
-            this.subtractHP(this.damageList[i].amount);
-
-            let painsound = THREE.MathUtils.randInt(0, 1);
-            switch(painsound){
-              case 1:
-                this.playSoundSet(SSFType.PAIN_2);
-              break;
-              default:
-                this.playSoundSet(SSFType.PAIN_1);
-              break;
-            }
-      
-            this.damageList.splice(i, 1);
-          }
-        }
-
-        this.deathStarted = false;
-        
-        if(this.animationState.index != ModuleCreatureAnimState.DEAD){
-          this.updateActionQueue(delta);
-        }
-
-        if(this.dialogAnimation && (GameState.Mode == EngineMode.DIALOG) && (!this.action || this.action.type != ActionType.ActionPlayAnimation)){
-          if(this.model){
-
-            if(!this.speed){
-                
-              let _animIsValid = (this.dialogAnimation.animation instanceof OdysseyModelAnimation);
-              if(_animIsValid){
-                let _animIsPlaying = (this.model.animationManager.currentAnimation == this.dialogAnimation.animation);
-                if(!_animIsPlaying && !this.dialogAnimation.started){
-                  let _newAnim = this.dialogAnimation.animation;
-                  if(_newAnim instanceof OdysseyModelAnimation){
-                    this.model.playAnimation( _newAnim, !!parseInt(this.dialogAnimation.data.looping) );
-                    this.dialogAnimation.started = true;
-                  }else{
-                    //Kill the dialogAnimation if the animation isn't valid
-                    this.dialogAnimation = null;
-                  }
-                }else if(!_animIsPlaying && this.dialogAnimation.started){
-                  //Kill the dialogAnimation if it has already played
-                  this.dialogAnimation = null;
-                }
-              }else{
-                //Kill the dialogAnimation if the animation isn't valid
-                this.dialogAnimation = null;
-              }
-
-            }
-  
-          }else{
-            //Kill the dialogAnimation if there is no model to animate?
-            this.dialogAnimation = null;
-          }
-        }else{
-          this.dialogAnimation = null;
-        }
-      }else{
-        this.damageList = [];
-        this.getUpAnimationPlayed = false;
-        if(
-          this.deathStarted && 
-          this.animationState.index != ModuleCreatureAnimState.DEAD && 
-          this.animationState.index != ModuleCreatureAnimState.DIE
-        ){
-          this.setAnimationState(ModuleCreatureAnimState.DEAD);
-          this.deathAnimationPlayed = true;
-        }
-        if(!this.deathStarted){
-          this.deathAnimationPlayed = false;
-          this.deathStarted = true;
-          this.clearAllActions();
-          this.onDeath();
-          this.playSoundSet(SSFType.DEAD);
-          this.resetOverlayAnimationState();
-          this.setAnimationState(ModuleCreatureAnimState.DIE);
-        }
-      }
+      this.updateLifeState(delta, netReplica);
 
       if(this.isDebilitated()){
         this.force = 0;
@@ -557,126 +443,25 @@ export class ModuleCreature extends ModuleObject {
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
       }
 
-      //-------------------------//
-      // BEGIN: Move Speed Logic //
-      //-------------------------//
+      this.updateMoveForce(delta, netMotion);
 
-      if(
-        this.isDead() ||
-        (
-          this.animationState.index == ModuleCreatureAnimState.DIE ||
-          this.animationState.index == ModuleCreatureAnimState.DIE1 ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD ||
-          this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1 
-        )
-      ){
-        this.force = 0;
-        this.speed = 0;
-        this.animSpeed = 1;
-        this.forceVector.set(0, 0, 0);
+      if(netMotion){
+        GameState.hooks.updateNetMotion(this, delta);
       }
-
-      this.forceVector.z = 0;
-
-      this.speed += (this.getMovementSpeed() * 2.5) * this.force * delta;
-
-      if(this.speed > this.getMovementSpeed()){
-        this.speed = this.getMovementSpeed();
-      }
-      
-      let forceDelta = Math.max(this.force * delta, this.speed * delta);
-      let gravityDelta = -1 * delta;
-      
-      if(this.speed){
-        this.animSpeed = this.speed / this.getRunSpeed();
-      }else{
-        this.animSpeed = 1;
-      }
-        
-      if(!this.forceVector.length()){
-        this.forceVector.x = ( Math.cos(this.rotation.z + Math.PI/2) * forceDelta );
-        this.forceVector.y = ( Math.sin(this.rotation.z + Math.PI/2) * forceDelta );
-        if(this.forceVector.length()){
-          if(this.animSpeed > 0.75){
-            this.setAnimationState(ModuleCreatureAnimState.RUNNING);
-          }else{
-            this.setAnimationState(ModuleCreatureAnimState.WALKING);
-          }
-        }
-        //this.forceVector.z = gravityDelta;
-      }else{
-        this.forceVector.multiplyScalar(forceDelta);
-      }
-
-      if(this.force < 1){
-        this.speed -= (this.getMovementSpeed() * 2.5) * delta;
-      }
-
-      if(this.speed < 0){
-        this.speed = 0;
-      }
-
-      if(!this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING )){
-        this.setAnimationState(ModuleCreatureAnimState.IDLE);
-        this.speed = 0;
-        this.force = 0;
-      }
-
-      //-----------------------//
-      // END: Move Speed Logic //
-      //-----------------------//
 
       if(this.combatData.combatState && this.animationState.index == ModuleCreatureAnimState.PAUSE){
         this.setAnimationState(ModuleCreatureAnimState.READY);
       }
 
       this.updateExcitedDuration(delta);
-      this.updateCombat(delta);
-      this.updateCasting(delta);
+      if(!netReplica){
+        this.updateCombat(delta);
+        this.updateCasting(delta);
+      }
       this.updateAnimationState();
       this.updateItems(delta);
       
-      if(this.model instanceof OdysseyModel3D && this.model.bonesInitialized){
-
-        //BEGIN: Animation Optimization
-        this.model.animateFrame = true;
-        //If the object is further than 50 meters, animate every other frame
-        if(this.distanceToCamera > 50){
-          this.model.animateFrame = this.model.oddFrame;
-        }
-        
-        if(this.model.animateFrame){
-          //If we can animate and there is fog, make sure the distance isn't greater than the far point of the fog effect
-          if(GameState.PartyManager.party.indexOf(this) == -1 && this.context.scene.fog){
-            if(this.distanceToCamera >= this.context.scene.fog.far){
-              this.model.animateFrame = false;
-              //If the object is past the near point, and the near point is greater than zero, animate every other frame
-            }else if(this.context.scene.fog.near && this.distanceToCamera >= this.context.scene.fog.near){
-              this.model.animateFrame = this.model.oddFrame;
-            }
-          }
-        }
-        //END: Animation Optimization
-
-        if(GameState.Mode != EngineMode.DIALOG){
-          this.model.update( this.movementSpeed * delta );
-          if(this.lipObject instanceof LIPObject){
-            this.lipObject.update(delta, this.model);
-          }
-        }else{
-          this.model.update( delta );
-          if(this.lipObject instanceof LIPObject){
-            this.lipObject.update(delta, this.model);
-          }
-          if(this.cutsceneMode && this.model){
-            for(let i = 0, len = this.model.skins.length; i < len; i++){
-              this.model.skins[i].frustumCulled = false;
-            }
-          }
-        }
-
-        this.updateHeadTracking(delta);
-      }
+      this.updateModelAnimation(delta);
 
       if(this.collisionManager.blockingObject != this.collisionManager.lastBlockingObject){
         this.collisionManager.lastBlockingObject = this.collisionManager.blockingObject;
@@ -687,99 +472,28 @@ export class ModuleCreature extends ModuleObject {
       if(this.forceVector.length())
         this.collisionManager.updateCollision(delta);
 
-      this.updatePerceptionList(delta);
-      this.updateListeningPatterns();
-
+      if(!netReplica){
+        this.updatePerceptionList(delta);
+        this.updateListeningPatterns();
+      }
 
       //If a non controlled party member is stuck, warp them to their follow position
-      if(this.npcId != undefined && this != (GameState.getCurrentPlayer() as any) && this.collisionTimer >= 1){
+      if(!netMotion && this.npcId != undefined && this != (GameState.getCurrentPlayer() as any) && this.collisionTimer >= 1){
         this.setPosition(GameState.PartyManager.GetFollowPosition(this));
         this.collisionTimer = 0;
       }
 
-      this.turning = 0;
-      if(this.facingAnim){
-        const current = Utility.NormalizeRadian(this.rotation.z);
-        const target = this.facing;
-        const remaining = Utility.NormalizeRadian(target - current);
-        const step = this.facingSpeed * delta;
-        if(Math.abs(remaining) <= step){
-          this.rotation.z = target;
-          this.wasFacing = target;
-          this.facingAnim = false;
-        }else{
-          this.rotation.z = Utility.NormalizeRadian(current + Math.sign(remaining) * step);
-          this.turning = Math.sign(remaining);
-        }
-      }
-
-      // Stationary turn animations (body turn when idle/pause/ready; not head look)
-      const stationaryTurnStates = [
-        ModuleCreatureAnimState.IDLE,
-        ModuleCreatureAnimState.PAUSE,
-        ModuleCreatureAnimState.READY,
-        ModuleCreatureAnimState.TURN_LEFT,
-        ModuleCreatureAnimState.TURN_RIGHT
-      ];
-      if(this.turning !== 0 && stationaryTurnStates.includes(this.animationState.index)){
-        const wantTurnLeft = this.turning < 0;
-        if(wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_LEFT){
-          this.setAnimationState(ModuleCreatureAnimState.TURN_LEFT);
-        }else if(!wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_RIGHT){
-          this.setAnimationState(ModuleCreatureAnimState.TURN_RIGHT);
-        }
-      }else if(this.turning === 0 && (this.animationState.index === ModuleCreatureAnimState.TURN_LEFT || this.animationState.index === ModuleCreatureAnimState.TURN_RIGHT)){
-        this.setAnimationState(this.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
-      }
+      this.updateTurning(delta);
 
       //Update equipment
-      if(this.equipment.HEAD){
-        this.equipment.HEAD.update(delta);
-      }
-      if(this.equipment.ARMS){
-        this.equipment.ARMS.update(delta);
-      }
-
-      if(this.equipment.RIGHTARMBAND){
-        this.equipment.RIGHTARMBAND.update(delta);
-      }
-
-      if(this.equipment.LEFTARMBAND){
-        this.equipment.LEFTARMBAND.update(delta);
-      }
-
-      if(this.equipment.RIGHTHAND){
-        this.equipment.RIGHTHAND.update(delta);
-      }
-
-      if(this.equipment.LEFTHAND){
-        this.equipment.LEFTHAND.update(delta);
-      }
-
-      if(this.equipment.ARMOR){
-        this.equipment.ARMOR.update(delta);
-      }
-      
-      if(this.equipment.BELT){
-        this.equipment.BELT.update(delta);
-      }
-
-      if(this.equipment.CLAW1){
-        this.equipment.CLAW1.update(delta);
-      }
-
-      if(this.equipment.CLAW2){
-        this.equipment.CLAW2.update(delta);
-      }
-
-      if(this.equipment.CLAW3){
-        this.equipment.CLAW3.update(delta);
+      for(const key of EquipmentSlots.WORN){
+        this.equipment[key]?.update(delta);
       }
 
       //Loop through and update the effects
       if(this.deferEventUpdate){
         for(let i = 0, len = this.effects.length; i < len; i++){
-          this.effects[i].update(delta);
+          const lenBefore = this.effects.length; this.effects[i]?.update(delta); if(this.effects.length < lenBefore){ i -= (lenBefore - this.effects.length); len = this.effects.length; }
         }
       }
 
@@ -796,13 +510,273 @@ export class ModuleCreature extends ModuleObject {
       this.updateItems(delta);
     }
 
-    this.updateRegen(delta);
+    if(!netReplica){
+      this.updateRegen(delta);
+    }
 
     this.collisionTimer -= delta;
     if(this.collisionTimer < 0)
       this.collisionTimer = 0;
 
     this.force = 0;
+  }
+
+  /** Get up when revived, apply queued damage, and play the dialog or death animations */
+  private updateLifeState(delta: number, netReplica: boolean){
+    if(!this.isDead() && (
+        this.animationState.index == ModuleCreatureAnimState.DEAD ||
+        this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
+      )
+    ){
+      this.deathAnimationPlayed = false;
+      this.setAnimationState(ModuleCreatureAnimState.GET_UP_DEAD);
+    }
+
+    if(!this.isDead()){
+
+      //Process DamageList
+      let elLen = this.damageList.length - 1;
+      for(let i = elLen; i >= 0; i--){
+        this.damageList[i].delay -= delta;
+        if(this.damageList[i].delay <= 0){
+          this.subtractHP(this.damageList[i].amount);
+
+          let painsound = THREE.MathUtils.randInt(0, 1);
+          switch(painsound){
+            case 1:
+              this.playSoundSet(SSFType.PAIN_2);
+            break;
+            default:
+              this.playSoundSet(SSFType.PAIN_1);
+            break;
+          }
+    
+          this.damageList.splice(i, 1);
+        }
+      }
+
+      this.deathStarted = false;
+      
+      if(!netReplica && this.animationState.index != ModuleCreatureAnimState.DEAD){
+        this.updateActionQueue(delta);
+      }
+
+      if(this.dialogAnimation && (GameState.Mode == EngineMode.DIALOG) && (!this.action || this.action.type != ActionType.ActionPlayAnimation)){
+        if(this.model){
+
+          if(!this.speed){
+              
+            let _animIsValid = (this.dialogAnimation.animation instanceof OdysseyModelAnimation);
+            if(_animIsValid){
+              let _animIsPlaying = (this.model.animationManager.currentAnimation == this.dialogAnimation.animation);
+              if(!_animIsPlaying && !this.dialogAnimation.started){
+                let _newAnim = this.dialogAnimation.animation;
+                if(_newAnim instanceof OdysseyModelAnimation){
+                  this.model.playAnimation( _newAnim, !!parseInt(this.dialogAnimation.data.looping) );
+                  this.dialogAnimation.started = true;
+                }else{
+                  //Kill the dialogAnimation if the animation isn't valid
+                  this.dialogAnimation = null;
+                }
+              }else if(!_animIsPlaying && this.dialogAnimation.started){
+                //Kill the dialogAnimation if it has already played
+                this.dialogAnimation = null;
+              }
+            }else{
+              //Kill the dialogAnimation if the animation isn't valid
+              this.dialogAnimation = null;
+            }
+
+          }
+
+        }else{
+          //Kill the dialogAnimation if there is no model to animate?
+          this.dialogAnimation = null;
+        }
+      }else{
+        this.dialogAnimation = null;
+      }
+    }else{
+      this.damageList = [];
+      this.getUpAnimationPlayed = false;
+      if(
+        this.deathStarted && 
+        this.animationState.index != ModuleCreatureAnimState.DEAD && 
+        this.animationState.index != ModuleCreatureAnimState.DIE
+      ){
+        this.setAnimationState(ModuleCreatureAnimState.DEAD);
+        this.deathAnimationPlayed = true;
+      }
+      if(!this.deathStarted){
+        this.deathAnimationPlayed = false;
+        this.deathStarted = true;
+        this.clearAllActions();
+        if(!netReplica) this.onDeath();
+        this.playSoundSet(SSFType.DEAD);
+        this.resetOverlayAnimationState();
+        this.setAnimationState(ModuleCreatureAnimState.DIE);
+      }
+    }
+  }
+
+  /** Turn this frame's force into speed and a movement vector (no movement while dead, debilitated or driven by the network) */
+  private updateMoveForce(delta: number, netMotion: boolean){
+    //-------------------------//
+    // BEGIN: Move Speed Logic //
+    //-------------------------//
+
+    if(
+      netMotion ||
+      this.isDead() ||
+      (
+        this.animationState.index == ModuleCreatureAnimState.DIE ||
+        this.animationState.index == ModuleCreatureAnimState.DIE1 ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD ||
+        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1 
+      )
+    ){
+      this.force = 0;
+      this.speed = 0;
+      this.animSpeed = 1;
+      this.forceVector.set(0, 0, 0);
+    }
+
+    this.forceVector.z = 0;
+
+    this.speed += (this.getMovementSpeed() * 2.5) * this.force * delta;
+
+    if(this.speed > this.getMovementSpeed()){
+      this.speed = this.getMovementSpeed();
+    }
+    
+    let forceDelta = Math.max(this.force * delta, this.speed * delta);
+    let gravityDelta = -1 * delta;
+    
+    if(this.speed){
+      this.animSpeed = this.speed / this.getRunSpeed();
+    }else{
+      this.animSpeed = 1;
+    }
+      
+    if(!this.forceVector.length()){
+      this.forceVector.x = ( Math.cos(this.rotation.z + Math.PI/2) * forceDelta );
+      this.forceVector.y = ( Math.sin(this.rotation.z + Math.PI/2) * forceDelta );
+      if(this.forceVector.length()){
+        if(this.stealthMode){
+          this.setAnimationState(ModuleCreatureAnimState.WALK_STEALTH);
+        }else if(this.animSpeed > 0.75){
+          this.setAnimationState(ModuleCreatureAnimState.RUNNING);
+        }else{
+          this.setAnimationState(ModuleCreatureAnimState.WALKING);
+        }
+      }
+      //this.forceVector.z = gravityDelta;
+    }else{
+      this.forceVector.multiplyScalar(forceDelta);
+    }
+
+    if(this.force < 1){
+      this.speed -= (this.getMovementSpeed() * 2.5) * delta;
+    }
+
+    if(this.speed < 0){
+      this.speed = 0;
+    }
+
+    if(!netMotion && !this.forceVector.length() && ( this.animationState.index == ModuleCreatureAnimState.RUNNING || this.animationState.index == ModuleCreatureAnimState.WALKING || this.animationState.index == ModuleCreatureAnimState.WALK_STEALTH )){
+      this.setAnimationState(ModuleCreatureAnimState.IDLE);
+      this.speed = 0;
+      this.force = 0;
+    }
+
+    //-----------------------//
+    // END: Move Speed Logic //
+    //-----------------------//
+  }
+
+  /** Advance the model's animation (every other frame when far from the camera) */
+  private updateModelAnimation(delta: number){
+    if(this.model instanceof OdysseyModel3D && this.model.bonesInitialized){
+
+      //BEGIN: Animation Optimization
+      this.model.animateFrame = true;
+      //If the object is further than 50 meters, animate every other frame
+      if(this.distanceToCamera > 50){
+        this.model.animateFrame = this.model.oddFrame;
+      }
+      
+      if(this.model.animateFrame){
+        //If we can animate and there is fog, make sure the distance isn't greater than the far point of the fog effect
+        if(GameState.PartyManager.party.indexOf(this) == -1 && this.context.scene.fog){
+          if(this.distanceToCamera >= this.context.scene.fog.far){
+            this.model.animateFrame = false;
+            //If the object is past the near point, and the near point is greater than zero, animate every other frame
+          }else if(this.context.scene.fog.near && this.distanceToCamera >= this.context.scene.fog.near){
+            this.model.animateFrame = this.model.oddFrame;
+          }
+        }
+      }
+      //END: Animation Optimization
+
+      if(GameState.Mode != EngineMode.DIALOG){
+        this.model.update( this.movementSpeed * delta );
+        if(this.lipObject instanceof LIPObject){
+          this.lipObject.update(delta, this.model);
+        }
+      }else{
+        this.model.update( delta );
+        if(this.lipObject instanceof LIPObject){
+          this.lipObject.update(delta, this.model);
+        }
+        if(this.cutsceneMode && this.model){
+          for(let i = 0, len = this.model.skins.length; i < len; i++){
+            this.model.skins[i].frustumCulled = false;
+          }
+        }
+      }
+
+      this.updateHeadTracking(delta);
+    }
+  }
+
+  /** Turn toward facing at facingSpeed, playing the turn animations while standing */
+  private updateTurning(delta: number){
+    this.turning = 0;
+    if(this.facingAnim){
+      const current = Utility.NormalizeRadian(this.rotation.z);
+      const target = this.facing;
+      const remaining = Utility.NormalizeRadian(target - current);
+      const step = this.facingSpeed * delta;
+      if(Math.abs(remaining) <= step){
+        this.rotation.z = target;
+        this.wasFacing = target;
+        this.facingAnim = false;
+      }else{
+        this.rotation.z = Utility.NormalizeRadian(current + Math.sign(remaining) * step);
+        this.turning = Math.sign(remaining);
+      }
+    }
+
+    // Stationary turn animations (body turn when idle/pause/ready; not head look)
+    const stationaryTurnStates = [
+      ModuleCreatureAnimState.IDLE,
+      ModuleCreatureAnimState.PAUSE,
+      ModuleCreatureAnimState.READY,
+      ModuleCreatureAnimState.TURN_LEFT,
+      ModuleCreatureAnimState.TURN_RIGHT
+    ];
+    if(this.turning !== 0 && stationaryTurnStates.includes(this.animationState.index)){
+      const wantTurnLeft = this.turning < 0;
+      if(wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_LEFT){
+        this.setAnimationState(ModuleCreatureAnimState.TURN_LEFT);
+      }else if(!wantTurnLeft && this.animationState.index !== ModuleCreatureAnimState.TURN_RIGHT){
+        this.setAnimationState(ModuleCreatureAnimState.TURN_RIGHT);
+      }
+    }else if(this.turning === 0 && (this.animationState.index === ModuleCreatureAnimState.TURN_LEFT || this.animationState.index === ModuleCreatureAnimState.TURN_RIGHT)){
+      this.setAnimationState(this.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
+    }
   }
 
   updateRegen(delta = 0){
@@ -838,9 +812,11 @@ export class ModuleCreature extends ModuleObject {
     if(!(this.action)){
       const currentPlayer = GameState.getCurrentPlayer();
       if(
-        !this.combatData.combatState && 
-        this.isPartyMember() && 
-        this != currentPlayer && 
+        !this.combatData.combatState &&
+        this.isPartyMember() &&
+        !this.gmOwnerPeerId &&
+        currentPlayer &&
+        this != currentPlayer &&
         !this.facingAnim
       ){
         this.lookAtObject = currentPlayer;
@@ -878,6 +854,10 @@ export class ModuleCreature extends ModuleObject {
     if(this.isDead())
       return true;
 
+    // Hidden by the game mode: it notices nobody until it's revealed
+    if(GameState.hooks.isHidden(this))
+      return;
+
     if(this.room){
       if(!this.room.model.visible){
         return;
@@ -910,6 +890,10 @@ export class ModuleCreature extends ModuleObject {
       }
 
       let distance = this.position.distanceTo(creature.position);
+      if(!this.canDetect(creature)){
+        this.notifyPerceptionSeenObject(creature, false);
+        continue;
+      }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
         if(GameState.PartyManager.party.indexOf(this) == -1){
           if(this.isHostile(creature)){
@@ -941,6 +925,10 @@ export class ModuleCreature extends ModuleObject {
       }
 
       let distance = this.position.distanceTo(creature.position);
+      if(!this.canDetect(creature)){
+        this.notifyPerceptionSeenObject(creature, false);
+        continue;
+      }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
         if(GameState.PartyManager.party.indexOf(this) == -1){
           if(this.isHostile(creature)){
@@ -954,13 +942,16 @@ export class ModuleCreature extends ModuleObject {
       }
     }
 
-    for(let i = 0, triglen = this.area.triggers.length; i < triglen; i++){
-      const trig = this.area.triggers[i];
-      if(trig.type != ModuleTriggerType.TRAP){ continue; }
-      if(trig.trapDetected){ continue; }
-      const actionFlag = new GameState.ActionFactory.ActionFlagMine();
-      actionFlag.setParameter(0, ActionParameterType.DWORD, trig);
-      this.actionQueue.addFront(actionFlag);
+    if(this.canSpotMines()){
+      for(let i = 0, triglen = this.area.triggers.length; i < triglen; i++){
+        const trig = this.area.triggers[i];
+        if(trig.type != ModuleTriggerType.TRAP || trig.trapDetected){ continue; }
+        if(this.position.distanceTo(trig.position) > ModuleCreature.MINE_DETECT_RANGE){ continue; }
+        const roll = 1 + Math.floor(Math.random() * 20) + this.getSkillLevel(SkillType.AWARENESS);
+        if(roll >= (Number(trig.trapDetectDC) || 0)){
+          trig.detectTrap();
+        }
+      }
     }
     
   }
@@ -1016,7 +1007,7 @@ export class ModuleCreature extends ModuleObject {
   updateCasting(delta = 0){
     //Update active spells
     for(let i = 0, len = this.casting.length; i < len; i++){
-      this.casting[i].spell.update(this.casting[i].target, this, this.casting[i], delta);
+      this.casting[i]?.spell?.update?.(this.casting[i].target, this, this.casting[i], delta);
     }
 
     //Remove completed spells
@@ -1108,6 +1099,9 @@ export class ModuleCreature extends ModuleObject {
     if((GameState.Mode == EngineMode.DIALOG) && this.dialogAnimation && !this.speed && !this.isDead())
       return;
 
+    this.holdStance();
+    this.refreshIdleStance();
+
     if(this.animationState.animation){
       if(currentAnimation != this.animationState.animation.name?.toLowerCase()){
         if(!this.animationState.started){
@@ -1142,6 +1136,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   canMove(){
+    // A GM can freeze players to watch a scene
+    if(GameState.hooks.isPlayerFrozen(this)) return false;
     return !this.isParalyzed() && !this.isStunned() && (
       this.animationState.index != ModuleCreatureAnimState.DEAD && 
       this.animationState.index != ModuleCreatureAnimState.DEAD1 && 
@@ -1392,30 +1388,93 @@ export class ModuleCreature extends ModuleObject {
   useTalent(talent: TalentObject, oTarget: ModuleObject): Action {
     let action: Action;
     if(talent instanceof TalentObject){
-      const combatAction = new CombatRoundAction();
-      switch(talent.objectType){
-        case 1: //FEAT
-          combatAction.actionType = CombatActionType.ATTACK_USE_FEAT;
-          combatAction.target = oTarget;
-          combatAction.setFeat(talent as TalentFeat);
-          this.combatRound.addAction(combatAction);
-        break;
-        case 2: //SKILL
-          if(talent.id == 6){ //Security
-            action = new GameState.ActionFactory.ActionUnlockObject();
-            action.setParameter(0, ActionParameterType.DWORD, oTarget.id || ModuleObjectConstant.OBJECT_INVALID);
-            this.actionQueue.add(action);
-          }
-        break;
-        case 0: //SPELL
-          combatAction.actionType = CombatActionType.CAST_SPELL;
-          combatAction.setSpell(talent as TalentSpell);
-          combatAction.target = oTarget;
-          this.combatRound.addAction(combatAction);
-        break;
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat) || talent.objectType === 1){
+        (talent as TalentFeat).useTalentOnObject(oTarget, this);
+        return action;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell) || talent.objectType === 0){
+        (talent as TalentSpell).useTalentOnObject(oTarget, this);
+        return action;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill) || talent.objectType === 2){
+        if(talent.id == 6){
+          action = new GameState.ActionFactory.ActionUnlockObject();
+          action.setParameter(0, ActionParameterType.DWORD, oTarget?.id || ModuleObjectConstant.OBJECT_INVALID);
+          this.actionQueue.add(action);
+        }
+        return action;
       }
     }
     return action;
+  }
+
+  /** The idle states whose stance depends on condition: standing, injured (HP at or below 20%) or sick */
+  static readonly IDLE_STATES = new Set<number>([
+    ModuleCreatureAnimState.PAUSE, ModuleCreatureAnimState.PAUSE_ALT, ModuleCreatureAnimState.PAUSE2,
+    ModuleCreatureAnimState.PAUSE3, ModuleCreatureAnimState.PAUSE4,
+  ]);
+  /** animations.2da rows of those stances: pause1, pause2, pauseinj, pausetired (sick), pause3, pause4 */
+  static readonly IDLE_STANCE_ROWS = [6, 7, 8, 15, 357, 359];
+
+  /**
+   * An idle stance loops until something else plays, so it was only ever chosen once. Pick it again when the
+   * creature's condition changes: one healed (or spawned before its HP was set) stops limping, one badly hurt starts.
+   */
+  refreshIdleStance(){
+    const state = this.animationState;
+    if(this.heldStance || !state.animation || !ModuleCreature.IDLE_STATES.has(state.index) || this.isSimpleCreature()) return;
+    // Something else is playing in the idle state (a scripted animation, say): leave it
+    if(!this.isIdleStanceAnimation(state.animation)) return;
+    const wanted = this.animationConstantToAnimation(state.index);
+    if(this.isIdleStanceAnimation(wanted) && wanted.name !== state.animation.name) this.setAnimationState(state.index);
+  }
+
+  /** Whether an animation is one of the plain idle stances the engine picks by itself */
+  isIdleStanceAnimation(anim?: ITwoDAAnimation): boolean {
+    if(!anim) return false;
+    const table = GameState.TwoDAManager?.datatables.get('animations');
+    if(!table) return false;
+    if(ModuleCreature.IDLE_STANCE_ROWS.some((row) => table.rows[row]?.name === anim.name)) return true;
+    // Beasts and droids idle on their own rows
+    return this.isSimpleCreature() && (anim.name === table.rows[256]?.name || anim.name === table.rows[257]?.name);
+  }
+
+  /**
+   * A looping animation (an animations.2da name) the creature holds whenever it would otherwise just stand idle:
+   * sitting, meditating, lying wounded... It survives walking somewhere and gestures, and gives way to combat.
+   */
+  heldStance: string = '';
+
+  setHeldStance(name: string = ''){
+    const previous = this.heldStance;
+    this.heldStance = String(name || '').trim().toLowerCase();
+    if(previous && previous !== this.heldStance && this.animationState.animation?.name?.toLowerCase() === previous){
+      // Back to standing (or straight into the new stance)
+      this.setAnimationState(ModuleCreatureAnimState.PAUSE);
+    }
+    this.holdStance();
+  }
+
+  /** Put the held stance back once the creature is just standing again */
+  holdStance(){
+    if(!this.heldStance || this.isDead() || this.combatData?.combatState) return;
+    const state = this.animationState;
+    if(state.index !== ModuleCreatureAnimState.PAUSE) return;
+    const current = state.animation?.name?.toLowerCase();
+    if(current === this.heldStance) return;
+    // Let a gesture or scripted animation finish first
+    if(state.animation && !this.isIdleStanceAnimation(state.animation)) return;
+    // A model without it would fall straight back to idle and try again every frame
+    if(!this.hasModelAnimation(this.heldStance)) return;
+    const anim = OdysseyModelAnimation.GetAnimation2DA(this.heldStance);
+    if(!anim) return;
+    this.playTwoDAAnimation(anim);
+  }
+
+  /** Whether the creature's loaded model has an animation of this name */
+  hasModelAnimation(name: string = ''): boolean {
+    const model = this.model as any;
+    return !!model?.odysseyAnimationMap?.has?.(String(name).toLowerCase().trim());
   }
 
   setAnimationState(animState: ModuleCreatureAnimState){
@@ -1444,6 +1503,7 @@ export class ModuleCreature extends ModuleObject {
         started: false,
         speed: 1,
       }
+      GameState.hooks.onHostTwoDAAnimation(this, animation);
     }
   }
 
@@ -1515,167 +1575,64 @@ export class ModuleCreature extends ModuleObject {
       this.setAnimationState(ModuleCreatureAnimState.PAUSE)
   }
 
-  getDamageAnimation( attackAnim: string ): ITwoDAAnimation {
-    
+  /**
+   * The animation this creature plays when an attack (attackAnim, an animations.2da name) reaches it: the
+   * damage reaction when hit, the dodge or parry one when missed. combatanimations.2da picks it for the
+   * attack and this creature's weapon; when the model lacks that animation, simple creatures play their
+   * generic reaction, a duel attack its matching reaction, and anything else the weapon's default.
+   */
+  getCombatReactionAnimation(attackAnim: string, reaction: 'damage' | 'dodge' | 'parry'): ITwoDAAnimation {
+    const weaponWield = this.getCombatAnimationWeaponType();
+    const anims = GameState.TwoDAManager.datatables.get('animations');
     let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
     for(let i = 0; i < anims.RowCount; i++){
       if(anims.rows[i].name == attackAnim){
         attackAnimIndex = i;
         break;
       }
     }
+    const modelHas = (row: any) => row && this.model.odysseyAnimationMap.get(row.name.toLowerCase().trim());
 
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    //console.log('getDamageAnimation', this.getName(), attackAnim, attackAnimIndex, combatAnimation, 'damage'+weaponWield);
+    const combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
     if(combatAnimation){
-      let damageAnimIndex = combatAnimation['damage'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('damage anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
+      // A single-hit attack on a creature holding a parrying weapon is parried rather than dodged
+      if(reaction === 'dodge' && combatAnimation.hits == 1 && [4, 2, 3].indexOf(weaponWield) >= 0){
+        const parry = anims.getByID(combatAnimation['parry'+weaponWield]);
+        if(modelHas(parry)){
+          return OdysseyModelAnimation.GetAnimation2DA(parry.name);
+        }
+      }
+      const row = anims.getByID(combatAnimation[reaction+weaponWield]);
+      if(modelHas(row)){
+        return OdysseyModelAnimation.GetAnimation2DA(row.name);
       }
     }
 
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdamages');
-    }
-    //console.log(attackAnim);
-    
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d5')
+    const modeltype = this.creatureAppearance.modeltype;
+    if(modeltype == 'S' || modeltype == 'L'){
+      return OdysseyModelAnimation.GetAnimation2DA(reaction === 'damage' ? 'cdamages' : 'cdodgeg');
     }
 
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'d1');
+    const duel = typeof attackAnim === 'string' ? attackAnim.match(/^c2a([1-5])$/) : null;
+    if(duel){
+      return OdysseyModelAnimation.GetAnimation2DA(`c2${reaction === 'parry' ? 'p' : 'd'}${duel[1]}`);
+    }
 
+    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+(reaction === 'damage' ? 'd1' : 'g1'));
+  }
+
+  getDamageAnimation( attackAnim: string ): ITwoDAAnimation {
+    return this.getCombatReactionAnimation(attackAnim, 'damage');
   }
 
   getDodgeAnimation( attackAnim: string ): ITwoDAAnimation {
-
-    let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
-    for(let i = 0; i < anims.RowCount; i++){
-      if(anims.rows[i].name == attackAnim){
-        attackAnimIndex = i;
-        break;
-      }
-    }
-
-    //console.log('getDodgeAnimation', this.getName(), attackAnim, attackAnimIndex);
-
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    if(combatAnimation){
-      if(combatAnimation.hits == 1 && [4, 2, 3].indexOf(weaponWield) >= 0){
-        let damageAnimIndex = combatAnimation['parry'+weaponWield];
-        let damageAnim = anims.getByID(damageAnimIndex);
-        if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-          //console.log('dodge/parry anim', this.getName(), damageAnim.name)
-          return damageAnim.name;
-        }
-      }
-      
-      let damageAnimIndex = combatAnimation['dodge'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('dodge anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
-      }
-    }
-
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdodgeg');
-    }
-    //console.log(attackAnim);
-    
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2d5')
-    }
-
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'g1');
-
+    return this.getCombatReactionAnimation(attackAnim, 'dodge');
   }
 
   getParryAnimation( attackAnim: string ): ITwoDAAnimation {
-
-    let attackAnimIndex = -1;
-
-    let modeltype = this.creatureAppearance.modeltype;
-    let attackKey = this.getCombatAnimationAttackType();
-    let weaponWield = this.getCombatAnimationWeaponType();
-    
-    let anims = GameState.TwoDAManager.datatables.get('animations');
-    for(let i = 0; i < anims.RowCount; i++){
-      if(anims.rows[i].name == attackAnim){
-        attackAnimIndex = i;
-        break;
-      }
-    }
-
-    //console.log('getParryAnimation', this.getName(), attackAnim, attackAnimIndex);
-    let combatAnimation = GameState.TwoDAManager.datatables.get('combatanimations').getByID(attackAnimIndex);
-    if(combatAnimation){
-      let damageAnimIndex = combatAnimation['parry'+weaponWield];
-      let damageAnim = anims.getByID(damageAnimIndex);
-      if(damageAnim && this.model.odysseyAnimationMap.get(damageAnim.name.toLowerCase().trim())){
-        //console.log('parry anim', this.getName(), damageAnim.name)
-        return OdysseyModelAnimation.GetAnimation2DA(damageAnim.name);
-      }
-    }
-
-    switch(modeltype){
-      case 'S':
-      case 'L':
-        return OdysseyModelAnimation.GetAnimation2DA('cdodgeg');
-    }
-    //console.log(attackAnim);
-    switch(attackAnim){
-      case 'c2a1':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p1')
-      case 'c2a2':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p2')
-      case 'c2a3':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p3')
-      case 'c2a4':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p4')
-      case 'c2a5':
-        return OdysseyModelAnimation.GetAnimation2DA('c2p5')
-    }
-
-    return OdysseyModelAnimation.GetAnimation2DA('g'+weaponWield+'g1');
-    
+    return this.getCombatReactionAnimation(attackAnim, 'parry');
   }
+
 
   getCombatAnimationAttackType(): string {
     let weapon = this.equipment.RIGHTHAND;
@@ -1784,57 +1741,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getEquippedWeaponType(){
-    let lWeapon = this.equipment.LEFTHAND;
-    let rWeapon = this.equipment.RIGHTHAND;
-    let claw1 = this.equipment.CLAW1;
-    let claw2 = this.equipment.CLAW2;
-    let claw3 = this.equipment.CLAW3;
-
-    if(rWeapon){
-      return (rWeapon.getWeaponType());
-    }
-
-    if(lWeapon){
-      return (lWeapon.getWeaponType());
-    }
-
-    if(claw1){
-      return (claw1.getWeaponType());
-    }
-
-    if(claw2){
-      return (claw2.getWeaponType());
-    }
-
-    if(claw3){
-      return (claw3.getWeaponType());
-    }
-
-    return 0;
+    return this.getWeapon()?.getWeaponType() || 0;
   }
 
   isRangedEquipped(){
-    if(this.equipment.RIGHTHAND){
-      return this.equipment.RIGHTHAND.isRangedWeapon();
-    }
-
-    if(this.equipment.LEFTHAND){
-      return this.equipment.LEFTHAND.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW1){
-      return this.equipment.CLAW1.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW2){
-      return this.equipment.CLAW2.isRangedWeapon();
-    }
-
-    if(this.equipment.CLAW3){
-      return this.equipment.CLAW3.isRangedWeapon();
-    }
-
-    return false;
+    return this.getWeapon()?.isRangedWeapon() || false;
   }
 
   updateItems(delta = 0){
@@ -1939,13 +1850,16 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
+  /** The weapon in use: in the right hand, else the left, else a natural weapon (undefined when unarmed) */
+  getWeapon(): ModuleItem | undefined {
+    for(const key of EquipmentSlots.WEAPONS){
+      if(this.equipment[key]){ return this.equipment[key]; }
+    }
+    return undefined;
+  }
+
   hasWeapons(){
-    let lWeapon = this.equipment.LEFTHAND;
-    let rWeapon = this.equipment.RIGHTHAND;
-    let cWeapon1 = this.equipment.CLAW1;
-    let cWeapon2 = this.equipment.CLAW2;
-    let cWeapon3 = this.equipment.CLAW3;
-    return (lWeapon) || (rWeapon) || (cWeapon1) || (cWeapon2) || (cWeapon3);
+    return !!this.getWeapon();
   }
 
   flourish(){
@@ -2155,8 +2069,17 @@ export class ModuleCreature extends ModuleObject {
       GameState.getCurrentPlayer().actionUseObject(this);
     }else if(!this.isDead()){
       this.clearAllActions();
-      if(this.getConversation() && this.getConversation().resref){
+      if(true){
+      if(this.getConversation() && this.getConversation().resref && !this.gmBarkText){
         GameState.getCurrentPlayer().actionDialogObject(this, this.getConversation().resref, false, undefined, undefined, true);
+      }else{
+        this.setFacingObject(callee);
+        (callee as any)?.setFacingObject?.(this);
+        this.playSoundSet(SSFType.SELECT_1);
+        this.setAnimationState(ModuleCreatureAnimState.GREETING);
+        const barkText = this.gmBarkText || `${this.getName() || 'Actor'}: Greetings.`;
+        GameState.MenuManager.InGameBark?.barkFromString(barkText);
+      }
       }
     }
     
@@ -2187,7 +2110,10 @@ export class ModuleCreature extends ModuleObject {
 
     if(this.isDead() || !this.combatData.combatState)
       return true;
-    
+
+    // A GM NPC chooses its next round here (GMCombatAI)
+    GameState.hooks.onCombatRoundEnd(this);
+
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnEndRound];
     if(!nwscript){ return true; }
     const instance = nwscript.newInstance();
@@ -2246,7 +2172,10 @@ export class ModuleCreature extends ModuleObject {
   }
 
   use(object: ModuleObject){
+    // A fallen player character in a GM session is knocked out, not a body to loot
+    if(GameState.hooks.isPlayerCharacter(this)) return;
     if(this.hasInventory()){
+      if(GameState.hooks.routeContainerOpen(this, object)) return;
       GameState.MenuManager.MenuContainer.AttachContainer(this);
       GameState.MenuManager.MenuContainer.open();
     }
@@ -2257,6 +2186,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   retrieveInventory(){
+    if(GameState.hooks.requestNetworkLoot(this)) return;
     while(this.inventory.length){
       GameState.InventoryManager.addItem(this.inventory.pop())
     }
@@ -2330,48 +2260,10 @@ export class ModuleCreature extends ModuleObject {
     return this.isCommandable;
   }
 
-  getItemInSlot(slot = 0){
-    switch(slot){
-      case ModuleCreatureArmorSlot.IMPLANT:
-        return this.equipment.IMPLANT;
-      break;
-      case ModuleCreatureArmorSlot.HEAD:
-        return this.equipment.HEAD;
-      break;
-      case ModuleCreatureArmorSlot.ARMS:
-        return this.equipment.ARMS;
-      break;
-      case ModuleCreatureArmorSlot.LEFTARMBAND:
-        return this.equipment.LEFTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.ARMOR:
-        return this.equipment.ARMOR;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTARMBAND:
-        return this.equipment.RIGHTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        return this.equipment.LEFTHAND;
-      break;
-      case ModuleCreatureArmorSlot.BELT:
-        return this.equipment.BELT;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        return this.equipment.RIGHTHAND;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        return this.equipment.CLAW1;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        return this.equipment.CLAW2;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        return this.equipment.CLAW3;
-      break;
-      default:
-        return null;
-      break;
-    }
+  /** The item in a slot (a ModuleCreatureArmorSlot value); null when the value isn't a slot */
+  getItemInSlot(slot = 0): ModuleItem | null | undefined {
+    const key = EquipmentSlots.keyOf(slot);
+    return key ? this.equipment[key] : null;
   }
 
   getInventory(): ModuleItem[] {
@@ -2567,8 +2459,15 @@ export class ModuleCreature extends ModuleObject {
     this.min1HP = bMinOneHP ? true : false;
   }
 
+  /**
+   * Current Force points. Stored the way hit points are (see getHP): forcePoints is the base, maxForcePoints
+   * the maximum and currentForce what's left relative to them, so spending (subtractFP) shows here.
+   */
   getFP(){
-    return this.forcePoints;
+    const base = Number(this.forcePoints) || 0;
+    const max = Number.isFinite(Number(this.maxForcePoints)) ? Number(this.maxForcePoints) : base;
+    const current = Number(this.currentForce) || 0;
+    return max + current - base;
   }
 
   getMaxFP(){
@@ -2623,132 +2522,121 @@ export class ModuleCreature extends ModuleObject {
     let armorAC = (this.equipment.ARMOR?.getACBonus() || 0);
 
     let dexBonus = Math.floor((this.getDEX() - 10) / 2);
+    const maxDexBonus = this.equipment.ARMOR?.getDexBonus() || 0;
+    if(maxDexBonus > 0 && dexBonus > maxDexBonus){
+      dexBonus = maxDexBonus;
+    }
+    let featBonus = this.combatRound ? this.combatRound.calculateDuelingBonus(this) : 0;
+    let effectBonus = 0;
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectACIncrease){
+          effectBonus += (eff.getInt(1) || eff.getInt(0) || 0);
+        }else if(eff.type === GameEffectType.EffectACDecrease){
+          effectBonus -= (eff.getInt(1) || eff.getInt(0) || 0);
+        }
+      }
+    }
+    featBonus += this.getFeatDefenseBonus();
+    return baseac + (this.naturalAC || 0) + classBonus + armorAC + dexBonus + featBonus + effectBonus;
 
     return baseac + classBonus + armorAC + dexBonus;
   }
 
-  getSTR(calculateBonuses = true){
+  /**
+   * An ability score (0 STR, 1 DEX, 2 CON, 3 INT, 4 WIS, 5 CHA), with the bonuses from worn items and
+   * effects unless calculateBonuses is false
+   */
+  getAbility(ability: number, calculateBonuses = true): number {
+    const base = [this.str, this.dex, this.con, this.int, this.wis, this.cha][ability];
     if(!calculateBonuses){
-      return this.str;
-    }else{
-      return this.str +
-      (this.equipment.HEAD?.getSTRBonus() || 0) +
-      (this.equipment.ARMOR?.getSTRBonus() || 0) +
-      (this.equipment.ARMS?.getSTRBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getSTRBonus() || 0) +
-      (this.equipment.LEFTHAND?.getSTRBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getSTRBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getSTRBonus() || 0) +
-      (this.equipment.IMPLANT?.getSTRBonus() || 0) +
-      (this.equipment.BELT?.getSTRBonus() || 0) +
-      (this.equipment.CLAW1?.getSTRBonus() || 0) +
-      (this.equipment.CLAW2?.getSTRBonus() || 0) +
-      (this.equipment.HIDE?.getSTRBonus() || 0);
+      return base;
     }
+    let bonus = 0;
+    for(const key of EquipmentSlots.WORN){
+      bonus += this.equipment[key]?.getAbilityBonus(ability) || 0;
+    }
+    return base + bonus + this.getAbilityEffectBonus(ability);
+  }
+
+  getSTR(calculateBonuses = true){
+    return this.getAbility(0, calculateBonuses);
   }
 
   getDEX(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.dex;
-    }else{
-      return this.dex +
-      (this.equipment.HEAD?.getDEXBonus() || 0) +
-      (this.equipment.ARMOR?.getDEXBonus() || 0) +
-      (this.equipment.ARMS?.getDEXBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getDEXBonus() || 0) +
-      (this.equipment.LEFTHAND?.getDEXBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getDEXBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getDEXBonus() || 0) +
-      (this.equipment.IMPLANT?.getDEXBonus() || 0) +
-      (this.equipment.BELT?.getDEXBonus() || 0) +
-      (this.equipment.CLAW1?.getDEXBonus() || 0) +
-      (this.equipment.CLAW2?.getDEXBonus() || 0) +
-      (this.equipment.HIDE?.getDEXBonus() || 0);
-    }
+    return this.getAbility(1, calculateBonuses);
   }
 
   getCON(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.con;
-    }else{
-      return this.con +
-      (this.equipment.HEAD?.getCONBonus() || 0) +
-      (this.equipment.ARMOR?.getCONBonus() || 0) +
-      (this.equipment.ARMS?.getCONBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getCONBonus() || 0) +
-      (this.equipment.LEFTHAND?.getCONBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getCONBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getCONBonus() || 0) +
-      (this.equipment.IMPLANT?.getCONBonus() || 0) +
-      (this.equipment.BELT?.getCONBonus() || 0) +
-      (this.equipment.CLAW1?.getCONBonus() || 0) +
-      (this.equipment.CLAW2?.getCONBonus() || 0) +
-      (this.equipment.HIDE?.getCONBonus() || 0);
-    }
-  }
-
-  getCHA(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.cha;
-    }else{
-      return this.cha +
-      (this.equipment.HEAD?.getCHABonus() || 0) +
-      (this.equipment.ARMOR?.getCHABonus() || 0) +
-      (this.equipment.ARMS?.getCHABonus() || 0) +
-      (this.equipment.RIGHTHAND?.getCHABonus() || 0) +
-      (this.equipment.LEFTHAND?.getCHABonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getCHABonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getCHABonus() || 0) +
-      (this.equipment.IMPLANT?.getCHABonus() || 0) +
-      (this.equipment.BELT?.getCHABonus() || 0) +
-      (this.equipment.CLAW1?.getCHABonus() || 0) +
-      (this.equipment.CLAW2?.getCHABonus() || 0) +
-      (this.equipment.HIDE?.getCHABonus() || 0);
-    }
-  }
-
-  getWIS(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.wis;
-    }else{
-      return this.wis +
-      (this.equipment.HEAD?.getWISBonus() || 0) +
-      (this.equipment.ARMOR?.getWISBonus() || 0) +
-      (this.equipment.ARMS?.getWISBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getWISBonus() || 0) +
-      (this.equipment.LEFTHAND?.getWISBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getWISBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getWISBonus() || 0) +
-      (this.equipment.IMPLANT?.getWISBonus() || 0) +
-      (this.equipment.BELT?.getWISBonus() || 0) +
-      (this.equipment.CLAW1?.getWISBonus() || 0) +
-      (this.equipment.CLAW2?.getWISBonus() || 0) +
-      (this.equipment.HIDE?.getWISBonus() || 0);
-    }
+    return this.getAbility(2, calculateBonuses);
   }
 
   getINT(calculateBonuses = true){
-    if(!calculateBonuses){
-      return this.int;
-    }else{
-      return this.int +
-      (this.equipment.HEAD?.getINTBonus() || 0) +
-      (this.equipment.ARMOR?.getINTBonus() || 0) +
-      (this.equipment.ARMS?.getINTBonus() || 0) +
-      (this.equipment.RIGHTHAND?.getINTBonus() || 0) +
-      (this.equipment.LEFTHAND?.getINTBonus() || 0) +
-      (this.equipment.LEFTARMBAND?.getINTBonus() || 0) +
-      (this.equipment.RIGHTARMBAND?.getINTBonus() || 0) +
-      (this.equipment.IMPLANT?.getINTBonus() || 0) +
-      (this.equipment.BELT?.getINTBonus() || 0) +
-      (this.equipment.CLAW1?.getINTBonus() || 0) +
-      (this.equipment.CLAW2?.getINTBonus() || 0) +
-      (this.equipment.HIDE?.getINTBonus() || 0);
-    }
+    return this.getAbility(3, calculateBonuses);
+  }
+
+  getWIS(calculateBonuses = true){
+    return this.getAbility(4, calculateBonuses);
+  }
+
+  getCHA(calculateBonuses = true){
+    return this.getAbility(5, calculateBonuses);
   }
 
   getSpellSaveDC(){
-    return 10 + this.getSpellCasterLevel();
+    const wisMod = Math.floor((this.getWIS() - 10) / 2);
+    const chaMod = Math.floor((this.getCHA() - 10) / 2);
+    let focusBonus = 0;
+    if(this.getHasFeat(CombatFeatType.FORCE_FOCUS_MASTERY)){
+      focusBonus = 4;
+    }else if(this.getHasFeat(CombatFeatType.FORCE_FOCUS_ADVANCED)){
+      focusBonus = 2;
+    }else if(this.getHasFeat(CombatFeatType.FORCE_FOCUS)){
+      focusBonus = 1;
+    }
+    const level = this.getTotalClassLevel() || this.getSpellCasterLevel();
+    return 5 + level + wisMod + chaMod + focusBonus;
+  }
+
+  getFortitudeSave(){
+    return (this.fortitudeSaveThrow || 0) + (this.fortbonus || 0) + this.getSaveBonus(1);
+  }
+
+  getReflexSave(){
+    return (this.reflexSaveThrow || 0) + (this.refbonus || 0) + this.getSaveBonus(2);
+  }
+
+  getWillSave(){
+    return (this.willSaveThrow || 0) + (this.willbonus || 0) + this.getSaveBonus(3);
+  }
+
+  getSaveBonus(saveType: number = 0): number {
+    let bonus = 0;
+    if(this.getHasFeat(CombatFeatType.MASTER_CONDITIONING)){
+      bonus += 3;
+    }else if(this.getHasFeat(CombatFeatType.IMPROVED_CONDITIONING)){
+      bonus += 2;
+    }else if(this.getHasFeat(CombatFeatType.CONDITIONING)){
+      bonus += 1;
+    }
+    if(Array.isArray(this.effects)){
+      for(const eff of this.effects){
+        if(!eff) continue;
+        if(eff.type === GameEffectType.EffectSavingThrowIncrease){
+          const effSave = eff.getInt(1) || 0;
+          if(effSave === 0 || effSave === saveType){
+            bonus += (eff.getInt(0) || 0);
+          }
+        }else if(eff.type === GameEffectType.EffectSavingThrowDecrease){
+          const effSave = eff.getInt(1) || 0;
+          if(effSave === 0 || effSave === saveType){
+            bonus -= (eff.getInt(0) || 0);
+          }
+        }
+      }
+    }
+    return bonus;
   }
 
   getSpellCasterLevel(){
@@ -2819,7 +2707,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getMovementSpeed(){
-    return (this.isWalking() ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
+    return ((this.isWalking() || this.stealthMode) ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
   }
 
   getHitDistance(){
@@ -2919,22 +2807,89 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
+  /** The classes' base attack bonus (what GetBaseAttackBonus returns); getAttackAbilityModifier adds the ability */
   getBaseAttackBonus(){
     let bab = 0;
     for(let i = 0, len = this.classes.length; i < len; i++){
       bab += this.classes[i].getBaseAttackBonus();
     }
-
-    let strMod = Math.floor(( this.getSTR() - 10) / 2);
-    let dexMod = Math.floor(( this.getDEX() - 10) / 2);
-
-    if(strMod > dexMod){
-      bab += strMod;
-    }else if(dexMod > strMod){
-      bab += dexMod;
-    }
-
     return bab;
+  }
+
+  /** The ability an attack adds (KotOR): Dexterity with a ranged weapon, Strength in melee or unarmed */
+  getAttackAbilityModifier(weapon?: any): number {
+    const score = weapon?.isRangedWeapon?.() ? this.getDEX() : this.getSTR();
+    return Math.floor((score - 10) / 2);
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Passive feats (numbers from the feats' own descriptions in the game)
+  // ---------------------------------------------------------------------------------------------------
+
+  /** The best of a chain of feats that replace each other: [feat id, value] from the lowest to the highest */
+  getFeatChainValue(chain: [number, number][]): number {
+    for(let i = chain.length - 1; i >= 0; i--){
+      if(this.getHasFeat(chain[i][0])) return chain[i][1];
+    }
+    return 0;
+  }
+
+  static DEFENSE_FEAT_CHAINS: [number, number][][] = [
+    [[CombatFeatType.SCOUNDRELS_LUCK, 2], [CombatFeatType.IMPROVED_SCOUNDRELS_LUCK, 4], [CombatFeatType.MASTER_SCOUNDRELS_LUCK, 6]],
+    [[CombatFeatType.JEDI_SENSE, 2], [CombatFeatType.KNIGHT_SENSE, 4], [CombatFeatType.MASTER_SENSE, 6]],
+    [[CombatFeatType.LOGIC_UPGRADE_COMBAT, 2], [CombatFeatType.LOGIC_UPGRADE_TACTICIAN, 4], [CombatFeatType.LOGIC_UPGRADE_BATTLE_DROID, 6]],
+  ];
+
+  /** Defense from always-on feats: Scoundrel's Luck, Jedi Sense, droids' logic upgrades (+2 / +4 / +6) */
+  getFeatDefenseBonus(): number {
+    let total = 0;
+    for(const chain of ModuleCreature.DEFENSE_FEAT_CHAINS) total += this.getFeatChainValue(chain);
+    return total;
+  }
+
+  /** Skill feats (+1 / +2 / +3): Caution, Empathy and Gear Head, and the skills each one helps */
+  static SKILL_FEAT_CHAINS: { chain: [number, number][]; skills: number[] }[] = [
+    { chain: [[CombatFeatType.CAUTIOUS, 1], [CombatFeatType.IMPROVED_CAUTION, 2], [CombatFeatType.MASTER_CAUTION, 3]], skills: [SkillType.DEMOLITIONS, SkillType.STEALTH] },
+    { chain: [[CombatFeatType.EMPATHY, 1], [CombatFeatType.IMPROVED_EMPATHY, 2], [CombatFeatType.MASTER__EMPATHY, 3]], skills: [SkillType.PERSUADE, SkillType.AWARENESS, SkillType.TREAT_INJURY] },
+    { chain: [[CombatFeatType.GEAR_HEAD, 1], [CombatFeatType.GEAR_HEAD_ADEPT, 2], [CombatFeatType.GEAR_HEAD_MASTER, 3]], skills: [SkillType.REPAIR, SkillType.SECURITY, SkillType.COMPUTER_USE] },
+  ];
+
+  getSkillFeatBonus(skill: number): number {
+    let total = 0;
+    for(const entry of ModuleCreature.SKILL_FEAT_CHAINS){
+      if(entry.skills.includes(skill)) total += this.getFeatChainValue(entry.chain);
+    }
+    return total;
+  }
+
+  /** Sentinels' Force Immunity: Fear; Stun (and fear); Paralysis (and the rest), as IMMUNITY_TYPE_* */
+  getFeatImmunities(): number[] {
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_PARALYSIS)) return [4, 12, 6];
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_STUN)) return [4, 12];
+    if(this.getHasFeat(CombatFeatType.FORCE_IMMUNITY_FEAR)) return [4];
+    return [];
+  }
+
+  /** Uncanny Dodge: +2 / +4 on saves against grenades */
+  getGrenadeSaveBonus(): number {
+    return this.getFeatChainValue([[CombatFeatType.UNCANNY_DODGE_1, 2], [CombatFeatType.UNCANNY_DODGE_2, 4]]);
+  }
+
+  /**
+   * Whether it can wear or wield an item, as KotOR's equip screen decides: every feat its base item requires
+   * (weapon and armour proficiencies, implant levels, Jedi Defense for robes), and droid or human only items.
+   */
+  canUseItem(item: any): boolean {
+    const base = item?.baseItem;
+    if(!base) return true;
+    const doh = Number(base.droidOrHuman) || 0;
+    const race = this.getRace();
+    if(doh === 1 && race === 5) return false;
+    if(doh === 2 && race !== 5) return false;
+    for(const feat of [base.requiredFeat0, base.requiredFeat1, base.requiredFeat2, base.requiredFeat3, base.requiredFeat4]){
+      if(typeof feat === 'number' && feat >= 0 && !this.getHasFeat(feat)) return false;
+    }
+    return true;
   }
 
   getFeats(){
@@ -2977,9 +2932,232 @@ export class ModuleCreature extends ModuleObject {
     return this.skills[value].rank > 0;
   }
 
+  /**
+   * A skill's total, as KotOR's GetSkillRank and its skill checks use it: ranks + the key ability's modifier +
+   * Skill Increase / Decrease effects. getSkillRanks gives the ranks alone.
+   */
   getSkillLevel(value: number){
-    return this.skills[value].rank;
+    const skill = this.skills[value];
+    if(!skill) return 0;
+    const ability = String(skill.keyAbility || '').toUpperCase();
+    const score = ability === 'STR' ? this.getSTR() : ability === 'DEX' ? this.getDEX() : ability === 'CON' ? this.getCON() :
+      ability === 'INT' ? this.getINT() : ability === 'WIS' ? this.getWIS() : ability === 'CHA' ? this.getCHA() : 10;
+    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value) + this.getSkillFeatBonus(value);
   }
+
+  /** Skill bonuses and penalties on what it wears (stealth units, Calrissian's belt...): subtype = SKILL_* */
+  getSkillItemBonus(skill: number): number {
+    if(!this.equipment) return 0;
+    const amount = (property: any) => Number(property.getValue?.()) || Number(property.costValue) || 0;
+    let total = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Skill)){
+      if(Number(property.subType) === skill) total += amount(property);
+    }
+    for(const property of this.getEquippedProperties(ModuleItemProperty.DecreasedSkill)){
+      if(Number(property.subType) === skill) total -= amount(property);
+    }
+    return total;
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Stealth (KotOR: a stealth unit worn in the belt slot lets a creature go into stealth; hostile creatures
+  // then only notice it if they win an Awareness check against its Stealth)
+  // ---------------------------------------------------------------------------------------------------
+
+  static STEALTH_UNIT_BASE_ITEM = 88;
+  /** How long one Awareness-vs-Stealth result holds before it's rolled again (seconds) */
+  static STEALTH_CHECK_SECONDS = 6;
+
+  stealthMode: boolean = false;
+  /** Left stealth by attacking: that first attack is a Sneak Attack */
+  sneakAttackFromStealth: boolean = false;
+  stealthChecks: Map<ModuleCreature, { seen: boolean; until: number }> = new Map();
+
+  canEnterStealth(): boolean {
+    return !this.isDead() && this.equipment?.BELT?.baseItemId === ModuleCreature.STEALTH_UNIT_BASE_ITEM;
+  }
+
+  /** Go into or out of stealth. force skips the stealth-unit check (a replica mirroring the host) */
+  setStealthMode(on: boolean, force: boolean = false): boolean {
+    if(on && !force && !this.canEnterStealth()) return false;
+    if(this.stealthMode === on) return true;
+    this.stealthMode = on;
+    if(on) this.sneakAttackFromStealth = false;
+    this.setOpacity(on ? 0.35 : 1);
+    if(!on){
+      // Everyone gets a fresh look once it's out of stealth
+      for(const creature of GameState.module?.area?.creatures || []){
+        (creature as ModuleCreature).stealthChecks?.delete(this);
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Whether it notices another creature: always, unless that creature is a hostile in stealth. Then it's an
+   * Awareness check (d20 + Awareness) against the other's Stealth (d20 + Stealth), held for a few seconds.
+   */
+  canDetect(other: ModuleCreature): boolean {
+    // Something hidden by the game mode (an actor waiting for its cue) can't be noticed, so it starts no fights
+    if(other && GameState.hooks.isHidden(other)) return false;
+    if(!other || other === this || !other.stealthMode || !this.isHostile(other)) return true;
+    const now = performance.now() / 1000;
+    const cached = this.stealthChecks.get(other);
+    if(cached && cached.until > now) return cached.seen;
+    const awareness = 1 + Math.floor(Math.random() * 20) + this.getSkillLevel(SkillType.AWARENESS);
+    const stealth = 1 + Math.floor(Math.random() * 20) + other.getSkillLevel(SkillType.STEALTH);
+    const seen = awareness >= stealth;
+    this.stealthChecks.set(other, { seen, until: now + ModuleCreature.STEALTH_CHECK_SECONDS });
+    return seen;
+  }
+
+  /** Mines it can spot: party members and players' characters roll Awareness against a mine's detect DC */
+  static MINE_DETECT_RANGE = 10;
+
+  canSpotMines(): boolean {
+    if(GameState.hooks.isMineReplica()) return false;
+    return GameState.PartyManager?.party?.includes(this) || !!this.gmOwnerPeerId;
+  }
+
+  getSkillRanks(value: number){
+    return this.skills[value]?.rank || 0;
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Passive effects, read by the rules (effects only carry their numbers)
+  // ---------------------------------------------------------------------------------------------------
+
+  /** Sum the amount (int index amountAt) of every effect of one type matching a test, minus its opposite */
+  sumEffects(increase: GameEffectType, decrease: GameEffectType | undefined, amountAt: number, matches?: (e: any) => boolean): number {
+    let total = 0;
+    for(const eff of this.effects || []){
+      if(!eff || (matches && !matches(eff))) continue;
+      if(eff.type === increase) total += eff.getInt(amountAt) || 0;
+      else if(decrease !== undefined && eff.type === decrease) total -= eff.getInt(amountAt) || 0;
+    }
+    return total;
+  }
+
+  /** Ability Increase / Decrease effects (adrenals, stims, Force Valor...): ABILITY_* in int 0, amount in int 1 */
+  getAbilityEffectBonus(ability: number): number {
+    if(!this.effects?.length) return 0;
+    return this.sumEffects(GameEffectType.EffectAbilityIncrease, GameEffectType.EffectAbilityDecrease, 1, (e) => e.getInt(0) === ability);
+  }
+
+  /** Skill Increase / Decrease effects: SKILL_* in int 0 (255: every skill), amount in int 1 */
+  getSkillEffectBonus(skill: number): number {
+    if(!this.effects?.length) return 0;
+    return this.sumEffects(GameEffectType.EffectSkillIncrease, GameEffectType.EffectSkillDecrease, 1, (e) => e.getInt(0) === skill || e.getInt(0) === 255);
+  }
+
+  /** Item properties of one kind on everything it wears and holds */
+  getEquippedProperties(kind: ModuleItemProperty): any[] {
+    const out: any[] = [];
+    for(const item of Object.values(this.equipment || {})){
+      for(const property of (item as any)?.properties || []){
+        if(property?.is?.(kind) && (!property.isUseable || property.isUseable())) out.push(property);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Force resistance: Force Resistance Increase / Decrease effects (Resist Force, Force Immunity...) and
+   * Improved Force Resistance on what it wears (some beasts' hides)
+   */
+  getForceResistance(): number {
+    let items = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.ImprovedMagicResist)){
+      items = Math.max(items, Number(property.getValue?.()) || 0);
+    }
+    return Math.max(0, items + this.sumEffects(GameEffectType.EffectForceResistanceIncrease, GameEffectType.EffectForceResistanceDecrease, 0));
+  }
+
+  /** Bonus to deflect blaster bolts with a lightsaber (Blaster Deflection effects and item properties) */
+  getBlasterDeflectionBonus(): number {
+    let items = 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Blaster_Bolt_Deflect_Increase)) items += Number(property.getValue?.()) || 0;
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Blaster_Bolt_Defect_Decrease)) items -= Number(property.getValue?.()) || 0;
+    return items + this.sumEffects(GameEffectType.EffectBlasterDeflectionIncrease, GameEffectType.EffectBlasterDeflectionDecrease, 0);
+  }
+
+  /** Percent chance an attack on it misses anyway (Concealment; the best one counts) */
+  getConcealment(): number {
+    let best = 0;
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectConcealment) best = Math.max(best, eff.getInt(0) || 0);
+    }
+    return Math.min(100, best);
+  }
+
+  /** Percent chance its own attacks miss anyway (Miss Chance; the worst one counts) */
+  getMissChance(): number {
+    let worst = 0;
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectMissChance) worst = Math.max(worst, eff.getInt(0) || 0);
+    }
+    return Math.min(100, worst);
+  }
+
+  /**
+   * Immune to IMMUNITY_TYPE_* (poison, mind-affecting, paralysis...): an Immunity effect, or an Immunity
+   * property on something it wears (droids' and beasts' hides carry theirs).
+   */
+  isImmune(immunityType: number): boolean {
+    for(const eff of this.effects || []){
+      if(eff?.type === GameEffectType.EffectImmunity && eff.getInt(0) === immunityType) return true;
+    }
+    for(const property of this.getEquippedProperties(ModuleItemProperty.Immunity)){
+      if((ModuleCreature.ITEM_IMMUNITY_COVERS[Number(property.subType)] || []).includes(immunityType)) return true;
+    }
+    return this.getFeatImmunities().includes(immunityType);
+  }
+
+  /** IMMUNITY_TYPE_* that blocks an effect, if any (as the Aurora engine checks when an effect is applied) */
+  static immunityAgainst(effect: any): number {
+    switch(effect?.type){
+      case GameEffectType.EffectPoison: return 2;
+      case GameEffectType.EffectDisease: return 3;
+      case GameEffectType.EffectSlow: return 9;
+      case GameEffectType.EffectEntangle: return 10;
+      case GameEffectType.EffectAbilityDecrease: return 19;
+      case GameEffectType.EffectAttackDecrease: return 20;
+      case GameEffectType.EffectDamageDecrease: return 21;
+      case GameEffectType.EffectDamageImmunityDecrease: return 22;
+      case GameEffectType.EffectACDecrease: return 23;
+      case GameEffectType.EffectMovementSpeedDecrease: return 24;
+      case GameEffectType.EffectSavingThrowDecrease: return 25;
+      case GameEffectType.EffectForceResistanceDecrease: return 26;
+      case GameEffectType.EffectSkillDecrease: return 27;
+      case GameEffectType.EffectKnockdown: return 28;
+      case GameEffectType.EffectSetState:
+        // 1 confused, 2 frightened, 4 stunned, 5 paralyzed, 6 asleep, 8 horrified
+        return ({ 1: 16, 2: 4, 4: 12, 5: 6, 6: 13, 8: 4 } as Record<number, number>)[effect.getInt(0)] || 0;
+    }
+    return 0;
+  }
+
+  isImmuneToEffect(effect: any): boolean {
+    const immunity = ModuleCreature.immunityAgainst(effect);
+    return immunity > 0 && this.isImmune(immunity);
+  }
+
+  /**
+   * What an item's Immunity property (its subtype, a row of iprp_immunity.2da) makes it immune to, as
+   * IMMUNITY_TYPE_*. Mind immunity covers every mind-affecting state, as in the Aurora rules.
+   */
+  static ITEM_IMMUNITY_COVERS: Record<number, number[]> = {
+    0: [30],                              // Backstab: sneak attack
+    1: [19, 29],                          // Level / ability drain
+    2: [1, 4, 12, 13, 14, 15, 16, 18],    // Mind spells: fear, stun, sleep, charm, dominate, confusion, daze
+    3: [2],                               // Poison
+    4: [3],                               // Disease
+    5: [4],                               // Fear
+    6: [28],                              // Knockdown
+    7: [6],                               // Paralysis
+    8: [31],                              // Critical hits
+    9: [32],                              // Death
+  };
 
   getHasSpell(id = 0){
     return (this.getSpell(id) instanceof TalentSpell) ? true : false;
@@ -3020,6 +3198,15 @@ export class ModuleCreature extends ModuleObject {
   hasTalent(talent: TalentObject){
     //console.log('hasTalent', talent);
     if(typeof talent != 'undefined'){
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)){
+        return this.getHasSpell(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)){
+        return this.getHasFeat(talent.id) ? true : false;
+      }
+      if(BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)){
+        return this.getHasSkill(talent.id) ? true : false;
+      }
       switch(talent.objectType){
         case 0: //Force / Spell
           return this.getHasSpell(talent.id) ? true : false;
@@ -3128,29 +3315,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utc'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        this.initProperties();
-        this.loadScripts();
-        GameState.FactionManager.AddCreatureToFaction(this);
-      }else{
-        console.error('Failed to load character template');
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts();
-      GameState.FactionManager.AddCreatureToFaction(this);
-    }
-    
+    const merged = this.mergeTemplate(ResourceTypes['utc']);
+    this.initProperties();
+    this.loadScripts();
+    if(merged){ GameState.FactionManager.AddCreatureToFaction(this); }
+
     if(!this.debugLabel){
       this.debugLabel = new TextSprite3D(`${this.getName()} | ${this.getTag()}`);
       this.debugLabel.setColor(this.helperColor);
@@ -3159,43 +3328,22 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
-  loadScripts (){
-
-    const scriptKeys = [
-      ModuleObjectScript.CreatureOnAttacked,
-      ModuleObjectScript.CreatureOnDamaged,
-      ModuleObjectScript.CreatureOnDeath,
-      ModuleObjectScript.CreatureOnDialog,
-      ModuleObjectScript.CreatureOnDisturbed,
-      ModuleObjectScript.CreatureOnEndDialog,
-      ModuleObjectScript.CreatureOnEndRound,
-      ModuleObjectScript.CreatureOnHeartbeat,
-      ModuleObjectScript.CreatureOnBlocked,
-      ModuleObjectScript.CreatureOnNotice,
-      ModuleObjectScript.CreatureOnRested,
-      ModuleObjectScript.CreatureOnSpawn,
-      ModuleObjectScript.CreatureOnSpellAt,
-      ModuleObjectScript.CreatureOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ 
-          console.warn(`ModuleCreature.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-          continue; 
-        }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.CreatureOnAttacked,
+    ModuleObjectScript.CreatureOnDamaged,
+    ModuleObjectScript.CreatureOnDeath,
+    ModuleObjectScript.CreatureOnDialog,
+    ModuleObjectScript.CreatureOnDisturbed,
+    ModuleObjectScript.CreatureOnEndDialog,
+    ModuleObjectScript.CreatureOnEndRound,
+    ModuleObjectScript.CreatureOnHeartbeat,
+    ModuleObjectScript.CreatureOnBlocked,
+    ModuleObjectScript.CreatureOnNotice,
+    ModuleObjectScript.CreatureOnRested,
+    ModuleObjectScript.CreatureOnSpawn,
+    ModuleObjectScript.CreatureOnSpellAt,
+    ModuleObjectScript.CreatureOnUserDefined,
+  ];
 
   async loadModel (): Promise<OdysseyModel3D> {
     this.isReady = false;
@@ -3338,187 +3486,48 @@ export class ModuleCreature extends ModuleObject {
     if(!item){
       return;
     }
+    // GM multiplayer: a player's own equipment is changed by the host
+    if(GameState.hooks.requestNetworkEquip(this, slot, item)) return;
 
     this.unequipSlot(slot);
     item.onEquip(this);
     await item.loadModel();
-    switch(slot){
-      case ModuleCreatureArmorSlot.ARMOR:
-        this.equipment.ARMOR = item;
-        await this.loadModel();
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        this.equipment.RIGHTHAND = item;
-        await item.loadModel();
-        if(item.model instanceof OdysseyModel3D)
-          this.model.rhand.add(item.model);
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        this.equipment.LEFTHAND = item;
-        await item.loadModel();
-        if(item.model instanceof OdysseyModel3D)
-          this.model.lhand.add(item.model);
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND2:
-        this.equipment.RIGHTHAND2 = item;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND2:
-        this.equipment.LEFTHAND2 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        this.equipment.CLAW1 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        this.equipment.CLAW2 = item;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        this.equipment.CLAW3 = item;
-      break;
+    const key = EquipmentSlots.keyOf(slot);
+    if(!key){ return; }
+    this.equipment[key] = item;
+    // Armour and headgear show on the creature's own model; weapons are held in its hands; the rest
+    // only change the character
+    if(EquipmentSlots.MODEL.includes(key)){
+      await this.loadModel();
+    }else if(key === 'RIGHTHAND' || key === 'LEFTHAND'){
+      if(item.model instanceof OdysseyModel3D){
+        (key === 'RIGHTHAND' ? this.model?.rhand : this.model?.lhand)?.add(item.model);
+      }
     }
   }
 
   unequipSlot(slot = 0x1){
+    if(GameState.hooks.requestNetworkUnequip(this, slot)) return;
+    const key = EquipmentSlots.keyOf(slot);
+    if(!key){ return; }
+    const item = this.equipment[key];
     try{
-      switch(slot){
-        case ModuleCreatureArmorSlot.IMPLANT:
-          try{
-            if(this.equipment.IMPLANT){
-              this.equipment.IMPLANT.onUnEquip(this);
-              this.equipment.IMPLANT.destroy();
-              this.equipment.IMPLANT = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.HEAD:
-
-          if(this.equipment.HEAD){
-            this.equipment.HEAD.onUnEquip(this);
-          }
-
-          try{
-            this.equipment.HEAD.model.parent.remove(this.equipment.HEAD.model);
-          }catch(e){}
-
-          this.equipment.HEAD = undefined;
-          this.loadModel();
-        break;
-        case ModuleCreatureArmorSlot.ARMS:
-          try{
-            if(this.equipment.ARMS){
-              this.equipment.ARMS.onUnEquip(this);
-              this.equipment.ARMS.destroy();
-              this.equipment.ARMS = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTARMBAND:
-          try{
-            if(this.equipment.RIGHTARMBAND){
-              this.equipment.RIGHTARMBAND.onUnEquip(this);
-              this.equipment.RIGHTARMBAND.destroy();
-              this.equipment.RIGHTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTARMBAND:
-          try{
-            if(this.equipment.LEFTARMBAND){
-              this.equipment.LEFTARMBAND.onUnEquip(this);
-              this.equipment.LEFTARMBAND.destroy();
-              this.equipment.LEFTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.ARMOR:
-
-          if(this.equipment.ARMOR){
-            this.equipment.ARMOR.onUnEquip(this);
-          }
-
-          this.equipment.ARMOR = undefined;
-          this.loadModel();
-        break;
-        case ModuleCreatureArmorSlot.RIGHTARMBAND:
-          try{
-            if(this.equipment.RIGHTARMBAND){
-              this.equipment.RIGHTARMBAND.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.RIGHTARMBAND.model);
-              this.equipment.RIGHTARMBAND.destroy();
-              this.equipment.RIGHTARMBAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTHAND:
-          try{
-            if(this.equipment.RIGHTHAND){
-              this.equipment.RIGHTHAND.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.RIGHTHAND.model);
-              this.equipment.RIGHTHAND.destroy();
-              this.equipment.RIGHTHAND = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.RIGHTHAND2:
-          try{
-            if(this.equipment.RIGHTHAND2){
-              this.equipment.RIGHTHAND2.onUnEquip(this);
-              // this.model.rhand.remove(this.equipment.RIGHTHAND2.model);
-              this.equipment.RIGHTHAND2.destroy();
-              this.equipment.RIGHTHAND2 = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.BELT:
-          try{
-            if(this.equipment.BELT){
-              this.equipment.BELT.onUnEquip(this);
-              this.model.rhand.remove(this.equipment.BELT.model);
-              this.equipment.BELT.destroy();
-              this.equipment.BELT = undefined;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTHAND:
-          try{
-            if(this.equipment.LEFTHAND){
-              this.equipment.LEFTHAND.onUnEquip(this);
-              this.model.lhand.remove(this.equipment.LEFTHAND.model);
-              this.equipment.LEFTHAND.destroy();
-              this.equipment.LEFTHAND = null;
-            }
-          }catch(e){
-            
-          }
-        break;
-        case ModuleCreatureArmorSlot.LEFTHAND2:
-          try{
-            if(this.equipment.LEFTHAND2){
-              this.equipment.LEFTHAND2.onUnEquip(this);
-              // this.model.lhand.remove(this.equipment.LEFTHAND2.model);
-              this.equipment.LEFTHAND2.destroy();
-              this.equipment.LEFTHAND2 = null;
-            }
-          }catch(e){
-            
-          }
-        break;
+      if(EquipmentSlots.MODEL.includes(key)){
+        // The item stays alive (it may go back to the inventory); the creature's model is rebuilt without it
+        item?.onUnEquip(this);
+        if(key === 'HEAD'){
+          try{ item?.model?.parent?.remove(item.model); }catch(e){}
+        }
+        this.equipment[key] = undefined;
+        this.loadModel();
+        return;
       }
+      if(!item){ return; }
+      item.onUnEquip(this);
+      if(key === 'RIGHTHAND'){ this.model?.rhand?.remove(item.model); }
+      if(key === 'LEFTHAND'){ this.model?.lhand?.remove(item.model); }
+      item.destroy();
+      this.equipment[key] = undefined;
     }catch(e){
       console.error('unequipItem', e);
     }
@@ -3534,61 +3543,6 @@ export class ModuleCreature extends ModuleObject {
     this.unequipSlot(ModuleCreatureArmorSlot.HEAD);
   }
 
-  GetItemInSlot(slot = 0){
-
-    switch(slot){
-      case ModuleCreatureArmorSlot.IMPLANT:
-        return this.equipment.IMPLANT;
-      break;
-      case ModuleCreatureArmorSlot.HEAD:
-        return this.equipment.HEAD;
-      break;
-      case ModuleCreatureArmorSlot.ARMS:
-        return this.equipment.ARMS;
-      break;
-      case ModuleCreatureArmorSlot.LEFTARMBAND:
-        return this.equipment.LEFTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.ARMOR:
-        return this.equipment.ARMOR;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTARMBAND:
-        return this.equipment.RIGHTARMBAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND:
-        return this.equipment.LEFTHAND;
-      break;
-      case ModuleCreatureArmorSlot.LEFTHAND2:
-        return this.equipment.LEFTHAND2;
-      break;
-      case ModuleCreatureArmorSlot.BELT:
-        return this.equipment.BELT;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND:
-        return this.equipment.RIGHTHAND;
-      break;
-      case ModuleCreatureArmorSlot.RIGHTHAND2:
-        return this.equipment.RIGHTHAND2;
-      break;
-      case ModuleCreatureArmorSlot.HIDE:
-        return this.equipment.HIDE;
-      break;
-      case ModuleCreatureArmorSlot.CLAW1:
-        return this.equipment.CLAW1;
-      break;
-      case ModuleCreatureArmorSlot.CLAW2:
-        return this.equipment.CLAW2;
-      break;
-      case ModuleCreatureArmorSlot.CLAW3:
-        return this.equipment.CLAW3;
-      break;
-      default:
-        return null;
-      break;
-    }
-
-  }
-
   setAppearance(appearance: number){
     this.appearance = appearance;
     this.creatureAppearance = GameState.AppearanceManager.GetCreatureAppearanceById(this.appearance);
@@ -3600,418 +3554,9 @@ export class ModuleCreature extends ModuleObject {
   }
 
   initProperties(){
-    try{
-      this.classes = [];
-      this.feats = [];
-      this.skills = GameState.SWRuleSet.skills.slice(0).map((skill: TalentSkill) => {
-        return skill.clone();
-      });
-      
-      if(!this.initialized){
-        if(BitWise.InstanceOfObject(this, ModuleObjectType.ModulePlayer)){
-          this.id = GameState.ModuleObjectManager.GetNextPlayerId();
-        }else if(this.template.RootNode.hasField('ObjectId')){
-          this.id = this.template.getFieldByLabel('ObjectId').getValue();
-        }else if(this.template.RootNode.hasField('ID')){
-          this.id = this.template.getFieldByLabel('ID').getValue();
-        }
-        
-        GameState.ModuleObjectManager.AddObjectById(this);
-      }
-
-      if(this.template.RootNode.hasField('Appearance_Type')){
-        this.setAppearance(this.template.getFieldByLabel('Appearance_Type').getValue());
-      }
-
-      if(this.template.RootNode.hasField('BodyBag'))
-        this.bodyBag = this.template.getFieldByLabel('BodyBag').getValue();
-
-      if(this.template.RootNode.hasField('BodyVariation'))
-        this.bodyBag = this.template.getFieldByLabel('BodyVariation').getValue();
-
-      if(this.template.RootNode.hasField('ChallengeRating'))
-        this.challengeRating = this.template.getFieldByLabel('ChallengeRating').getValue();
-
-      if(this.template.RootNode.hasField('ClassList')){
-        let classes = this.template.RootNode.getFieldByLabel('ClassList').getChildStructs();
-        for(let i = 0; i < classes.length; i++){
-          this.classes.push(
-            CreatureClass.FromCreatureClassStruct(classes[i])
-          );
-        }
-      }
-
-      if(this.template.RootNode.hasField('Conversation')){
-        this.conversation = DLGObject.FromResRef(this.template.getFieldByLabel('Conversation').getValue());
-      }
-
-      if(this.template.RootNode.hasField('CurrentForce'))
-        this.currentForce = this.template.getFieldByLabel('CurrentForce').getValue();
-
-      if(this.template.RootNode.hasField('CurrentHitPoints'))
-        this.currentHitPoints = this.template.getFieldByLabel('CurrentHitPoints').getValue();
-
-      if(this.template.RootNode.hasField('HitPoints'))
-        this.hitPoints = this.template.getFieldByLabel('HitPoints').getValue();
-
-      if(this.template.RootNode.hasField('Disarmable'))
-        this.disarmable = this.template.getFieldByLabel('Disarmable').getValue();
-    
-      if(this.template.RootNode.hasField('Experience'))
-        this.experience = this.template.RootNode.getFieldByLabel('Experience').getValue();
-
-      if(this.template.RootNode.hasField('Listening')){
-        this.setListening(this.template.RootNode.getFieldByLabel('Listening').getValue());
-      }
-      if(this.template.RootNode.hasField('Commandable')){
-        this.setCommadable(this.template.RootNode.getFieldByLabel('Commandable').getValue());
-      }
-
-      if(this.template.RootNode.hasField('ExpressionList')){
-        let expressions = this.template.RootNode.getFieldByLabel('ExpressionList').getChildStructs();
-        for(let i = 0; i < expressions.length; i++){
-          this.setListeningPattern(
-            expressions[i].getFieldByLabel('ExpressionString').getValue(),
-            expressions[i].getFieldByLabel('ExpressionId').getValue()
-          );
-        }
-      }
-          
-      if(this.template.RootNode.hasField('FactionID')){
-        this.factionId = this.template.getFieldByLabel('FactionID').getValue();
-        if((this.factionId & 0xFFFFFFFF) == -1){
-          this.factionId = 0;
-        }
-      }
-      this.faction = GameState.FactionManager.factions.get(this.factionId);
-
-      if(this.template.RootNode.hasField('FeatList')){
-        let feats = this.template.RootNode.getFieldByLabel('FeatList').getChildStructs();
-        for(let i = 0; i < feats.length; i++){
-          this.feats.push(
-            new TalentFeat( feats[i].getFieldByLabel('Feat').getValue() )
-          );
-        }
-      }
-
-      if(this.template.RootNode.hasField('FirstName'))
-        this.firstName = this.template.RootNode.getFieldByLabel('FirstName').getValue();
-      
-      if(this.template.RootNode.hasField('ForcePoints'))
-        this.forcePoints = this.template.RootNode.getFieldByLabel('ForcePoints').getValue();
-          
-      if(this.template.RootNode.hasField('Gender'))
-        this.gender = this.template.RootNode.getFieldByLabel('Gender').getValue();
-    
-      if(this.template.RootNode.hasField('GoodEvil'))
-        this.goodEvil = this.template.RootNode.getFieldByLabel('GoodEvil').getValue();
-        
-      if(this.template.RootNode.hasField('Hologram'))
-        this.isHologram = this.template.getFieldByLabel('Hologram').getValue();
-
-      if(this.template.RootNode.hasField('Interruptable'))
-        this.interruptable = this.template.getFieldByLabel('Interruptable').getValue();
-
-      if(this.template.RootNode.hasField('IsPC'))
-        this.isPC = this.template.getFieldByLabel('IsPC').getValue();
-
-      if(this.template.RootNode.hasField('LastName'))
-        this.lastName = this.template.getFieldByLabel('LastName').getValue();
-
-      if(this.template.RootNode.hasField('MaxHitPoints')){
-        this.maxHitPoints = this.template.getFieldByLabel('MaxHitPoints').getValue();
-      }
-
-      if(this.template.RootNode.hasField('MaxForcePoints')){
-        this.maxForcePoints = this.template.getFieldByLabel('MaxForcePoints').getValue();
-      }
-
-      if(this.template.RootNode.hasField('Min1HP'))
-        this.min1HP = this.template.getFieldByLabel('Min1HP').getValue();
-
-      if(this.template.RootNode.hasField('NaturalAC'))
-        this.naturalAC = this.template.getFieldByLabel('NaturalAC').getValue();
-
-      if(this.template.RootNode.hasField('NoPermDeath'))
-        this.noPermDeath = this.template.getFieldByLabel('NoPermDeath').getValue();
-
-      if(this.template.RootNode.hasField('NotReorienting'))
-        this.notReorienting = this.template.getFieldByLabel('NotReorienting').getValue();
-
-      if(this.template.RootNode.hasField('PartyInteract'))
-        this.partyInteract = this.template.getFieldByLabel('PartyInteract').getValue();
-
-      if(this.template.RootNode.hasField('PerceptionRange')){
-        this.perceptionRange = GameState.SWRuleSet.ranges[this.template.getFieldByLabel('PerceptionRange').getValue()];
-      }else{
-        //https://forum.neverwintervault.org/t/perception-range/3191/9
-        //It appears that PerceptionRange isn't saved inside the GIT file.
-        //The original game appears to use PercepRngDefault when a creature is reloaded from a SaveGame
-        this.perceptionRange = GameState.SWRuleSet.ranges[11];
-      }
-
-      if(this.template.RootNode.hasField('Phenotype'))
-        this.phenotype = this.template.getFieldByLabel('Phenotype').getValue();
-
-      if(this.template.RootNode.hasField('Plot'))
-        this.plot = this.template.getFieldByLabel('Plot').getValue();
-
-      if(this.template.RootNode.hasField('PortraitId')){
-        this.portraitId = this.template.getFieldByLabel('PortraitId').getValue();
-        this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
-      }
-    
-      if(this.template.RootNode.hasField('Race'))
-        this.race = this.template.RootNode.getFieldByLabel('Race').getValue();
-
-      if(this.template.RootNode.hasField('SkillList')){
-        let skills = this.template.RootNode.getFieldByLabel('SkillList').getChildStructs();
-        for(let i = 0; i < skills.length; i++){
-          this.skills[i].rank = skills[i].getFieldByLabel('Rank').getValue();
-        }
-      }
-
-      if(this.template.RootNode.hasField('SoundSetFile'))
-        this.soundSetFile = this.template.RootNode.getFieldByLabel('SoundSetFile').getValue();
-    
-      if(this.template.RootNode.hasField('SubRace'))
-        this.subrace = this.template.RootNode.getFieldByLabel('SubRace').getValue();
-
-      if(this.template.RootNode.hasField('Tag'))
-        this.tag = this.template.getFieldByLabel('Tag').getValue();
-
-      if(this.template.RootNode.hasField('TemplateResRef'))
-        this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
-
-      if(this.template.RootNode.hasField('TextureVar'))
-        this.textureVar = this.template.getFieldByLabel('TextureVar').getValue();
-
-      if(this.template.RootNode.hasField('WalkRate'))
-        this.walkRate = this.template.getFieldByLabel('WalkRate').getValue();
-
-      if(this.template.RootNode.hasField('Str'))
-        this.str = this.template.getFieldByLabel('Str').getValue();
-    
-      if(this.template.RootNode.hasField('Dex'))
-        this.dex = this.template.getFieldByLabel('Dex').getValue();
-    
-      if(this.template.RootNode.hasField('Con'))
-        this.con = this.template.getFieldByLabel('Con').getValue();
-    
-      if(this.template.RootNode.hasField('Cha'))
-        this.cha = this.template.getFieldByLabel('Cha').getValue();
-    
-      if(this.template.RootNode.hasField('Wis'))
-        this.wis = this.template.getFieldByLabel('Wis').getValue();
-    
-      if(this.template.RootNode.hasField('Int'))
-        this.int = this.template.getFieldByLabel('Int').getValue();
-
-      if(this.template.RootNode.hasField('XPosition'))
-        this.position.x = this.template.RootNode.getFieldByLabel('XPosition').getValue();
-
-      if(this.template.RootNode.hasField('YPosition'))
-        this.position.y = this.template.RootNode.getFieldByLabel('YPosition').getValue();
-
-      if(this.template.RootNode.hasField('ZPosition'))
-        this.position.z = this.template.RootNode.getFieldByLabel('ZPosition').getValue();
-
-      if(this.template.RootNode.hasField('XOrientation'))
-        this.xOrientation = this.template.RootNode.getFieldByLabel('XOrientation').getValue();
-
-      if(this.template.RootNode.hasField('YOrientation'))
-        this.yOrientation = this.template.RootNode.getFieldByLabel('YOrientation').getValue();
-
-      if(this.template.RootNode.hasField('ZOrientation'))
-        this.zOrientation = this.template.RootNode.getFieldByLabel('ZOrientation').getValue();
-        
-      if(this.template.RootNode.hasField('FortSaveThrow'))
-        this.fortitudeSaveThrow = this.template.RootNode.getFieldByLabel('FortSaveThrow').getValue();
-
-      if(this.template.RootNode.hasField('RefSaveThrow'))
-        this.reflexSaveThrow = this.template.RootNode.getFieldByLabel('RefSaveThrow').getValue();
-
-      if(this.template.RootNode.hasField('WillSaveThrow'))
-        this.willSaveThrow = this.template.RootNode.getFieldByLabel('WillSaveThrow').getValue();
-
-        if(this.template.RootNode.hasField('SubraceIndex'))
-          this.subraceIndex = this.template.RootNode.getFieldByLabel('SubraceIndex').getValue();
-
-
-      if(this.template.RootNode.hasField('SWVarTable')){
-        let localBools = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0].getFieldByLabel('BitArray').getChildStructs();
-        //console.log(localBools);
-        for(let i = 0; i < localBools.length; i++){
-          let data = localBools[i].getFieldByLabel('Variable').getValue();
-          for(let bit = 0; bit < 32; bit++){
-            this._locals.Booleans[bit + (i*32)] = ( (data>>bit) % 2 != 0);
-          }
-        }
-        let localNumbers = this.template.RootNode.getFieldByLabel('SWVarTable').getChildStructs()[0].getFieldByLabel('ByteArray').getChildStructs();
-        //console.log(localNumbers);
-        for(let i = 0; i < localNumbers.length; i++){
-          let data = localNumbers[i].getFieldByLabel('Variable').getValue();
-          this.setLocalNumber(i, data);
-        }
-      }
-
-      if(this.template.RootNode.hasField('PM_Appearance'))
-        this.pm_Appearance = this.template.RootNode.getFieldByLabel('PM_Appearance').getValue();
-
-      if(this.template.RootNode.hasField('PM_IsDisguised'))
-        this.pm_IsDisguised = !!this.template.RootNode.getFieldByLabel('PM_IsDisguised').getValue();
-
-      try{
-        if(this.template.RootNode.hasField('EffectList')){
-          let effects = this.template.RootNode.getFieldByLabel('EffectList').getChildStructs() || [];
-          for(let i = 0; i < effects.length; i++){
-            let effect = GameEffectFactory.EffectFromStruct(effects[i]);
-            if(effect){
-              effect.setAttachedObject(this);
-              effect.loadModel();
-              //console.log('attached');
-              this.effects.push(effect);
-              //this.addEffect(effect);
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      try{
-        if(this.template.RootNode.hasField('Equip_ItemList')){
-          let equipment = this.template.RootNode.getFieldByLabel('Equip_ItemList').getChildStructs() || [];
-          for(let i = 0; i < equipment.length; i++){
-            let strt = equipment[i];
-            let equipped_item = undefined;
-            let slot_type = strt.type;
-            if(strt.hasField('EquippedRes')){
-              equipped_item = new GameState.Module.ModuleArea.ModuleItem(strt.getFieldByLabel('EquippedRes').getValue());
-            }else{
-              equipped_item = new GameState.Module.ModuleArea.ModuleItem(GFFObject.FromStruct(strt));
-            }
-            
-            switch(slot_type){
-              case ModuleCreatureArmorSlot.HEAD:
-                this.equipment.HEAD = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.ARMS:
-                this.equipment.ARMS = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.ARMOR:
-                this.equipment.ARMOR = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTHAND:
-                this.equipment.LEFTHAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTHAND2:
-                this.equipment.LEFTHAND2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTHAND:
-                this.equipment.RIGHTHAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTHAND2:
-                this.equipment.RIGHTHAND2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.LEFTARMBAND:
-                this.equipment.LEFTARMBAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.RIGHTARMBAND:
-                this.equipment.RIGHTARMBAND = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.IMPLANT:
-              this.equipment.IMPLANT = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.BELT:
-                this.equipment.BELT = equipped_item;
-              break;
-
-              //Simple Creature Slots
-              case ModuleCreatureArmorSlot.HIDE:
-                this.equipment.HIDE = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW1:
-                this.equipment.CLAW1 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW2:
-                this.equipment.CLAW2 = equipped_item;
-              break;
-              case ModuleCreatureArmorSlot.CLAW3:
-                this.equipment.CLAW3 = equipped_item;
-              break;
-              default:
-                console.warn('ModuleCreature.initProperties', 'Unhandled Equipment Slot', equipped_item);
-              break;
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      this.parseEquipmentSlots();
-
-      if(this.template.RootNode.hasField('ItemList')){
-        const inventory = this.template.RootNode.getFieldByLabel('ItemList').getChildStructs();
-        for(let i = 0; i < inventory.length; i++){
-          this.loadItem(GFFObject.FromStruct(inventory[i]));
-        }
-      }
-      this.loadSoundSet();
-
-      //ActionList
-      try{
-        if(this.template.RootNode.hasField('ActionList')){
-          const actionStructs = this.template.RootNode.getFieldByLabel('ActionList').getChildStructs();
-          for(let i = 0, len = actionStructs.length; i < len; i++){
-            const action = GameState.ActionFactory.FromStruct(actionStructs[i]);
-            if(action){
-              this.actionQueue.add(action);
-            }
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-
-      //PerceptionList
-      try{
-        if(this.template.RootNode.hasField('PerceptionList')){
-          let perceptionList = this.template.RootNode.getFieldByLabel('PerceptionList').getChildStructs();
-          if(perceptionList.length){
-            this.perceptionList = [];
-          }
-
-          for(let i = 0, len = perceptionList.length; i < len; i++){
-            const perception = perceptionList[i];
-
-            const objectId = perception.getFieldByLabel('ObjectId').getValue();
-            const data = perception.getFieldByLabel('PerceptionData').getValue() as PerceptionType;
-
-            this.perceptionList.push({
-              object: undefined,
-              objectId: objectId,
-              data: data
-            });
-          }
-        }
-      }catch(e: any){
-        console.error(e);
-      }
-    }catch(e: any){
-      console.error(e);
-    }
-
-    if(this.template.RootNode.hasField('Animation')){
-      this.setAnimationState(
-        this.template.getFieldByLabel('Animation').getValue()
-      );
-    }
-
-    this.initialized = true;
-
+    CreatureTemplate.read(this);
   }
+
 
   async loadEquipmentModels(): Promise<void> {
     const array =  Object.keys(this.equipment);
@@ -4107,79 +3652,9 @@ export class ModuleCreature extends ModuleObject {
       this.head = undefined;
     }
 
-    if(this.equipment.ARMOR){
-      this.equipment.ARMOR.destroy();
-      this.equipment.ARMOR = undefined;
-    }
-
-    if(this.equipment.ARMS){
-      this.equipment.ARMS.destroy();
-      this.equipment.ARMS = undefined;
-    }
-
-    if(this.equipment.BELT){
-      this.equipment.BELT.destroy();
-      this.equipment.BELT = undefined;
-    }
-
-    if(this.equipment.CLAW1){
-      this.equipment.CLAW1.destroy();
-      this.equipment.CLAW1 = undefined;
-    }
-
-    if(this.equipment.CLAW2){
-      this.equipment.CLAW2.destroy();
-      this.equipment.CLAW2 = undefined;
-    }
-
-    if(this.equipment.CLAW3){
-      this.equipment.CLAW3.destroy();
-      this.equipment.CLAW3 = undefined;
-    }
-
-    if(this.equipment.HEAD){
-      this.equipment.HEAD.destroy();
-      this.equipment.HEAD = undefined;
-    }
-
-    if(this.equipment.HIDE){
-      this.equipment.HIDE.destroy();
-      this.equipment.HIDE = undefined;
-    }
-
-    if(this.equipment.IMPLANT){
-      this.equipment.IMPLANT.destroy();
-      this.equipment.IMPLANT = undefined;
-    }
-
-    if(this.equipment.LEFTARMBAND){
-      this.equipment.LEFTARMBAND.destroy();
-      this.equipment.LEFTARMBAND = undefined;
-    }
-
-    if(this.equipment.LEFTHAND){
-      this.equipment.LEFTHAND.destroy();
-      this.equipment.LEFTHAND = undefined;
-    }
-
-    if(this.equipment.LEFTHAND2){
-      this.equipment.LEFTHAND2.destroy();
-      this.equipment.LEFTHAND2 = undefined;
-    }
-
-    if(this.equipment.RIGHTARMBAND){
-      this.equipment.RIGHTARMBAND.destroy();
-      this.equipment.RIGHTARMBAND = undefined;
-    }
-
-    if(this.equipment.RIGHTHAND){
-      this.equipment.RIGHTHAND.destroy();
-      this.equipment.RIGHTHAND = undefined;
-    }
-
-    if(this.equipment.RIGHTHAND2){
-      this.equipment.RIGHTHAND2.destroy();
-      this.equipment.RIGHTHAND2 = undefined;
+    for(const key of EquipmentSlots.ALL){
+      this.equipment[key]?.destroy();
+      this.equipment[key] = undefined;
     }
 
     while(this.inventory.length){
@@ -4198,383 +3673,17 @@ export class ModuleCreature extends ModuleObject {
   }
 
   save(){
-
-    let gff = new GFFObject();
-    gff.FileType = 'UTC ';
-    
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Mod_CommntyName') ).setValue('Bad StrRef');
-    if(this.playerCreated){
-      gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Mod_IsPrimaryPlr') ).setValue(1);
-    }
-    
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_FirstName') )
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Mod_LastName') )
-
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'AIState') ).setValue(0);
-
-    gff.RootNode.addField( this.actionQueueToActionList() );
-
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'Age') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'AmbientAnimState') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'Animation') ).setValue(this.animationState.index);
-    //gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Appearance_Head') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'Appearance_Type') ).setValue(this.appearance);
-    //gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'AreaId') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'ArmorClass') ).setValue(this.getAC());
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') ).setValue(this.bodyBag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Cha') ).setValue(this.cha);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ChallengeRating') ).setValue(this.challengeRating);
-
-    //Classes
-    let classList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ClassList') );
-    for(let i = 0; i < this.classes.length; i++){
-      classList.addChildStruct( this.classes[i].save() );
-    }
-    
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Color_Hair') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Color_Skin') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Color_Tattoo1') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Color_Tattoo2') ).setValue(0);
-
-    let combatInfoStruct = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'CombatInfo') );
-
-    //TODO: CombatInfo
-
-    let combatRoundDataStruct = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'CombatRoundData') );
-
-    //TODO: CombatRoundData
-
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Commandable') ).setValue(this.getCommadable() ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Con') ).setValue(this.str);
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Conversation') ).setValue(this.conversation ? this.conversation.resref : '');
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'CreatnScrptFird') ).setValue( this.spawned ? 1 : 0 );
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'CreatureSize') ).setValue(3);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentForce') ).setValue(this.currentForce);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentHitPoints') ).setValue(this.currentHitPoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DeadSelectable') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Deity') ).setValue('');
-    //gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') ).setValue();
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DetectMode') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Dex') ).setValue(this.dex);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Disarmable') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DuplicatingHead') ).setValue(255);
-    
-    //Effects
-    let effectList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'EffectList') );
-    for(let i = 0; i < this.effects.length; i++){
-      effectList.addChildStruct( this.effects[i].save() );
-    }
-
-    //Equipment
-    let equipItemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-
-    if(this.equipment.ARMOR){
-      let equipItem = this.equipment.ARMOR.save();
-      equipItem.setType(ModuleCreatureArmorSlot.ARMOR);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.ARMS){
-      let equipItem = this.equipment.ARMS.save();
-      equipItem.setType(ModuleCreatureArmorSlot.ARMS);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.BELT){
-      let equipItem = this.equipment.BELT.save();
-      equipItem.setType(ModuleCreatureArmorSlot.BELT);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW1){
-      let equipItem = this.equipment.CLAW1.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW1);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW2){
-      let equipItem = this.equipment.CLAW2.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW2);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.CLAW3){
-      let equipItem = this.equipment.CLAW3.save();
-      equipItem.setType(ModuleCreatureArmorSlot.CLAW3);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.HEAD){
-      let equipItem = this.equipment.HEAD.save();
-      equipItem.setType(ModuleCreatureArmorSlot.HEAD);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.HIDE){
-      let equipItem = this.equipment.HIDE.save();
-      equipItem.setType(ModuleCreatureArmorSlot.HIDE);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.IMPLANT){
-      let equipItem = this.equipment.IMPLANT.save();
-      equipItem.setType(ModuleCreatureArmorSlot.IMPLANT);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.LEFTARMBAND){
-      let equipItem = this.equipment.LEFTARMBAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.LEFTARMBAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.LEFTHAND){
-      let equipItem = this.equipment.LEFTHAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.LEFTHAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.RIGHTARMBAND){
-      let equipItem = this.equipment.RIGHTARMBAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.RIGHTARMBAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    if(this.equipment.RIGHTHAND){
-      let equipItem = this.equipment.RIGHTHAND.save();
-      equipItem.setType(ModuleCreatureArmorSlot.RIGHTHAND);
-      equipItemList.addChildStruct(equipItem)
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Experience') ).setValue(this.experience);
-    
-    let expressionList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ExpressionList') );
-    let expressions = Object.keys(this.listeningPatterns);
-    for(let i = 0; i < expressions.length; i++){
-      let expressionString = expressions[i];
-      let expressionId = this.listeningPatterns[expressionString];
-
-      let expressionStruct = new GFFStruct();
-      expressionStruct.addField( new GFFField(GFFDataType.INT, 'ExpressionId') ).setValue( expressionId );
-      expressionStruct.addField( new GFFField(GFFDataType.CEXOSTRING, 'ExpressionString') ).setValue( expressionString );
-      expressionList.addChildStruct(expressionStruct);
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'FactionID') ).setValue(this.faction ? this.faction.id : this.factionId);
-
-    //Feats
-    let featList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'FeatList') );
-    for(let i = 0; i < this.feats.length; i++){
-      featList.addChildStruct( this.feats[i].save() );
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName') ).setValue( this.template.RootNode.getFieldByLabel('FirstName')?.getCExoLocString() );
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'ForcePoints') ).setValue(this.forcePoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'FortSaveThrow') ).setValue(this.fortitudeSaveThrow);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Gender') ).setValue(this.gender);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Gold') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GoodEvil') ).setValue(this.goodEvil);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'HitPoints') ).setValue(this.hitPoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Int') ).setValue(this.int);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Interruptable') ).setValue(this.interruptable ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsDestroyable') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsPC') ).setValue( this.playerCreated ? 1 : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsRaiseable') ).setValue(1);
-    if(this.playerCreated){
-      gff.RootNode.addField( new GFFField(GFFDataType.INT, 'PlayerCreated') ).setValue(1);
-    }
-
-    //Creature Inventory
-    let itemList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'ItemList') );
-    for(let i = 0; i < this.inventory.length; i++){
-      let itemStruct = this.inventory[i].save();
-      itemList.addChildStruct(itemStruct);
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'JoiningXP') ).setValue( this.joiningXP ? this.joiningXP : 0 );
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName') ).setValue( this.template.RootNode.getFieldByLabel('LastName')?.getCExoLocString() );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Listening') ).setValue( this.isListening );
-
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'MaxForcePoints') ).setValue(this.maxForcePoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'MaxHitPoints') ).setValue(this.maxHitPoints);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Min1HP') ).setValue(this.min1HP);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'MovementRate') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NaturalAC') ).setValue(this.naturalAC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NotReorienting') ).setValue(this.notReorienting);
-
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PM_IsDisguised') ).setValue( this.hasEffect(GameEffectType.EffectDisguise) ? 1 : 0 );
-    if( this.hasEffect(GameEffectType.EffectDisguise) ){
-      gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'PM_Appearance') ).setValue( this.appearance );
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PartyInteract') ).setValue(this.partyInteract);
-
-    //Save PerceptionLists
-    let perceptionList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'PerceptionList') );
-    for(let i = 0; i < this.perceptionList.length; i++){
-      let percept = this.perceptionList[i];
-
-      let perceptionStruct = new GFFStruct();
-      perceptionStruct.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( percept.objectId );
-      perceptionStruct.addField( new GFFField(GFFDataType.BYTE, 'PerceptionData') ).setValue( (percept.data & 0xFF) );
-      perceptionList.addChildStruct(perceptionStruct);
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PerceptionRange') ).setValue(this.perceptionRange?.id || 0);
-
-    gff.RootNode.addField( new GFFField(GFFDataType.INT, 'Phenotype') ).setValue(this.phenotype);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') ).setValue(this.portraitId);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'PregameCurrent') ).setValue(28);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Race') ).setValue(this.race);
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'RefSaveThrow') ).setValue(this.reflexSaveThrow);
-
-    let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
-    swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
-
-    //Scripts
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptAttacked') ).setValue(this.scripts[ModuleObjectScript.CreatureOnAttacked]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDamaged') ).setValue(this.scripts[ModuleObjectScript.CreatureOnDamaged]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDeath') ).setValue(this.scripts[ModuleObjectScript.CreatureOnDeath]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDialogue') ).setValue(this.scripts[ModuleObjectScript.CreatureOnDialog]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDisturbed') ).setValue(this.scripts[ModuleObjectScript.CreatureOnDisturbed]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndDialogu') ).setValue(this.scripts[ModuleObjectScript.CreatureOnEndDialog]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndRound') ).setValue(this.scripts[ModuleObjectScript.CreatureOnEndRound]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat') ).setValue(this.scripts[ModuleObjectScript.CreatureOnHeartbeat]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked') ).setValue(this.scripts[ModuleObjectScript.CreatureOnBlocked]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnNotice') ).setValue(this.scripts[ModuleObjectScript.CreatureOnNotice]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptRested') ).setValue(this.scripts[ModuleObjectScript.CreatureOnRested]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpawn') ).setValue(this.scripts[ModuleObjectScript.CreatureOnSpawn]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpellAt') ).setValue(this.scripts[ModuleObjectScript.CreatureOnSpellAt]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptUserDefine') ).setValue(this.scripts[ModuleObjectScript.CreatureOnUserDefined]?.name || '');
-
-    //Skills
-    let skillList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'SkillList') );
-    for(let i = 0; i < 8; i++){
-      skillList.addChildStruct( this.skills[i].save() );
-    }
-
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'SkillPoints') ).setValue( this.skillPoints ? this.skillPoints : 0);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'SoundSetFile') ).setValue(this.soundSetFile);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'StartingPackage') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'StealthMode') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Str') ).setValue(this.str);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Subrace') ).setValue('');
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'SubraceIndex') ).setValue(this.subrace);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Tail') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'UseBackupHead') ).setValue(0);
-    let varTable = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
-    gff.RootNode.addField( new GFFField(GFFDataType.CHAR, 'WillSaveThrow') ).setValue(this.willSaveThrow);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Wings') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Wis') ).setValue(this.wis);
-
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XPosition') ).setValue( this.position.x );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YPosition') ).setValue( this.position.y );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZPosition') ).setValue( this.position.z );
-
-    let theta = this.rotation.z * Math.PI;
-
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'XOrientation') ).setValue( 1 * Math.cos(theta) );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'YOrientation') ).setValue( 1 * Math.sin(theta) );
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ZOrientation') ).setValue( 0 );
-
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'fortbonus') ).setValue(this.fortbonus);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'refbonus') ).setValue(this.refbonus);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'refbonus') ).setValue(this.refbonus);
-
-    this.template = gff;
-
-    if(this.npcId >= 0){
-      GameState.PartyManager.NPCS[this.npcId].template = this.template;
-    }
-
-    return gff;
-
+    return CreatureTemplate.write(this);
   }
 
-  static GenerateTemplate(){
-    let template = new GFFObject();
-    template.FileType = 'UTC ';
 
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'Appearance_Type') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyVariation') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Cha') );
-    template.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ChallengeRating') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'ClassList') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Comment') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Con') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Conversation') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentForce') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentHitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Deity') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Dex') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Disarmable') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'FactionID') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'FeatList') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'ForcePoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Gender') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GoodEvil') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'HitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Int') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Interruptable') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'IsPC') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LastName') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'LawfulChaotic') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'MaxHitPoints') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Min1HP') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NaturalAC') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NoPermDeath') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NotReorienting') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PalletID') ).setValue(4);
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PartyInteract') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PerceptionRange') );
-    template.RootNode.addField( new GFFField(GFFDataType.INT, 'Phenotype') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Race') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptAttacked') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDamaged') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDeath') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDialogue') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDisturbed') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndDialogu') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndRound') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnNotice') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptRested') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpawn') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpellAt') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptUserDefine') );
-    let skillList = template.RootNode.addField( new GFFField(GFFDataType.LIST, 'SkillList') );
-    template.RootNode.addField( new GFFField(GFFDataType.WORD, 'SoundSetFile') )
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'SpecAbilityList') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Str') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Subrace') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'SubraceIndex') );
-    template.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') );
-    template.RootNode.addField( new GFFField(GFFDataType.LIST, 'TemplateList') );
-    template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'TemplateResRef') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TextureVar') );
-    template.RootNode.addField( new GFFField(GFFDataType.INT, 'WalkRate') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Wis') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'fortbonus') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'refbonus') );
-    template.RootNode.addField( new GFFField(GFFDataType.SHORT, 'willbonus') );
-
-    for(let i = 0; i < 8; i++){
-      let _skill = new GFFStruct();
-      _skill.addField( new GFFField(GFFDataType.RESREF, 'Rank') ).setValue(0);
-      skillList.addChildStruct(_skill);
-    }
-
-    return template;
+  static GenerateTemplate(): GFFObject {
+    return CreatureTemplate.generate();
   }
 
+
+}
+
+export interface ModuleCreature {
+  gmSpawnConfig?: GMCreatureSpawnConfig;
 }

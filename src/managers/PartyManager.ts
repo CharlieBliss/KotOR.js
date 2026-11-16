@@ -216,14 +216,10 @@ export class PartyManager {
     }
 
     //TSL: PT_ITEM_CHEMICAL
-    if(gff.RootNode.hasField('PT_ITEM_CHEMICAL')){
-      GameState.PartyManager.ChemicalCount = gff.RootNode.getFieldByLabel('PT_ITEM_CHEMICAL').getValue();
-    }
+    GameState.PartyManager.ChemicalCount = gff.RootNode.get('PT_ITEM_CHEMICAL', GameState.PartyManager.ChemicalCount);
 
     //TSL: PT_ITEM_COMPONEN
-    if(gff.RootNode.hasField('PT_ITEM_COMPONEN')){
-      GameState.PartyManager.ComponentCount = gff.RootNode.getFieldByLabel('PT_ITEM_COMPONEN').getValue();
-    }
+    GameState.PartyManager.ComponentCount = gff.RootNode.get('PT_ITEM_COMPONEN', GameState.PartyManager.ComponentCount);
   
     //TSL: PT_AVAIL_PUPS
     if(gff.RootNode.hasField('PT_INFLUENCE')){
@@ -347,8 +343,8 @@ export class PartyManager {
         );
       }
 
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'JNL_SortOrder')).setValue(0);
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'PT_AISTATE')).setValue(0);
+      partytable.RootNode.addInt('JNL_SortOrder', 0);
+      partytable.RootNode.addInt('PT_AISTATE', 0);
       let availNPCSList = partytable.RootNode.addField(new GFFField(GFFDataType.LIST, 'PT_AVAIL_NPCS'));
 
       //TODO: Party Available NPCS
@@ -356,13 +352,13 @@ export class PartyManager {
       for(let i = 0; i < maxPartyMembers; i++){
         let pm = GameState.PartyManager.NPCS[i];
         let availStruct = new GFFStruct();
-        availStruct.addField( new GFFField(GFFDataType.BYTE, 'PT_NPC_AVAIL') ).setValue(pm.available ? 1 : 0);
-        availStruct.addField( new GFFField(GFFDataType.BYTE, 'PT_NPC_SELECT') ).setValue(pm.canSelect ? 1 : 0);
+        availStruct.addByte('PT_NPC_AVAIL', pm.available ? 1 : 0);
+        availStruct.addByte('PT_NPC_SELECT', pm.canSelect ? 1 : 0);
         availNPCSList.addChildStruct(availStruct);
       }
 
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'PT_CHEAT_USED')).setValue(0);
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'PT_CONTROLLED_NP')).setValue( GameState.getCurrentPlayer() == GameState.PartyManager.Player ? -1 : GameState.PartyManager.party.indexOf(GameState.getCurrentPlayer()) );
+      partytable.RootNode.addInt('PT_CHEAT_USED', 0);
+      partytable.RootNode.addInt('PT_CONTROLLED_NP',  GameState.getCurrentPlayer() == GameState.PartyManager.Player ? -1 : GameState.PartyManager.party.indexOf(GameState.getCurrentPlayer()) );
       partytable.RootNode.addField(new GFFField(GFFDataType.LIST, 'PT_COST_MULT_LIS'));
 
       //TODO: COST MULT LIST
@@ -383,9 +379,9 @@ export class PartyManager {
         );
       }
 
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'PT_FOLLOWSTATE')).setValue(0);
-      partytable.RootNode.addField(new GFFField(GFFDataType.DWORD, 'PT_GOLD')).setValue(GameState.PartyManager.Gold);
-      partytable.RootNode.addField(new GFFField(GFFDataType.INT, 'PT_LAST_GUI_PNL')).setValue(0);
+      partytable.RootNode.addInt('PT_FOLLOWSTATE', 0);
+      partytable.RootNode.addDWord('PT_GOLD', GameState.PartyManager.Gold);
+      partytable.RootNode.addInt('PT_LAST_GUI_PNL', 0);
       let ptMembersList = partytable.RootNode.addField(new GFFField(GFFDataType.LIST, 'PT_MEMBERS'));
 
       let numMembers = 0;
@@ -393,14 +389,14 @@ export class PartyManager {
         let member = GameState.PartyManager.party[i];
         if(member != GameState.PartyManager.Player){
           let memberStruct = new GFFStruct();
-          memberStruct.addField( new GFFField(GFFDataType.BYTE, 'PT_IS_LEADER') ).setValue( GameState.getCurrentPlayer() == member ? 1 : 0 );
-          memberStruct.addField( new GFFField(GFFDataType.INT, 'PT_MEMBER_ID') ).setValue( member.npcId );
+          memberStruct.addByte('PT_IS_LEADER',  GameState.getCurrentPlayer() == member ? 1 : 0 );
+          memberStruct.addInt('PT_MEMBER_ID',  member.npcId );
           ptMembersList.addChildStruct( memberStruct );
           numMembers++;
         }
       }
 
-      partytable.RootNode.addField(new GFFField(GFFDataType.BYTE, 'PT_NUM_MEMBERS')).setValue(numMembers);
+      partytable.RootNode.addByte('PT_NUM_MEMBERS', numMembers);
 
       /**
        * Pazaak Cards
@@ -432,8 +428,8 @@ export class PartyManager {
         pazaakSideDeckList.addChildStruct(sideDeckStruct);
       }
 
-      partytable.RootNode.addField(new GFFField(GFFDataType.DWORD, 'PT_PLAYEDSECONDS')).setValue(0);
-      partytable.RootNode.addField(new GFFField(GFFDataType.BYTE, 'PT_SOLOMODE')).setValue(0);
+      partytable.RootNode.addDWord('PT_PLAYEDSECONDS', 0);
+      partytable.RootNode.addByte('PT_SOLOMODE', 0);
 
       const tutorial2DA = GameState.TwoDAManager.datatables.get('tutorial');
       if(tutorial2DA){
@@ -488,6 +484,7 @@ export class PartyManager {
    * @returns void
    */
   static SwitchLeaderAtIndex(index: number = 0){
+    if(PartyManager.isLeaderLocked()) return;
     index = Math.abs(index);
 
     if(index >= PartyManager.party.length){
@@ -859,7 +856,15 @@ export class PartyManager {
    * Shift the current leader to the end of the party array
    * @returns void
    */
+  /**
+   * A player in a GM session controls only their own character: Tab and the party portraits can't switch it
+   */
+  static isLeaderLocked(): boolean {
+    return GameState.hooks.isLeaderLocked();
+  }
+
   static ShiftLeader(){
+    if(PartyManager.isLeaderLocked()) return;
     PartyManager.party.push( PartyManager.party.shift() );
     PartyManager.UpdateLeader();
   }
@@ -948,7 +953,7 @@ export class PartyManager {
   static async LoadPartyMember(nIdx: number = 0){
     const npc = PartyManager.NPCS[PartyManager.CurrentMembers[nIdx].memberID];
     const template = npc.template;
-    template.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( GameState.ModuleObjectManager.GetNextPlayerId() );
+    template.RootNode.addDWord('ObjectId',  GameState.ModuleObjectManager.GetNextPlayerId() );
     const partyMember = new ModuleCreature(template);
 
     if(nIdx < 0 || nIdx > 1){
@@ -1242,66 +1247,66 @@ export class PartyManager {
   public static GeneratePlayerTemplate(): GFFObject {
     let pTPL = new GFFObject();
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( GameState.ModuleObjectManager.GetNextPlayerId() );
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'Appearance_Type') ).setValue(GameState.GameKey == GameEngineType.TSL ? 134 : 177);
+    pTPL.RootNode.addDWord('ObjectId',  GameState.ModuleObjectManager.GetNextPlayerId() );
+    pTPL.RootNode.addWord('Appearance_Type', GameState.GameKey == GameEngineType.TSL ? 134 : 177);
     pTPL.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'FirstName') ).setValue(GameState.GameKey == GameEngineType.TSL ? 'Leia Organa' : 'Luke Skywalker');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.INT, 'Age') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.SHORT, 'ArmorClass') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'ChallengeRating') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'FactionID') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') ).setValue(GameState.GameKey == GameEngineType.TSL ? 10 : 26);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'HitPoints') ).setValue(100);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'MaxHitPoints') ).setValue(100);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'CurrentHitPoints') ).setValue(70);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'ForcePoints') ).setValue(15);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'MaxForcePoints') ).setValue(15);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'Commandable') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'CurrentForce') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'DeadSelectable') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'DetectMode') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'Disarmable') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'IsDestroyable') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'IsPC') ).setValue(1);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'IsRaiseable') ).setValue(1);
+    pTPL.RootNode.addInt('Age', 0);
+    pTPL.RootNode.addShort('ArmorClass', 10);
+    pTPL.RootNode.addByte('BodyBag', 0);
+    pTPL.RootNode.addFloat('ChallengeRating', 0);
+    pTPL.RootNode.addWord('FactionID', 0);
+    pTPL.RootNode.addWord('PortraitId', GameState.GameKey == GameEngineType.TSL ? 10 : 26);
+    pTPL.RootNode.addWord('HitPoints', 100);
+    pTPL.RootNode.addWord('MaxHitPoints', 100);
+    pTPL.RootNode.addWord('CurrentHitPoints', 70);
+    pTPL.RootNode.addWord('ForcePoints', 15);
+    pTPL.RootNode.addWord('MaxForcePoints', 15);
+    pTPL.RootNode.addWord('Commandable', 1);
+    pTPL.RootNode.addWord('CurrentForce', 10);
+    pTPL.RootNode.addWord('DeadSelectable', 1);
+    pTPL.RootNode.addWord('DetectMode', 1);
+    pTPL.RootNode.addWord('Disarmable', 1);
+    pTPL.RootNode.addWord('IsDestroyable', 1);
+    pTPL.RootNode.addWord('IsPC', 1);
+    pTPL.RootNode.addWord('IsRaiseable', 1);
     let equipment = pTPL.RootNode.addField( new GFFField(GFFDataType.LIST, 'Equip_ItemList') );
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptAttacked') ).setValue('k_hen_attacked01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDamaged') ).setValue('k_def_damage01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDeath') ).setValue('');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDialogue') ).setValue('k_hen_dialogue01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptDisturbed') ).setValue('');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndDialogu') ).setValue('');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptEndRound') ).setValue('k_hen_combend01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptHeartbeat') ).setValue('k_hen_heartbt01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnBlocked') ).setValue('k_def_blocked01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptOnNotice') ).setValue('k_hen_percept01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptRested') ).setValue('');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpawn') ).setValue('k_hen_spawn01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptSpellAt') ).setValue('k_def_spellat01');
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'ScriptUserDefine') ).setValue('k_def_userdef01');
+    pTPL.RootNode.addRESREF('ScriptAttacked', 'k_hen_attacked01');
+    pTPL.RootNode.addRESREF('ScriptDamaged', 'k_def_damage01');
+    pTPL.RootNode.addRESREF('ScriptDeath', '');
+    pTPL.RootNode.addRESREF('ScriptDialogue', 'k_hen_dialogue01');
+    pTPL.RootNode.addRESREF('ScriptDisturbed', '');
+    pTPL.RootNode.addRESREF('ScriptEndDialogu', '');
+    pTPL.RootNode.addRESREF('ScriptEndRound', 'k_hen_combend01');
+    pTPL.RootNode.addRESREF('ScriptHeartbeat', 'k_hen_heartbt01');
+    pTPL.RootNode.addRESREF('ScriptOnBlocked', 'k_def_blocked01');
+    pTPL.RootNode.addRESREF('ScriptOnNotice', 'k_hen_percept01');
+    pTPL.RootNode.addRESREF('ScriptRested', '');
+    pTPL.RootNode.addRESREF('ScriptSpawn', 'k_hen_spawn01');
+    pTPL.RootNode.addRESREF('ScriptSpellAt', 'k_def_spellat01');
+    pTPL.RootNode.addRESREF('ScriptUserDefine', 'k_def_userdef01');
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GoodEvil') ).setValue(50);
+    pTPL.RootNode.addByte('GoodEvil', 50);
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'NaturalAC') ).setValue(0);
+    pTPL.RootNode.addByte('NaturalAC', 0);
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Con') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Dex') ).setValue(14);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Str') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Wis') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Cha') ).setValue(10);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Int') ).setValue(10);
+    pTPL.RootNode.addByte('Con', 10);
+    pTPL.RootNode.addByte('Dex', 14);
+    pTPL.RootNode.addByte('Str', 10);
+    pTPL.RootNode.addByte('Wis', 10);
+    pTPL.RootNode.addByte('Cha', 10);
+    pTPL.RootNode.addByte('Int', 10);
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'fortbonus') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'refbonus') ).setValue(0);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'willbonus') ).setValue(0);
+    pTPL.RootNode.addByte('fortbonus', 0);
+    pTPL.RootNode.addByte('refbonus', 0);
+    pTPL.RootNode.addByte('willbonus', 0);
 
-    pTPL.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PerceptionRange') ).setValue(12);
+    pTPL.RootNode.addByte('PerceptionRange', 12);
 
     let classList = pTPL.RootNode.addField( new GFFField(GFFDataType.LIST, 'ClassList') );
     for(let i = 0; i < 1; i++){
       let _class = new GFFStruct();
-      _class.addField( new GFFField(GFFDataType.INT, 'Class') ).setValue(0);
-      _class.addField( new GFFField(GFFDataType.SHORT, 'ClassLevel') ).setValue(1);
+      _class.addInt('Class', 0);
+      _class.addShort('ClassLevel', 1);
       _class.addField( new GFFField(GFFDataType.LIST, 'KnownList0') );
       classList.addChildStruct(_class);
     }
@@ -1310,28 +1315,28 @@ export class PartyManager {
 
     for(let i = 0; i < 8; i++){
       let _skill = new GFFStruct();
-      _skill.addField( new GFFField(GFFDataType.RESREF, 'Rank') ).setValue(0);
+      _skill.addByte('Rank', 0);
       skillList.addChildStruct(_skill);
     }
 
     let armorStruct = new GFFStruct(ModuleCreatureArmorSlot.ARMOR);
-    armorStruct.addField( new GFFField(GFFDataType.RESREF, 'EquippedRes') ).setValue('g_a_jedirobe01');
+    armorStruct.addRESREF('EquippedRes', 'g_a_jedirobe01');
     let rhStruct = new GFFStruct(ModuleCreatureArmorSlot.RIGHTHAND);
-    rhStruct.addField( new GFFField(GFFDataType.RESREF, 'EquippedRes') ).setValue('g_w_lghtsbr01');
+    rhStruct.addRESREF('EquippedRes', 'g_w_lghtsbr01');
 
     equipment.addChildStruct( armorStruct );
     equipment.addChildStruct( rhStruct );
 
     // SoundSetFile
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'SoundSetFile') ).setValue(85);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Race') ).setValue(6);
+    pTPL.RootNode.addWord('SoundSetFile', 85);
+    pTPL.RootNode.addByte('Race', 6);
 
     /*let spawnLoc = this.getSpawnLocation();
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'XPosition') ).setValue(spawnLoc.XPosition);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'YPosition') ).setValue(spawnLoc.YPosition);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'ZPosition') ).setValue(spawnLoc.ZPosition);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'XOrientation') ).setValue(spawnLoc.XOrientation);
-    pTPL.RootNode.addField( new GFFField(GFFDataType.WORD, 'YOrientation') ).setValue(spawnLoc.YOrientation);*/
+    pTPL.RootNode.addWord('XPosition', spawnLoc.XPosition);
+    pTPL.RootNode.addWord('YPosition', spawnLoc.YPosition);
+    pTPL.RootNode.addWord('ZPosition', spawnLoc.ZPosition);
+    pTPL.RootNode.addWord('XOrientation', spawnLoc.XOrientation);
+    pTPL.RootNode.addWord('YOrientation', spawnLoc.YOrientation);*/
     PartyManager.PlayerTemplate = pTPL;
     PartyManager.PlayerTemplate.json = PartyManager.PlayerTemplate.toJSON();
     return PartyManager.PlayerTemplate;

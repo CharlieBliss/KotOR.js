@@ -212,7 +212,7 @@ export class GameEffect {
   }
 
   update(delta: number = 0){
-    if(this.getDurationType() == GameEffectDurationType.TEMPORARY && (this.expireDay || this.expireTime)){
+    if(this.getDurationType() == GameEffectDurationType.TEMPORARY){
       if(this.duration <= 0){
         this.onDurationEnd();
         return;
@@ -245,7 +245,7 @@ export class GameEffect {
   //When the effect duration has expired
   onDurationEnd(){
     this.durationEnded = true;
-    if(this.object){
+    if(this.object && typeof this.object.removeEffect === 'function'){
       this.object.removeEffect(this);
     }else{
       this.onRemove();
@@ -259,17 +259,17 @@ export class GameEffect {
   save(){
 
     let effectStruct = new GFFStruct(2);
-    effectStruct.addField( new GFFField(GFFDataType.DWORD64, 'Id') ).setValue(0);
-    effectStruct.addField( new GFFField(GFFDataType.WORD, 'Type') ).setValue(this.getSaveType());
-    effectStruct.addField( new GFFField(GFFDataType.WORD, 'SubType') ).setValue(this.getSubTypeUnMasked());
-    effectStruct.addField( new GFFField(GFFDataType.FLOAT, 'Duration') ).setValue(this.getDuration());
-    effectStruct.addField( new GFFField(GFFDataType.BYTE, 'SkipOnLoad') ).setValue(this.skipOnLoad ? 1 : 0);
-    effectStruct.addField( new GFFField(GFFDataType.DWORD, 'ExpireDay') ).setValue(this.getExpireDay());
-    effectStruct.addField( new GFFField(GFFDataType.DWORD, 'ExpireTime') ).setValue(this.getExpireTime());
-    effectStruct.addField( new GFFField(GFFDataType.DWORD, 'CreatorId') ).setValue( typeof this.creator === 'object' ? this.creator.id : 2130706432 );
-    effectStruct.addField( new GFFField(GFFDataType.DWORD, 'SpellId') ).setValue(this.getSpellId() >= 0 ? this.getSpellId() : 4294967295);
-    effectStruct.addField( new GFFField(GFFDataType.INT, 'IsExposed') ).setValue(1);
-    effectStruct.addField( new GFFField(GFFDataType.INT, 'NumIntegers') ).setValue(8);
+    effectStruct.addDWord64('Id', 0);
+    effectStruct.addWord('Type', this.getSaveType());
+    effectStruct.addWord('SubType', this.getSubTypeUnMasked());
+    effectStruct.addFloat('Duration', this.getDuration());
+    effectStruct.addByte('SkipOnLoad', this.skipOnLoad ? 1 : 0);
+    effectStruct.addDWord('ExpireDay', this.getExpireDay());
+    effectStruct.addDWord('ExpireTime', this.getExpireTime());
+    effectStruct.addDWord('CreatorId',  typeof this.creator === 'object' ? this.creator.id : 2130706432 );
+    effectStruct.addDWord('SpellId', this.getSpellId() >= 0 ? this.getSpellId() : 4294967295);
+    effectStruct.addInt('IsExposed', 1);
+    effectStruct.addInt('NumIntegers', 8);
 
     let intList = effectStruct.addField( new GFFField(GFFDataType.LIST, 'IntList') );
     for(let i = 0; i < 8; i++){

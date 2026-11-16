@@ -3,6 +3,7 @@ import { GameState } from "@/GameState";
 import type { LightManager } from "@/managers";
 import { OdysseyModel3D } from "@/three/odyssey";
 import type { GUIControl } from "@/gui/GUIControl";
+import type { EngineDebugType } from "@/enums/engine/EngineDebugType";
 
 /**
  * LBL_3DView class.
@@ -37,6 +38,8 @@ export class LBL_3DView {
   control: any;
   frustumMat4: THREE.Matrix4;
   viewportFrustum: THREE.Frustum;
+  /** Objects shown here ask their context for debug overlays, as they ask GameState; a menu view shows none */
+  debug: Partial<Record<EngineDebugType, boolean>> = {};
 
   constructor(width: number = 800, height: number = 600){
 
@@ -80,6 +83,10 @@ export class LBL_3DView {
     this.scene.add(this.group.creatures);
 
     this.lightManager.init(this);
+  }
+
+  GetDebugState(type: EngineDebugType){
+    return !!this.debug[type];
   }
 
   setControl(control: GUIControl){

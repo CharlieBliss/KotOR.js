@@ -819,77 +819,52 @@ export class ModuleMGPlayer extends ModuleObject {
     instance.run(this, 0);
   }
 
-  loadScripts (){
-    const scriptResRefs = [
-      ModuleObjectScript.MGPlayerOnAccelerate,
-      ModuleObjectScript.MGPlayerOnAnimEvent,
-      ModuleObjectScript.MGPlayerOnBrake,
-      ModuleObjectScript.MGPlayerOnCreate,
-      ModuleObjectScript.MGPlayerOnDamage,
-      ModuleObjectScript.MGPlayerOnDeath,
-      ModuleObjectScript.MGPlayerOnFire,
-      ModuleObjectScript.MGPlayerOnHeartbeat,
-      ModuleObjectScript.MGPlayerOnHitBullet,
-      ModuleObjectScript.MGPlayerOnHitFollower,
-      ModuleObjectScript.MGPlayerOnHitObstacle,
-      ModuleObjectScript.MGPlayerOnHitWorld,
-      ModuleObjectScript.MGPlayerOnTrackLoop,
-    ];
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.MGPlayerOnAccelerate,
+    ModuleObjectScript.MGPlayerOnAnimEvent,
+    ModuleObjectScript.MGPlayerOnBrake,
+    ModuleObjectScript.MGPlayerOnCreate,
+    ModuleObjectScript.MGPlayerOnDamage,
+    ModuleObjectScript.MGPlayerOnDeath,
+    ModuleObjectScript.MGPlayerOnFire,
+    ModuleObjectScript.MGPlayerOnHeartbeat,
+    ModuleObjectScript.MGPlayerOnHitBullet,
+    ModuleObjectScript.MGPlayerOnHitFollower,
+    ModuleObjectScript.MGPlayerOnHitObstacle,
+    ModuleObjectScript.MGPlayerOnHitWorld,
+    ModuleObjectScript.MGPlayerOnTrackLoop,
+  ];
 
-    const scriptsNode = this.template.getFieldByLabel('Scripts')?.getFieldStruct();
-    if(scriptsNode){
-      for(const scriptKey of scriptResRefs){
-        if(scriptsNode.hasField(scriptKey)){
-          const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-          if(!resRef){ continue; }
-          const nwscript = GameState.NWScript.Load(resRef);
-          if(!nwscript){ 
-            console.warn(`ModuleMGPlayer.loadScripts: Failed to load script [${scriptKey}]:${resRef} for object ${this.name}`);
-            continue; 
-          }
-          nwscript.caller = this;
-          this.scripts[scriptKey] = nwscript;
-        }
-      }
-    }
+  /** A minigame object's scripts are in its template's Scripts struct */
+  loadScripts(){
+    super.loadScripts(this.template.getFieldByLabel('Scripts')?.getFieldStruct());
   }
 
+
   initProperties(){
-    if(this.template.RootNode.hasField('Accel_Secs'))
-      this.accel_secs = this.template.getFieldByLabel('Accel_Secs').getValue();
+    this.accel_secs = this.template.RootNode.get('Accel_Secs', this.accel_secs);
 
-    if(this.template.RootNode.hasField('Bump_Damage'))
-      this.bump_damage = this.template.getFieldByLabel('Bump_Damage').getValue();
+    this.bump_damage = this.template.RootNode.get('Bump_Damage', this.bump_damage);
 
-    if(this.template.RootNode.hasField('Camera'))
-      this.cameraName = this.template.getFieldByLabel('Camera').getValue();
+    this.cameraName = this.template.RootNode.get('Camera', this.cameraName);
 
-    if(this.template.RootNode.hasField('CameraRotate'))
-      this.cameraRotate = this.template.getFieldByLabel('CameraRotate').getValue();
+    this.cameraRotate = this.template.RootNode.get('CameraRotate', this.cameraRotate);
 
-    if(this.template.RootNode.hasField('Hit_Points'))
-      this.hit_points = this.template.getFieldByLabel('Hit_Points').getValue();
+    this.hit_points = this.template.RootNode.get('Hit_Points', this.hit_points);
 
-    if(this.template.RootNode.hasField('Invince_Period'))
-      this.invince_period = this.template.getFieldByLabel('Invince_Period').getValue();
+    this.invince_period = this.template.RootNode.get('Invince_Period', this.invince_period);
 
-    if(this.template.RootNode.hasField('Max_HPs'))
-      this.max_hps = this.template.getFieldByLabel('Max_HPs').getValue();
+    this.max_hps = this.template.RootNode.get('Max_HPs', this.max_hps);
 
-    if(this.template.RootNode.hasField('Maximum_Speed'))
-      this.speed_max = this.template.getFieldByLabel('Maximum_Speed').getValue();
+    this.speed_max = this.template.RootNode.get('Maximum_Speed', this.speed_max);
 
-    if(this.template.RootNode.hasField('Minimum_Speed'))
-      this.speed_min = this.template.getFieldByLabel('Minimum_Speed').getValue();
+    this.speed_min = this.template.RootNode.get('Minimum_Speed', this.speed_min);
 
-    if(this.template.RootNode.hasField('Num_Loops'))
-      this.num_loops = this.template.getFieldByLabel('Num_Loops').getValue();
+    this.num_loops = this.template.RootNode.get('Num_Loops', this.num_loops);
 
-    if(this.template.RootNode.hasField('Sphere_Radius'))
-      this.sphere_radius = this.template.getFieldByLabel('Sphere_Radius').getValue();
+    this.sphere_radius = this.template.RootNode.get('Sphere_Radius', this.sphere_radius);
 
-    if(this.template.RootNode.hasField('Track'))
-      this.trackName = this.template.getFieldByLabel('Track').getValue();
+    this.trackName = this.template.RootNode.get('Track', this.trackName);
 
     if(this.template.RootNode.hasField('TunnelXNeg'))
       this.tunnel.neg.x = THREE.MathUtils.degToRad(this.template.getFieldByLabel('TunnelXNeg').getValue());
@@ -939,17 +914,13 @@ export class ModuleMGPlayer extends ModuleObject {
     /*if(this.template.RootNode.hasField('CameraRotate'))
       this.cameraRotate = this.template.getFieldByLabel('CameraRotate').getValue();
 
-    if(this.template.RootNode.hasField('Hit_Points'))
-      this.hit_points = this.template.getFieldByLabel('Hit_Points').getValue();
+    this.hit_points = this.template.RootNode.get('Hit_Points', this.hit_points);
 
-    if(this.template.RootNode.hasField('Invince_Period'))
-      this.invince_period = this.template.getFieldByLabel('Invince_Period').getValue();
+    this.invince_period = this.template.RootNode.get('Invince_Period', this.invince_period);
 
-    if(this.template.RootNode.hasField('Max_HPs'))
-      this.max_hps = this.template.getFieldByLabel('Max_HPs').getValue();
+    this.max_hps = this.template.RootNode.get('Max_HPs', this.max_hps);
 
-    if(this.template.RootNode.hasField('Maximum_Speed'))
-      this.maximum_speed = this.template.getFieldByLabel('Maximum_Speed').getValue();*/
+    this.maximum_speed = this.template.RootNode.get('Maximum_Speed', this.maximum_speed);*/
 
 
 

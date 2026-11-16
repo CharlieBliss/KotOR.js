@@ -1,4 +1,5 @@
 import { ModuleObject } from "@/module/ModuleObject";
+import { ModuleLockable } from "@/module/ModuleLockable";
 import type { ModuleRoom } from "@/module/ModuleRoom";
 import { AudioEmitter } from "@/audio/AudioEmitter";
 import { GameState } from "@/GameState";
@@ -53,7 +54,7 @@ interface AnimStateInfo {
 * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
 * @memberof KotOR
 */
-export class ModuleDoor extends ModuleObject {
+export class ModuleDoor extends ModuleLockable {
   openState: ModuleDoorOpenState = ModuleDoorOpenState.DEFAULT;
   objectInteractSide: ModuleDoorInteractSide = ModuleDoorInteractSide.SIDE_1;
 
@@ -64,16 +65,11 @@ export class ModuleDoor extends ModuleObject {
   lastUsedBy: ModuleObject;
 
   animationState: number;
-  closeLockDC: number;
   disarmDC: number;
   fort: number;
   genericType: number;
   hardness: number;
   interruptable: boolean;
-  keyRequired: boolean;
-  lockable: boolean;
-  locked: boolean;
-  openLockDC: number;
   paletteID: number;
   ref: number;
   static: boolean;
@@ -207,14 +203,6 @@ export class ModuleDoor extends ModuleObject {
     return this.bearing;
   }
 
-  isLocked(){
-    return this.locked;
-  }
-
-  setLocked(value: boolean){
-    this.locked = value ? true : false;
-  }
-
   requiresKey(){
     return this.keyRequired && this.keyName.length ? true : false;
   }
@@ -230,56 +218,8 @@ export class ModuleDoor extends ModuleObject {
   getDoorAppearance(){
     return this.doorAppearance;
   }
-
-  getObjectSounds(){
-    let result = {"__rowlabel":-1,"label":"","armortype":"","opened":"****","closed":"****","destroyed":"****","used":"****","locked":"****"};
-    const appearance = this.getDoorAppearance();
-    if(!appearance) return result;
-
-    const soundIdx = appearance.soundapptype;
-    if(!isNaN(soundIdx) && soundIdx >= 0){
-      const table = GameState.TwoDAManager.datatables.get('placeableobjsnds');
-      if(table && typeof table.rows[soundIdx] !== 'undefined'){
-        return table.rows[soundIdx];
-      }
-    }
-    return result;
-  }
-
-  playObjectSound(type: ModulePlaceableObjectSound){
-    const objSounds = this.getObjectSounds();
-
-    if(!this.audioEmitter){
-      return;
-    }
-
-    switch(type){
-      case ModulePlaceableObjectSound.OPENED:
-        if(objSounds?.opened != '****'){
-          this.audioEmitter.playSound(objSounds?.opened);
-        }
-      break;
-      case ModulePlaceableObjectSound.CLOSED:
-        if(objSounds?.closed != '****'){
-          this.audioEmitter.playSound(objSounds?.closed);
-        }
-      break;
-      case ModulePlaceableObjectSound.DESTROYED:
-        if(objSounds?.destroyed != '****'){
-          this.audioEmitter.playSound(objSounds?.destroyed);
-        }
-      break;
-      case ModulePlaceableObjectSound.USED:
-        if(objSounds?.used != '****'){
-          this.audioEmitter.playSound(objSounds?.used);
-        }
-      break;
-      case ModulePlaceableObjectSound.LOCKED:
-        if(objSounds?.locked != '****'){
-          this.audioEmitter.playSound(objSounds?.locked);
-        }
-      break;
-    }
+  getObjectSoundsAppearance(){
+    return this.getDoorAppearance();
   }
 
   /*getTemplateResRef(){
@@ -408,56 +348,12 @@ export class ModuleDoor extends ModuleObject {
       }
 
       this.playObjectSound(ModulePlaceableObjectSound.LOCKED);
+      GameState.hooks.onUseBlocked(this, object, 'locked');
       return;
     }
     
     this.openDoor(object);
 
-  }
-
-  lock(object: ModuleObject){
-    if(this.locked){ return; }
-    this.locked = true;
-    
-    const onLock = this.scripts[ModuleObjectScript.DoorOnLock];
-    if(onLock){
-      onLock.run(this);
-    }
-  }
-
-  unlock(object: ModuleObject){
-    if(!this.locked){ return; }
-    this.locked = false;
-    
-    const onUnlock = this.scripts[ModuleObjectScript.DoorOnUnlock];
-    if(onUnlock){
-      onUnlock.run(this);
-    }
-  }
-
-  attemptUnlock(object: ModuleObject){
-    if(!BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleObject)){
-      return false;
-    }
-    
-    const nSecuritySkill = object.getSkillLevel(SkillType.SECURITY);
-    if(this.isLocked() && !this.keyRequired && nSecuritySkill >= 1){
-      let d20 = 20;//d20 rolls are auto 20's outside of combat
-      let skillCheck = (((object.getWIS()/2) + nSecuritySkill) + d20) - this.openLockDC;
-      if(skillCheck >= 1 && nSecuritySkill >= 1){
-        this.unlock(object);
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_SUCCESS);
-        }
-      }else{
-        if(BitWise.InstanceOf(object?.objectType, ModuleObjectType.ModuleCreature)){
-          object.playSoundSet(SSFType.UNLOCK_FAIL);
-        }
-      }
-    }
-        
-    this.use(object);
-    return true;
   }
 
   openDoor(object: ModuleObject){
@@ -480,6 +376,7 @@ export class ModuleDoor extends ModuleObject {
     }
 
     this.playObjectSound(ModulePlaceableObjectSound.OPENED);
+    GameState.hooks.onDoorOpened(this, object);
 
     // if(GameState.selectedObject == this){
     //   GameState.selectedObject = GameState.selected = undefined;
@@ -884,27 +781,9 @@ export class ModuleDoor extends ModuleObject {
   }
 
   load(){
-    if(this.getTemplateResRef()){
-      //Load template and merge fields
-      const buffer = ResourceLoader.loadCachedResource(ResourceTypes['utd'], this.getTemplateResRef());
-      if(buffer){
-        const gff = new GFFObject(buffer);
-        this.template.merge(gff);
-        //console.log(this.template, gff, this)
-        this.initProperties();
-        this.loadScripts();
-      }else{
-        console.error(`Failed to load ${ModuleDoor.name} template`);
-        if(this.template instanceof GFFObject){
-          this.initProperties();
-          this.loadScripts();
-        }
-      }
-    }else{
-      //We already have the template (From SAVEGAME)
-      this.initProperties();
-      this.loadScripts();
-    }
+    this.mergeTemplate(ResourceTypes['utd']);
+    this.initProperties();
+    this.loadScripts();
   }
 
   loadModel(): Promise<OdysseyModel3D> {
@@ -967,38 +846,23 @@ export class ModuleDoor extends ModuleObject {
     });
   }
 
-  loadScripts(){
-    const scriptKeys = [
-      ModuleObjectScript.DoorOnClick,
-      ModuleObjectScript.DoorOnClosed,
-      ModuleObjectScript.DoorOnDamaged,
-      ModuleObjectScript.DoorOnDeath,
-      ModuleObjectScript.DoorOnDisarm,
-      ModuleObjectScript.DoorOnFailToOpen,
-      ModuleObjectScript.DoorOnHeartbeat,
-      ModuleObjectScript.DoorOnInvDisturbed,
-      ModuleObjectScript.DoorOnLock,
-      ModuleObjectScript.DoorOnMeleeAttacked,
-      ModuleObjectScript.DoorOnOpen,
-      ModuleObjectScript.DoorOnSpellCastAt,
-      ModuleObjectScript.DoorOnTrapTriggered,
-      ModuleObjectScript.DoorOnUnlock,
-      ModuleObjectScript.DoorOnUserDefined,
-    ];
-
-    const scriptsNode = this.template?.RootNode;
-    if(!scriptsNode){ return; }
-    for(const scriptKey of scriptKeys){
-      if(scriptsNode.hasField(scriptKey)){
-        const resRef = scriptsNode.getFieldByLabel(scriptKey).getValue();
-        if(!resRef){ continue; }
-        const nwscript = GameState.NWScript.Load(resRef);
-        if(!nwscript){ continue; }
-        nwscript.caller = this;
-        this.scripts[scriptKey] = nwscript;
-      }
-    }
-  }
+  static SCRIPT_KEYS: ModuleObjectScript[] = [
+    ModuleObjectScript.DoorOnClick,
+    ModuleObjectScript.DoorOnClosed,
+    ModuleObjectScript.DoorOnDamaged,
+    ModuleObjectScript.DoorOnDeath,
+    ModuleObjectScript.DoorOnDisarm,
+    ModuleObjectScript.DoorOnFailToOpen,
+    ModuleObjectScript.DoorOnHeartbeat,
+    ModuleObjectScript.DoorOnInvDisturbed,
+    ModuleObjectScript.DoorOnLock,
+    ModuleObjectScript.DoorOnMeleeAttacked,
+    ModuleObjectScript.DoorOnOpen,
+    ModuleObjectScript.DoorOnSpellCastAt,
+    ModuleObjectScript.DoorOnTrapTriggered,
+    ModuleObjectScript.DoorOnUnlock,
+    ModuleObjectScript.DoorOnUserDefined,
+  ];
 
   async loadWalkmesh(resRef = ''): Promise<OdysseyWalkMesh> {
     try{
@@ -1028,27 +892,21 @@ export class ModuleDoor extends ModuleObject {
       GameState.ModuleObjectManager.AddObjectById(this);
     }
 
-    if(this.template.RootNode.hasField('AnimationState'))
-      this.animationState = this.template.getFieldByLabel('AnimationState').getValue();
+    this.animationState = this.template.RootNode.get('AnimationState', this.animationState);
 
-    if(this.template.RootNode.hasField('Appearance'))
-      this.appearance = this.template.getFieldByLabel('Appearance').getValue();
+    this.appearance = this.template.RootNode.get('Appearance', this.appearance);
 
-    if(this.template.RootNode.hasField('AutoRemoveKey'))
-      this.autoRemoveKey = this.template.getFieldByLabel('AutoRemoveKey').getValue();
+    this.autoRemoveKey = this.template.RootNode.get('AutoRemoveKey', this.autoRemoveKey);
 
-    if(this.template.RootNode.hasField('CloseLockDC'))
-      this.closeLockDC = this.template.getFieldByLabel('CloseLockDC').getValue();
+    this.closeLockDC = this.template.RootNode.get('CloseLockDC', this.closeLockDC);
 
     if(this.template.RootNode.hasField('Conversation')){
       this.conversation = DLGObject.FromResRef(this.template.getFieldByLabel('Conversation').getValue());
     }
 
-    if(this.template.RootNode.hasField('CurrentHP'))
-      this.currentHP = this.template.getFieldByLabel('CurrentHP').getValue();
+    this.currentHP = this.template.RootNode.get('CurrentHP', this.currentHP);
 
-    if(this.template.RootNode.hasField('DisarmDC'))
-      this.disarmDC = this.template.getFieldByLabel('DisarmDC').getValue();
+    this.disarmDC = this.template.RootNode.get('DisarmDC', this.disarmDC);
 
     if(this.template.RootNode.hasField('Faction')){
       this.factionId = this.template.getFieldByLabel('Faction').getValue();
@@ -1058,73 +916,52 @@ export class ModuleDoor extends ModuleObject {
     }
     this.faction = GameState.FactionManager.factions.get(this.factionId);
 
-    if(this.template.RootNode.hasField('Fort'))
-      this.fort = this.template.getFieldByLabel('Fort').getValue();
+    this.fort = this.template.RootNode.get('Fort', this.fort);
   
     if(this.template.RootNode.hasField('GenericType')){
       this.genericType = this.template.RootNode.getFieldByLabel('GenericType').getValue();
       this.doorAppearance = GameState.AppearanceManager.GetDoorAppearanceById(this.genericType);
     }
         
-    if(this.template.RootNode.hasField('HP'))
-      this.hp = this.template.RootNode.getFieldByLabel('HP').getValue();
+    this.hp = this.template.RootNode.get('HP', this.hp);
 
-    if(this.template.RootNode.hasField('Hardness'))
-      this.hardness = this.template.RootNode.getFieldByLabel('Hardness').getValue();
+    this.hardness = this.template.RootNode.get('Hardness', this.hardness);
     
-    if(this.template.RootNode.hasField('Interruptable'))
-      this.interruptable = this.template.RootNode.getFieldByLabel('Interruptable').getValue();
+    this.interruptable = this.template.RootNode.get('Interruptable', this.interruptable);
         
-    if(this.template.RootNode.hasField('KeyName'))
-      this.keyName = this.template.RootNode.getFieldByLabel('KeyName').getValue();
+    this.keyName = this.template.RootNode.get('KeyName', this.keyName);
   
-    if(this.template.RootNode.hasField('KeyRequired'))
-      this.keyRequired = this.template.RootNode.getFieldByLabel('KeyRequired').getValue();
+    this.keyRequired = this.template.RootNode.get('KeyRequired', this.keyRequired);
       
-    if(this.template.RootNode.hasField('LoadScreenID'))
-      this.loadScreenID = this.template.getFieldByLabel('LoadScreenID').getValue();
+    this.loadScreenID = this.template.RootNode.get('LoadScreenID', this.loadScreenID);
 
     if(this.template.RootNode.hasField('LocName'))
       this.locName = this.template.getFieldByLabel('LocName').getCExoLocString();
 
-    if(this.template.RootNode.hasField('Locked'))
-      this.locked = this.template.getFieldByLabel('Locked').getValue();
+    this.locked = this.template.RootNode.get('Locked', this.locked);
 
-    if(this.template.RootNode.hasField('Min1HP'))
-      this.min1HP = this.template.getFieldByLabel('Min1HP').getValue();
+    this.min1HP = this.template.RootNode.get('Min1HP', this.min1HP);
 
-    if(this.template.RootNode.hasField('OpenLockDC'))
-      this.openLockDC = this.template.getFieldByLabel('OpenLockDC').getValue();
+    this.openLockDC = this.template.RootNode.get('OpenLockDC', this.openLockDC);
 
-    if(this.template.RootNode.hasField('OpenState'))
-      this.openState = this.template.getFieldByLabel('OpenState').getValue();
+    this.openState = this.template.RootNode.get('OpenState', this.openState);
 
-    if(this.template.RootNode.hasField('PaletteID'))
-      this.paletteID = this.template.getFieldByLabel('PaletteID').getValue();
+    this.paletteID = this.template.RootNode.get('PaletteID', this.paletteID);
 
-    if(this.template.RootNode.hasField('Plot'))
-      this.plot = this.template.getFieldByLabel('Plot').getValue();
+    this.plot = this.template.RootNode.get('Plot', this.plot);
 
     if(this.template.RootNode.hasField('PortraidId')){
       this.portraitId = this.template.getFieldByLabel('PortraidId').getValue();
       this.portrait = GameState.SWRuleSet.portraits[this.portraitId];
     }
 
+    this.ref = this.template.RootNode.get('Ref', this.ref);
 
-    if(this.template.RootNode.hasField('Ref'))
-      this.ref = this.template.getFieldByLabel('Ref').getValue();
+    this.static = this.template.RootNode.get('Static', this.static);
 
-    if(this.template.RootNode.hasField('Static'))
-      this.static = this.template.getFieldByLabel('Static').getValue();
+    this.initCommonProperties();
 
-    if(this.template.RootNode.hasField('Tag'))
-      this.tag = this.template.getFieldByLabel('Tag').getValue();
-
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
-
-    if(this.template.RootNode.hasField('TrapDetectDC'))
-      this.trapDetectDC = this.template.getFieldByLabel('TrapDetectDC').getValue();
+    this.trapDetectDC = this.template.RootNode.get('TrapDetectDC', this.trapDetectDC);
   
     if(this.template.RootNode.hasField('TrapDetectable'))
       this.trapDetectable = !!this.template.RootNode.getFieldByLabel('TrapDetectable').getValue();
@@ -1138,14 +975,9 @@ export class ModuleDoor extends ModuleObject {
     if(this.template.RootNode.hasField('TrapOneShot'))
       this.trapOneShot = !!this.template.getFieldByLabel('TrapOneShot').getValue();
 
-    if(this.template.RootNode.hasField('TemplateResRef'))
-      this.templateResRef = this.template.getFieldByLabel('TemplateResRef').getValue();
+    this.trapType = this.template.RootNode.get('TrapType', this.trapType);
 
-    if(this.template.RootNode.hasField('TrapType'))
-      this.trapType = this.template.getFieldByLabel('TrapType').getValue();
-
-    if(this.template.RootNode.hasField('Will'))
-      this.will = this.template.getFieldByLabel('Will').getValue();
+    this.will = this.template.RootNode.get('Will', this.will);
 
     if(this.template.RootNode.hasField('X'))
       this.x = this.position.x = this.template.RootNode.getFieldByLabel('X').getValue();
@@ -1183,21 +1015,17 @@ export class ModuleDoor extends ModuleObject {
       }
     }
 
-    if(this.template.RootNode.hasField('LinkedTo'))
-      this.linkedTo = this.template.RootNode.getFieldByLabel('LinkedTo').getValue();
+    this.linkedTo = this.template.RootNode.get('LinkedTo', this.linkedTo);
 
-    if(this.template.RootNode.hasField('LinkedToFlags'))
-      this.linkedToFlags = this.template.RootNode.getFieldByLabel('LinkedToFlags').getValue();
+    this.linkedToFlags = this.template.RootNode.get('LinkedToFlags', this.linkedToFlags);
 
-    if(this.template.RootNode.hasField('LinkedToModule'))
-      this.linkedToModule = this.template.RootNode.getFieldByLabel('LinkedToModule').getValue();
+    this.linkedToModule = this.template.RootNode.get('LinkedToModule', this.linkedToModule);
 
     if(this.template.RootNode.hasField('TransitionDestin'))
       this.transitionDestin = this.template.RootNode.getFieldByLabel('TransitionDestin').getCExoLocString();
     
     //BEGIN: TSL Properties
-    if(this.template.RootNode.hasField('TweakColor'))
-      this.tweakColor = this.template.getFieldByLabel('TweakColor').getValue();
+    this.tweakColor = this.template.RootNode.get('TweakColor', this.tweakColor);
     
     if(this.template.RootNode.hasField('UseTweakColor'))
       this.useTweakColor = !!this.template.getFieldByLabel('UseTweakColor').getValue();
@@ -1224,16 +1052,16 @@ export class ModuleDoor extends ModuleObject {
     gff.FileType = 'UTD ';
 
     let actionList = gff.RootNode.addField( this.actionQueueToActionList() );
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Appearance') ).setValue(this.appearance);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'AutoRemoveKey') ).setValue(this.autoRemoveKey);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Bearing') ).setValue(this.bearing);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'BodyBag') ).setValue(this.bodyBag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'CloseLockDC') ).setValue(this.closeLockDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Commandable') ).setValue(1);
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'Conversation') ).setValue(this.conversation ? this.conversation.resref : '');
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'CurrentHP') ).setValue(this.currentHP);
+    gff.RootNode.addDWord('Appearance', this.appearance);
+    gff.RootNode.addByte('AutoRemoveKey', this.autoRemoveKey);
+    gff.RootNode.addFloat('Bearing', this.bearing);
+    gff.RootNode.addByte('BodyBag', this.bodyBag);
+    gff.RootNode.addByte('CloseLockDC', this.closeLockDC);
+    gff.RootNode.addByte('Commandable', 1);
+    gff.RootNode.addRESREF('Conversation', this.conversation ? this.conversation.resref : '');
+    gff.RootNode.addShort('CurrentHP', this.currentHP);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'Description') ).setValue('');
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'DisarmDC') ).setValue(this.disarmDC);
+    gff.RootNode.addByte('DisarmDC', this.disarmDC);
 
     //Effects
     let effectList = gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'EffectList') );
@@ -1241,65 +1069,52 @@ export class ModuleDoor extends ModuleObject {
       effectList.addChildStruct( this.effects[i].save() );
     }
 
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'Faction') ).setValue(this.faction ? this.faction.id : this.factionId);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Fort') ).setValue(this.fort);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'GenericType') ).setValue(this.genericType);
-    gff.RootNode.addField( new GFFField(GFFDataType.SHORT, 'HP') ).setValue(this.hp);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Hardness') ).setValue(this.hardness);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'KeyName') ).setValue(this.keyName);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'KeyRequired') ).setValue(this.keyRequired);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'LinkedTo') ).setValue(this.linkedTo);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'LinkedToFlags') ).setValue(this.linkedToFlags);
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, 'LinkedToModule') ).setValue(this.linkedToModule);
+    gff.RootNode.addDWord('Faction', this.faction ? this.faction.id : this.factionId);
+    gff.RootNode.addByte('Fort', this.fort);
+    gff.RootNode.addByte('GenericType', this.genericType);
+    gff.RootNode.addShort('HP', this.hp);
+    gff.RootNode.addByte('Hardness', this.hardness);
+    gff.RootNode.addCExoString('KeyName', this.keyName);
+    gff.RootNode.addByte('KeyRequired', this.keyRequired);
+    gff.RootNode.addCExoString('LinkedTo', this.linkedTo);
+    gff.RootNode.addByte('LinkedToFlags', this.linkedToFlags);
+    gff.RootNode.addRESREF('LinkedToModule', this.linkedToModule);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'LocName') ).setValue(this.locName);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'LoadScreenID') ).setValue(this.loadScreenID);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Lockable') ).setValue(this.lockable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Locked') ).setValue(this.locked);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Min1HP') ).setValue(this.min1HP);
-    gff.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    gff.RootNode.addWord('LoadScreenID', this.loadScreenID);
+    gff.RootNode.addByte('Lockable', this.lockable);
+    gff.RootNode.addByte('Locked', this.locked);
+    gff.RootNode.addByte('Min1HP', this.min1HP);
+    gff.RootNode.addDWord('ObjectId', this.id);
 
     //Scripts
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnClick) ).setValue(this.scripts[ModuleObjectScript.DoorOnClick]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnClosed) ).setValue(this.scripts[ModuleObjectScript.DoorOnClosed]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnDamaged) ).setValue(this.scripts[ModuleObjectScript.DoorOnDamaged]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnDeath) ).setValue(this.scripts[ModuleObjectScript.DoorOnDeath]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnDisarm) ).setValue(this.scripts[ModuleObjectScript.DoorOnDisarm]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnFailToOpen) ).setValue(this.scripts[ModuleObjectScript.DoorOnFailToOpen]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnHeartbeat) ).setValue(this.scripts[ModuleObjectScript.DoorOnHeartbeat]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnLock) ).setValue(this.scripts[ModuleObjectScript.DoorOnLock]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnMeleeAttacked) ).setValue(this.scripts[ModuleObjectScript.DoorOnMeleeAttacked]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnOpen) ).setValue(this.scripts[ModuleObjectScript.DoorOnOpen]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnSpellCastAt) ).setValue(this.scripts[ModuleObjectScript.DoorOnSpellCastAt]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnTrapTriggered) ).setValue(this.scripts[ModuleObjectScript.DoorOnTrapTriggered]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnUnlock) ).setValue(this.scripts[ModuleObjectScript.DoorOnUnlock]?.name || '');
-    gff.RootNode.addField( new GFFField(GFFDataType.RESREF, ModuleObjectScript.DoorOnUserDefined) ).setValue(this.scripts[ModuleObjectScript.DoorOnUserDefined]?.name || '');
+    this.saveScripts(gff.RootNode);
     
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'OpenLockDC') ).setValue(this.openLockDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'OpenState') ).setValue(this.openState);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') ).setValue(this.plot);
-    gff.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraitId') ).setValue(this.portraitId);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Ref') ).setValue(this.ref);
+    gff.RootNode.addByte('OpenLockDC', this.openLockDC);
+    gff.RootNode.addByte('OpenState', this.openState);
+    gff.RootNode.addByte('Plot', this.plot);
+    gff.RootNode.addWord('PortraitId', this.portraitId);
+    gff.RootNode.addByte('Ref', this.ref);
 
     //SWVarTable
     let swVarTable = gff.RootNode.addField( new GFFField(GFFDataType.STRUCT, 'SWVarTable') );
     swVarTable.addChildStruct( this.getSWVarTableSaveStruct() );
 
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'SecretDoorDC') ).setValue(0);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Static') ).setValue(this.static);
-    gff.RootNode.addField( new GFFField(GFFDataType.CEXOSTRING, 'Tag') ).setValue(this.tag);
+    gff.RootNode.addByte('SecretDoorDC', 0);
+    gff.RootNode.addByte('Static', this.static);
+    gff.RootNode.addCExoString('Tag', this.tag);
     gff.RootNode.addField( new GFFField(GFFDataType.CEXOLOCSTRING, 'TransitionDestin') ).setValue(this.transitionDestin);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectDC') ).setValue(this.trapDetectDC);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDetectable') ).setValue(this.trapDetectable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapDisarmable') ).setValue(this.trapDisarmable);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapFlag') ).setValue(this.trapFlag);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapOneShot') ).setValue(this.trapOneShot);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TrapType') ).setValue(this.trapType);
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Useable') ).setValue(this.useable);
+    gff.RootNode.addByte('TrapDetectDC', this.trapDetectDC);
+    gff.RootNode.addByte('TrapDetectable', this.trapDetectable);
+    gff.RootNode.addByte('TrapDisarmable', this.trapDisarmable);
+    gff.RootNode.addByte('TrapFlag', this.trapFlag);
+    gff.RootNode.addByte('TrapOneShot', this.trapOneShot);
+    gff.RootNode.addByte('TrapType', this.trapType);
+    gff.RootNode.addByte('Useable', this.useable);
     gff.RootNode.addField( new GFFField(GFFDataType.LIST, 'VarTable') );
-    gff.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Will') ).setValue(this.will);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'X') ).setValue(this.position.x);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Y') ).setValue(this.position.y);
-    gff.RootNode.addField( new GFFField(GFFDataType.FLOAT, 'Z') ).setValue(this.position.z);
+    gff.RootNode.addByte('Will', this.will);
+    gff.RootNode.addFloat('X', this.position.x);
+    gff.RootNode.addFloat('Y', this.position.y);
+    gff.RootNode.addFloat('Z', this.position.z);
 
     this.template = gff;
     return gff;
@@ -1376,7 +1191,7 @@ export class ModuleDoor extends ModuleObject {
     template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'OnUsed') );
     template.RootNode.addField( new GFFField(GFFDataType.RESREF, 'OnUserDefined') );
     template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'OpenLockDC') );
-    template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'PaletteId') ).setValue(6);
+    template.RootNode.addByte('PaletteId', 6);
     template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Plot') );
     template.RootNode.addField( new GFFField(GFFDataType.WORD, 'PortraidId') );
     template.RootNode.addField( new GFFField(GFFDataType.BYTE, 'Ref') );

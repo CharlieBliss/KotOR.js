@@ -410,37 +410,37 @@ export class ModuleArea extends ModuleObject {
 
     //update triggers
     for(let i = 0; i < trigCount; i++){
-      this.triggers[i].update(delta);
+      this.triggers[i]?.update(delta);
     }
 
     //update encounters
     for(let i = 0; i < encounterCount; i++){
-      this.encounters[i].update(delta);
+      this.encounters[i]?.update(delta);
     }
     
     //update aoe
     for(let i = 0; i < aoeCount; i++){
-      this.areaOfEffects[i].update(delta);
+      this.areaOfEffects[i]?.update(delta);
     }
 
     //update party
     for(let i = 0; i < partyCount; i++){
-      GameState.PartyManager.party[i].update(delta);
+      GameState.PartyManager.party[i]?.update(delta);
     }
     
     //update creatures
     for(let i = 0; i < creatureCount; i++){
-      this.creatures[i].update(delta);
+      this.creatures[i]?.update(delta);
     }
     
     //update placeables
     for(let i = 0; i < placeableCount; i++){
-      this.placeables[i].update(delta);
+      this.placeables[i]?.update(delta);
     }
     
     //update doors
     for(let i = 0; i < doorCount; i++){
-      this.doors[i].update(delta);
+      this.doors[i]?.update(delta);
     }
 
     //unset party controlled
@@ -454,12 +454,12 @@ export class ModuleArea extends ModuleObject {
 
     //update rooms
     for(let i = 0; i < roomCount; i++){
-      this.rooms[i].update(delta);
+      this.rooms[i]?.update(delta);
       // this.rooms[i].hide();
     }
 
     for(let i = 0, spellCount = this.spellInstances.length; i < spellCount; i++){
-      this.spellInstances[i].update(delta);
+      this.spellInstances[i]?.update(delta);
     }
 
     let spellIndex = this.spellInstances.length;
@@ -498,9 +498,9 @@ export class ModuleArea extends ModuleObject {
     }
 
     this.updateRoomVisibility(delta);
-    FollowerCamera.update(delta, this);
+    if(GameState.Mode != EngineMode.FREELOOK && !GameState.gmMode) FollowerCamera.update(delta, this);
 
-    this.weather.update(delta);
+    this.weather?.update(delta);
 
     if(this.path){
       this.path.update(delta);
@@ -521,37 +521,37 @@ export class ModuleArea extends ModuleObject {
 
     //update triggers
     for(let i = 0; i < trigCount; i++){
-      this.triggers[i].updatePaused(delta);
+      this.triggers[i]?.updatePaused(delta);
     }
 
     //update encounters
     for(let i = 0; i < encounterCount; i++){
-      this.encounters[i].updatePaused(delta);
+      this.encounters[i]?.updatePaused(delta);
     }
 
     //update aoe
     for(let i = 0; i < aoeCount; i++){
-      this.areaOfEffects[i].updatePaused(delta);
+      this.areaOfEffects[i]?.updatePaused(delta);
     }
 
     //update party
     for(let i = 0; i < partyCount; i++){
-      GameState.PartyManager.party[i].updatePaused(delta);
+      GameState.PartyManager.party[i]?.updatePaused(delta);
     }
     
     //update creatures
     for(let i = 0; i < creatureCount; i++){
-      this.creatures[i].updatePaused(delta);
+      this.creatures[i]?.updatePaused(delta);
     }
     
     //update placeables
     for(let i = 0; i < placeableCount; i++){
-      this.placeables[i].updatePaused(delta);
+      this.placeables[i]?.updatePaused(delta);
     }
     
     //update doors
     for(let i = 0; i < doorCount; i++){
-      this.doors[i].updatePaused(delta);
+      this.doors[i]?.updatePaused(delta);
     }
 
     if(GameState.Mode == EngineMode.MINIGAME){
@@ -564,7 +564,7 @@ export class ModuleArea extends ModuleObject {
     // }
 
     this.updateRoomVisibility(delta);
-    FollowerCamera.update(delta, this);
+    if(GameState.Mode != EngineMode.FREELOOK && !GameState.gmMode) FollowerCamera.update(delta, this);
 
     this.updateMusic(delta);
   }
@@ -634,6 +634,7 @@ export class ModuleArea extends ModuleObject {
   updateMusic(delta: number = 0){
     const audioEngine = AudioEngine.GetAudioEngine();
     const oPC = GameState.getCurrentPlayer();
+    if(!oPC) return;
     if(oPC.excitedDuration > 0 && audioEngine.bgmMode == BackgroundMusicMode.AREA && audioEngine.battleMusicLoaded){
       audioEngine.bgmMode = BackgroundMusicMode.BATTLE;
       audioEngine.areaMusicDayAudioEmitter.stop();
@@ -659,10 +660,43 @@ export class ModuleArea extends ModuleObject {
     audioEngine.bgmLoopTime = delay;
   }
 
+  /** Whether this area is borrowed from the other game (OtherGameManager) */
+  isBorrowedScene(): boolean {
+    const name = this.module?.filename || GameState.module?.filename || '';
+    return GameState.Module.IsBorrowedModule(name);
+  }
+
+  /**
+   * Whether the area loads without the module's own objects of a kind: a borrowed area never has them (they
+   * are the other game's), and a GM scene has them only when the GM kept them (props by default, creatures,
+   * encounters and triggers not)
+   */
+  skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean {
+    if(this.isBorrowedScene()) return true;
+    return GameState.hooks.skipsModuleObjects(kind);
+  }
+
+  /** An area colour as the game keeps it (0x00BBGGRR) */
+  static ColorFromBGR(bgr: number): THREE.Color {
+    const v = Number(bgr) >>> 0;
+    return new THREE.Color((v & 0xff) / 255, ((v >> 8) & 0xff) / 255, ((v >> 16) & 0xff) / 255);
+  }
+
+  /** Tables that areas index into by row (music, ambience): the other game's, for a borrowed area */
+  static BorrowedTables: (name: string) => any = () => undefined;
+
+  audioTable(name: string): any {
+    if(this.isBorrowedScene()){
+      const borrowed = ModuleArea.BorrowedTables(name);
+      if(borrowed) return borrowed;
+    }
+    return GameState.TwoDAManager.datatables.get(name);
+  }
+
   async musicBackgroundDaySet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the background music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const bgMusic = ambientmusic2DA.rows[index];
     this.audio.music.day = index;
     try{
@@ -680,7 +714,7 @@ export class ModuleArea extends ModuleObject {
   async musicBackgroundNightSet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the battle music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const bgMusic = ambientmusic2DA.rows[index];
     this.audio.music.night = index;
     try{
@@ -708,7 +742,7 @@ export class ModuleArea extends ModuleObject {
   async musicBattleSet(index: number){
     const audioEngine = AudioEngine.GetAudioEngine();
     //Load the battle music
-    const ambientmusic2DA = GameState.TwoDAManager.datatables.get('ambientmusic');
+    const ambientmusic2DA = this.audioTable('ambientmusic');
     const battleMusic = ambientmusic2DA.rows[index];
     this.audio.music.battle = index;
     try{
@@ -748,7 +782,7 @@ export class ModuleArea extends ModuleObject {
     const audioEngine = AudioEngine.GetAudioEngine();
 
     this.audio.ambient.day = index;
-    const ambientsound2DA = GameState.TwoDAManager.datatables.get('ambientsound');
+    const ambientsound2DA = this.audioTable('ambientsound');
     if(ambientsound2DA){
       //Load the ambient day sound
       const ambientDay = ambientsound2DA.rows[this.audio.ambient.day];
@@ -770,7 +804,7 @@ export class ModuleArea extends ModuleObject {
     const audioEngine = AudioEngine.GetAudioEngine();
 
     this.audio.ambient.night = index;
-    const ambientsound2DA = GameState.TwoDAManager.datatables.get('ambientsound');
+    const ambientsound2DA = this.audioTable('ambientsound');
     if(ambientsound2DA){
       //Load the ambient day sound
       const ambientDay = ambientsound2DA.rows[this.audio.ambient.night];
@@ -790,7 +824,7 @@ export class ModuleArea extends ModuleObject {
 
   attachSpellInstance(spellInstance: SpellCastInstance){
     if(!spellInstance) return;
-    GameState.group.spell_instances.add(spellInstance.container);
+    if(GameState.group?.spell_instances && spellInstance.container) GameState.group.spell_instances.add(spellInstance.container);
     this.spellInstances.push(spellInstance);
   }
 
@@ -832,7 +866,13 @@ export class ModuleArea extends ModuleObject {
       case EngineMode.FREELOOK:
       default:
         const player = GameState.getCurrentPlayer();
-        if(!player){ return; }
+        if(!player || GameState.Mode == EngineMode.FREELOOK || GameState.gmMode){
+          this.lastRoom = undefined;
+          for(let i = 0, len = this.rooms.length; i < len; i++){
+            this.rooms[i]?.show(false);
+          }
+          return;
+        }
         //Check to see if the player has moved to a new room
         if(this.lastRoom && this.lastRoom == player.room){
           return;
@@ -919,8 +959,7 @@ export class ModuleArea extends ModuleObject {
 
     //BEGIN AREA LOAD
 
-    if(this.are.RootNode.hasField('ObjectId'))
-      this.id = this.are.getFieldByLabel('ObjectId').getValue();
+    this.id = this.are.RootNode.get('ObjectId', this.id);
 
     let rooms = this.are.getFieldByLabel('Rooms');
 
@@ -1042,7 +1081,7 @@ export class ModuleArea extends ModuleObject {
 
     if(this.sun.fogOn){
       this.fog = new THREE.Fog(
-        this.sun.fogColor,
+        ModuleArea.ColorFromBGR(this.sun.fogColor),
         this.sun.fogNear,
         this.sun.fogFar
       );
@@ -1367,11 +1406,11 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(10);
       
-      try { await this.loadPlayer(); } catch(e){ console.error(e); }
+      if(!GameState.gmMode){ try { await this.loadPlayer(); } catch(e){ console.error(e); } }
 
       try { await this.loadCameras(); } catch(e){ console.error(e); }
 
-      try { await this.loadPlaceables(); } catch(e){ console.error(e); }
+      if(this.skipsModuleObjects('placeables')){ this.placeables = []; } else { try { await this.loadPlaceables(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(20);
 
@@ -1380,8 +1419,8 @@ export class ModuleArea extends ModuleObject {
       GameState.MenuManager.LoadScreen.setProgress(30);
 
       try { await this.loadAreaEffects(); } catch(e){ console.error(e); }
-      try { await this.loadCreatures(); } catch(e){ console.error(e); }
-      try { await this.loadParty(); } catch(e){ console.error(e); }
+      if(this.skipsModuleObjects('creatures')){ this.creatures = []; } else { try { await this.loadCreatures(); } catch(e){ console.error(e); } }
+      if(!GameState.gmMode){ try { await this.loadParty(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(40);
 
@@ -1389,9 +1428,9 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(50);
 
-      try { await this.loadTriggers(); } catch(e){ console.error(e); }
+      if(this.skipsModuleObjects('triggers')){ this.triggers = []; } else { try { await this.loadTriggers(); } catch(e){ console.error(e); } }
 
-      try { await this.loadEncounters(); } catch(e){ console.error(e); }
+      if(this.skipsModuleObjects('creatures')){ this.encounters = []; } else { try { await this.loadEncounters(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(60);
 
@@ -1401,11 +1440,12 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(70);
 
-      try { await this.loadDoors(); } catch(e){ console.error(e); }
+      // A borrowed scene's doors use the other game's door table, so they're left out (their doorways stay open)
+      if(this.isBorrowedScene()){ this.doors = []; } else { try { await this.loadDoors(); } catch(e){ console.error(e); } }
 
       this.doorWalkmeshes = this.doors.filter( (d) => { return d?.collisionManager?.walkmesh}).map( (d) => { return d.collisionManager.walkmesh; });
 
-      try { await this.loadStores(); } catch(e){ console.error(e); }
+      if(!this.isBorrowedScene()){ try { await this.loadStores(); } catch(e){ console.error(e); } }
 
       GameState.MenuManager.LoadScreen.setProgress(80);
 
@@ -1419,7 +1459,7 @@ export class ModuleArea extends ModuleObject {
 
       GameState.MenuManager.LoadScreen.setProgress(100);
 
-      FollowerCamera.facing = Utility.NormalizeRadian(GameState.PartyManager.party[0].getFacing() - Math.PI/2);
+      if(GameState.PartyManager.party[0]) FollowerCamera.facing = Utility.NormalizeRadian(GameState.PartyManager.party[0].getFacing() - Math.PI/2);
 
       try { await this.weather.load(); } catch(e){ console.error(e); }
 
@@ -1471,7 +1511,7 @@ export class ModuleArea extends ModuleObject {
 
   getPlayerTemplate(): GFFObject {
     if(GameState.PartyManager.PlayerTemplate){
-      GameState.PartyManager.PlayerTemplate.RootNode.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue( GameState.ModuleObjectManager.GetNextPlayerId() );
+      GameState.PartyManager.PlayerTemplate.RootNode.addDWord('ObjectId',  GameState.ModuleObjectManager.GetNextPlayerId() );
       return GameState.PartyManager.PlayerTemplate;
     }else{
       return GameState.PartyManager.GeneratePlayerTemplate();
@@ -1675,15 +1715,44 @@ export class ModuleArea extends ModuleObject {
   }
 
   /**
+   * Run load for each object in an area list, one at a time. An object that fails to load is logged and skipped.
+   */
+  private async loadEach<T>(label: string, objects: T[], load: (object: T) => void | Promise<void>): Promise<void> {
+    console.log(`Loading ${label}`);
+    for(const object of objects){
+      try{
+        await load(object);
+      }catch(e){
+        console.error(e);
+      }
+    }
+  }
+
+  /** The room whose bounds contain point, the one with its centre nearest when several do; null outside every room */
+  roomContaining(point: THREE.Vector3): OdysseyModel3D | null {
+    let nearest: OdysseyModel3D | null = null;
+    let nearestDistance = Infinity;
+    const roomCenter = new THREE.Vector3();
+    for(const room of GameState.group.rooms.children){
+      if(!(room instanceof OdysseyModel3D) || !room.box.containsPoint(point)){ continue; }
+      room.box.getCenter(roomCenter);
+      const distance = point.distanceTo(roomCenter);
+      if(distance < nearestDistance){
+        nearestDistance = distance;
+        nearest = room;
+      }
+    }
+    return nearest;
+  }
+
+  /**
    * Load the area's static cameras
    */
   async loadCameras(){
-    console.log('Loading Cameras');
-    for(let i = 0; i < this.cameras.length; i++){
-      const camera = this.cameras[i];
+    await this.loadEach('Cameras', this.cameras, (camera) => {
       camera.load();
       GameState.staticCameras.push(camera.perspectiveCamera);
-    }
+    });
   }
 
   /**
@@ -1757,60 +1826,52 @@ export class ModuleArea extends ModuleObject {
    * Load the area's doors
    */
   async loadDoors(): Promise<void> {
-    console.log('Loading Doors');
-    for(let i = 0; i < this.doors.length; i++){
-      const door = this.doors[i];
+    await this.loadEach('Doors', this.doors, async (door) => {
+      door.load();
+      // door.position.x = door.getX();
+      // door.position.y = door.getY();
+      // door.position.z = door.getZ();
+      door.rotation.set(0, 0, door.getBearing());
+      const model = await door.loadModel();
+      door.computeBoundingBox();
+      const dwk = await door.loadWalkmesh(model.name);
+
       try{
-        door.load();
-        // door.position.x = door.getX();
-        // door.position.y = door.getY();
-        // door.position.z = door.getZ();
-        door.rotation.set(0, 0, door.getBearing());
-        const model = await door.loadModel();
-        door.computeBoundingBox();
-        const dwk = await door.loadWalkmesh(model.name);
+        model.userData.walkmesh = dwk;
+        door.collisionManager.setWalkmesh(dwk);
+        GameState.walkmeshList.push( dwk.mesh );
 
-        try{
-          model.userData.walkmesh = dwk;
-          door.collisionManager.setWalkmesh(dwk);
-          GameState.walkmeshList.push( dwk.mesh );
-
-          if(dwk.mesh instanceof THREE.Object3D){
-            dwk.mat4.makeRotationFromEuler(door.rotation);
-            dwk.mat4.setPosition( door.position.x, door.position.y, door.position.z);
-            dwk.mesh.geometry.applyMatrix4(dwk.mat4);
-            dwk.updateMatrix();
-            //dwk.mesh.position.copy(door.position);
-            // if(!door.isOpen()){
-            //   GameState.group.room_walkmeshes.add( dwk.mesh );
-            // }
-          }
-        }catch(e){
-          console.error('Failed to add dwk', model.name, dwk, e);
+        if(dwk.mesh instanceof THREE.Object3D){
+          dwk.mat4.makeRotationFromEuler(door.rotation);
+          dwk.mat4.setPosition( door.position.x, door.position.y, door.position.z);
+          dwk.mesh.geometry.applyMatrix4(dwk.mat4);
+          dwk.updateMatrix();
+          //dwk.mesh.position.copy(door.position);
+          // if(!door.isOpen()){
+          //   GameState.group.room_walkmeshes.add( dwk.mesh );
+          // }
         }
-
-        if(door.model instanceof OdysseyModel3D){
-          door.box.setFromObject(door.model);
-        }
-
-        if(door.openState){
-          door.model.playAnimation('opened1', true);
-        }
-        door.getCurrentRoom();
-        GameState.group.doors.add( door.container );
       }catch(e){
-        console.error(e);
+        console.error('Failed to add dwk', model.name, dwk, e);
       }
-    }
+
+      if(door.model instanceof OdysseyModel3D){
+        door.box.setFromObject(door.model);
+      }
+
+      if(door.openState){
+        door.model.playAnimation('opened1', true);
+      }
+      door.getCurrentRoom();
+      GameState.group.doors.add( door.container );
+    });
   }
 
   /**
    * Load the area's placeables
    */
   async loadPlaceables(): Promise<void> {
-    console.log('Loading Placeables');
-    for(let i = 0; i < this.placeables.length; i++){
-      const plc = this.placeables[i];
+    await this.loadEach('Placeables', this.placeables, async (plc) => {
       plc.load();
       plc.position.set(plc.getX(), plc.getY(), plc.getZ());
       plc.rotation.set(0, 0, plc.getBearing());
@@ -1833,16 +1894,14 @@ export class ModuleArea extends ModuleObject {
       plc.getCurrentRoom();
       plc.position.set(plc.getX(), plc.getY(), plc.getZ());
       plc.computeBoundingBox();
-    }
+    });
   }
 
   /**
    * Load the area's waypoints
    */
   async loadWaypoints(): Promise<void> {
-    console.log('Loading Waypoints');
-    for(let i = 0; i < this.waypoints.length; i++){
-      const waypnt = this.waypoints[i];
+    await this.loadEach('Waypoints', this.waypoints, (waypnt) => {
       waypnt.load();
       const wpObj = new THREE.Object3D();
       wpObj.name = waypnt.getTag();
@@ -1850,166 +1909,79 @@ export class ModuleArea extends ModuleObject {
       wpObj.quaternion.setFromAxisAngle(new THREE.Vector3(0,0,1), Math.atan2(-waypnt.getYOrientation(), -waypnt.getXOrientation()));
       waypnt.rotation.z = Math.atan2(-waypnt.getYOrientation(), -waypnt.getXOrientation()) + Math.PI/2;
       GameState.group.waypoints.add(wpObj);
-
-      let _distance = 1000000000;
-      let _currentRoom = null;
-      let roomCenter = new THREE.Vector3();
-      for(let i = 0; i < GameState.group.rooms.children.length; i++){
-        let room = GameState.group.rooms.children[i];
-        if(room instanceof OdysseyModel3D){
-          if(room.box.containsPoint(wpObj.position)){
-            room.box.getCenter(roomCenter);
-            let distance = wpObj.position.distanceTo(roomCenter);
-            if(distance < _distance){
-              _distance = distance;
-              _currentRoom = room;
-            }
-          }
-        }
-      }
-      wpObj.userData.area = _currentRoom;
+      wpObj.userData.area = this.roomContaining(wpObj.position);
       this.areaMap.addMapNote(waypnt);
-    }
+    });
   }
 
   /**
    * Load the area's encounters
    */
   async loadEncounters(): Promise<void> {
-    console.log('Loading Encounters');
-    for(let i = 0; i < this.encounters.length; i++){
-      const encounter = this.encounters[i];
-      try{
-        encounter.load();
-        let _distance = 1000000000;
-        let _currentRoom = null;
-        let roomCenter = new THREE.Vector3();
-        for(let i = 0; i < GameState.group.rooms.children.length; i++){
-          let room = GameState.group.rooms.children[i];
-          if(room instanceof OdysseyModel3D){
-            if(room.box.containsPoint(encounter.mesh.position)){
-              room.box.getCenter(roomCenter);
-              let distance = encounter.mesh.position.distanceTo(roomCenter);
-              if(distance < _distance){
-                _distance = distance;
-                _currentRoom = room;
-              }
-            }
-          }
-        }
-        encounter.mesh.userData.area = _currentRoom;
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Encounters', this.encounters, (encounter) => {
+      encounter.load();
+      encounter.mesh.userData.area = this.roomContaining(encounter.mesh.position);
+    });
   }
 
   /**
    * Load the area's Area of Effects
    */
   async loadAreaEffects(): Promise<void> {
-    console.log('Loading AreaEffects');
-    for(let i = 0; i < this.areaOfEffects.length; i++){
-      try{
-        const aoe = this.areaOfEffects[i];
-        aoe.load();
-        GameState.group.effects.add( aoe.container );
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('AreaEffects', this.areaOfEffects, (aoe) => {
+      aoe.load();
+      GameState.group.effects.add( aoe.container );
+    });
   }
 
   /**
    * Load the area's triggers
    */
   async loadTriggers(): Promise<void> {
-    console.log('Loading Triggers');
-    for(let i = 0; i < this.triggers.length; i++){
-      try{
-        const trig = this.triggers[i];
-        trig.load();
-        let _distance = 1000000000;
-        let _currentRoom = null;
-        let roomCenter = new THREE.Vector3();
-        for(let i = 0; i < GameState.group.rooms.children.length; i++){
-          let room = GameState.group.rooms.children[i];
-          if(room instanceof OdysseyModel3D){
-            if(room.box.containsPoint(trig.mesh.position)){
-              room.box.getCenter(roomCenter);
-              let distance = trig.mesh.position.distanceTo(roomCenter);
-              if(distance < _distance){
-                _distance = distance;
-                _currentRoom = room;
-              }
-            }
-          }
-        }
-        trig.mesh.userData.area = _currentRoom;
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Triggers', this.triggers, (trig) => {
+      trig.load();
+      trig.mesh.userData.area = this.roomContaining(trig.mesh.position);
+    });
   }
 
   /**
    * Load the area's creatures
    */
   async loadCreatures(): Promise<void> {
-    console.log('Loading Creatures');
-    for(let i = 0; i < this.creatures.length; i++){
-      try{
-        const creature = this.creatures[i];
-        creature.load();
-        const model = await creature.loadModel();
-        creature.model.userData.moduleObject = creature;
-        
-        //creature.setFacing(Math.atan2(creature.getXOrientation(), creature.getYOrientation()) + Math.PI/2, true);
-        creature.setFacing(-Math.atan2(creature.getXOrientation(), creature.getYOrientation()), true);
+    await this.loadEach('Creatures', this.creatures, async (creature) => {
+      creature.load();
+      const model = await creature.loadModel();
+      creature.model.userData.moduleObject = creature;
+      
+      //creature.setFacing(Math.atan2(creature.getXOrientation(), creature.getYOrientation()) + Math.PI/2, true);
+      creature.setFacing(-Math.atan2(creature.getXOrientation(), creature.getYOrientation()), true);
 
-        model.hasCollision = true;
-        model.name = creature.getTag();
-        GameState.group.creatures.add( creature.container );
+      model.hasCollision = true;
+      model.name = creature.getTag();
+      GameState.group.creatures.add( creature.container );
 
-        creature.getCurrentRoom();
-        creature.updateCollision(0.0000000000000000000001);
-        creature.update(0.0000000000000000000001);
-        creature.computeBoundingBox();
-      }catch(e){
-        console.error(e);
-      }
-    }
+      creature.getCurrentRoom();
+      creature.updateCollision(0.0000000000000000000001);
+      creature.update(0.0000000000000000000001);
+      creature.computeBoundingBox();
+    });
   }
 
   /**
    * Load the area's stores
    */
   async loadStores(): Promise<void> {
-    console.log('Loading Stores');
-    for(let i = 0; i < this.stores.length; i++){
-      try{
-        const store = this.stores[i];
-        store.load();
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Stores', this.stores, (store) => store.load());
   }
 
   /**
    * Load the area's sounds
    */
   async loadsounds(): Promise<void> {
-    console.log('Loading Sound Emitter');
-    for(let i = 0; i < this.sounds.length; i++){
-      try{
-        const sound = this.sounds[i];
-        sound.load();
-        await sound.loadSound();
-      }catch(e){
-        console.error(e);
-      }
-    }
+    await this.loadEach('Sound Emitter', this.sounds, async (sound) => {
+      sound.load();
+      await sound.loadSound();
+    });
   }
 
   /**
@@ -2078,7 +2050,7 @@ export class ModuleArea extends ModuleObject {
       this.miniGame.initMiniGameObjects();
     }
 
-    this.runStartScripts();
+    if(!GameState.gmMode) this.runStartScripts();
   }
 
   runOnEnterScripts(){
@@ -2219,34 +2191,34 @@ export class ModuleArea extends ModuleObject {
 
   getAreaPropertiesStruct(){
     let struct = new GFFStruct();
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndDay') ).setValue(this.audio.ambient.day);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndDayVol') ).setValue(this.audio.ambient.dayVolume);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndNight') ).setValue(this.audio.ambient.night);
-    struct.addField( new GFFField(GFFDataType.INT, 'AmbientSndNitVol') ).setValue(this.audio.ambient.nightVolume);
-    struct.addField( new GFFField(GFFDataType.INT, 'EnvAudio') ).setValue(this.audio.environmentAudio);
+    struct.addInt('AmbientSndDay', this.audio.ambient.day);
+    struct.addInt('AmbientSndDayVol', this.audio.ambient.dayVolume);
+    struct.addInt('AmbientSndNight', this.audio.ambient.night);
+    struct.addInt('AmbientSndNitVol', this.audio.ambient.nightVolume);
+    struct.addInt('EnvAudio', this.audio.environmentAudio);
     
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicBattle') ).setValue(this.audio.music.battle);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicDay') ).setValue(this.audio.music.day);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicDelay') ).setValue(this.audio.music.delay);
-    struct.addField( new GFFField(GFFDataType.INT, 'MusicNight') ).setValue(this.audio.music.night);
+    struct.addInt('MusicBattle', this.audio.music.battle);
+    struct.addInt('MusicDay', this.audio.music.day);
+    struct.addInt('MusicDelay', this.audio.music.delay);
+    struct.addInt('MusicNight', this.audio.music.night);
 
-    struct.addField( new GFFField(GFFDataType.BYTE, 'RestrictMode') ).setValue(this.restrictMode ? 1 : 0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'StealthXPCurrent') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'StealthXPLoss') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'StealthXPMax') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.DWORD, 'SunFogColor') ).setValue(0);
+    struct.addByte('RestrictMode', this.restrictMode ? 1 : 0);
+    struct.addDWord('StealthXPCurrent', 0);
+    struct.addByte('StealthXPLoss', 0);
+    struct.addDWord('StealthXPMax', 0);
+    struct.addDWord('SunFogColor', 0);
     
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPendCurrID') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPendNextID') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'TransPending') ).setValue(0);
-    struct.addField( new GFFField(GFFDataType.BYTE, 'Unescapable') ).setValue(this.unescapable);
+    struct.addByte('TransPendCurrID', 0);
+    struct.addByte('TransPendNextID', 0);
+    struct.addByte('TransPending', 0);
+    struct.addByte('Unescapable', this.unescapable);
     return struct;
   }
 
   saveAreaListStruct(){
     let areaStruct = new GFFStruct();
-    areaStruct.addField( new GFFField(GFFDataType.RESREF, 'Area_Name') ).setValue(this.name);
-    areaStruct.addField( new GFFField(GFFDataType.DWORD, 'ObjectId') ).setValue(this.id);
+    areaStruct.addRESREF('Area_Name', this.name);
+    areaStruct.addDWord('ObjectId', this.id);
     //unescapable
     return areaStruct;
   }
@@ -2310,9 +2282,9 @@ export class ModuleArea extends ModuleObject {
       storeList.addChildStruct( this.stores[i].save().RootNode );
     }
     
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPendCurrID') ).setValue(0);
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPendNextID') ).setValue(0);
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'TransPending') ).setValue(0);
+    git.RootNode.addByte('TransPendCurrID', 0);
+    git.RootNode.addByte('TransPendNextID', 0);
+    git.RootNode.addByte('TransPending', 0);
 
     const triggerList = git.RootNode.addField( new GFFField(GFFDataType.LIST, 'TriggerList') );
     for(let i = 0; i < this.triggers.length; i++){
@@ -2326,7 +2298,7 @@ export class ModuleArea extends ModuleObject {
       waypointList.addChildStruct( this.waypoints[i].save().RootNode );
     }
     
-    git.RootNode.addField( new GFFField(GFFDataType.BYTE, 'WeatherStarted') ).setValue(this.weather.started ? 1 : 0);
+    git.RootNode.addByte('WeatherStarted', this.weather.started ? 1 : 0);
 
     this.git = git;
 

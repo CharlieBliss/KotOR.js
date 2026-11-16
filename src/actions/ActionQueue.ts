@@ -147,7 +147,15 @@ export class ActionQueue extends Array {
     let action = this[0];
     if(!action){ return; }
     action.owner = this.owner;
-    let status = action.update( delta );
+    let status: ActionStatus;
+    try{
+      status = action.update( delta );
+    }catch(e){
+      // Retrying it would throw again every frame and hold up everything queued after it
+      const owner = (this.owner as any)?.getName?.() || (this.owner as any)?.getTag?.() || 'object';
+      console.error(`ActionQueue: ${ActionType[action.type] || action.type} on ${owner} failed and was dropped`, e);
+      status = ActionStatus.FAILED;
+    }
     if(status != ActionStatus.IN_PROGRESS){
       this.shift();
     }

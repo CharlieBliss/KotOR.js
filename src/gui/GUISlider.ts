@@ -103,8 +103,8 @@ export class GUISlider extends GUIControl{
 
     this.addEventListener('click', (e) =>{
       e.stopPropagation();
-      const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getViewportWidthScaled() / 2);
-      const mouseY = Mouse.positionViewport.y - (GameState.ResolutionManager.getViewportHeightScaled() / 2);
+      const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getGUIWidthScaled() / 2);
+      const mouseY = Mouse.positionViewport.y - (GameState.ResolutionManager.getGUIHeightScaled() / 2);
       const scrollLeft = ( this.thumb.mesh.position.x + (this.thumb.mesh.scale.x / 2) ) + mouseX;
       const scrollTop = ( this.thumb.mesh.position.y + (this.thumb.mesh.scale.y / 2) ) + mouseY;
 
@@ -116,8 +116,8 @@ export class GUISlider extends GUIControl{
 
     this.addEventListener('mouseDown', (e) => {
       e.stopPropagation();
-      const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getViewportWidthScaled() / 2);
-      const mouseY = Mouse.positionViewport.y - (GameState.ResolutionManager.getViewportHeightScaled() / 2);
+      const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getGUIWidthScaled() / 2);
+      const mouseY = Mouse.positionViewport.y - (GameState.ResolutionManager.getGUIHeightScaled() / 2);
       const scrollLeft = ( this.thumb.mesh.position.x + (this.thumb.mesh.scale.x / 2) ) + mouseX;
       const scrollTop = ( this.thumb.mesh.position.y + (this.thumb.mesh.scale.y / 2) ) + mouseY;
 
@@ -141,8 +141,8 @@ export class GUISlider extends GUIControl{
   mouseInside(){
     if(this.disableSelection) return;
 
-    // const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getViewportWidthScaled() / 2);
-    const mouseY = -(Mouse.positionViewport.y - (GameState.ResolutionManager.getViewportHeightScaled() / 2));
+    // const mouseX = Mouse.positionViewport.x - (GameState.ResolutionManager.getGUIWidthScaled() / 2);
+    const mouseY = -(Mouse.positionViewport.y - (GameState.ResolutionManager.getGUIHeightScaled() / 2));
     const scrollBarWidth = this.extent.width;
     const scrollBarHeight = this.extent.height;
 

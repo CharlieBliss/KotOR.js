@@ -1605,34 +1605,34 @@ export class GUIControl {
 
     switch(this.anchor){
       case Anchor.TopLeft:
-        this.anchorOffset.x = -((GameState.ResolutionManager.getViewportWidth()) / 2) + ((this.extent.width/2)) + this.extent.left;
-        this.anchorOffset.y = ((GameState.ResolutionManager.getViewportHeight()) / 2) - (this.extent.top + (this.extent.height/2));
+        this.anchorOffset.x = -((GameState.ResolutionManager.getGUIWidth()) / 2) + ((this.extent.width/2)) + this.extent.left;
+        this.anchorOffset.y = ((GameState.ResolutionManager.getGUIHeight()) / 2) - (this.extent.top + (this.extent.height/2));
       break;
       case Anchor.TopCenter:
         if(this.extent.left < halfX){
-          this.anchorOffset.y = ((GameState.ResolutionManager.getViewportHeight()) / 2) - (this.extent.top + (this.extent.height/2));
+          this.anchorOffset.y = ((GameState.ResolutionManager.getGUIHeight()) / 2) - (this.extent.top + (this.extent.height/2));
         }else{
-          this.anchorOffset.y = ((GameState.ResolutionManager.getViewportHeight()) / 2) - (this.extent.top + (this.extent.height/2));
+          this.anchorOffset.y = ((GameState.ResolutionManager.getGUIHeight()) / 2) - (this.extent.top + (this.extent.height/2));
         }
       break;
       case Anchor.TopRight:
-        this.anchorOffset.x = ((GameState.ResolutionManager.getViewportWidth()) / 2) + ((this.extent.width/2) + (this.extent.left - 800));
-        this.anchorOffset.y = ((GameState.ResolutionManager.getViewportHeight()) / 2) - (this.extent.top + (this.extent.height/2));
+        this.anchorOffset.x = ((GameState.ResolutionManager.getGUIWidth()) / 2) + ((this.extent.width/2) + (this.extent.left - 800));
+        this.anchorOffset.y = ((GameState.ResolutionManager.getGUIHeight()) / 2) - (this.extent.top + (this.extent.height/2));
       break;
       case Anchor.BottomLeft:
-        this.anchorOffset.x = -((GameState.ResolutionManager.getViewportWidth()) / 2) + ((this.extent.width/2)) + this.extent.left;
-        this.anchorOffset.y = -(((GameState.ResolutionManager.getViewportHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
+        this.anchorOffset.x = -((GameState.ResolutionManager.getGUIWidth()) / 2) + ((this.extent.width/2)) + this.extent.left;
+        this.anchorOffset.y = -(((GameState.ResolutionManager.getGUIHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
       break;
       case Anchor.BottomCenter:
         if(this.extent.left < (halfX)){
-          this.anchorOffset.y = -(((GameState.ResolutionManager.getViewportHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
+          this.anchorOffset.y = -(((GameState.ResolutionManager.getGUIHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
         }else{
-          this.anchorOffset.y = -(((GameState.ResolutionManager.getViewportHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));  
+          this.anchorOffset.y = -(((GameState.ResolutionManager.getGUIHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));  
         }
       break;
       case Anchor.BottomRight:
-        this.anchorOffset.x = ((GameState.ResolutionManager.getViewportWidth()) / 2) + ((this.extent.width/2) + (this.extent.left - 800));
-        this.anchorOffset.y = -(((GameState.ResolutionManager.getViewportHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
+        this.anchorOffset.x = ((GameState.ResolutionManager.getGUIWidth()) / 2) + ((this.extent.width/2) + (this.extent.left - 800));
+        this.anchorOffset.y = -(((GameState.ResolutionManager.getGUIHeight()) / 2) - (600 - this.extent.top) + (this.extent.height/2));
       break;
       default:
         this.anchorOffset = new THREE.Vector2(posX, posY);
@@ -1705,8 +1705,8 @@ export class GUIControl {
   getControlExtent(){
     let renderSize = this.getRendererSize();
 
-    let wRatio = GameState.ResolutionManager.getViewportWidth() / this.menu.tGuiPanel.extent.width;
-    let hRatio = GameState.ResolutionManager.getViewportHeight() / this.menu.tGuiPanel.extent.height;
+    let wRatio = GameState.ResolutionManager.getGUIWidth() / this.menu.tGuiPanel.extent.width;
+    let hRatio = GameState.ResolutionManager.getGUIHeight() / this.menu.tGuiPanel.extent.height;
 
     let parentExtent = { width: this.menu.width, height: this.menu.height };
     //if(!(this.parent instanceof THREE.Scene)){
@@ -2311,7 +2311,7 @@ export class GUIControl {
   }
 
   getRendererSize(){
-    return {width: GameState.ResolutionManager.getViewportWidth(), height: GameState.ResolutionManager.getViewportHeight()};
+    return {width: GameState.ResolutionManager.getGUIWidth(), height: GameState.ResolutionManager.getGUIHeight()};
   }
 
   setKeymapAction(action: KeyMapAction){
