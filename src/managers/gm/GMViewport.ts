@@ -256,9 +256,14 @@ export class GMViewport {
       const dy = e.clientY - this.pointerDownPos.y;
       if (Math.hypot(dx, dy) > this.DRAG_THRESHOLD) return;
 
-      // A right-click (not a right-drag, which looks around) puts down the placement or teleport tool
+      // A right-click (not a right-drag, which looks around) puts down the placement or teleport tool; with
+      // nothing in hand, it opens the GM's menu for what's under the mouse (or the ground there)
       if (e.button === 2) {
-        if (GMManager.activeTool !== 'select') GMManager.setToolMode('select');
+        if (GMManager.activeTool !== 'select') {
+          GMManager.setToolMode('select');
+        } else if (GMManager.controlMode !== 'POSSESS') {
+          this.openContextMenu(e.clientX, e.clientY);
+        }
         return;
       }
 
@@ -274,6 +279,17 @@ export class GMViewport {
 
       this.handleViewportClick(e.clientX, e.clientY, isDoubleClick, e.shiftKey);
     });
+  }
+
+  /**
+   * The GM's right-click menu: what's under the mouse and the ground point there, for the panel to show actions
+   * for (GMPanel's ContextMenu)
+   */
+  static openContextMenu(clientX: number, clientY: number) {
+    this.updateMouseRaycast(clientX, clientY);
+    const target = this.pickObjectAtCursor(true);
+    const point = this.hasValidRaycastPoint ? this.lastRaycastPoint.clone() : null;
+    GMManager.events.dispatchEvent('context-menu', { x: clientX, y: clientY, target, point });
   }
 
   /** The selected objects that can be moved and turned (doors stay in their frames) */
@@ -617,10 +633,7 @@ export class GMViewport {
 
     if (!this.hasValidRaycastPoint) return;
     const spawnPos = this.snapVectorToGrid(this.lastRaycastPoint);
-    const cam = this.getActiveThreeCamera();
-    const baseFacing = cam ? Math.atan2(cam.position.x - spawnPos.x, cam.position.y - spawnPos.y) : 0;
-    const yawRad = (this.placementYawOffset * Math.PI) / 180;
-    const facing = Utility.NormalizeRadian(baseFacing + yawRad);
+    const facing = this.placementFacing(spawnPos);
 
     if (GMManager.activeTool === 'place_creature') {
       const creature = await GMSpawner.spawnCreature(GMManager.pendingCreatureConfig, spawnPos, facing);
@@ -642,11 +655,36 @@ export class GMViewport {
     }
   }
 
+  /** Which way something placed there faces: toward the camera, turned by the placement rotation (R) */
+  static placementFacing(spawnPos: THREE.Vector3): number {
+    const cam = this.getActiveThreeCamera();
+    const baseFacing = cam ? Math.atan2(cam.position.x - spawnPos.x, cam.position.y - spawnPos.y) : 0;
+    const yawRad = (this.placementYawOffset * Math.PI) / 180;
+    return Utility.NormalizeRadian(baseFacing + yawRad);
+  }
+
+  /**
+   * Put a creature or object down at a point, as a click with the Place tool does (the right-click menu and the
+   * quick-place palette): placed, selected and undoable
+   */
+  static async placeAt(kind: 'creature' | 'placeable', config: any, point: THREE.Vector3): Promise<ModuleObject | null> {
+    if (!config || !point) return null;
+    const spawnPos = this.snapVectorToGrid(point.clone());
+    const facing = this.placementFacing(spawnPos);
+    const obj = kind === 'creature'
+      ? await GMSpawner.spawnCreature(config, spawnPos, facing)
+      : await GMSpawner.spawnPlaceable(config, spawnPos, facing);
+    if (obj) this.placed(obj);
+    return obj || null;
+  }
+
   /** Something just placed: hidden if the GM is setting a scene up out of sight, selected, and undoable */
   static placed(obj: ModuleObject) {
     if (GMEditTools.placeHidden) GMManager.setObjectHidden(obj, true);
     GMHistory.created(`Place ${GMHistory.nameOf([obj])}`, [obj]);
     GMManager.selectObject(obj);
+    // The panel keeps what was placed lately, to place again from the palette or the right-click menu
+    GMManager.events.dispatchEvent('placed', obj);
   }
 
   static isPlacementTool(tool: GMToolMode): boolean {

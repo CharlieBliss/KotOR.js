@@ -756,6 +756,19 @@ export class GMManager {
     this.notifyChange();
   }
 
+  /** Take a share of a creature's (or object's) maximum health off it, never below 1 (Kill does that) */
+  static hurtObject(obj: ModuleObject, fraction: number = 0.25) {
+    if (!obj) return;
+    const max = obj.getMaxHP() || 100;
+    const hp = Math.max(1, (obj.getHP() || 0) - Math.round(max * fraction));
+    if (GMObjectKind.isCreature(obj)) this.setCreatureHP(obj as ModuleCreature, hp, max);
+    else obj.currentHP = hp;
+    if (GMNetworkManager.role !== 'offline') {
+      GMNetworkManager.broadcastActorUpdate(GMReplication.serializeSingleActor(obj));
+    }
+    this.notifyChange();
+  }
+
   static teleportObject(obj: ModuleObject, pos: THREE.Vector3) {
     if (!obj || !pos) return;
     this.placeAt(obj, pos);

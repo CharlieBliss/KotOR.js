@@ -14,6 +14,10 @@ import { PromptCard } from "@/apps/game/components/gm-panel/overlays/PromptCard"
 import { CharacterSheet } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
+import { ContextMenu } from "@/apps/game/components/gm-panel/overlays/ContextMenu";
+import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
+import { CombatTracker, anyoneFighting } from "@/apps/game/components/gm-panel/overlays/CombatTracker";
+import { wireRecentPlacements } from "@/apps/game/components/gm-panel/controls/quickActions";
 import { installGameCursor } from "@/apps/game/components/gm-panel/gameCursor";
 import "@/apps/game/components/gm-panel/gm-cursor.scss";
 import { ScenesTab } from "@/apps/game/components/gm-panel/tabs/ScenesTab";
@@ -22,6 +26,7 @@ import { PlayersTab } from "@/apps/game/components/gm-panel/tabs/PlayersTab";
 import { InspectorTab } from "@/apps/game/components/gm-panel/tabs/InspectorTab";
 import { SessionTab } from "@/apps/game/components/gm-panel/tabs/SessionTab";
 import "@/apps/game/components/gm-panel/gm-panel.scss";
+import "@/apps/game/components/gm-panel/gm-quick-tools.scss";
 
 /**
  * The GM panel: the toolbar, the controls strip, overlays (conversations, a downed player, the GM's
@@ -36,6 +41,11 @@ export const GMPanel: React.FC = () => {
   const [sheet, setSheet] = useState<{ creature: KotOR.ModuleCreature | null; section: SheetSectionId; gmView: boolean } | null>(null);
   const [opened, setOpened] = useState<Set<Exclude<DrawerTab, null>>>(() => new Set());
   const [showQuickJoinOnMenu, setShowQuickJoinOnMenu] = useState(false);
+  // The quick-place palette (and the spot it places at, from the right-click menu's Search…)
+  const [palette, setPalette] = useState<{ open: boolean; point: any }>({ open: false, point: null });
+  // The combat tracker: null shows it while there's a fight; true / false is the GM's choice
+  const [trackerShown, setTrackerShown] = useState<boolean | null>(null);
+  const toggleTracker = useCallback(() => setTrackerShown((prev) => !(prev === null ? anyoneFighting() : prev)), []);
 
   const setDrawerTab = useCallback((tab: DrawerTab) => {
     setDrawerTabState(tab);
@@ -57,6 +67,7 @@ export const GMPanel: React.FC = () => {
 
   useEffect(() => {
     const onInspect = () => setDrawerTab('inspector');
+    wireRecentPlacements();
     // The game's cursor over the panel's layers, once its images can be read
     void installGameCursor();
     const onOpenJoin = () => setShowQuickJoinOnMenu(true);
@@ -69,6 +80,13 @@ export const GMPanel: React.FC = () => {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!KotOR.GameState.gmMode || !GMManager.isGMUser()) return;
+      // With the right-click menu or the palette up, Esc only closes it (their own handlers do): it isn't also
+      // "select nothing", which left the menu's next order with nobody to give it to
+      if (e.key === 'Escape' && document.querySelector('.gm-context-menu, .gm-palette')) {
+        if (document.querySelector('.gm-palette')) setPalette({ open: false, point: null });
+        e.preventDefault();
+        return;
+      }
       // Esc puts down a placement or teleport tool, wherever focus is, and does nothing else
       // (this listener runs in the capture phase, before the game's own Esc handling opens Options)
       if (e.key === 'Escape' && GMManager.activeTool !== 'select') {
@@ -78,6 +96,20 @@ export const GMPanel: React.FC = () => {
         return;
       }
       if (KotOR.IngameControls.isTypingInPageField(e)) return;
+      // / or Ctrl+K: find something to place, or a command
+      if ((e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPalette({ open: true, point: null });
+        return;
+      }
+      // T: the combat tracker, in the GM camera
+      if (e.code === 'KeyT' && !e.ctrlKey && !e.metaKey && !e.altKey && GMManager.controlMode !== 'POSSESS') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleTracker();
+        return;
+      }
       if (editShortcut(e)) {
         e.preventDefault();
         e.stopPropagation();
@@ -241,8 +273,9 @@ export const GMPanel: React.FC = () => {
     controlHints = [['WASD', 'move'], ['Click', 'interact'], ['F2', 'back to GM camera']];
   } else {
     controlHints = [
-      ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Shift + drag', 'box'], ['Drag it', 'move'],
-      ['Shift + wheel', 'turn'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'], ['F2', `play as ${possessCandidateName}`],
+      ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Right-click', 'menu'], ['/', 'place or command'],
+      ['T', 'combat'], ['Shift + drag', 'box'], ['Drag it', 'move'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'],
+      ['F2', `play as ${possessCandidateName}`],
     ];
   }
 
@@ -397,6 +430,19 @@ export const GMPanel: React.FC = () => {
 
       {/* Conversations: the GM speaks for NPCs players are talking to */}
       {!isPlayerView && GMNetworkManager.role === 'host' && <ConversationsDock />}
+
+      {/* Quick tools: the right-click menu, the quick-place palette and the combat tracker */}
+      {!isPlayerView && <ContextMenu onOpenPalette={(point) => setPalette({ open: true, point })} />}
+      {!isPlayerView && (
+        <QuickPalette
+          open={palette.open}
+          point={palette.point}
+          onClose={() => setPalette({ open: false, point: null })}
+          onOpenTab={setDrawerTab}
+          onToggleTracker={toggleTracker}
+        />
+      )}
+      {!isPlayerView && <CombatTracker shown={trackerShown} onShownChange={setTrackerShown} />}
 
       {/* Our character is down: what happens next, by the session's rule */}
       {isPlayerView && <DownedBanner />}

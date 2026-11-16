@@ -58,6 +58,8 @@ export function editShortcut(e: KeyboardEvent): boolean {
 
 /** Every editing control, for the Inspector's key list */
 export const EDIT_SHORTCUT_HINTS: [string, string][] = [
+  ['Right-click', 'orders, side, health and more for what\'s there'], ['/ or Ctrl + K', 'place anything, or run a command'],
+  ['T', 'combat tracker'],
   ['Click / Shift + click', 'select / add or take out'], ['Shift + drag', 'select with a box'], ['Ctrl + A', 'creatures on screen'],
   ['Esc', 'select nothing'], ['Drag it', 'move (the selection)'], ['Alt + drag', 'raise an object'],
   ['Shift or Ctrl + wheel', 'turn each'], ['Ctrl + Shift + wheel', 'turn the group'], ['Delete', 'remove'],

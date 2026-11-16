@@ -1,0 +1,288 @@
+// The GM's quick tools: the right-click menu, the quick-place palette and the combat tracker
+.gm-panel-root {
+
+  // --- Right-click menu
+  .gm-context-menu {
+    position: fixed;
+    z-index: 9700;
+    pointer-events: auto;
+    min-width: 220px;
+    max-width: min(340px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    overflow-y: auto;
+    padding: 4px;
+    background: rgba(9, 19, 32, 0.97);
+    border: 1px solid rgba(68, 162, 240, 0.55);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8);
+    font-size: 12px;
+  }
+
+  .gm-context-heading {
+    display: flex;
+    flex-direction: column;
+    padding: 5px 8px 3px;
+    font-weight: 600;
+    color: #ffffff;
+
+    span {
+      font-weight: 400;
+      font-size: 11px;
+      color: #8fb4d3;
+    }
+  }
+
+  .gm-context-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 3px 6px;
+  }
+
+  .gm-context-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: #d7e9f7;
+    font-size: 12px;
+    cursor: pointer;
+
+    &:hover {
+      background: rgba(28, 64, 102, 0.95);
+      color: #ffffff;
+    }
+  }
+
+  .gm-context-sep {
+    height: 1px;
+    margin: 4px 6px;
+    background: rgba(68, 162, 240, 0.25);
+  }
+
+  // --- Quick-place palette
+  .gm-palette-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9800;
+    pointer-events: auto;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 12vh;
+    background: rgba(0, 0, 0, 0.35);
+  }
+
+  .gm-palette {
+    width: min(620px, calc(100vw - 32px));
+    display: flex;
+    flex-direction: column;
+    background: rgba(9, 19, 32, 0.98);
+    border: 1px solid rgba(91, 192, 255, 0.6);
+    border-radius: 8px;
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.85);
+    overflow: hidden;
+  }
+
+  .gm-palette-input {
+    margin: 10px;
+    font-size: 15px;
+    padding: 9px 11px;
+    user-select: text;
+  }
+
+  .gm-palette-list {
+    max-height: min(420px, 55vh);
+    overflow-y: auto;
+    padding: 0 6px 6px;
+  }
+
+  .gm-palette-item {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &.active {
+      background: linear-gradient(180deg, #1b5e96 0%, #0f3d66 100%);
+    }
+  }
+
+  .gm-palette-group {
+    flex: 0 0 72px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #82cfff;
+
+    &.g-recent { color: #ffe082; }
+    &.g-command { color: #98ffcb; }
+    &.g-template { color: #b6a8ff; }
+  }
+
+  .gm-palette-label {
+    flex: 0 1 auto;
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gm-palette-detail {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 11px;
+    color: #8fb4d3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gm-palette-foot {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: #8fb4d3;
+    border-top: 1px solid rgba(68, 162, 240, 0.25);
+  }
+
+  // --- Combat tracker
+  .gm-tracker {
+    position: fixed;
+    top: 52px;
+    right: 12px;
+    z-index: 9550;
+    pointer-events: auto;
+    width: min(272px, calc(100vw - 24px));
+    max-height: calc(100vh - 130px);
+    overflow-y: auto;
+    padding: 6px;
+    background: rgba(9, 19, 32, 0.9);
+    border: 1px solid rgba(68, 162, 240, 0.45);
+    border-radius: 6px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+    font-size: 12px;
+  }
+
+  // The roll feed moves over beside it
+  .gm-tracker ~ .gm-roll-feed {
+    right: 296px;
+  }
+
+  .gm-tracker-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2px 4px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .gm-tracker-side {
+    margin-top: 4px;
+
+    // Which side, by the edge of each row (the bars show health the same way for both)
+    &.hostile .gm-tracker-row { border-left: 3px solid rgba(255, 107, 107, 0.75); }
+    &.others .gm-tracker-row { border-left: 3px solid rgba(85, 239, 196, 0.6); }
+    &.hostile .gm-tracker-toggle { color: #ff9b9b; }
+  }
+
+  .gm-tracker-side-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 2px 2px 3px;
+  }
+
+  .gm-tracker-toggle {
+    border: none;
+    background: transparent;
+    padding: 0;
+    color: #82cfff;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    cursor: pointer;
+
+    span {
+      margin-left: 4px;
+      font-weight: 400;
+      text-transform: none;
+      color: #8fb4d3;
+    }
+  }
+
+  .gm-tracker-row {
+    padding: 3px 6px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: rgba(16, 36, 58, 0.7);
+    cursor: pointer;
+
+    &:hover { border-color: rgba(91, 192, 255, 0.5); }
+    &.selected { border-color: #6bd0ff; background: rgba(27, 94, 150, 0.55); }
+    &.dead { opacity: 0.45; }
+  }
+
+  .gm-tracker-line {
+    display: flex;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .gm-tracker-name {
+    color: #ffffff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .gm-tracker-hp {
+    flex: 0 0 auto;
+    color: #b9d3e8;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .gm-tracker-bar {
+    height: 4px;
+    margin-top: 3px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.1);
+    overflow: hidden;
+
+    > div {
+      height: 100%;
+      background: #55efc4;
+      transition: width 0.3s ease;
+
+      &.mid { background: #ffd166; }
+      &.low { background: #ff6b6b; }
+    }
+
+    &.fp {
+      height: 2px;
+      > div { background: #5bc0ff; }
+    }
+  }
+
+  .gm-tracker-sub {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin-top: 2px;
+    font-size: 11px;
+    color: #8fb4d3;
+  }
+
+  .gm-tracker-doing {
+    color: #ffe082;
+  }
+}
