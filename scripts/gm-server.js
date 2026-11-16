@@ -12,6 +12,7 @@ let activeStandaloneWss = null;
 
 // Packets that change the shared world; only the registered host may send them
 const HOST_ONLY_TYPES = new Set([
+  'scene.atmosphere',
   'mine.state',
   'mine.remove',
   'world.snapshot',

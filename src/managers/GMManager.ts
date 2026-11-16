@@ -37,6 +37,7 @@ import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMHistory } from "@/managers/gm/GMHistory";
+import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
 import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
@@ -571,6 +572,9 @@ export class GMManager {
         this.registerNetObject(`cre_area_${idx}_${c.getTag() || c.id}`, c);
       }
     });
+
+    // The scene's own music, sound and look, before the GM changes any
+    GMAtmosphere.onSceneLoaded();
 
     // Show all rooms so GM free camera can see the entire area
     for (const room of mod.area.rooms) {

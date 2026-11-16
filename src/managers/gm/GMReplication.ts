@@ -22,6 +22,7 @@ import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
+import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
 
 /** Keeping players' games in step with the GM's: serializing the world, applying it on clients, smoothing replica motion and mirroring the host's visuals. */
 export class GMReplication {
@@ -148,6 +149,7 @@ export class GMReplication {
       actors: this.serializeActorsForTick(),
       doors,
       mines: GMMines.getMines().map((m) => GMMines.serializeMine(m)),
+      atmosphere: Object.keys(GMAtmosphere.current).length ? GMAtmosphere.current : undefined,
     };
   }
 
@@ -188,6 +190,7 @@ export class GMReplication {
   }
 
   static async syncSnapshotEntitiesOnClient(snapshot: GMWorldSnapshot) {
+    await GMAtmosphere.receive(snapshot.atmosphere);
     if (Array.isArray(snapshot.mines)) {
       const known = new Set(snapshot.mines.map((m) => m.netId));
       for (const mine of GMMines.getMines()) {
@@ -699,6 +702,9 @@ GMNetworkManager.on('actor.remove', 'client', (packet) => {
 });
 GMNetworkManager.on('door.state', 'client', (packet) => {
   if (packet.payload) GMReplication.applyDoorStateOnClient(packet.payload);
+});
+GMNetworkManager.on('scene.atmosphere', 'client', async (packet) => {
+  await GMAtmosphere.receive(packet.payload?.atmosphere);
 });
 GMNetworkManager.on('fx.event', 'client', (packet) => {
   if (packet.payload) GMReplication.applyFxEventOnClient(packet.payload);

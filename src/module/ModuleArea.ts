@@ -676,6 +676,12 @@ export class ModuleArea extends ModuleObject {
     return GameState.hooks.skipsModuleObjects(kind);
   }
 
+  /** An area colour as the game keeps it (0x00BBGGRR) */
+  static ColorFromBGR(bgr: number): THREE.Color {
+    const v = Number(bgr) >>> 0;
+    return new THREE.Color((v & 0xff) / 255, ((v >> 8) & 0xff) / 255, ((v >> 16) & 0xff) / 255);
+  }
+
   /** Tables that areas index into by row (music, ambience): the other game's, for a borrowed area */
   static BorrowedTables: (name: string) => any = () => undefined;
 
@@ -1075,7 +1081,7 @@ export class ModuleArea extends ModuleObject {
 
     if(this.sun.fogOn){
       this.fog = new THREE.Fog(
-        this.sun.fogColor,
+        ModuleArea.ColorFromBGR(this.sun.fogColor),
         this.sun.fogNear,
         this.sun.fogFar
       );

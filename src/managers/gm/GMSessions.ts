@@ -19,6 +19,7 @@ import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
+import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
 
 /** Saving GM work in this browser: whole sessions to pick back up later, and kits (saved layouts) to place again. */
 export class GMSessions {
@@ -220,6 +221,7 @@ export class GMSessions {
       rules: GMManager.sessionRules(),
       pinnedNetIds: pinnedNetIds.length ? pinnedNetIds : undefined,
       groups: groups.length ? groups : undefined,
+      atmosphere: Object.keys(GMAtmosphere.current).length ? { ...GMAtmosphere.current } : undefined,
     };
   }
 
@@ -347,6 +349,7 @@ export class GMSessions {
       const obj = GMManager.netIdMap.get(netId);
       if (obj) obj.gmPinned = true;
     }
+    if (save.atmosphere) await GMAtmosphere.set(save.atmosphere);
     GMEditTools.groups.clear();
     for (const g of save.groups || []) {
       const members = [

@@ -217,6 +217,29 @@ export interface GMSavedObject {
   pinned?: boolean;
 }
 
+/**
+ * A scene's atmosphere as the GM set it (GMAtmosphere); anything unset is the scene's own. Colours are the
+ * game's 0x00BBGGRR; music and sounds are rows of ambientmusic.2da / ambientsound.2da (-1: none).
+ */
+export interface GMAtmosphereSettings {
+  /** The area it was taken from, if it was */
+  source?: string;
+  fog?: { on: boolean; color: number; near: number; far: number };
+  light?: number;
+  music?: number;
+  battle?: number;
+  ambient?: number;
+  /** 0-127, as the game keeps it */
+  ambientVolume?: number;
+}
+
+/** A piece of music or ambient sound to choose from */
+export interface GMSoundChoice {
+  row: number;
+  resource: string;
+  name: string;
+}
+
 /** A saved group (number key 1-9): placed objects by their index in the save, the rest by net id */
 export interface GMSavedGroup {
   n: number;
@@ -254,6 +277,8 @@ export interface GMSessionSave {
   pinnedNetIds?: string[];
   /** Saved groups of the selection */
   groups?: GMSavedGroup[];
+  /** The music, sound and look the GM gave the scene */
+  atmosphere?: GMAtmosphereSettings;
 }
 
 /**

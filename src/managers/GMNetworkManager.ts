@@ -1,4 +1,4 @@
-import type { GMCharacter, GMCheck } from "@/managers/gm/GMTypes";
+import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import { GameState } from "@/GameState";
 
@@ -213,6 +213,8 @@ export interface GMWorldSnapshot {
   actors: GMSerializedActor[];
   doors: GMSerializedDoorState[];
   mines?: GMSerializedMine[];
+  /** The music, sound and look the GM gave this scene */
+  atmosphere?: GMAtmosphereSettings;
 }
 
 export interface GMPlayerJoinPreset {
@@ -293,6 +295,7 @@ export interface GMPacketMap {
   'roll.result': { name: string; netId?: string; label: string; roll: number; bonus: number; total: number };
   'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
+  'scene.atmosphere': { atmosphere: GMAtmosphereSettings };
   'player.respawn': Record<string, never>;
 }
 

@@ -1316,7 +1316,8 @@ export class GameState implements EngineContext {
     }
 
     GameState.renderer.compile(GameState.scene, GameState.currentCamera);
-    GameState.renderer.setClearColor( new THREE.Color(GameState.module.area.sun.fogColor) );
+    // Area colours are 0x00BBGGRR
+    GameState.renderer.setClearColor( GameState.Module.ModuleArea.ColorFromBGR(GameState.module.area.sun.fogColor) );
 
     GameState.SetEngineMode(GameState.gmMode ? EngineMode.FREELOOK : (GameState.module.area.miniGame ? EngineMode.MINIGAME : EngineMode.INGAME));
     await GameState.module.area.initAreaObjects(!GameState.gmMode && runSpawnScripts);

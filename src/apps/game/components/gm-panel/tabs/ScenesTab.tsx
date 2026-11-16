@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { GMManager, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { AtmosphereSection } from "@/apps/game/components/gm-panel/tabs/AtmosphereSection";
 
 /** Scene tab: load an area (this game's or the other's), import a scene plan, and run its beats */
 export const ScenesTab: React.FC<{ active: boolean }> = React.memo(({ active }) => {
@@ -58,6 +59,7 @@ export const ScenesTab: React.FC<{ active: boolean }> = React.memo(({ active }) 
   };
   return (
     <>
+      <AtmosphereSection active={active} />
       {KotOR.GMScenePlan.active && (() => {
         const runner = KotOR.GMScenePlan.active;
         const plan = runner.plan;
