@@ -126,6 +126,29 @@ To make NPCs fight each other with the players out of it, use hostile against fr
 
 Use `template` when one fits (it keeps the game's own name and behaviour). Use `appearance` for pure set dressing.
 
+Props block the way like walls: NPCs walk around them, but a room packed with tables leaves no way through. Keep walkways a couple of metres wide, especially where beats send NPCs.
+
+### Seats
+
+The seated stances (`chair`, `chair_drunk`, `chair_pazaak`) don't bring a chair: put a seat prop down and the actor on it, facing the same way.
+
+```jsonc
+"props":  [ { "id": "seat1", "template": "plc_chair_mil_01", "at": { "spot": "room:207tel_1", "offset": [10.5, -4.4] }, "facing": 0 } ],
+"actors": [ { "id": "gambler", "template": "n_rodian", "at": { "spot": "prop:seat1" }, "facing": 0, "stance": "chair_pazaak" } ]
+```
+
+One seat per seated actor: give a group a seat each (props and actors with the same `count`, `formation` and `spacing`, so the copies line up), or a bench per two. Put the table 1.3 m in front of the seat (in the facing direction) for `chair_pazaak`.
+
+| Seat | KotOR (`content: "kotor"`) | KotOR II (`content: "tsl"`) |
+|---|---|---|
+| Military chair (best for most scenes) | `plc_chair1` (named "Food pile" in the game's data, but it's the chair) | `plc_chair_mil_01` |
+| Luxurious chair | `plc_chair2` | `plc_chair2` |
+| Bench | `plc_bench`, `plc_bench2` | `plc_bench`, `plc_bench2`, `plc_lbench01` (long), `plc_medbench01` |
+| Lounge chair | | `plc_chair03`, `plc_chair04` (low, angled: reads oddly with `chair_pazaak`) |
+| Rakata bench | `plc_rbench` | `plc_rbench` |
+
+In KotOR II `plc_chair1` is a food pile, not a chair.
+
 ## Orders
 
 | Order | Meaning |
@@ -198,9 +221,9 @@ Each creature's model has its own set of animations. When an actor's model lacks
 | `meditate_sit` | Meditating, seated | KotOR II |
 | `meditate_stand` | Meditating, standing | KotOR II |
 | `sit` | Sitting on the ground | KotOR II |
-| `chair` | Sitting in a chair | both |
-| `chair_drunk` | Slumped in a chair | both |
-| `chair_pazaak` | Playing pazaak at a table | both |
+| `chair` | Sitting in a chair (needs a seat prop) | both |
+| `chair_drunk` | Slumped in a chair (needs a seat prop) | both |
+| `chair_pazaak` | Playing pazaak at a table (needs a seat prop) | both |
 | `computer` | Using a computer | both |
 | `datapad` | Reading a datapad | some models |
 | `weld` | Welding | some models |

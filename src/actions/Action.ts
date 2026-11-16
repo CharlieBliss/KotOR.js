@@ -10,6 +10,7 @@ import { type ModuleCreature, type ModuleObject } from "@/module";
 // import type { NWScriptInstance } from "@/nwscript/NWScriptInstance";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { BitWise } from "@/utility/BitWise";
+import { Utility } from "@/utility/Utility";
 import { ActionParameter } from "@/actions/ActionParameter";
 import { ActionQueue } from "@/actions/ActionQueue";
 import * as THREE from "three";
@@ -161,6 +162,12 @@ export class Action {
    * adjusts movement vectors to avoid them. Only applies to creature-type
    * objects that are part of the party.
    */
+  /** Milliseconds an NPC follows a path around someone before it may plan another */
+  static AVOIDANCE_REPLAN_MS = 700;
+
+  /** When each NPC last planned its way around someone */
+  static lastAvoidance = new WeakMap<ModuleObject, number>();
+
   runCreatureAvoidance(delta = 0, finalTarget: THREE.Vector3, excludeTarget?: ModuleObject) {
     if (!BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)) return;
     const owner: ModuleCreature = this.owner as any;
@@ -190,6 +197,13 @@ export class Action {
     const checkCreatureCollision = (creature: ModuleCreature) => {
       if (creature === owner || creature.isDead() || !creature.getAppearance()) return;
 
+      // Not there for the creatures around it (a GM's hidden actor)
+      if (GameState.hooks.walksThrough(creature)) return;
+
+      // Walking the same way: it's moving out of the way too (a group setting off together). Detouring around
+      // it would only send both in circles
+      if ((creature.force > 0 || creature.speed > 0.5) && Math.abs(Utility.NormalizeRadian(creature.getFacing() - owner.getFacing())) < Math.PI / 3) return;
+
       // Skip the target object if it's specified
       if (excludeTarget && creature === excludeTarget) {
         return;
@@ -206,7 +220,8 @@ export class Action {
         return;
       }
 
-      const hitDistance = creature.getAppearance().hitdist * SAFETY_BUFFER;
+      // Close enough to bump: its size and the mover's own (collision stops them that far apart)
+      const hitDistance = (creature.getAppearance().hitdist + (owner.getAppearance()?.hitdist || 0)) * SAFETY_BUFFER;
       const creaturePos = creature.position;
 
       // Check both look-ahead points
@@ -247,9 +262,14 @@ export class Action {
       // For player character, use force-based avoidance (adjust movement vector)
       this.applyPlayerAvoidance(owner, closestObstacle, closestDistance, delta);
     } else {
-      // For NPCs, use full path recalculation
-      this.calculateAvoidancePath(owner, closestObstacle, finalTarget, closestDistance);
-      this.coordinateObstacleAvoidance(owner, closestObstacle);
+      // For NPCs, a new path around it: not again for a moment while it walks the last one (a new path every
+      // frame, around someone also moving, never gets anywhere)
+      const now = performance.now();
+      if (now - (Action.lastAvoidance.get(owner) || 0) >= Action.AVOIDANCE_REPLAN_MS) {
+        Action.lastAvoidance.set(owner, now);
+        this.calculateAvoidancePath(owner, closestObstacle, finalTarget, closestDistance);
+        this.coordinateObstacleAvoidance(owner, closestObstacle);
+      }
     }
 
     owner.blockingTimer += 1;
@@ -295,7 +315,8 @@ export class Action {
    */
   private calculateAvoidancePath(owner: ModuleCreature, obstacle: ModuleCreature, finalTarget: THREE.Vector3, obstacleDistance: number) {
     const SAFETY_BUFFER = 1.5;
-    const safeRadius = obstacle.getHitDistance() * SAFETY_BUFFER;
+    // Room for both of them to pass
+    const safeRadius = (obstacle.getHitDistance() + owner.getHitDistance()) * SAFETY_BUFFER;
 
     // Calculate perpendicular direction for detour
     const direction = owner.forceVector.clone().normalize();
@@ -311,10 +332,13 @@ export class Action {
       owner.getHitDistance()
     );
 
-     // Choose the better detour point based on edge distance
-    const detour1Score = owner.area.scorePointEdgeDistance(detourPoint1);
-    const detour2Score = owner.area.scorePointEdgeDistance(detourPoint2);
-    const usePoint1 = detour1Score > detour2Score;
+    // The side that keeps it heading where it's going (a detour backwards is how NPCs end up circling); when
+    // both cost about the same, the one with more room from the walls
+    const cost = (p: THREE.Vector3) => p.distanceTo(owner.position) + p.distanceTo(finalTarget);
+    const cost1 = cost(detourPoint1), cost2 = cost(detourPoint2);
+    const usePoint1 = Math.abs(cost1 - cost2) > 0.5
+      ? cost1 < cost2
+      : owner.area.scorePointEdgeDistance(detourPoint1) > owner.area.scorePointEdgeDistance(detourPoint2);
     const chosenDetourPoint = usePoint1 ? detourPoint1 : detourPoint2;
 
     // Create and set the avoidance path

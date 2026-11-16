@@ -1330,6 +1330,7 @@ export class GMManager {
     requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
     onCombatRoundEnd: (creature) => GMCombatAI.onRoundEnd(creature),
     holdsScriptAttack: (creature) => GMCombatAI.holdsScriptAttack(creature),
+    walksThrough: (creature) => !!creature.gmHidden,
     openCharacterSheet: (section) => {
       // A player gets their own sheet; the GM (even playing a character) keeps the game's screens
       if (!GameState.gmMode || GMManager.isGMUser()) return false;

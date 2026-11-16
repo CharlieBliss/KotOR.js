@@ -62,7 +62,19 @@ def unreachable_patrol(_):
     }
 
 
+def chair_without_seat(plan):
+    actor(plan, "master")["stance"] = "chair"
+
+
+def chair_on_a_table(plan):
+    plan["props"].append({"id": "table", "template": "plc_gentable", "at": {"spot": "room:m13aa_02a"}})
+    actor(plan, "master")["stance"] = "chair_pazaak"
+    actor(plan, "master")["at"] = {"spot": "prop:table"}
+
+
 CASES = [
+    ("a seated actor without a seat", chair_without_seat, "sits on nothing"),
+    ("a seated actor on a table", chair_on_a_table, "isn't a chair or bench"),
     ("the example passes", None, "OK: Massacre at the Onderon Temple"),
     ("an offset into a wall", into_a_wall, "from any floor"),
     ("15 actors in a 7x24 corridor", crowded_corridor, "crowded"),

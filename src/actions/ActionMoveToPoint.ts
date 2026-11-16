@@ -9,7 +9,8 @@ import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import type { ModuleObject } from "@/module/ModuleObject";
-import type { ComputedPath } from "@/engine/pathfinding/ComputedPath";
+import { ComputedPath } from "@/engine/pathfinding/ComputedPath";
+import { PathPoint } from "@/engine/pathfinding/PathPoint";
 import { TURN_SPEED_FAST } from "@/engine/TurnSpeeds";
 
 /**
@@ -30,6 +31,17 @@ export class ActionMoveToPoint extends Action {
 
   target_position: THREE.Vector3 = new THREE.Vector3();
   real_target_position: THREE.Vector3 = new THREE.Vector3();
+
+  /** Seconds walking without getting anywhere before stepping aside and finding another way */
+  static STUCK_SECONDS = 1.2;
+  /** Metres it must cover to count as getting somewhere */
+  static PROGRESS_DISTANCE = 0.4;
+  /** How far it steps aside when stuck */
+  static SIDESTEP_DISTANCE = 1.5;
+
+  progressFrom: THREE.Vector3 | undefined;
+  stuckTime = 0;
+  sidestepLeft = false;
 
   constructor( actionId: number = -1, groupId: number = -1 ){
     super(actionId, groupId);
@@ -109,6 +121,7 @@ export class ActionMoveToPoint extends Action {
           this.owner.force = 1;//Math.min( 1, Math.max( 0.5, ( ( distanceToTarget - arrivalDistance ) / 1 ) ) );
           // this.owner.walk = !run;
           this.owner.setAnimationState(run ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);
+          this.watchProgress(delta);
         }else{
           this.computedPath.pop();
         }
@@ -149,6 +162,59 @@ export class ActionMoveToPoint extends Action {
 
     this.setComputedPath(undefined);
     return ActionStatus.FAILED;
+  }
+
+  /**
+   * Walking into something the path didn't know about (a prop, a crowd) and getting nowhere: step aside,
+   * alternating sides, and find the way from there
+   */
+  watchProgress(delta: number){
+    if(!this.progressFrom){
+      this.progressFrom = this.owner.position.clone();
+      this.stuckTime = 0;
+      return;
+    }
+    if(Utility.Distance2D(this.owner.position, this.progressFrom) >= ActionMoveToPoint.PROGRESS_DISTANCE){
+      this.progressFrom.copy(this.owner.position);
+      this.stuckTime = 0;
+      return;
+    }
+    this.stuckTime += delta;
+    if(this.stuckTime < ActionMoveToPoint.STUCK_SECONDS) return;
+    this.stuckTime = 0;
+    this.progressFrom.copy(this.owner.position);
+    this.sidestep();
+  }
+
+  sidestep(){
+    const owner = this.owner;
+    const area = owner?.area;
+    if(!area) return;
+    const next = this.computedPath?.points[0]?.vector || this.target_position;
+    const ahead = new THREE.Vector3(next.x - owner.position.x, next.y - owner.position.y, 0);
+    if(ahead.lengthSq() < 1e-6) ahead.set(0, 1, 0);
+    ahead.normalize();
+    const sides = this.sidestepLeft ? [1, -1] : [-1, 1];
+    this.sidestepLeft = !this.sidestepLeft;
+    for(const side of sides){
+      // Sideways and a little back, away from what it walked into
+      const step = new THREE.Vector3(-ahead.y * side, ahead.x * side, 0).multiplyScalar(ActionMoveToPoint.SIDESTEP_DISTANCE).addScaledVector(ahead, -0.5);
+      const aside = area.getNearestWalkablePoint(owner.position.clone().add(step), owner.getHitDistance());
+      if(Utility.Distance2D(aside, owner.position) < 0.5) continue;
+      const from = PathPoint.FromVector3(owner.position); from.setArea(area);
+      const to = PathPoint.FromVector3(aside); to.setArea(area);
+      if(!from.hasLOS(to, owner)) continue;
+      const path = ComputedPath.FromVector3List([owner.position.clone(), aside]);
+      const onward = area.path.traverseToPoint(owner, aside, this.target_position);
+      path.merge(onward);
+      path.fixWalkEdges(owner.getHitDistance());
+      path.setOwner?.(owner);
+      path.setColor(owner.helperColor);
+      if(BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature)) path.realtime = true;
+      path.timer = 20;
+      this.setComputedPath(path);
+      return;
+    }
   }
 
   calculatePath(){

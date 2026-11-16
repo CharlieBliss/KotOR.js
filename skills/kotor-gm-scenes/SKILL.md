@@ -39,7 +39,10 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
    - **Factions:** set the faction the scene needs; it overrides the template's.
    - **Numbers:** keep them sane. 25 or fewer creatures on screen plays well.
    - **Body language:** give actors a `stance` that sells the moment (meditating Jedi, a prisoner kneeling, the wounded lying down, a technician at a console). Change it, or add a gesture, in a beat with `animate`. The ids are in `reference/format.md`; some exist only in KotOR II.
-6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
+   - **Seated actors need a seat.** `chair`, `chair_drunk` and `chair_pazaak` sit on nothing unless the plan places a chair or bench under them. Give each seated actor its own seat prop and put the actor on it: `"at": { "spot": "prop:<seat id>" }`, with the same `facing` as the seat. Seats are in `reference/format.md` ("Seats"). `sit` and `meditate_sit` are on the floor and need none.
+6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners, chairs and benches. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
+   - **Search by model as well as name.** A template's name can be wrong (KotOR II's `plc_chair1` is a food pile); its `model` column says what it really is.
+   - **Props are obstacles.** Tables, crates and chairs block the way. Leave walkways a couple of metres wide between them, especially on routes NPCs are ordered along.
 7. **Script it as beats.**
    - **Arrivals:** place them up front with `"hidden": true`, then reveal them in a beat, with orders.
    - **Watching only:** to keep players out of the action, set `"players": { "frozen": true }` and free them in a later beat (`freezePlayers`).

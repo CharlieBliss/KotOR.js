@@ -87,6 +87,8 @@ export interface EngineHooks {
   onCombatRoundEnd(creature: ModuleCreature): void;
   /** A creature's own script asks it to attack: true when the mode has it busy with something else */
   holdsScriptAttack(creature: ModuleCreature): boolean;
+  /** Creatures walk through this one rather than around it (it isn't there for them, e.g. hidden by the GM) */
+  walksThrough(creature: ModuleObject): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -126,4 +128,5 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   openCharacterSheet: () => false,
   onCombatRoundEnd: () => {},
   holdsScriptAttack: () => false,
+  walksThrough: () => false,
 };

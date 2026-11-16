@@ -389,22 +389,21 @@ export class ModulePath {
     const fallbackPath = ComputedPath.FromPointsList([originPoint, destPoint]);
     if(!this.points.length) return fallbackPath;
 
+    // Nothing but floor between them: straight there (creature avoidance walks it around anyone in the way)
     if(originPoint.hasLOS(destPoint, owner)) return fallbackPath;
 
+    // The start and the end join the area's path points they can walk straight to; when none can be seen
+    // (a corner, a doorway), the nearest one, so the search always has somewhere to go
     const closest_origin_point = this.getClosestPathPoint(origin);
     const closest_destination_point = this.getClosestPathPoint(dest);
-
-    //origin
-    originPoint.addConnection(closest_origin_point);
-    closest_origin_point.addConnection(originPoint);
-
-    //dest
-    closest_destination_point.addConnection(destPoint);
-    destPoint.addConnection(closest_destination_point);
-
-    originPoint.connections = this.points.slice(0).filter( (p) => {
-      return p.hasLOS(originPoint, owner);
-    });
+    const visibleFromOrigin = this.points.filter((p) => p.hasLOS(originPoint, owner));
+    const visibleFromDest = this.points.filter((p) => p.hasLOS(destPoint, owner));
+    for(const p of (visibleFromOrigin.length ? visibleFromOrigin : [closest_origin_point])){
+      if(p) originPoint.addConnection(p);
+    }
+    for(const p of (visibleFromDest.length ? visibleFromDest : [closest_destination_point])){
+      if(p) destPoint.addConnection(p);
+    }
 
     const path = new ComputedPath(owner, originPoint, destPoint);
     path.setOwner(owner);
@@ -416,6 +415,8 @@ export class ModulePath {
       p.removeConnection(originPoint);
       p.removeConnection(destPoint);
     }
+    originPoint.connections = [];
+    destPoint.connections = [];
 
     if(path.points.length){
       if(smooth)

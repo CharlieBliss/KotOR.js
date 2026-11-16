@@ -30,6 +30,19 @@ ORDERS = VOCAB["orders"]
 ACTIONS = VOCAB["actions"]
 # Stance and gesture ids; a creature's model may not have every one
 STANCES = VOCAB["stances"]
+# Stances that sit in a chair: they need a seat prop under the actor
+SEATED = {"chair", "chair_drunk", "chair_pazaak"}
+
+
+def is_seat(prop, content):
+    """A chair or bench prop (KotOR II's plc_chair1 is a food pile; KotOR's is a chair named "Food pile")"""
+    template = str(prop.get("template", "")).lower()
+    if content == "tsl" and template == "plc_chair1":
+        return False
+    if template == "plc_chair1":
+        return True
+    name = f'{template} {prop.get("appearance", "")}'.lower()
+    return any(word in name for word in ("chair", "bench", "stool", "seat", "couch", "sofa"))
 GESTURES = VOCAB["gestures"]
 
 
@@ -187,6 +200,13 @@ def main():
         check_order(a.get("order"), where)
         if a.get("stance") and a["stance"] not in STANCES:
             warn(where, f'unknown stance "{a["stance"]}"')
+        if a.get("stance") in SEATED:
+            spot = str((a.get("at") or {}).get("spot", ""))
+            seat = next((p for p in props if spot == f'prop:{p.get("id")}'), None)
+            if not seat:
+                warn(where, f'stance "{a["stance"]}" sits on nothing: place a seat prop and put the actor on it ("at": {{"spot": "prop:<seat id>"}}; see "Seats" in format.md)')
+            elif not is_seat(seat, content):
+                warn(where, f'stance "{a["stance"]}" sits on prop "{seat.get("id")}", which isn\'t a chair or bench: give the actor a seat of its own (see "Seats" in format.md)')
         for item in a.get("loot", []) + [v for k, v in (a.get("customize") or {}).items() if k in ("rightHand", "leftHand", "armor") and v]:
             if items and str(item).lower() not in items:
                 err(where, f'no item "{item}" in {content}')

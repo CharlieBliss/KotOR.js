@@ -151,6 +151,9 @@ export class GMCombatAI {
   /** The NPC's own AI scripts asking it to attack wait while it uses a power or an item the GM AI chose */
   static holdsScriptAttack(npc: ModuleCreature): boolean {
     if (!GameState.gmMode || !GameState.GMManager?.isAutonomousNpc?.(npc)) return false;
+    // Told to stand down or run: its scripts don't send it back into the fight
+    const order = npc.gmOrder?.kind;
+    if (order === 'standDown' || order === 'flee') return true;
     return this.isActing(npc);
   }
 
