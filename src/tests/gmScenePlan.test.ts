@@ -162,3 +162,40 @@ describe("players watching a scene", () => {
     GMNetworkManager.role = "offline";
   });
 });
+
+describe("Scene plans: nobody stands inside a prop", () => {
+  const table = { id: "table", box: new THREE.Box3(new THREE.Vector3(-2, -1, -1), new THREE.Vector3(2, 1, 1)) };
+
+  test("an actor on a table's spot is moved just clear of it, to the nearest side", () => {
+    const runner = new GMScenePlan(plan());
+    runner.footprints = [table];
+    jest.spyOn(GMViewport, "getGroundZAt").mockImplementation((_x: number, _y: number, z: number = 0) => z);
+    const clear = runner.clearOfProps(new THREE.Vector3(0, 0.3, 0));
+    expect(clear?.from).toBe("table");
+    // The long side it's nearest: just past the table's edge plus an actor's room
+    expect(clear!.point.y).toBeGreaterThanOrEqual(1 + GMScenePlan.ACTOR_CLEARANCE);
+    expect(runner.footprintAt(clear!.point)).toBeNull();
+  });
+
+  test("someone already beside it stays put", () => {
+    const runner = new GMScenePlan(plan());
+    runner.footprints = [table];
+    expect(runner.footprintAt(new THREE.Vector3(0, 2, 0))).toBeNull();
+  });
+
+  test("a seated actor on a chair belongs in it; on a table it doesn't", () => {
+    const runner = new GMScenePlan(plan({
+      props: [
+        { id: "seat", template: "plc_chair_mil_01", at: { spot: "entry" } },
+        { id: "table", template: "plc_gentable", at: { spot: "entry" } },
+        { id: "food", template: "plc_chair1", at: { spot: "entry" } },
+      ],
+    }));
+    const actor = (spot: string, stance?: string) => ({ id: "a", template: "n_rodian", faction: "neutral" as const, at: { spot }, stance });
+    expect(runner.seatFor(actor("prop:seat", "chair_pazaak"))).toBe("seat");
+    expect(runner.seatFor(actor("prop:table", "chair_pazaak"))).toBeUndefined();
+    expect(runner.seatFor(actor("prop:seat"))).toBeUndefined();
+    // KotOR II's plc_chair1 is a food pile
+    expect(runner.seatFor(actor("prop:food", "chair"))).toBeUndefined();
+  });
+});

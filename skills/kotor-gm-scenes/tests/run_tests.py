@@ -62,6 +62,12 @@ def unreachable_patrol(_):
     }
 
 
+def inside_a_prop(plan):
+    # A footlocker is 0.6 x 1.2 m: standing on its spot is standing in it
+    plan["props"].append({"id": "locker", "template": "g_trescivil001", "at": {"spot": "room:m13aa_02a"}})
+    actor(plan, "master")["at"] = {"spot": "prop:locker"}
+
+
 def chair_without_seat(plan):
     actor(plan, "master")["stance"] = "chair"
 
@@ -73,6 +79,7 @@ def chair_on_a_table(plan):
 
 
 CASES = [
+    ("an actor standing inside a prop", inside_a_prop, 'stands inside prop "locker"'),
     ("a seated actor without a seat", chair_without_seat, "sits on nothing"),
     ("a seated actor on a table", chair_on_a_table, "isn't a chair or bench"),
     ("the example passes", None, "OK: Massacre at the Onderon Temple"),

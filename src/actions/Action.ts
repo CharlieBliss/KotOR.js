@@ -168,6 +168,12 @@ export class Action {
   /** When each NPC last planned its way around someone */
   static lastAvoidance = new WeakMap<ModuleObject, number>();
 
+  /** Milliseconds an NPC keeps going round the same creature on the same side */
+  static DETOUR_STICKY_MS = 2500;
+
+  /** The side each NPC last went round someone on */
+  static lastDetour = new WeakMap<ModuleObject, { obstacle: ModuleObject; first: boolean; at: number }>();
+
   runCreatureAvoidance(delta = 0, finalTarget: THREE.Vector3, excludeTarget?: ModuleObject) {
     if (!BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)) return;
     const owner: ModuleCreature = this.owner as any;
@@ -336,9 +342,15 @@ export class Action {
     // both cost about the same, the one with more room from the walls
     const cost = (p: THREE.Vector3) => p.distanceTo(owner.position) + p.distanceTo(finalTarget);
     const cost1 = cost(detourPoint1), cost2 = cost(detourPoint2);
-    const usePoint1 = Math.abs(cost1 - cost2) > 0.5
-      ? cost1 < cost2
-      : owner.area.scorePointEdgeDistance(detourPoint1) > owner.area.scorePointEdgeDistance(detourPoint2);
+    // Going round the same one again: the same side as last time, so it doesn't swing from side to side
+    const last = Action.lastDetour.get(owner);
+    const now = performance.now();
+    const usePoint1 = last && last.obstacle === obstacle && now - last.at < Action.DETOUR_STICKY_MS
+      ? last.first
+      : Math.abs(cost1 - cost2) > 0.5
+        ? cost1 < cost2
+        : owner.area.scorePointEdgeDistance(detourPoint1) > owner.area.scorePointEdgeDistance(detourPoint2);
+    Action.lastDetour.set(owner, { obstacle, first: usePoint1, at: now });
     const chosenDetourPoint = usePoint1 ? detourPoint1 : detourPoint2;
 
     // Create and set the avoidance path

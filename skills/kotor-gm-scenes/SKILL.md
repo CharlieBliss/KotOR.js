@@ -43,6 +43,7 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
 6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners, chairs and benches. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
    - **Search by model as well as name.** A template's name can be wrong (KotOR II's `plc_chair1` is a food pile); its `model` column says what it really is.
    - **Props are obstacles.** Tables, crates and chairs block the way. Leave walkways a couple of metres wide between them, especially on routes NPCs are ordered along.
+   - **Nobody stands inside a prop.** The catalogs give each solid prop's `footprint` (its size on the floor). Place actors around a table or crate at least half its size plus 0.5 m from its spot ("Footprints" in `reference/format.md`). The checker reports anyone inside one and where the game would move them.
 7. **Script it as beats.**
    - **Arrivals:** place them up front with `"hidden": true`, then reveal them in a beat, with orders.
    - **Watching only:** to keep players out of the action, set `"players": { "frozen": true }` and free them in a later beat (`freezePlayers`).

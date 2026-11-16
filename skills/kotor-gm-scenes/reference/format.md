@@ -128,6 +128,13 @@ Use `template` when one fits (it keeps the game's own name and behaviour). Use `
 
 Props block the way like walls: NPCs walk around them, but a room packed with tables leaves no way through. Keep walkways a couple of metres wide, especially where beats send NPCs.
 
+**Footprints.** `placeables.tsv` and `models.tsv` give each solid prop's `footprint`: the floor it covers, as `minX,minY,maxX,maxY` in metres around its spot before it's turned (empty: it can be walked through). Use it to place actors beside a prop, not in it:
+- **Beside it:** offset the actor from the prop's spot by more than half the footprint's width or depth, plus 0.5 m for the actor. KotOR II's `plc_gentable` is 4 x 2 m (`-2,-1.05,2.01,0.92`), so someone at its long side stands about 1.5 m from its spot, not 0.5 m.
+- **Around it** (`"spot": "prop:<id>"`, `"formation": "ring"`): the ring's radius is `spacing` (or larger for many copies), measured from the prop's spot. Make it more than half the footprint's longest side plus 0.5 m.
+- **On it:** only a seated actor on a seat (see "Seats" below).
+
+The checker and the game both catch the rest. An actor standing inside a prop is moved to the nearest clear floor (up to 4 m), and the checker says where it lands. Treat that note as a fix to make in the plan.
+
 ### Seats
 
 The seated stances (`chair`, `chair_drunk`, `chair_pazaak`) don't bring a chair: put a seat prop down and the actor on it, facing the same way.

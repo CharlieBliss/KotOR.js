@@ -218,7 +218,8 @@ export class GMCombatAI {
 
   /** Fight with what it has: decide one round's action against this target and start it */
   static engage(npc: ModuleCreature, target: ModuleCreature, everyone: ModuleCreature[]): string {
-    if (!npc || !target) return '';
+    // Nobody fights a body
+    if (!npc || !target || target.isDead?.()) return '';
     if (this.isActing(npc)) return 'acting';
     const style: GMCombatStyle = npc.gmCombatStyle || 'all';
     const attack = () => {

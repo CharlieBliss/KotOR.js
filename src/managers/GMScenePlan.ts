@@ -166,6 +166,33 @@ export class GMScenePlan {
   objects: Map<string, ModuleObject[]> = new Map();
   /** Orders actors had when placed hidden, given when they're revealed */
   pendingOrders: Map<string, GMPlanOrder> = new Map();
+
+  /** Stances that sit in a chair: an actor with one, put on a seat prop, belongs inside it */
+  static SEATED_STANCES = ['chair', 'chair_drunk', 'chair_pazaak'];
+
+  /**
+   * The seat an actor is meant to sit in: its spot is a prop that's a chair or bench, and its stance sits.
+   * (KotOR II's plc_chair1 is a food pile; KotOR's is a chair the game calls "Food pile".)
+   */
+  seatFor(actor: GMPlanActor): string | undefined {
+    const spot = String(actor.at?.spot || '');
+    if (!spot.startsWith('prop:') || !GMScenePlan.SEATED_STANCES.includes(String(actor.stance || ''))) return undefined;
+    const id = spot.slice(5);
+    const prop = (this.plan.props || []).find((p) => p.id === id);
+    if (!prop) return undefined;
+    const template = String(prop.template || '').toLowerCase();
+    if (template === 'plc_chair1') return this.plan.content === 'tsl' ? undefined : id;
+    return /chair|bench|stool|seat|couch|sofa/.test(`${template} ${String(prop.appearance || '').toLowerCase()}`) ? id : undefined;
+  }
+
+  /** Room an actor needs beside a prop (metres, about a creature's half-width) */
+  static ACTOR_CLEARANCE = 0.45;
+
+  /** How far an actor may be moved to get it out of a prop, before it's left where it is */
+  static MAX_CLEARING_MOVE = 4;
+
+  /** The solid props' footprints (their collision walkmesh, on the floor), by plan prop id */
+  footprints: { id: string; box: THREE.Box3 }[] = [];
   beatsRun: Set<number> = new Set();
   log: string[] = [];
 
@@ -412,6 +439,7 @@ export class GMScenePlan {
     GMManager.sceneStartPoint = this.playerStart ? this.playerStart.clone() : null;
 
     for (const prop of plan.props || []) await this.placeProp(prop);
+    this.footprints = this.propFootprints();
     for (const actor of plan.actors || []) await this.placeActor(actor);
     // Orders last, once everyone they mention exists
     for (const actor of plan.actors || []) {
@@ -426,10 +454,85 @@ export class GMScenePlan {
     GMManager.notifyChange();
   }
 
+  /** Where each placed prop can't be walked through: its collision walkmesh's bounds, on the floor plan */
+  propFootprints(): { id: string; box: THREE.Box3 }[] {
+    const out: { id: string; box: THREE.Box3 }[] = [];
+    for (const prop of this.plan.props || []) {
+      for (const obj of this.objects.get(prop.id) || []) {
+        // The walkmesh's vertices are where the prop stands, turned as it's turned (as in the scene catalog)
+        const vertices = obj.collisionManager?.walkmesh?.vertices || [];
+        if (!vertices.length) continue;
+        const box = new THREE.Box3().setFromPoints(vertices);
+        if (box.isEmpty() || box.max.x - box.min.x < 0.05 || box.max.y - box.min.y < 0.05) continue;
+        out.push({ id: prop.id, box });
+      }
+    }
+    return out;
+  }
+
+  /** The footprint a floor point stands in (with room for an actor), if any; exempt: a seat it's meant to be on */
+  footprintAt(p: THREE.Vector3, exempt?: string): { id: string; box: THREE.Box3 } | null {
+    const c = GMScenePlan.ACTOR_CLEARANCE;
+    return this.footprints.find((f) => f.id !== exempt &&
+      p.x > f.box.min.x - c && p.x < f.box.max.x + c && p.y > f.box.min.y - c && p.y < f.box.max.y + c) || null;
+  }
+
+  /**
+   * An actor's point moved just clear of any prop it stands in: to the nearest side of the prop that's floor
+   * and not inside another prop. Null when it's clear already, or there's nowhere close to go.
+   */
+  clearOfProps(p: THREE.Vector3, exempt?: string): { point: THREE.Vector3; from: string } | null {
+    const first = this.footprintAt(p, exempt);
+    if (!first) return null;
+    const c = GMScenePlan.ACTOR_CLEARANCE + 0.05;
+    let best: THREE.Vector3 | null = null;
+    let bestDistance = Infinity;
+    // The sides of every prop it touches, and a ring of points around it, nearest first
+    const candidates: THREE.Vector3[] = [];
+    for (const f of this.footprints) {
+      const k = GMScenePlan.ACTOR_CLEARANCE;
+      if (f.id === exempt || !(p.x > f.box.min.x - k && p.x < f.box.max.x + k && p.y > f.box.min.y - k && p.y < f.box.max.y + k)) continue;
+      candidates.push(
+        new THREE.Vector3(f.box.min.x - c, p.y, p.z), new THREE.Vector3(f.box.max.x + c, p.y, p.z),
+        new THREE.Vector3(p.x, f.box.min.y - c, p.z), new THREE.Vector3(p.x, f.box.max.y + c, p.z),
+      );
+    }
+    for (let r = 0.5; r <= GMScenePlan.MAX_CLEARING_MOVE; r += 0.5) {
+      for (let a = 0; a < 12; a++) candidates.push(new THREE.Vector3(p.x + Math.cos((a / 12) * Math.PI * 2) * r, p.y + Math.sin((a / 12) * Math.PI * 2) * r, p.z));
+    }
+    for (const candidate of candidates) {
+      const d = Math.hypot(candidate.x - p.x, candidate.y - p.y);
+      if (d >= bestDistance || d > GMScenePlan.MAX_CLEARING_MOVE) continue;
+      const onFloor = this.walkable(candidate);
+      // Snapping to the floor mustn't carry it far, or back into a prop
+      if (Math.hypot(onFloor.x - candidate.x, onFloor.y - candidate.y) > 0.3 || this.footprintAt(onFloor, exempt)) continue;
+      best = onFloor;
+      bestDistance = d;
+    }
+    return best ? { point: best, from: first.id } : null;
+  }
+
   async placeActor(actor: GMPlanActor) {
     const count = Math.max(1, Math.min(20, actor.count || 1));
     const points = this.placementPoints(actor.at, count);
     if (!points) { this.note(`Actor "${actor.id}": spot "${actor.at.spot}" isn't in this area.`); return; }
+    // Nobody stands inside a table or a crate: a copy that would is moved just clear of it. A seated actor put on
+    // a seat prop is meant to be in it
+    const seat = this.seatFor(actor);
+    const moved: string[] = [];
+    let stuck = 0;
+    for (let i = 0; i < points.length; i++) {
+      if (!this.footprintAt(points[i], seat)) continue;
+      const clear = this.clearOfProps(points[i], seat);
+      if (clear) {
+        moved.push(`${clear.from} (${Math.hypot(clear.point.x - points[i].x, clear.point.y - points[i].y).toFixed(1)} m)`);
+        points[i] = clear.point;
+      } else {
+        stuck++;
+      }
+    }
+    if (moved.length) this.note(`Actor "${actor.id}": ${moved.length} of ${points.length} stood inside a prop (${[...new Set(moved)].join(', ')}); moved just clear of it. Place it beside the prop, not on it.`);
+    if (stuck) this.note(`Actor "${actor.id}": ${stuck} of ${points.length} stand inside a prop with no clear floor within ${GMScenePlan.MAX_CLEARING_MOVE} m; left there.`);
     const info = await GMSpawner.describeCreatureTemplate(String(actor.template || ''));
     if (!info) { this.note(`Actor "${actor.id}": no creature template "${actor.template}".`); return; }
     const base = GMSpawner.creatureConfigFromTemplate(info);

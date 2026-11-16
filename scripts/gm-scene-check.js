@@ -281,6 +281,21 @@ async function run() {
 
   // --- What the importer did --------------------------------------------------------------------
   for (const line of imported.log) findings.push(`Importer: ${line}`);
+  // Anyone still standing inside a table or a crate (the importer moves them clear where it can)
+  const insideProps = await evalIn(win, (K) => {
+    const runner = K.GMScenePlan.active;
+    if (!runner) return [];
+    const out = [];
+    for (const actor of runner.plan.actors || []) {
+      const seat = runner.seatFor(actor);
+      for (const cre of runner.objects.get(actor.id) || []) {
+        const f = runner.footprintAt(cre.position, seat);
+        if (f) out.push(`${cre.getName()} (${actor.id}) stands inside prop "${f.id}"`);
+      }
+    }
+    return out;
+  });
+  for (const line of insideProps) findings.push(`${line}: move it beside the prop.`);
   const lines = ['## Where everything stands', '', '| id | copy | x, y | room | hidden | model | stance | offline (x, y) | off by |', '|---|---|---|---|---|---|---|---|---|'];
   const groups = [...(plan.props || []).map((p) => ({ ...p, kind: 'prop' })), ...(plan.actors || []).map((a) => ({ ...a, kind: 'actor' }))];
   for (const g of groups) {

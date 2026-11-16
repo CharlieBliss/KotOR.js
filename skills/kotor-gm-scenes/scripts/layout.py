@@ -173,12 +173,53 @@ def read_floor(game, module):
 # Where things land (as GMScenePlan.placementPoints does it)
 # --------------------------------------------------------------------------------------------------
 
+# Props: actors don't stand inside them (as GMScenePlan.clearOfProps)
+ACTOR_CLEARANCE = 0.45      # room an actor needs beside a prop
+MAX_CLEARING_MOVE = 4.0     # farthest the game moves an actor to get it out of a prop
+SEATED_STANCES = {"chair", "chair_drunk", "chair_pazaak"}
+SEAT_WORDS = ("chair", "bench", "stool", "seat", "couch", "sofa")
+
+
+def read_footprints(game):
+    """Model footprints from the catalog: {template or appearance (lower case): (x0, y0, x1, y1)}"""
+    out = {}
+    for name, key in (("placeables.tsv", "template"), ("models.tsv", "appearance")):
+        path = CATALOG / game / name
+        if not path.exists():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if not lines:
+            continue
+        head = lines[0].split("\t")
+        if "footprint" not in head:
+            continue
+        k, f = head.index(key), head.index("footprint")
+        for line in lines[1:]:
+            cells = line.split("\t")
+            if len(cells) > max(k, f) and cells[f]:
+                try:
+                    out[cells[k].lower()] = tuple(float(v) for v in cells[f].split(","))
+                except ValueError:
+                    pass
+    return out
+
+
+def is_seat(prop, content):
+    """A chair or bench (KotOR II's plc_chair1 is a food pile; KotOR's is a chair the game calls "Food pile")"""
+    template = str(prop.get("template", "")).lower()
+    if template == "plc_chair1":
+        return content != "tsl"
+    name = f'{template} {prop.get("appearance", "")}'.lower()
+    return any(word in name for word in SEAT_WORDS)
+
+
 class Layout:
     def __init__(self, plan, area, floor):
         self.plan = plan
         self.area = area
         self.floor = floor
         self.placed = {}        # id -> [Point]
+        self.footprints = []    # (prop id, x0, y0, x1, y1): where props can't be stood in, on the floor plan
         self.player_start = None
         self.problems = []      # (level, where, message)
         self.destinations = []  # (where, actor id, Point): move and patrol destinations
@@ -276,18 +317,100 @@ class Layout:
         d = math.hypot(dx, dy)
         return (dx / d, dy / d) if d >= 0.1 else None
 
+    def facing_angle(self, x, y, facing):
+        """The engine's facing in radians (as GMScenePlan.facingFrom)"""
+        if isinstance(facing, (int, float)):
+            return math.radians(facing)
+        target = None
+        if isinstance(facing, str) and facing.startswith("toward:"):
+            target = self.resolve_spot(facing[7:])
+        if target is None:
+            target = self.resolve_spot("players")
+        if target is None or math.hypot(target[0] - x, target[1] - y) < 0.1:
+            return 0.0
+        return math.atan2(-(target[0] - x), target[1] - y)
+
+    def add_footprints(self, prop, pts, known):
+        """Where a prop's copies can't be stood in: its footprint turned to its facing, around each copy"""
+        fp = known.get(str(prop.get("template", "")).lower()) or known.get(str(prop.get("appearance", "")).lower())
+        if not fp:
+            return
+        scale = float(prop.get("scale") or 1.0)
+        x0, y0, x1, y1 = (v * scale for v in fp)
+        for pt in pts:
+            a = self.facing_angle(pt.x, pt.y, prop.get("facing"))
+            c, s = math.cos(a), math.sin(a)
+            xs, ys = [], []
+            for cx, cy in ((x0, y0), (x1, y0), (x0, y1), (x1, y1)):
+                xs.append(pt.x + cx * c - cy * s)
+                ys.append(pt.y + cx * s + cy * c)
+            self.footprints.append((prop["id"], min(xs), min(ys), max(xs), max(ys)))
+
+    def footprint_at(self, x, y, exempt=None):
+        k = ACTOR_CLEARANCE
+        for f in self.footprints:
+            if f[0] != exempt and f[1] - k < x < f[3] + k and f[2] - k < y < f[4] + k:
+                return f
+        return None
+
+    def clear_of_props(self, pt, exempt):
+        """Where the game moves a point standing in a prop: the nearest floor just clear of it, or None"""
+        c = ACTOR_CLEARANCE + 0.05
+        candidates = []
+        for f in self.footprints:
+            if f[0] != exempt and f[1] - ACTOR_CLEARANCE < pt.x < f[3] + ACTOR_CLEARANCE and f[2] - ACTOR_CLEARANCE < pt.y < f[4] + ACTOR_CLEARANCE:
+                candidates += [(f[1] - c, pt.y), (f[3] + c, pt.y), (pt.x, f[2] - c), (pt.x, f[4] + c)]
+        r = 0.5
+        while r <= MAX_CLEARING_MOVE:
+            for i in range(12):
+                a = i / 12 * math.pi * 2
+                candidates.append((pt.x + math.cos(a) * r, pt.y + math.sin(a) * r))
+            r += 0.5
+        best, best_d = None, float("inf")
+        for x, y in candidates:
+            d = math.hypot(x - pt.x, y - pt.y)
+            if d >= best_d or d > MAX_CLEARING_MOVE:
+                continue
+            snapped = self.floor.snap(x, y) if self.floor else (x, y, 0.0, None)
+            if snapped is None or math.hypot(snapped[0] - x, snapped[1] - y) > 0.3 or self.footprint_at(snapped[0], snapped[1], exempt):
+                continue
+            best, best_d = snapped, d
+        return best
+
     def place_all(self):
         plan = self.plan
+        content = str(plan.get("content", ""))
+        known = read_footprints(content)
         players = plan.get("players") or {}
         start = self.points({**(players.get("at") or {}), "formation": None}, 1, "players.at", "the players' start")
         self.player_start = start[0] if start else None
         self.players = self.points(players.get("at") or {}, PLAYERS_SHOWN, "players.at", "player") if start else []
+        props = {p["id"]: p for p in plan.get("props") or [] if p.get("id")}
         for p in plan.get("props") or []:
             count = max(1, min(20, int(p.get("count", 1))))
-            self.placed[p["id"]] = self.points(p.get("at") or {}, count, f"props {p['id']}", p.get("name") or p["id"])
+            pts = self.points(p.get("at") or {}, count, f"props {p['id']}", p.get("name") or p["id"])
+            self.placed[p["id"]] = pts
+            self.add_footprints(p, pts, known)
         for a in plan.get("actors") or []:
             count = max(1, min(20, int(a.get("count", 1))))
-            pts = self.points(a.get("at") or {}, count, f"actors {a['id']}", a.get("name") or a["id"])
+            where = f"actors {a['id']}"
+            pts = self.points(a.get("at") or {}, count, where, a.get("name") or a["id"])
+            # A seated actor put on a seat prop belongs in it; anyone else standing in a prop is moved clear
+            spot = str((a.get("at") or {}).get("spot", ""))
+            seat = spot[5:] if spot.startswith("prop:") and a.get("stance") in SEATED_STANCES and spot[5:] in props and is_seat(props[spot[5:]], content) else None
+            for pt in pts:
+                inside = self.footprint_at(pt.x, pt.y, seat)
+                if not inside:
+                    continue
+                clear = self.clear_of_props(pt, seat)
+                if clear:
+                    moved = math.hypot(clear[0] - pt.x, clear[1] - pt.y)
+                    self.problem("NOTE", where, f'{pt.name} stands inside prop "{inside[0]}" at {pt.x:.1f},{pt.y:.1f}: the game moves it '
+                                                f'{moved:.1f} m to {clear[0]:.1f},{clear[1]:.1f}. Place it beside the prop instead')
+                    pt.x, pt.y, pt.room = clear[0], clear[1], clear[3] or pt.room
+                else:
+                    self.problem("ERROR", where, f'{pt.name} stands inside prop "{inside[0]}" with no clear floor within '
+                                                 f'{MAX_CLEARING_MOVE:g} m. Move it beside the prop')
             self.placed[a["id"]] = pts
             for pt in pts:
                 pt.facing = self.facing_vector(pt.x, pt.y, a.get("facing"))

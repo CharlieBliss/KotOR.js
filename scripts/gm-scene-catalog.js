@@ -154,9 +154,30 @@ async function exportCatalog() {
 
   // --- Placeable templates and models ------------------------------------------------------------
   const plcRows = T.get('placeables').rows;
+  /**
+   * A model's footprint: the floor its collision walkmesh (.pwk) covers, as "minX,minY,maxX,maxY" in metres
+   * around the model's origin, unturned. Empty for models that can be walked through.
+   */
+  const r2 = (n) => Math.round(n * 100) / 100;
+  const footprints = new Map();
+  const footprintOf = async (model) => {
+    const key = String(model || '').toLowerCase();
+    if (!key || key === '****') return '';
+    if (footprints.has(key)) return footprints.get(key);
+    let fp = '';
+    try {
+      const buffer = await K.ResourceLoader.loadResource(RT.pwk, key);
+      const wm = new K.OdysseyWalkMesh(new K.BinaryReader(buffer));
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const v of wm.vertices || []) { x0 = Math.min(x0, v.x); y0 = Math.min(y0, v.y); x1 = Math.max(x1, v.x); y1 = Math.max(y1, v.y); }
+      if (isFinite(x0) && x1 - x0 > 0.05 && y1 - y0 > 0.05) fp = [x0, y0, x1, y1].map(r2).join(',');
+    } catch (e) {}
+    footprints.set(key, fp);
+    return fp;
+  };
   for (const row of Object.values(plcRows)) {
     if (!row.label || row.label === '****') continue;
-    out.models.push({ id: Number(row.__index), label: row.label, model: row.modelname || '', name: row.strref && row.strref !== '****' ? tlk(row.strref) : '' });
+    out.models.push({ id: Number(row.__index), label: row.label, model: row.modelname || '', name: row.strref && row.strref !== '****' ? tlk(row.strref) : '', footprint: await footprintOf(row.modelname) });
   }
   const utps = [...new Set(keys.filter((k) => k.resType == RT.utp).map((k) => k.resRef.toLowerCase()))].sort();
   for (const resRef of utps) {
@@ -172,6 +193,7 @@ async function exportCatalog() {
         container: !!g('HasInventory', 0),
         useable: !!g('Useable', 0),
         locked: !!g('Locked', 0),
+        footprint: await footprintOf(row.modelname),
       });
     } catch (e) {}
   }
@@ -237,12 +259,12 @@ function writeCatalog(game, data) {
     ...data.creatures.map((c) => [c.resRef, c.name, ({ 1: 'hostile', 2: 'friendly', 5: 'neutral' })[c.factionId] || `faction ${c.factionId}`, c.classes, c.hp, c.fp, c.appearanceLabel, [c.rightHandResRef, c.leftHandResRef].filter(Boolean).join('+')]),
   ]));
   fs.writeFileSync(path.join(dir, 'placeables.tsv'), tsv([
-    ['template', 'name', 'model', 'container', 'useable', 'locked'],
-    ...data.placeables.map((p) => [p.resRef, p.name, p.model, p.container ? 'yes' : '', p.useable ? 'yes' : '', p.locked ? 'yes' : '']),
+    ['template', 'name', 'model', 'container', 'useable', 'locked', 'footprint'],
+    ...data.placeables.map((p) => [p.resRef, p.name, p.model, p.container ? 'yes' : '', p.useable ? 'yes' : '', p.locked ? 'yes' : '', p.footprint || '']),
   ]));
   fs.writeFileSync(path.join(dir, 'models.tsv'), tsv([
-    ['appearance', 'model', 'name'],
-    ...data.models.map((m) => [m.label, m.model, m.name]),
+    ['appearance', 'model', 'name', 'footprint'],
+    ...data.models.map((m) => [m.label, m.model, m.name, m.footprint || '']),
   ]));
   fs.writeFileSync(path.join(dir, 'items.tsv'), tsv([
     ['template', 'name', 'base item'],

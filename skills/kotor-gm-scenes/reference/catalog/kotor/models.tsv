@@ -1,224 +1,224 @@
-appearance	model	name
-Invisible	PLC_Invis	Invisible placeholder
-AirSpeeder1	PLC_AirSpder1	Airspeeder
-AirSpeeder2	PLC_AirSpder2	Airspeeder 2
-Backpack	PLC_Backpack	Backpack
-BanthaCorpse	PLC_BnthCrps	Bantha corpse
-Bed1_military_cot	PLC_Bed1	Military style cot
-Bed2_comfy_doublebed	PLC_Bed2	Comfortable double bed
-Bench	PLC_Bench	Bench
-BloodPuddle_large	PLC_BldPdlLg	Large puddle of blood
-BloodPuddle_small	PLC_BldPdlSm	Small puddle of blood
-BrokenDroid	PLC_BroknDrd	Broken Droid
-BurningJunk	PLC_BurnJunk	Burning pile of refuse
-ButtonPanel_hightech	PLC_BtnPnlHT	Button panel - High tech, hand sized similar to a computer screen
-ButtonPanel_lowtech	PLC_BtnPnlLT	Button panel - Low tech, hand sized, stone with a wooden frame
-Cage_large	PLC_CageLg	Cage - large
-Cage_small	PLC_CageSm	Cage - small
-CeilingFan	PLC_fan01	Ceiling Fan
-Chair1_military_style	PLC_Chair1	Chair - military style
-Chair2_luxurious	PLC_Chair2	Chair - luxurious
-ChewedCorpse_human_common	PLC_ChewdHmn	Chewed corpse - human commoner
-ChewedCorpse_twilek_common	PLC_ChwdTwlk	Chewed corpse - Twi'lek commoner
-CompPanel	PLC_CompPnl	Computer Panel - floor mount
-CompPanel2_wall	PLC_CompPnl2	Computer panel - wall mount
-Crate_wooden	PLC_Crate	Crate
-DanglingVine	PLC_DnglVine	Dangling vine - from above
-Desk1_office	PLC_Desk1	Desk - basic office
-Desk2_fancy	PLC_Desk2	Desk - fancy office
-DrippingWater	PLC_DripWatr	Dripping water effect from ceiling
-ElectricalSpark_large	PLC_ESparkLg	Electrical spark effect - large
-ElectricalSpark_small	PLC_ESparkSm	Electrical spark effect - small
-EnvironmentalSuit	PLC_EnvrSuit	Environmental suit
-EquipPack	PLC_EqupPack	Equipment pack
-Firepit	PLC_FirePit	Fire pit
-Firepit_large	PLC_FirPitLg	Fire pit - large
-FlameBurst_continual	PLC_FlmBrstC	Flame burst - continual
-FlameBurst_intermittent	PLC_FlmBrstI	Flame burst - intermittent
-Foodpile	PLC_FoodPile	Food pile - organized on a table
-Footlocker	PLC_FootLker	Footlocker
-FountnMarble	PLC_FntnMrbl	Marble fountain
-FountnMetal	PLC_FntnMetl	Metal fountain
-GenCorpse	PLC_GenCrps	Generic Corpse
-GenCorpse2	PLC_GenCrps2	Generic Corpse 2
-GlowPuddle	PLC_GlowPudl	Glowing puddle
-Gong	PLC_Gong	Gong
-FirixaLoop	PLC_FirixaLoop	Firaxa Loop
-Hologram1_female	PLC_HoloArt1	Hologram - female with swirling lights
-Hologram2_abstract	PLC_HoloArt2	Hologram - Abstract animated multicolored objects
-HoverSled	PLC_HvrSled	Hover sled
-HoverSled_with_engine	PLC_HvrSledE	Hover sled - with swoop bike engine
-HumanSkeleton	PLC_HmnSkel	Skeletal human remains
-InfoTerminal	PLC_InfoTerm	Information terminal
-Invisible	PLC_Invis	Invisible placeholder
-JnkSpeeder1	PLC_JnkSpdr1	Junked land speeder
-JnkSpeeder2	PLC_JnkSpdr2	Junked land speeder
-JnkSwoop1	PLC_JnkSwpB1	Junked swoop bike
-JnkSwoop2	PLC_JnkSwpB2	Junked swoop bike
-Kiosk1_food	PLC_Kiosk1	Kiosk - food
-Kiosk2_droidparts	PLC_Kiosk2	Kiosk - droid parts
-Kiosk3_plain	PLC_Kiosk3	Kiosk - generic
-KoltoTank_empty	PLC_KolTank	Kolto tank - empty
-KoltoTank2_with_body	PLC_KolTank2	Kolto tank with floating body
-LandSpeeder1	PLC_LndSpdr1	Landspeeder
-LandSpeeder2	PLC_LndSpdr2	Landspeeder 2
-LargeLocker	PLC_LockerLg	Large locker
-Lever	PLC_Lever	Lever
-LgWallButton	PLC_WallPnl	Large button on wall
-LightBeam	PLC_LghtBeam	Light beam - spot light from above
-MeatPieces	PLC_MeatPces	Pieces of meat
-MetalBox_octagonal	PLC_MetalBox	Metal Box
-MoistureEvaporator	PLC_MstrEvap	Moisture Vaporator
-PartsPile	PLC_PartPile	Parts pile - organized machine parts on table
-Plant1_alien_potted	PLC_Plant1	Potted plant - alien looking
-Plant2_alien_potted	PLC_Plant2	Potted plant 2 - alien looking
-PlasticCrate_cylinder	PLC_PlstcCrt	Plasteel cylinder
-PullChain	PLC_PulChain	Pull chain
-RakataBed	PLC_RakatBed	Rakatan bed
-RakataBin_wicker	PLC_RakatBin	Wicker Bin
-RakataBin2_wicker_footlocker	PLC_RakatBn2	Wicker Footlocker
-RakataCorpse_on_pike	PLC_RakatCrp	Rakatan corpse on pike
-RakataStatue	PLC_RakaStat	Rakatan statue - heroic figure
-RakataWarFlag	PLC_RakatFlg	Rakatan war flag
-RefusePile_large	PLC_RfPileLg	Refuse pile - large
-RefusePile_med	PLC_RfPileMd	Refuse pile - medium
-RefusePile_small	PLC_RfPileSm	Refuse pile - small
-RepSoldier_corpse	PLC_RSldCrps	Corpse - Republic soldier
-Rubble	PLC_Rubble	Rubble
-RuneObelisk	PLC_RneOblsk	Rune covered obelisk
-RunePillar	PLC_RnePillr	Rune covered pillar
-SeveredArm_w/data_pad	PLC_SevrdArm	Severed arm holding datapad
-SewerFan	PLC_SewerFan	Sewer fan
-Sign	PLC_Sign	Sign
-SithSoldier_corpse	PLC_SSldCrps	Corpse - Sith soldier
-Smoke	PLC_Smoke	Gas cloud
-SparkingWires_floor	PLC_SWireFlr	Sparking wires - floor
-SparkingWires_wall	PLC_SWireWal	Sparking wires - wall
-StarMap	PLC_StarMap	Star map
-StarshipJunk_largepile	PLC_ShpJnkLg	Starship junk pile - large
-StarshipJunk_smallpile	PLC_ShpJnkSm	Starship junk pile - small
-Statue1_roman_style	PLC_Statue1	Statue - Roman style figure
-Statue2_heroic_Jedi	PLC_Statue2	Statue - Heroic Jedi
-SteamVent_continual	PLC_StmVentC	Steam vent - continual
-SteamVent_intermittent	PLC_StmVentI	Steam vent - intermittent
-SwoopBike1	PLC_SwpBike1	Swoop bike
-SwoopBike2	PLC_SwpBike2	Swoop bike 2
-SwoopEngine	PLC_SwpEngin	Swoop bike engine
-TwilekCorpse	PLC_TwlkCrps	Twi'lek corpse
-WallPanel	plc_wallpnl	Wall panel
-Winch	PLC_Winch	Winch
-Windmill	PLC_WindMil	Wind mill
-WookieCorpse	PLC_WookCrps	Wookiee corpse
-ChewedNobleMan	PLC_ChwdNblC	Chewed nobleman's corpse
-BuzzingInsects	PLC_BuzzBugs	Buzzing Insects
-BrokenSewerFan	PLC_BrknSFan	Broken Sewer Fan
-RakatanComputer	PLC_RakatCom	Rakatan Computer Terminal
-Firixa01	PLC_Firixa01	Acid pool
-OilPuddle	PLC_OilPudle	Oil Puddle
-DataPad	PLC_DataPad	Cutscene Datapad
-KinrathBody	PLC_KnrthCps	Kinrath body
-KinrathBodyVine	PLC_KnrthVin	Kinrath body & Vine
-KinrathEgg	PLC_KnrthEgg	Kinrath Egg
-Campfire	PLC_FirePit2	Campfire, Low-tech
-CzerkaMarker	PLC_Marker	Czerka Marker Post
-CzerkaSonicDevice	PLC_SonicDev	Czerka Sonic Device
-KatarnBody	PLC_KatrnCps	Katarn Body
-RakatanHolo	PLC_RakatHol	Rakatan Hologram
-SaberCrystalBlue	PLC_SCrysBlu	Saber Crystal - Blue
-SaberCrystalGreen	PLC_SCrysGrn	Saber Crystal - Green
-SaberCrystalRed	PLC_SCrysRed	Saber Crystal - Red
-GroundBag_Pouch	PLC_Bag01	Pouch
-GroundBag_MetalCase	PLC_Bag02	Metal Case
-GroundBag_PileofCloth	PLC_Bag03	Pile of Cloth
-GroundBag_BagwStrap	PLC_Bag04	Bag
-River_of_Acid	PLC_Acd	River of Acid
-Invisible_Barrier	PLC_Blockage	Invisible Barrier
-Dead_Malak	PLC_EndCorps	Malak's Dead Jedi
-Pillar	PLC_PuzPillr	Pillar
-Falling_Roof	PLC_Rfl	Falling Roof M39aa
-Sith_Sarcophagus	PLC_SithSarc	Sith Sarcophagus
-Trap_Device	PLC_Trap	Trap Device
-Trash_Compactor	PLC_TrashCom	Trash Compacting Ceiling
-SabreCrystalPurple	PLC_SCrysPpl01	Sabre Crystal - Purple
-SabreCrystalYellow	PLC_SCrysYlw01	Sabre Crystal - Yellow
-ForceCage	PLC_FcCage	Force Cage
-FloorPanel	PLC_FlPnl	Floor Panel
-EbonHawkContainer	PLC_EbCont	Ebon Hawk Container
-PowerConductor	PLC_PwrCond	Power Conductor
-BattleScreen1	PLC_BtlScreen01	Battle Screen 1
-BattleScreen2	PLC_BtlScreen02	Battle Screen 2
-WaterLevel	PLC_WtrLvl	Water Level
-DeadFall1	PLC_Deadfall_01	Deadfall 1
-DeadFall2	PLC_Deadfall_02	Deadfall 2
-SpeederDistortion	PLC_SpdDist	Speeder Distortion
-White_Box	PLC_WhiteBox	White Box
-Rubble1	PLC_Rub1	Rubble 1
-Rubble2	PLC_Rub2	Rubble 2
-Rubble3	PLC_Rub3	Rubble 3
-KoltoHarvester1	PLC_Kolp1	Kolto Harvester 1
-KoltoHarvester2	PLC_Kolp2	Kolto Harvester 2
-InvisibleEbonContainer	PLC_InvEb	Invisible Ebon Container
-RepairTable1	PLC_RepTab1	Repair Table 1
-RepairTable2	PLC_RepTab2	Repair Table 2
-ManaanTable1	PLC_ManTab1	Manaan Table 1
-ManaanTable2	PLC_ManTab2	Manaan Table 2
-LandSpeeder3	PLC_LndSpdr3	Land Speeder 3
-ForceCage2	PLC_FcCage2	Force Cage 2
-EndarSpireScreen	PLC_EndS	Endar Spire Screen
-CS09Door	PLC_CS09Door	Speeder Distortion
-GWingEscapeShip	PLC_Gwing	GWing Escape Ship
-SithFlag	PLC_SithFlag	Sith Flag
-TuskanRagPile	PLC_RagP	Tuskan Rag Pile
-CeramicJar	PLC_CJar	Ceramic Jar
-Hyperdrive	PLC_Hyper	Hyper Drive
-Spacesuit	PLC_SpcSuit	Space suit
-HyperdriveParts	PLC_Drive	Hyperdrive part
-PazaakCards	PLC_Pazaak	Pazaak Cards
-ClayUrn	PLC_Cjar2	Clay Urn
-ClayBowl	PLC_Cjar3	Clay Bowl
-TossedPazaakCards	PLC_Pazaak2	Tossed Pazaak Cards
-AlienPaleAle	PLC_Beer	Alien Pale Ale
-Drink	PLC_Beer2	Drink
-Light	PLC_Light	Light
-RedRakataFlag	PLC_RakatFlg2	Rakata Flag - Red
-BlackRakataFlag	PLC_RakatFlg3	Rakata Flag - Black
-Bench2	PLC_Bench2	Bench 2
-FallingRoof2	PLC_RFL2	Falling Roof 2
-FallingRoofRubble	PLC_InvCalo	Falling Roof Rubble
-HeapofGarbage	PLC_DungHeap	Heap of Garbage
-RakataBench	PLC_RBench	Rakata Bench
-RuinedPillar	PLC_RPCont2	Ruined pillar
-RuinedPillarContainer	PLC_RPCont1	Ruined pillar container
-SittingBith	N_bith	Sitting Bith
-SittingRakata	N_rakata	Sitting Rakata
-SittingRodian	N_rodian	Sitting Rodian
-SittingSelkath	N_selkath	Sitting Selkath
-SittingTwilekFemale	N_twilekF	Sitting Twilek Female
-SittingTwilekMale	N_twilekM	Sitting Twilek Male
-SittingWalrusman	N_Walrusman	Sitting Walrusman
-SittingWookieFemale	N_wookieF	Sitting WookieeFemale
-SittingWookieMale	N_wookieM	Sitting WookieeMale
-SittingSwoopganger	N_swoopgang	Sitting Swoopganger
-HeapofGarbage2	PLC_DungHeap1	Heap of Garbage 2
-StatueWithSword	PLC_Statue3	Statue with Sword
-SittingCommonerFemale	L_CommF	Sitting Commoner - Female
-SittingCommonerMale	L_CommM	Sitting Commoner - Male
-SittingAlien	L_Alien02	Sitting Alien
-SittingAlien2	L_Alien05	Sitting Alien 2
-SubDroidBroken	PLC_subdroid	Sub droid - Broken
-SubDroid	PLC_subdroid2	Sub droid
-RancorCorpse	PLC_bodyRanc	Corpse - Rancor
-KraytCorpse	PLC_bodyKray	Corpse - Krayt Dragon
-InvisibleCaloNord	PLC_InvCalo	Invisible Calo Nord rubble
-LevelInfoTerminal	PLC_LevInd	Level Information Terminal
-EbonHawkContainer	PLC_EbStrg	Ebon Hawk Container
-StockTicker	PLC_Stock	Stock Ticker
-CzerkaAdBanner	PLC_Ban	Czerka Ad Banner
-CzerkaSign	PLC_CzSign	Czerka Neon Sign
-SwoopRaceMonitor	PLC_SwScreen	Swoop Race Monitor
-ImpassableLargeCage	PLC_CageLgB	Lage Cage - Empty (Impassable)
-RingOfHanoi1	PLC_Ring01	Ring of Hanoi 1
-RingOfHanoi2	PLC_Ring02	Ring of Hanoi 2
-RingOfHanoi3	PLC_Ring03	Ring of Hanoi 3
-RingOfHanoi4	PLC_Ring04	Ring of Hanoi 4
-RedSteamBurst	PLC_Stmtrap	Steam vent - continual
+appearance	model	name	footprint
+Invisible	PLC_Invis	Invisible placeholder	
+AirSpeeder1	PLC_AirSpder1	Airspeeder	
+AirSpeeder2	PLC_AirSpder2	Airspeeder 2	
+Backpack	PLC_Backpack	Backpack	
+BanthaCorpse	PLC_BnthCrps	Bantha corpse	
+Bed1_military_cot	PLC_Bed1	Military style cot	-1.46,-0.58,1.46,0.58
+Bed2_comfy_doublebed	PLC_Bed2	Comfortable double bed	-1.22,-1.49,1.21,1.48
+Bench	PLC_Bench	Bench	-0.27,-0.71,0.26,0.7
+BloodPuddle_large	PLC_BldPdlLg	Large puddle of blood	
+BloodPuddle_small	PLC_BldPdlSm	Small puddle of blood	
+BrokenDroid	PLC_BroknDrd	Broken Droid	-0.35,-0.56,0.22,0.08
+BurningJunk	PLC_BurnJunk	Burning pile of refuse	-0.84,-0.74,0.74,0.58
+ButtonPanel_hightech	PLC_BtnPnlHT	Button panel - High tech, hand sized similar to a computer screen	
+ButtonPanel_lowtech	PLC_BtnPnlLT	Button panel - Low tech, hand sized, stone with a wooden frame	
+Cage_large	PLC_CageLg	Cage - large	-1,-0.57,1,1.17
+Cage_small	PLC_CageSm	Cage - small	-0.65,-0.37,2.23,1.3
+CeilingFan	PLC_fan01	Ceiling Fan	
+Chair1_military_style	PLC_Chair1	Chair - military style	-0.33,-0.42,0.33,0.42
+Chair2_luxurious	PLC_Chair2	Chair - luxurious	-0.24,-0.25,0.24,0.25
+ChewedCorpse_human_common	PLC_ChewdHmn	Chewed corpse - human commoner	
+ChewedCorpse_twilek_common	PLC_ChwdTwlk	Chewed corpse - Twi'lek commoner	
+CompPanel	PLC_CompPnl	Computer Panel - floor mount	-0.8,-0.2,0.8,0.2
+CompPanel2_wall	PLC_CompPnl2	Computer panel - wall mount	-0.45,-0.38,0.47,0.38
+Crate_wooden	PLC_Crate	Crate	-0.22,-0.45,0.21,0.46
+DanglingVine	PLC_DnglVine	Dangling vine - from above	
+Desk1_office	PLC_Desk1	Desk - basic office	-1.6,-0.42,1.6,0.42
+Desk2_fancy	PLC_Desk2	Desk - fancy office	-1.65,-1.11,1.65,1.34
+DrippingWater	PLC_DripWatr	Dripping water effect from ceiling	
+ElectricalSpark_large	PLC_ESparkLg	Electrical spark effect - large	
+ElectricalSpark_small	PLC_ESparkSm	Electrical spark effect - small	
+EnvironmentalSuit	PLC_EnvrSuit	Environmental suit	-0.67,-0.6,0.58,0.41
+EquipPack	PLC_EqupPack	Equipment pack	
+Firepit	PLC_FirePit	Fire pit	-0.44,-0.44,0.44,0.44
+Firepit_large	PLC_FirPitLg	Fire pit - large	-0.89,-0.89,0.9,0.9
+FlameBurst_continual	PLC_FlmBrstC	Flame burst - continual	
+FlameBurst_intermittent	PLC_FlmBrstI	Flame burst - intermittent	
+Foodpile	PLC_FoodPile	Food pile - organized on a table	
+Footlocker	PLC_FootLker	Footlocker	-0.3,-0.6,0.3,0.6
+FountnMarble	PLC_FntnMrbl	Marble fountain	
+FountnMetal	PLC_FntnMetl	Metal fountain	-0.93,-0.94,0.93,0.94
+GenCorpse	PLC_GenCrps	Generic Corpse	
+GenCorpse2	PLC_GenCrps2	Generic Corpse 2	
+GlowPuddle	PLC_GlowPudl	Glowing puddle	
+Gong	PLC_Gong	Gong	-0.87,-0.23,0.87,0.23
+FirixaLoop	PLC_FirixaLoop	Firaxa Loop	
+Hologram1_female	PLC_HoloArt1	Hologram - female with swirling lights	-0.39,-0.34,0.39,0.34
+Hologram2_abstract	PLC_HoloArt2	Hologram - Abstract animated multicolored objects	-0.29,-0.25,0.29,0.25
+HoverSled	PLC_HvrSled	Hover sled	-1.17,-0.97,1.18,0.97
+HoverSled_with_engine	PLC_HvrSledE	Hover sled - with swoop bike engine	-1.17,-0.97,1.18,0.97
+HumanSkeleton	PLC_HmnSkel	Skeletal human remains	
+InfoTerminal	PLC_InfoTerm	Information terminal	-0.41,-0.25,0.42,0.24
+Invisible	PLC_Invis	Invisible placeholder	
+JnkSpeeder1	PLC_JnkSpdr1	Junked land speeder	-2.38,-4.73,2.7,4.08
+JnkSpeeder2	PLC_JnkSpdr2	Junked land speeder	-1.99,-4.52,1.98,4.52
+JnkSwoop1	PLC_JnkSwpB1	Junked swoop bike	-1.68,-3.72,1.08,3.28
+JnkSwoop2	PLC_JnkSwpB2	Junked swoop bike	-2.04,-1.56,1.78,2.06
+Kiosk1_food	PLC_Kiosk1	Kiosk - food	-1.05,-1.05,1.05,1.05
+Kiosk2_droidparts	PLC_Kiosk2	Kiosk - droid parts	-0.61,-0.96,0.6,0.94
+Kiosk3_plain	PLC_Kiosk3	Kiosk - generic	-0.97,-0.48,0.98,0.48
+KoltoTank_empty	PLC_KolTank	Kolto tank - empty	-0.7,-1.64,0.7,1.62
+KoltoTank2_with_body	PLC_KolTank2	Kolto tank with floating body	-0.7,-1.64,0.7,1.62
+LandSpeeder1	PLC_LndSpdr1	Landspeeder	-1.5,-4.38,1.5,4.37
+LandSpeeder2	PLC_LndSpdr2	Landspeeder 2	-1.57,-4.27,1.56,4.27
+LargeLocker	PLC_LockerLg	Large locker	-0.17,-0.22,0.17,0.23
+Lever	PLC_Lever	Lever	-0.24,-0.24,0.26,0.26
+LgWallButton	PLC_WallPnl	Large button on wall	
+LightBeam	PLC_LghtBeam	Light beam - spot light from above	
+MeatPieces	PLC_MeatPces	Pieces of meat	
+MetalBox_octagonal	PLC_MetalBox	Metal Box	-0.49,-0.49,0.49,0.5
+MoistureEvaporator	PLC_MstrEvap	Moisture Vaporator	-1.43,-0.2,1.43,0.19
+PartsPile	PLC_PartPile	Parts pile - organized machine parts on table	-0.47,-0.57,0.45,0.57
+Plant1_alien_potted	PLC_Plant1	Potted plant - alien looking	-0.83,-0.72,0.83,0.72
+Plant2_alien_potted	PLC_Plant2	Potted plant 2 - alien looking	-0.58,-0.39,0.59,0.76
+PlasticCrate_cylinder	PLC_PlstcCrt	Plasteel cylinder	-0.38,-0.37,0.38,0.38
+PullChain	PLC_PulChain	Pull chain	
+RakataBed	PLC_RakatBed	Rakatan bed	-1.46,-0.69,1.47,0.68
+RakataBin_wicker	PLC_RakatBin	Wicker Bin	-0.32,-0.35,0.31,0.35
+RakataBin2_wicker_footlocker	PLC_RakatBn2	Wicker Footlocker	-0.36,-0.36,0.36,0.36
+RakataCorpse_on_pike	PLC_RakatCrp	Rakatan corpse on pike	-0.34,-0.69,0.34,0.68
+RakataStatue	PLC_RakaStat	Rakatan statue - heroic figure	
+RakataWarFlag	PLC_RakatFlg	Rakatan war flag	-0.71,-0.06,0.72,0.05
+RefusePile_large	PLC_RfPileLg	Refuse pile - large	-0.88,-0.92,0.84,0.95
+RefusePile_med	PLC_RfPileMd	Refuse pile - medium	-0.61,-0.66,0.64,0.95
+RefusePile_small	PLC_RfPileSm	Refuse pile - small	
+RepSoldier_corpse	PLC_RSldCrps	Corpse - Republic soldier	
+Rubble	PLC_Rubble	Rubble	-0.77,-0.48,0.66,0.51
+RuneObelisk	PLC_RneOblsk	Rune covered obelisk	-0.93,-0.26,0.92,0.26
+RunePillar	PLC_RnePillr	Rune covered pillar	-0.84,-0.84,0.84,0.84
+SeveredArm_w/data_pad	PLC_SevrdArm	Severed arm holding datapad	
+SewerFan	PLC_SewerFan	Sewer fan	
+Sign	PLC_Sign	Sign	-0.52,-0.27,0.35,0.27
+SithSoldier_corpse	PLC_SSldCrps	Corpse - Sith soldier	
+Smoke	PLC_Smoke	Gas cloud	
+SparkingWires_floor	PLC_SWireFlr	Sparking wires - floor	
+SparkingWires_wall	PLC_SWireWal	Sparking wires - wall	
+StarMap	PLC_StarMap	Star map	-1.95,-2.19,1.95,1.18
+StarshipJunk_largepile	PLC_ShpJnkLg	Starship junk pile - large	-0.95,-1.19,1,1.16
+StarshipJunk_smallpile	PLC_ShpJnkSm	Starship junk pile - small	
+Statue1_roman_style	PLC_Statue1	Statue - Roman style figure	-0.6,-0.84,0.61,0.83
+Statue2_heroic_Jedi	PLC_Statue2	Statue - Heroic Jedi	-0.4,-0.47,0.39,0.47
+SteamVent_continual	PLC_StmVentC	Steam vent - continual	
+SteamVent_intermittent	PLC_StmVentI	Steam vent - intermittent	
+SwoopBike1	PLC_SwpBike1	Swoop bike	-1.1,-3.31,1.1,3.31
+SwoopBike2	PLC_SwpBike2	Swoop bike 2	-1.1,-3.31,1.1,3.31
+SwoopEngine	PLC_SwpEngin	Swoop bike engine	-0.37,-0.32,0.36,0.3
+TwilekCorpse	PLC_TwlkCrps	Twi'lek corpse	
+WallPanel	plc_wallpnl	Wall panel	
+Winch	PLC_Winch	Winch	
+Windmill	PLC_WindMil	Wind mill	-1,-1,1,1
+WookieCorpse	PLC_WookCrps	Wookiee corpse	
+ChewedNobleMan	PLC_ChwdNblC	Chewed nobleman's corpse	-0.33,-0.95,0.58,0.82
+BuzzingInsects	PLC_BuzzBugs	Buzzing Insects	
+BrokenSewerFan	PLC_BrknSFan	Broken Sewer Fan	
+RakatanComputer	PLC_RakatCom	Rakatan Computer Terminal	-1.43,-0.63,1.44,0.68
+Firixa01	PLC_Firixa01	Acid pool	
+OilPuddle	PLC_OilPudle	Oil Puddle	
+DataPad	PLC_DataPad	Cutscene Datapad	
+KinrathBody	PLC_KnrthCps	Kinrath body	-0.45,-0.58,0.61,0.52
+KinrathBodyVine	PLC_KnrthVin	Kinrath body & Vine	-0.3,-0.47,0.36,0.6
+KinrathEgg	PLC_KnrthEgg	Kinrath Egg	-0.35,-0.35,0.31,0.29
+Campfire	PLC_FirePit2	Campfire, Low-tech	-0.44,-0.44,0.44,0.44
+CzerkaMarker	PLC_Marker	Czerka Marker Post	-0.08,-0.08,0.08,0.08
+CzerkaSonicDevice	PLC_SonicDev	Czerka Sonic Device	-0.13,-0.22,0.25,0.22
+KatarnBody	PLC_KatrnCps	Katarn Body	-0.78,-1.11,0.78,1.12
+RakatanHolo	PLC_RakatHol	Rakatan Hologram	-0.59,-0.51,0.59,0.51
+SaberCrystalBlue	PLC_SCrysBlu	Saber Crystal - Blue	-0.37,-0.32,0.38,0.43
+SaberCrystalGreen	PLC_SCrysGrn	Saber Crystal - Green	-0.37,-0.33,0.38,0.43
+SaberCrystalRed	PLC_SCrysRed	Saber Crystal - Red	-0.37,-0.32,0.38,0.43
+GroundBag_Pouch	PLC_Bag01	Pouch	
+GroundBag_MetalCase	PLC_Bag02	Metal Case	
+GroundBag_PileofCloth	PLC_Bag03	Pile of Cloth	
+GroundBag_BagwStrap	PLC_Bag04	Bag	
+River_of_Acid	PLC_Acd	River of Acid	
+Invisible_Barrier	PLC_Blockage	Invisible Barrier	-3.3,-0.3,3.3,0.3
+Dead_Malak	PLC_EndCorps	Malak's Dead Jedi	
+Pillar	PLC_PuzPillr	Pillar	-0.3,-0.3,0.3,0.3
+Falling_Roof	PLC_Rfl	Falling Roof M39aa	
+Sith_Sarcophagus	PLC_SithSarc	Sith Sarcophagus	-0.63,-1.34,0.63,1.44
+Trap_Device	PLC_Trap	Trap Device	-0.19,-0.2,0.19,0.2
+Trash_Compactor	PLC_TrashCom	Trash Compacting Ceiling	
+SabreCrystalPurple	PLC_SCrysPpl01	Sabre Crystal - Purple	-0.37,-0.32,0.38,0.3
+SabreCrystalYellow	PLC_SCrysYlw01	Sabre Crystal - Yellow	-0.37,-0.52,0.38,0.3
+ForceCage	PLC_FcCage	Force Cage	-0.79,-0.33,0.79,0.79
+FloorPanel	PLC_FlPnl	Floor Panel	
+EbonHawkContainer	PLC_EbCont	Ebon Hawk Container	-0.74,-0.44,0.74,0.44
+PowerConductor	PLC_PwrCond	Power Conductor	-0.63,-0.12,0.64,0.13
+BattleScreen1	PLC_BtlScreen01	Battle Screen 1	
+BattleScreen2	PLC_BtlScreen02	Battle Screen 2	
+WaterLevel	PLC_WtrLvl	Water Level	
+DeadFall1	PLC_Deadfall_01	Deadfall 1	
+DeadFall2	PLC_Deadfall_02	Deadfall 2	
+SpeederDistortion	PLC_SpdDist	Speeder Distortion	
+White_Box	PLC_WhiteBox	White Box	-0.22,-0.23,0.23,0.2
+Rubble1	PLC_Rub1	Rubble 1	-0.51,-0.31,0.73,0.38
+Rubble2	PLC_Rub2	Rubble 2	-1.18,-1.99,1.72,1.96
+Rubble3	PLC_Rub3	Rubble 3	-0.5,-0.56,0.5,0.56
+KoltoHarvester1	PLC_Kolp1	Kolto Harvester 1	-0.54,-0.54,0.54,0.54
+KoltoHarvester2	PLC_Kolp2	Kolto Harvester 2	-0.54,-0.54,0.54,0.54
+InvisibleEbonContainer	PLC_InvEb	Invisible Ebon Container	
+RepairTable1	PLC_RepTab1	Repair Table 1	-0.88,-0.63,1.12,0.37
+RepairTable2	PLC_RepTab2	Repair Table 2	-0.88,-0.63,1.12,0.37
+ManaanTable1	PLC_ManTab1	Manaan Table 1	-0.5,-1.53,0.71,1.06
+ManaanTable2	PLC_ManTab2	Manaan Table 2	-0.62,-1.01,0.86,0.47
+LandSpeeder3	PLC_LndSpdr3	Land Speeder 3	-1.5,-4.38,1.5,4.37
+ForceCage2	PLC_FcCage2	Force Cage 2	-1.39,-0.72,1.39,1.39
+EndarSpireScreen	PLC_EndS	Endar Spire Screen	
+CS09Door	PLC_CS09Door	Speeder Distortion	
+GWingEscapeShip	PLC_Gwing	GWing Escape Ship	-6.43,-6.97,6.29,5.58
+SithFlag	PLC_SithFlag	Sith Flag	-0.5,-0.37,0.15,0.04
+TuskanRagPile	PLC_RagP	Tuskan Rag Pile	
+CeramicJar	PLC_CJar	Ceramic Jar	-0.23,-0.23,0.23,0.23
+Hyperdrive	PLC_Hyper	Hyper Drive	-1.03,-4.1,0.8,0.46
+Spacesuit	PLC_SpcSuit	Space suit	-0.67,-0.6,0.58,0.41
+HyperdriveParts	PLC_Drive	Hyperdrive part	-0.25,-0.5,0.25,0.52
+PazaakCards	PLC_Pazaak	Pazaak Cards	
+ClayUrn	PLC_Cjar2	Clay Urn	-0.17,-0.18,0.17,0.17
+ClayBowl	PLC_Cjar3	Clay Bowl	-0.18,-0.17,0.17,0.18
+TossedPazaakCards	PLC_Pazaak2	Tossed Pazaak Cards	
+AlienPaleAle	PLC_Beer	Alien Pale Ale	
+Drink	PLC_Beer2	Drink	
+Light	PLC_Light	Light	
+RedRakataFlag	PLC_RakatFlg2	Rakata Flag - Red	-0.71,-0.06,0.72,0.05
+BlackRakataFlag	PLC_RakatFlg3	Rakata Flag - Black	-0.71,-0.06,0.72,0.05
+Bench2	PLC_Bench2	Bench 2	-0.27,-0.71,0.26,0.7
+FallingRoof2	PLC_RFL2	Falling Roof 2	
+FallingRoofRubble	PLC_InvCalo	Falling Roof Rubble	-4.11,-3.74,4.2,4.01
+HeapofGarbage	PLC_DungHeap	Heap of Garbage	-2.64,-1,3.19,2.83
+RakataBench	PLC_RBench	Rakata Bench	-0.51,-0.65,0.39,0.65
+RuinedPillar	PLC_RPCont2	Ruined pillar	-0.93,-0.26,0.92,0.26
+RuinedPillarContainer	PLC_RPCont1	Ruined pillar container	-0.84,-0.84,0.84,0.84
+SittingBith	N_bith	Sitting Bith	
+SittingRakata	N_rakata	Sitting Rakata	
+SittingRodian	N_rodian	Sitting Rodian	
+SittingSelkath	N_selkath	Sitting Selkath	
+SittingTwilekFemale	N_twilekF	Sitting Twilek Female	
+SittingTwilekMale	N_twilekM	Sitting Twilek Male	
+SittingWalrusman	N_Walrusman	Sitting Walrusman	
+SittingWookieFemale	N_wookieF	Sitting WookieeFemale	
+SittingWookieMale	N_wookieM	Sitting WookieeMale	
+SittingSwoopganger	N_swoopgang	Sitting Swoopganger	
+HeapofGarbage2	PLC_DungHeap1	Heap of Garbage 2	-1.99,-1.57,2.05,1.27
+StatueWithSword	PLC_Statue3	Statue with Sword	-0.4,-0.47,0.39,0.47
+SittingCommonerFemale	L_CommF	Sitting Commoner - Female	
+SittingCommonerMale	L_CommM	Sitting Commoner - Male	
+SittingAlien	L_Alien02	Sitting Alien	
+SittingAlien2	L_Alien05	Sitting Alien 2	
+SubDroidBroken	PLC_subdroid	Sub droid - Broken	-1.07,-0.93,1.94,2.26
+SubDroid	PLC_subdroid2	Sub droid	-2.14,-1.96,1.51,1.71
+RancorCorpse	PLC_bodyRanc	Corpse - Rancor	-5.89,-6.13,6.38,6.1
+KraytCorpse	PLC_bodyKray	Corpse - Krayt Dragon	-9.29,-18.02,9.91,18.02
+InvisibleCaloNord	PLC_InvCalo	Invisible Calo Nord rubble	-4.11,-3.74,4.2,4.01
+LevelInfoTerminal	PLC_LevInd	Level Information Terminal	-0.52,-0.26,0.49,0.29
+EbonHawkContainer	PLC_EbStrg	Ebon Hawk Container	-1.3,0.65,1.2,2.22
+StockTicker	PLC_Stock	Stock Ticker	
+CzerkaAdBanner	PLC_Ban	Czerka Ad Banner	
+CzerkaSign	PLC_CzSign	Czerka Neon Sign	
+SwoopRaceMonitor	PLC_SwScreen	Swoop Race Monitor	
+ImpassableLargeCage	PLC_CageLgB	Lage Cage - Empty (Impassable)	-1,-1.23,1,1.17
+RingOfHanoi1	PLC_Ring01	Ring of Hanoi 1	
+RingOfHanoi2	PLC_Ring02	Ring of Hanoi 2	
+RingOfHanoi3	PLC_Ring03	Ring of Hanoi 3	
+RingOfHanoi4	PLC_Ring04	Ring of Hanoi 4	
+RedSteamBurst	PLC_Stmtrap	Steam vent - continual	
