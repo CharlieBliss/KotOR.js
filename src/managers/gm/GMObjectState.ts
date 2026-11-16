@@ -2,6 +2,7 @@ import type * as THREE from "three";
 import type { GMCreatureSpawnConfig, GMPlaceableSpawnConfig, GMPlayerSpawnConfig, GMSkillGate } from "@/managers/gm/GMTypes";
 import type { GMLootItem } from "@/managers/GMNetworkManager";
 import type { GMNpcOrder } from "@/managers/GMNpcOrders";
+import type { GMCombatStyle } from "@/managers/gm/GMCombatAI";
 import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 
 /**
@@ -44,6 +45,20 @@ export interface GMObjectState {
   gmNetTarget?: THREE.Vector3;
   /** When this player character last rolled a skill (performance clock, ms), for GMChecks' cooldown */
   gmLastRollAt?: number;
+  /** NPC: what it fights with (GMCombatAI): everything it has (default), weapons only, or plain attacks */
+  gmCombatStyle?: GMCombatStyle;
+  /** NPC: when each combat tactic can next be used (performance clock, ms) */
+  gmCombatCooldowns?: Record<string, number>;
+  /** NPC: busy with a power, item or weapon swap it chose until then (performance clock, ms) */
+  gmCombatActingUntil?: number;
+  /** NPC: how close it was to its target, and since when (GMCombatAI.checkStuck) */
+  gmCombatProgress?: { targetId: number; distance: number; since: number };
+  /** NPC: a target it couldn't reach, out of its melee plans until then */
+  gmCombatUnreachable?: { targetId: number; until: number };
+  /** NPC: since when its combat round has held an action nothing will start (GMCombatAI.checkStuck) */
+  gmCombatIdleSince?: number;
+  /** NPC: the AI is closing its combat round itself (GMCombatAI.startFresh) */
+  gmCombatClosingRound?: boolean;
   /** Replica: the animation state the host says it is in */
   gmNetAnim?: number;
   /** Replica: an animation an effect from the host is playing on it */

@@ -127,6 +127,8 @@ export class EffectVisualEffect extends GameEffect {
       if(this.object.model && this.model){
         for(let node of this.object.model.nodes){
           let c_node = this.model.nodes.get(node[0]);
+          // The effect's model needn't have every bone the creature's does
+          if(!c_node) continue;
           c_node.position.copy(node[1].position);
           c_node.quaternion.copy(node[1].quaternion);
           c_node.scale.copy(node[1].scale);

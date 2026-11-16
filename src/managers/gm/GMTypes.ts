@@ -209,6 +209,8 @@ export interface GMSavedObject {
   loot: string[];
   barkText: string;
   stance?: string;
+  /** What it fights with (GMCombatAI), when not everything */
+  combatStyle?: 'weapons' | 'attack';
 }
 
 /** A player character as saved in a session; network players are matched back by name */

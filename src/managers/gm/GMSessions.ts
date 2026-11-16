@@ -160,6 +160,7 @@ export class GMSessions {
         loot: GMPlayers.toLootItems(cre.inventory).map((e) => e.resRef),
         barkText: cre.gmBarkText || '',
         stance: cre.heldStance || undefined,
+        combatStyle: cre.gmCombatStyle && cre.gmCombatStyle !== 'all' ? cre.gmCombatStyle : undefined,
       });
     }
 
@@ -303,6 +304,7 @@ export class GMSessions {
           saved.facing
         );
         if (cre && typeof saved.hp === 'number') GMManager.setCreatureHP(cre, saved.hp, saved.maxHp);
+        if (cre && saved.combatStyle) cre.gmCombatStyle = saved.combatStyle;
         obj = cre;
       } else {
         const cfg = saved.config as GMPlaceableSpawnConfig;

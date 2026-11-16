@@ -147,6 +147,24 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     </button>
                 </div>
 
+                {!selectedObj.gmOwnerPeerId && !selectedObj.gmPlayerConfig && (
+                  <div className="gm-row" title="What it uses when it fights on its own or on your orders">
+                    <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Fights with</span>
+                    <div className="gm-segmented" role="group" aria-label="Fights with">
+                      {KotOR.GMCombatAI.STYLES.map((style: { id: 'all' | 'weapons' | 'attack'; label: string; title: string }) => (
+                        <button
+                          key={style.id}
+                          className={`gm-btn small ${(selectedObj.gmCombatStyle || 'all') === style.id ? 'active' : ''}`}
+                          title={style.title}
+                          onClick={() => KotOR.GMCombatAI.setStyle(selectedObj as KotOR.ModuleCreature, style.id)}
+                        >
+                          {style.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {!selectedObj.gmOwnerPeerId && (() => {
                   const cre = selectedObj as KotOR.ModuleCreature;
                   const stances = GMManager.availableAnimations(cre, 'stance');

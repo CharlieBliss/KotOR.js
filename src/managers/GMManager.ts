@@ -36,6 +36,7 @@ import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
 import { GMLog } from "@/managers/gm/GMLog";
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -1028,6 +1029,8 @@ export class GMManager {
     const everyone: ModuleCreature[] = [...area.creatures, ...GameState.PartyManager.party];
     for (const cre of area.creatures) {
       if (!this.isAutonomousNpc(cre)) continue;
+      // Walking on the spot towards someone it can't reach: think again (GMCombatAI)
+      GMCombatAI.checkStuck(cre, everyone);
       if (GMNpcOrders.getOrder(cre)) {
         GMNpcOrders.think(cre, everyone);
         continue;
@@ -1047,8 +1050,9 @@ export class GMManager {
       // Already swinging, or with attacks queued: let the combat round play out
       if (cre.combatRound.action || cre.combatRound.scheduledActionList.length) continue;
 
+      // Fight with what it has: powers, feats, grenades, medpacs, the right weapon (GMCombatAI)
       const target = this.chooseNpcTarget(cre, everyone);
-      if (target) cre.attackCreature(target, undefined);
+      if (target) GMCombatAI.engage(cre, target, everyone);
     }
   }
 
@@ -1247,6 +1251,8 @@ export class GMManager {
     onUseBlocked: (obj, user, reason) => GMPlayers.onUseBlocked(obj, user, reason),
     traceInteraction: (message, data) => GMLog.info('click', message, data),
     requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
+    onCombatRoundEnd: (creature) => GMCombatAI.onRoundEnd(creature),
+    holdsScriptAttack: (creature) => GMCombatAI.holdsScriptAttack(creature),
     openCharacterSheet: (section) => {
       // A player gets their own sheet; the GM (even playing a character) keeps the game's screens
       if (!GameState.gmMode || GMManager.isGMUser()) return false;

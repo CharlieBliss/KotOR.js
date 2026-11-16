@@ -621,6 +621,8 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.OBJECT, NWScriptDataType.INTEGER],
     action: function(this: NWScriptInstance, args: [ModuleObject, number]){
       if(BitWise.InstanceOfObject(args[0], ModuleObjectType.ModuleCreature)){
+        // A GM NPC throwing a grenade or using a medpac: its own AI scripts don't take it back to swinging
+        if(GameState.hooks.holdsScriptAttack(this.caller as any)) return;
         this.caller.attackCreature(args[0]);
       }else{
         console.error('ActionAttack target undefined')
@@ -5124,13 +5126,13 @@ NWScriptDefK1.Actions = {
         let item = inventory[i];
         let baseItem = item.baseItem;
         if(
-          baseItem.weaponWield == WeaponWield.STUN_BATON || 
-          baseItem.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
-          baseItem.weaponWield == WeaponWield.TWO_HANDED_SWORD
+          baseItem?.weaponWield == WeaponWield.STUN_BATON || 
+          baseItem?.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
+          baseItem?.weaponWield == WeaponWield.TWO_HANDED_SWORD
         ){
           if(!weapon){
             weapon = item;
-          }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+          }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
             weapon = item;
           }
         }
@@ -5142,13 +5144,13 @@ NWScriptDefK1.Actions = {
           let item = inventory[i];
           let baseItem = item.baseItem;
           if(
-            baseItem.weaponWield == WeaponWield.BLASTER_PISTOL || 
-            baseItem.weaponWield == WeaponWield.BLASTER_RIFLE || 
-            baseItem.weaponWield == WeaponWield.BLASTER_HEAVY
+            baseItem?.weaponWield == WeaponWield.BLASTER_PISTOL || 
+            baseItem?.weaponWield == WeaponWield.BLASTER_RIFLE || 
+            baseItem?.weaponWield == WeaponWield.BLASTER_HEAVY
           ){
             if(!weapon){
               weapon = item;
-            }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+            }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
               weapon = item;
             }
           }
@@ -5194,13 +5196,13 @@ NWScriptDefK1.Actions = {
         const item = inventory[i];
         const baseItem = item.baseItem;
         if(
-          baseItem.weaponWield == WeaponWield.BLASTER_PISTOL || 
-          baseItem.weaponWield == WeaponWield.BLASTER_RIFLE || 
-          baseItem.weaponWield == WeaponWield.BLASTER_HEAVY
+          baseItem?.weaponWield == WeaponWield.BLASTER_PISTOL || 
+          baseItem?.weaponWield == WeaponWield.BLASTER_RIFLE || 
+          baseItem?.weaponWield == WeaponWield.BLASTER_HEAVY
         ){
           if(!weapon){
             weapon = item;
-          }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+          }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
             weapon = item;
           }
         }
@@ -5212,13 +5214,13 @@ NWScriptDefK1.Actions = {
           const item = inventory[i];
           const baseItem = item.baseItem;
           if(
-            baseItem.weaponWield == WeaponWield.STUN_BATON || 
-            baseItem.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
-            baseItem.weaponWield == WeaponWield.TWO_HANDED_SWORD
+            baseItem?.weaponWield == WeaponWield.STUN_BATON || 
+            baseItem?.weaponWield == WeaponWield.ONE_HANDED_SWORD || 
+            baseItem?.weaponWield == WeaponWield.TWO_HANDED_SWORD
           ){
             if(!weapon){
               weapon = item;
-            }else if((baseItem.dieToRoll * baseItem.numDice) > (weapon.baseItem.dieToRoll * weapon.baseItem.numDice)){
+            }else if((baseItem?.dieToRoll * baseItem?.numDice) > (weapon.baseItem?.dieToRoll * weapon.baseItem?.numDice)){
               weapon = item;
             }
           }

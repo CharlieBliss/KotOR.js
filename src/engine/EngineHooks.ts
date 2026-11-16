@@ -83,6 +83,10 @@ export interface EngineHooks {
   requestNetworkLevelUp(creature: ModuleObject): boolean;
   /** Show the mode's own character sheet instead of the game's Character or Abilities screen; true when it did */
   openCharacterSheet(section: 'overview' | 'abilities'): boolean;
+  /** A creature in combat finished a combat round (the mode may choose its next one) */
+  onCombatRoundEnd(creature: ModuleCreature): void;
+  /** A creature's own script asks it to attack: true when the mode has it busy with something else */
+  holdsScriptAttack(creature: ModuleCreature): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -120,4 +124,6 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   traceInteraction: () => {},
   requestNetworkLevelUp: () => false,
   openCharacterSheet: () => false,
+  onCombatRoundEnd: () => {},
+  holdsScriptAttack: () => false,
 };

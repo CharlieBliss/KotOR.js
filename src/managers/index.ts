@@ -50,3 +50,4 @@ export * from "@/managers/gm/GMCharacters";
 export * from "@/managers/gm/GMItems";
 export * from "@/managers/gm/GMLog";
 export * from "@/managers/gm/GMPlayerRequests";
+export * from "@/managers/gm/GMCombatAI";

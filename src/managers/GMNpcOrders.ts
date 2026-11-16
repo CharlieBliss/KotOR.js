@@ -6,6 +6,7 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
 import { BitWise } from "@/utility/BitWise";
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleObject } from "@/module/ModuleObject";
 
@@ -117,7 +118,7 @@ export class GMNpcOrders {
           this.setOrder(cre, undefined);
           return;
         }
-        if (!busy) cre.attackCreature(target, undefined);
+        if (!busy) GMCombatAI.engage(cre, target, everyone);
         return;
       }
 
@@ -130,7 +131,7 @@ export class GMNpcOrders {
         // Fights back, but doesn't go looking for trouble
         const attacker = this.retaliateTarget(cre);
         if (attacker) {
-          if (!busy) cre.attackCreature(attacker, undefined);
+          if (!busy) GMCombatAI.engage(cre, attacker, everyone);
           return;
         }
         if (busy) return;
@@ -153,7 +154,7 @@ export class GMNpcOrders {
       case 'guard': {
         const enemy = this.retaliateTarget(cre) || this.nearestEnemy(cre, everyone, order.radius, true, order.point);
         if (enemy) {
-          if (!busy) cre.attackCreature(enemy, undefined);
+          if (!busy) GMCombatAI.engage(cre, enemy, everyone);
           return;
         }
         if (!busy && !this.isMoving(cre) && this.distance2D(cre.position, order.point) > this.GUARD_RETURN_DISTANCE) {
@@ -167,7 +168,7 @@ export class GMNpcOrders {
         if (!order.points.length) return;
         const enemy = this.retaliateTarget(cre) || GameState.GMManager?.chooseNpcTarget(cre, everyone);
         if (enemy) {
-          if (!busy) cre.attackCreature(enemy, undefined);
+          if (!busy) GMCombatAI.engage(cre, enemy, everyone);
           return;
         }
         if (busy) return;

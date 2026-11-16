@@ -2110,7 +2110,10 @@ export class ModuleCreature extends ModuleObject {
 
     if(this.isDead() || !this.combatData.combatState)
       return true;
-    
+
+    // A GM NPC chooses its next round here (GMCombatAI)
+    GameState.hooks.onCombatRoundEnd(this);
+
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnEndRound];
     if(!nwscript){ return true; }
     const instance = nwscript.newInstance();
