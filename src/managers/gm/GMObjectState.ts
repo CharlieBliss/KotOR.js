@@ -45,6 +45,8 @@ export interface GMObjectState {
   gmTeleportSeq?: number;
   /** Replica: where the host says it is; it moves there smoothly */
   gmNetTarget?: THREE.Vector3;
+  /** Client: our character's combat action and queue on the host, as icons (the HUD's queue) */
+  gmNetQueue?: string[];
   /** Client: whether this creature's weapons were last powered up (with the host's combat state) */
   gmNetPowered?: boolean;
   /** When this player character last rolled a skill (performance clock, ms), for GMChecks' cooldown */
@@ -57,8 +59,12 @@ export interface GMObjectState {
   gmCombatActingUntil?: number;
   /** NPC: how close it was to its target, and since when (GMCombatAI.checkStuck) */
   gmCombatProgress?: { targetId: number; distance: number; since: number };
+  /** NPC: no way through to anyone it could swing at; it stands ready until then (performance clock, ms) */
+  gmCombatHoldUntil?: number;
   /** NPC: a target it couldn't reach, out of its melee plans until then */
   gmCombatUnreachable?: { targetId: number; until: number };
+  /** NPC: how close it was to the spot its order sends it to, and since when (GMNpcOrders.arrived) */
+  gmOrderProgress?: { x: number; y: number; distance: number; since: number };
   /** NPC: since when its combat round has held an action nothing will start (GMCombatAI.checkStuck) */
   gmCombatIdleSince?: number;
   /** NPC: the AI is closing its combat round itself (GMCombatAI.startFresh) */

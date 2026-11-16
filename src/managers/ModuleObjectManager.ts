@@ -29,12 +29,19 @@ export class ModuleObjectManager {
   static module: Module;
 
   static ObjectList: Map<any, ModuleObject> = new Map();
-  static COUNT: number = 1;
+  /** The next object id. 1 is KotOR scripts' OBJECT_INVALID, so no object gets it (see SCRIPT_OBJECT_INVALID) */
+  static COUNT: number = 2;
+  /**
+   * KotOR's compiled scripts use 1 for OBJECT_INVALID (nwscript.nss: object OBJECT_INVALID = 1). An object
+   * holding id 1 (the first one loaded: Onderon palace's exit trigger) was found by scripts meaning "nobody",
+   * and area powers put their effects on it
+   */
+  static SCRIPT_OBJECT_INVALID = 1;
   static PLAYER_ID = ModuleObjectConstant.PLAYER_ID;
 
   static GetObjectById(id: ModuleObject|number = -1){
 
-    if(id == ModuleObjectConstant.OBJECT_INVALID)
+    if(id == ModuleObjectConstant.OBJECT_INVALID || id === this.SCRIPT_OBJECT_INVALID)
       return undefined;
 
     if(typeof id === 'object'){
@@ -89,7 +96,7 @@ export class ModuleObjectManager {
   }
 
   static Reset(){
-    this.COUNT = 1;
+    this.COUNT = 2;
     this.PLAYER_ID = ModuleObjectConstant.PLAYER_ID;
     this.ObjectList.clear();
   }

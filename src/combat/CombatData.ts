@@ -21,6 +21,8 @@ export class CombatData {
   
   lastAttemptedAttackTarget: ModuleObject;
   lastAttackTarget: ModuleObject;
+  /** The creature it last reached in melee (ActionPhysicalAttacks keeps after it with a little slack) */
+  meleeContact: ModuleObject;
   lastSpellTarget: ModuleObject;
   lastAttemptedSpellTarget: ModuleObject;
   lastSpellAttacker: ModuleObject;

@@ -93,6 +93,7 @@ export class GMReplication {
       scale: obj.gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
       combat: isPlaceable ? undefined : !!(obj as ModuleCreature).combatData?.combatState,
+      queue: obj.gmOwnerPeerId && !isPlaceable ? this.queueOf(obj as ModuleCreature) : undefined,
       hidden: !!obj.gmHidden,
       stealth: !!(obj as any).stealthMode,
       hostDriven: !!obj.gmHostDriven,
@@ -107,6 +108,15 @@ export class GMReplication {
       openState: isPlaceable ? (obj as ModulePlaceable).state : 0,
       lootResRefs: isPlaceable ? GMSpawner.lootOf(obj) : []
     };
+  }
+
+  /** Host: a player character's combat action and queue, as icons (what the HUD's queue shows) */
+  static queueOf(cre: ModuleCreature): string[] {
+    const round = cre.combatRound;
+    if (!round) return [];
+    const icons = [round.action?.iconResRef || '', ...round.scheduledActionList.slice(0, 3).map((a) => a?.iconResRef || '')];
+    while (icons.length && !icons[icons.length - 1]) icons.pop();
+    return icons;
   }
 
   static serializeActorsForTick(): GMSerializedActor[] {
@@ -230,6 +240,9 @@ export class GMReplication {
         ) {
           GMNetworkManager.awaitingHost = false;
         }
+        // What it's doing and has queued on the host, for our HUD (host-driven or not: in a fight it is)
+        const ownForQueue = GMManager.netIdMap.get(actor.netId) as ModuleCreature | undefined;
+        if (ownForQueue) ownForQueue.gmNetQueue = actor.queue || [];
         // While the host drives our actor, follow it like any other replica
         if (GMNetworkManager.awaitingHost) {
           this.spawnOrUpdateFromSerialized(actor);
@@ -244,6 +257,8 @@ export class GMReplication {
             if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
             // Fights happen on the host: under attack there, our character takes its combat stance here too
             if (actor.combat) own.resetExcitedDuration();
+            // What it's doing and has queued there, for our HUD
+            own.gmNetQueue = actor.queue || [];
             // Our character fights on the host: its weapons light up here when it does
             if (actor.combat !== undefined) this.syncWeaponPower(own, !!actor.combat || !!own.combatData?.combatState);
           } else {

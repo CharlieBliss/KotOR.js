@@ -10,6 +10,7 @@ import type { GameEffect } from "@/effects/GameEffect";
 import EngineLocation from "@/engine/EngineLocation";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { ModulePlaceableAnimState } from "@/enums/module/ModulePlaceableAnimState";
 import { NWScriptEventType } from "@/enums/nwscript/NWScriptEventType";
@@ -2218,8 +2219,19 @@ export class ModuleObject {
     effect.setAttachedObject(this);
     effect.loadModel();
     effect.onApply(this);
+    // A heal, hit or resurrection has done its work once applied: kept, it sat on the creature for good, listed
+    // as a "Heal" or "Damage" with no source
+    if(ModuleObject.ONE_SHOT_EFFECTS.has(effect.type) && effect.getDurationType() == GameEffectDurationType.INSTANT){
+      return;
+    }
     this.effects.push(effect);
   }
+
+  /** Effects that act once, when applied instantly (other types default to instant and still last) */
+  static ONE_SHOT_EFFECTS = new Set<number>([
+    GameEffectType.EffectHeal, GameEffectType.EffectDamage, GameEffectType.EffectHealForcePoints,
+    GameEffectType.EffectDamageForcePoints, GameEffectType.EffectResurrection, GameEffectType.EffectDeath,
+  ]);
 
   /**
    * Get an effect by type

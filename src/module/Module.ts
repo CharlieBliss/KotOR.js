@@ -913,7 +913,7 @@ export class Module {
       await module.area.load();
 
       if(module.nextObjId0)
-        GameState.ModuleObjectManager.COUNT = module.nextObjId0;
+        GameState.ModuleObjectManager.COUNT = Math.max(2, module.nextObjId0);
 
       GameState.ModuleObjectManager.module = module;
 

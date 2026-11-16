@@ -154,6 +154,7 @@ export class GMCombatAI {
     // Told to stand down or run: its scripts don't send it back into the fight
     const order = npc.gmOrder?.kind;
     if (order === 'standDown' || order === 'flee') return true;
+    if ((npc.gmCombatHoldUntil || 0) > performance.now()) return true;
     return this.isActing(npc);
   }
 
@@ -204,6 +205,33 @@ export class GMCombatAI {
     this.engage(npc, target, everyone);
   }
 
+  /** Seconds a melee NPC with no way through stands ready before looking again */
+  static HOLD_SECONDS = 1.5;
+  /** Someone this close to the straight line between them is in the way */
+  static IN_THE_WAY = 0.75;
+
+  /**
+   * Nobody stands in the straight line from the NPC to that creature (within melee reach of it, someone close to
+   * it doesn't count: they're fighting it, there may be room beside them)
+   */
+  static clearWay(npc: ModuleCreature, to: ModuleCreature, everyone: ModuleCreature[]): boolean {
+    const ax = npc.position.x, ay = npc.position.y;
+    const dx = to.position.x - ax, dy = to.position.y - ay;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 0.01) return true;
+    const len = Math.sqrt(len2);
+    for (const c of everyone) {
+      if (!c || c === npc || c === to || c.isDead?.()) continue;
+      const t = ((c.position.x - ax) * dx + (c.position.y - ay) * dy) / len2;
+      if (t <= 0 || t >= 1) continue;
+      // Beside the target, within reach of it: not in the way
+      if ((1 - t) * len < 1.5) continue;
+      const px = ax + t * dx - c.position.x, py = ay + t * dy - c.position.y;
+      if (px * px + py * py < this.IN_THE_WAY * this.IN_THE_WAY) return false;
+    }
+    return true;
+  }
+
   /** It couldn't get to this target lately (checkStuck) */
   static isUnreachable(npc: ModuleCreature, target: ModuleCreature): boolean {
     const u = npc.gmCombatUnreachable;
@@ -221,6 +249,8 @@ export class GMCombatAI {
     // Nobody fights a body
     if (!npc || !target || target.isDead?.()) return '';
     if (this.isActing(npc)) return 'acting';
+    // Standing ready for an opening (no way through to anyone it could swing at)
+    if ((npc.gmCombatHoldUntil || 0) > performance.now()) return 'hold';
     const style: GMCombatStyle = npc.gmCombatStyle || 'all';
     const attack = () => {
       // Already swinging at them: let the attack carry on
@@ -230,16 +260,23 @@ export class GMCombatAI {
     if (style === 'attack') return attack();
     const s = this.situation(npc, target, everyone);
     let choice = this.choose(s, style);
-    // Can't get to them to swing: fight someone it can reach (powers and shots still go to the target)
+    // Can't get to them to swing: fight someone it has a clear way to (powers and shots still go to the target).
+    // With nobody, it stands ready for an opening: walking at the back of a melee, it slid from side to side
+    // behind its own front line and ran in circles
     const melee = !npc.isRangedEquipped?.();
     if (melee && this.isUnreachable(npc, target) && (!choice || choice.tactic.id === 'attack' || choice.tactic.id === 'feat')) {
       const other = everyone
-        .filter((c) => c && c !== target && c !== npc && !c.isDead?.() && !c.gmHidden && npc.isHostile(c))
+        .filter((c) => c && c !== target && c !== npc && !c.isDead?.() && !c.gmHidden && npc.isHostile(c) && !this.isUnreachable(npc, c))
+        .filter((c) => this.clearWay(npc, c, everyone))
         .sort((a, b) => a.position.distanceTo(npc.position) - b.position.distanceTo(npc.position))[0];
       if (other) {
         GMLog.info('ai', `${npc.getName()} turns on ${other.getName()} instead`);
         return this.engage(npc, other, everyone);
       }
+      npc.clearAllActions();
+      npc.gmCombatHoldUntil = s.now + this.HOLD_SECONDS * 1000;
+      GMLog.info('ai', `${npc.getName()} waits for an opening at ${target.getName()}`);
+      return 'hold';
     }
     if (!choice || choice.tactic.id === 'attack') return attack();
     const cooldowns: Record<string, number> = npc.gmCombatCooldowns || (npc.gmCombatCooldowns = {});
@@ -462,7 +499,10 @@ export class GMCombatAI {
         if (!ally) return null;
         // Items heal their user; powers reach others
         const heal = s.kit.heals.find((t) => t.spell && GMCombatAI.usableOn(s, t, ally));
-        return heal ? { score: 75, choice: { heal, ally } } : null;
+        // Worth more the closer they are to dropping: a caster with someone a little hurt nearby (most of a big
+        // fight) kept healing instead of using its attack powers
+        const ratio = (Number(ally.getHP?.()) || 0) / Math.max(1, Number(ally.getMaxHP?.()) || 1);
+        return heal ? { score: 55 + (HEAL_BELOW - ratio) * 100, choice: { heal, ally } } : null;
       },
       act: (s, c: { heal: GMCombatTalent; ally: ModuleCreature }) => GMCombatAI.use(s, c.heal, c.ally),
     },
@@ -506,7 +546,7 @@ export class GMCombatAI {
           // Not again on a target still under it (stun, slow, fear...)
           .filter((t) => !GMCombatAI.hasEffectFrom(s.target, t.spellId));
         const choice = pick(options);
-        return choice ? { score: 60 + Math.random() * 10, choice } : null;
+        return choice ? { score: 64 + Math.random() * 12, choice } : null;
       },
       act: (s, t: GMCombatTalent) => GMCombatAI.use(s, t, s.target),
     },

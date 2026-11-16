@@ -1473,6 +1473,26 @@ export class ModuleCreature extends ModuleObject {
     this.playTwoDAAnimation(anim);
   }
 
+  /**
+   * Plays the first of these animations its model has: a power's cast, a grenade's throw. Goes through
+   * playTwoDAAnimation, so in GM sessions players see it too. Nothing played a cast animation before: casters
+   * stood still while their powers went off.
+   */
+  playCastAnimation(names: string[] = []): boolean {
+    if(this.isDead()) return false;
+    for(const name of names){
+      if(!name || !this.hasModelAnimation(name)) continue;
+      const anim = OdysseyModelAnimation.GetAnimation2DA(name);
+      if(!anim) continue;
+      this.playTwoDAAnimation(anim);
+      // Its own state, as a swing's is ATTACK: left at PAUSE, the combat stance (and the turn to face the
+      // target) took over before the cast was drawn
+      this.animationState.index = /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1;
+      return true;
+    }
+    return false;
+  }
+
   /** Whether the creature's loaded model has an animation of this name */
   hasModelAnimation(name: string = ''): boolean {
     const model = this.model as any;

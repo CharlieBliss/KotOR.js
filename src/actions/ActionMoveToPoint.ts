@@ -88,6 +88,15 @@ export class ActionMoveToPoint extends Action {
       if( distanceRT <= range ){
         return ActionStatus.COMPLETE;
       }
+
+      // Closing to melee with a creature others already surround: as close as it gets is close enough
+      if(this.closeAsItGets(delta, range)){
+        this.owner.force = 0;
+        this.owner.speed = 0;
+        this.setComputedPath(undefined);
+        if(this.owner.combatData) this.owner.combatData.meleeContact = this.target;
+        return ActionStatus.COMPLETE;
+      }
     }
 
     if(!this.computedPath){
@@ -163,6 +172,40 @@ export class ActionMoveToPoint extends Action {
     this.setComputedPath(undefined);
     return ActionStatus.FAILED;
   }
+
+  /**
+   * Walking to melee reach of a creature (a short range) and, within a little more than that, not getting any
+   * closer for a moment: the spots around it are taken. Without this it slid round the crowd for good (and
+   * everyone after a target in a melee did, the whole fight)
+   */
+  closeAsItGets(delta: number, range: number): boolean {
+    if(!BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) || range > ActionMoveToPoint.MELEE_RANGE_MAX){
+      return false;
+    }
+    const toTarget = Utility.Distance2D(this.owner.position, this.target.position);
+    if(toTarget > range + ActionMoveToPoint.CROWD_SLACK){
+      this.closestToTarget = undefined;
+      return false;
+    }
+    if(this.closestToTarget === undefined || toTarget < this.closestToTarget - ActionMoveToPoint.CLOSING_DISTANCE){
+      this.closestToTarget = toTarget;
+      this.closingTime = 0;
+      return false;
+    }
+    this.closingTime += delta;
+    return this.closingTime >= ActionMoveToPoint.CLOSING_SECONDS;
+  }
+
+  /** Moves this short are closing to melee */
+  static MELEE_RANGE_MAX = 3;
+  /** Metres past the range a crowded approach may stop at */
+  static CROWD_SLACK = 1.2;
+  /** Closer by this... */
+  static CLOSING_DISTANCE = 0.3;
+  /** ...within this many seconds, or it's as close as it gets */
+  static CLOSING_SECONDS = 0.8;
+  closestToTarget: number | undefined;
+  closingTime = 0;
 
   /**
    * Walking into something the path didn't know about (a prop, a crowd) and getting nowhere: step aside,

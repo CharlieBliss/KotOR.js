@@ -987,63 +987,42 @@ export class InGameOverlay extends GameMenu {
         this.getControlByName('LBL_DEBILATATED' + (id + 1))?.hide();
       }
     }
-    if (oPC.excitedDuration || oPC.combatRound.scheduledActionList.length) {
+    const queue = this.queueIcons(oPC);
+    if (oPC.excitedDuration || queue.slice(1).some(Boolean)) {
       this.showCombatUI();
-      let action0 = oPC.combatRound.action;
-      let action1 = oPC.combatRound.scheduledActionList[0];
-      let action2 = oPC.combatRound.scheduledActionList[1];
-      let action3 = oPC.combatRound.scheduledActionList[2];
-      if (action0 != undefined) {
-        if (this.LBL_QUEUE0.getFillTextureName() != action0.iconResRef) {
-          this.LBL_QUEUE0.setFillTextureName(action0.iconResRef);
-          TextureLoader.tpcLoader.fetch(action0.iconResRef).then((texture: OdysseyTexture) => {
-            this.LBL_QUEUE0.setFillTexture(texture);
-            this.LBL_QUEUE0.border.fill.material.transparent = true;
-          });
+      const labels = [this.LBL_QUEUE0, this.LBL_QUEUE1, this.LBL_QUEUE2, this.LBL_QUEUE3];
+      labels.forEach((label, i) => {
+        const icon = queue[i] || '';
+        if (icon) {
+          if (label.getFillTextureName() != icon) {
+            label.setFillTextureName(icon);
+            TextureLoader.tpcLoader.fetch(icon).then((texture: OdysseyTexture) => {
+              label.setFillTexture(texture);
+              label.border.fill.material.transparent = true;
+            });
+          }
+        } else if (label.getFillTextureName()) {
+          label.setFillTextureName('');
+          label.setFillTexture(undefined);
         }
-      } else {
-        this.LBL_QUEUE0.setFillTextureName('');
-        this.LBL_QUEUE0.setFillTexture(undefined);
-      }
-      if (action1 != undefined) {
-        if (this.LBL_QUEUE1.getFillTextureName() != action1.iconResRef) {
-          this.LBL_QUEUE1.setFillTextureName(action1.iconResRef);
-          TextureLoader.tpcLoader.fetch(action1.iconResRef).then((texture: OdysseyTexture) => {
-            this.LBL_QUEUE1.setFillTexture(texture);
-            this.LBL_QUEUE1.border.fill.material.transparent = true;
-          });
-        }
-      } else {
-        this.LBL_QUEUE1.setFillTextureName('');
-        this.LBL_QUEUE1.setFillTexture(undefined);
-      }
-      if (action2 != undefined) {
-        if (this.LBL_QUEUE2.getFillTextureName() != action2.iconResRef) {
-          this.LBL_QUEUE2.setFillTextureName(action2.iconResRef);
-          TextureLoader.tpcLoader.fetch(action2.iconResRef).then((texture: OdysseyTexture) => {
-            this.LBL_QUEUE2.setFillTexture(texture);
-            this.LBL_QUEUE2.border.fill.material.transparent = true;
-          });
-        }
-      } else {
-        this.LBL_QUEUE2.setFillTextureName('');
-        this.LBL_QUEUE2.setFillTexture(undefined);
-      }
-      if (action3 != undefined) {
-        if (this.LBL_QUEUE3.getFillTextureName() != action3.iconResRef) {
-          this.LBL_QUEUE3.setFillTextureName(action3.iconResRef);
-          TextureLoader.tpcLoader.fetch(action3.iconResRef).then((texture: OdysseyTexture) => {
-            this.LBL_QUEUE3.setFillTexture(texture);
-            this.LBL_QUEUE3.border.fill.material.transparent = true;
-          });
-        }
-      } else {
-        this.LBL_QUEUE3.setFillTextureName('');
-        this.LBL_QUEUE3.setFillTexture(undefined);
-      }
+      });
     } else {
       this.hideCombatUI();
     }
+  }
+
+  /**
+   * The icons of what the character is doing and has queued: its combat round's action, then what's scheduled.
+   * A player in a GM session fights on the host, whose queue arrives with the character's state (gmNetQueue);
+   * the local round there is always empty.
+   */
+  queueIcons(oPC: any): string[] {
+    if (GameState.gmMode && GameState.GMNetworkManager?.role === 'client' && Array.isArray(oPC?.gmNetQueue)) {
+      return oPC.gmNetQueue.slice(0, 4);
+    }
+    const round = oPC?.combatRound;
+    if (!round) return [];
+    return [round.action?.iconResRef || '', ...round.scheduledActionList.slice(0, 3).map((a: any) => a?.iconResRef || '')];
   }
 
   show() {

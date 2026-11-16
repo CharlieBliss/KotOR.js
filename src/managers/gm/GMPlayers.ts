@@ -37,6 +37,7 @@ import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSessions } from "@/managers/gm/GMSessions";
 import { GMLog } from "@/managers/gm/GMLog";
+import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayerRequests } from "@/managers/gm/GMPlayerRequests";
 
@@ -625,7 +626,21 @@ export class GMPlayers {
       return;
     }
 
-    if (meta.interrupts) actor.clearAllActions();
+    // Already attacking the enemy they clicked: the attack carries on (restarting it cost the swing in progress)
+    if (intent.kind === 'attack' && target && GMObjectKind.isCreature(target) && this.isAttackingTarget(actor, target as ModuleCreature)) {
+      actor.gmNetTarget = undefined;
+      actor.gmHostDriven = true;
+      GMLog.info('host', `${request}: already on it`);
+      return;
+    }
+    // A power, combat feat or item joins the combat queue behind what's there, as in KotOR (each one cleared
+    // the queue: it never filled, and a power waiting for its round was dropped by the next click)
+    const queues = intent.kind === 'ability' && this.QUEUED_ABILITIES.includes(String(intent.ability));
+    if (queues && (actor.combatRound?.scheduledActionList?.length || 0) >= this.QUEUE_LIMIT) {
+      GMNetworkManager.appendChat('System', `${actor.getName()}'s queue is full.`);
+      return;
+    }
+    if (meta.interrupts && !queues) actor.clearAllActions();
     const result = handler(actor, intent, peerId);
     if (!meta.interrupts) {
       GMLog.info('host', request);
@@ -641,6 +656,18 @@ export class GMPlayers {
     } else {
       report(!!result);
     }
+  }
+
+  /** Abilities that queue in combat rather than interrupt */
+  static QUEUED_ABILITIES = ['spell', 'feat', 'item'];
+  /** Actions waiting behind the current one, at most (KotOR's HUD shows the current one and three more) */
+  static QUEUE_LIMIT = 3;
+
+  /** Host: this character's attack (queued, or its combat round's) is on that target */
+  static isAttackingTarget(actor: ModuleCreature, target: ModuleCreature): boolean {
+    const round = actor.combatRound;
+    const attack = (a: any) => a && a.target === target && (a.actionType === CombatActionType.ATTACK || a.actionType === CombatActionType.ATTACK_USE_FEAT);
+    return attack(round?.action) || !!round?.scheduledActionList?.some(attack);
   }
 
   /**
