@@ -17,6 +17,7 @@ Used by check_plan.py; standard library only.
 """
 import base64
 import json
+import functools
 import math
 import re
 import struct
@@ -204,11 +205,54 @@ def read_footprints(game):
     return out
 
 
+HIP_OFFSET = 0.46   # a sitter's hips sit this far behind its origin (GMSeats.HIP_OFFSET)
+SEAT_REACH = 1.6    # a seated actor sits in the free seat nearest where the plan put it, this far at most
+
+
+@functools.lru_cache(maxsize=4)
+def read_seats(game):
+    """
+    Seats from the catalog: {template or appearance (lower case): [(x, y, fx, fy, either)]}, in the model's frame:
+    where a sitter's hips go, the way it faces, and whether a backless seat can face the other way too
+    """
+    out = {}
+    for name, key in (("placeables.tsv", "template"), ("models.tsv", "appearance")):
+        path = CATALOG / game / name
+        if not path.exists():
+            continue
+        lines = path.read_text(encoding="utf-8").splitlines()
+        if not lines or "seats" not in lines[0].split("\t"):
+            continue
+        head = lines[0].split("\t")
+        k, s = head.index(key), head.index("seats")
+        for line in lines[1:]:
+            cells = line.split("\t")
+            if len(cells) <= max(k, s) or not cells[s]:
+                continue
+            seats = []
+            for part in cells[s].split(";"):
+                v = part.split(",")
+                try:
+                    seats.append((float(v[0]), float(v[1]), float(v[2]), float(v[3]), len(v) > 4 and v[4] == "e"))
+                except (ValueError, IndexError):
+                    pass
+            if seats:
+                out[cells[k].lower()] = seats
+    return out
+
+
+def seats_of(prop, seats):
+    return seats.get(str(prop.get("template", "")).lower()) or seats.get(str(prop.get("appearance", "")).lower()) or []
+
+
 def is_seat(prop, content):
     """A chair or bench (KotOR II's plc_chair1 is a food pile; KotOR's is a chair the game calls "Food pile")"""
     template = str(prop.get("template", "")).lower()
     if template == "plc_chair1":
         return content != "tsl"
+    known = read_seats(content) if content in ("kotor", "tsl") else {}
+    if known:
+        return bool(seats_of(prop, known))
     name = f'{template} {prop.get("appearance", "")}'.lower()
     return any(word in name for word in SEAT_WORDS)
 
@@ -320,7 +364,7 @@ class Layout:
     def facing_angle(self, x, y, facing):
         """The engine's facing in radians (as GMScenePlan.facingFrom)"""
         if isinstance(facing, (int, float)):
-            return math.radians(facing)
+            return -math.radians(facing)  # degrees clockwise from north; the engine turns the other way
         target = None
         if isinstance(facing, str) and facing.startswith("toward:"):
             target = self.resolve_spot(facing[7:])
@@ -377,10 +421,40 @@ class Layout:
             best, best_d = snapped, d
         return best
 
+    def add_seats(self, prop, pts, known):
+        """Where sitters go on a seat prop's copies: (prop id, copy, seat, x, y, facing vector, either)"""
+        for ci, pt in enumerate(pts):
+            a = self.facing_angle(pt.x, pt.y, prop.get("facing"))
+            c, s = math.cos(a), math.sin(a)
+            for si, (x, y, fx, fy, either) in enumerate(seats_of(prop, known)):
+                cx, cy = x * c - y * s, x * s + y * c
+                dx, dy = fx * c - fy * s, fx * s + fy * c
+                self.seat_spots.append({"prop": prop["id"], "copy": ci, "seat": si, "cx": pt.x + cx, "cy": pt.y + cy,
+                                        "dir": (dx, dy), "either": either, "room": pt.room})
+
+    def sit(self, pt, want, taken):
+        """The free seat nearest a point within reach (GMSeats.nearestFree): its spot, facing and key; None if none"""
+        best, best_d = None, SEAT_REACH
+        for spot in self.seat_spots:
+            key = (spot["prop"], spot["copy"], spot["seat"])
+            if key in taken:
+                continue
+            dx, dy = spot["dir"]
+            if spot["either"] and want and want[0] * dx + want[1] * dy < 0:
+                dx, dy = -dx, -dy
+            x, y = spot["cx"] + dx * HIP_OFFSET, spot["cy"] + dy * HIP_OFFSET
+            d = math.hypot(x - pt.x, y - pt.y)
+            if d < best_d:
+                best, best_d = (x, y, (dx, dy), key, spot["room"]), d
+        return best
+
     def place_all(self):
         plan = self.plan
         content = str(plan.get("content", ""))
         known = read_footprints(content)
+        seat_models = read_seats(content)
+        self.seat_spots = []
+        taken = set()
         players = plan.get("players") or {}
         start = self.points({**(players.get("at") or {}), "formation": None}, 1, "players.at", "the players' start")
         self.player_start = start[0] if start else None
@@ -391,6 +465,7 @@ class Layout:
             pts = self.points(p.get("at") or {}, count, f"props {p['id']}", p.get("name") or p["id"])
             self.placed[p["id"]] = pts
             self.add_footprints(p, pts, known)
+            self.add_seats(p, pts, seat_models)
         for a in plan.get("actors") or []:
             count = max(1, min(20, int(a.get("count", 1))))
             where = f"actors {a['id']}"
@@ -398,7 +473,18 @@ class Layout:
             # A seated actor put on a seat prop belongs in it; anyone else standing in a prop is moved clear
             spot = str((a.get("at") or {}).get("spot", ""))
             seat = spot[5:] if spot.startswith("prop:") and a.get("stance") in SEATED_STANCES and spot[5:] in props and is_seat(props[spot[5:]], content) else None
+            seated = a.get("stance") in SEATED_STANCES
             for pt in pts:
+                # A sitter takes the free seat nearest it, on the seat's own spot and facing (as the game does)
+                if seated:
+                    got = self.sit(pt, self.facing_vector(pt.x, pt.y, a.get("facing")), taken)
+                    if got:
+                        pt.x, pt.y, pt.room = got[0], got[1], got[4] or pt.room
+                        pt.seat_facing = got[2]
+                        taken.add(got[3])
+                        continue
+                    self.problem("NOTE", where, f'{pt.name} sits with no free seat within {SEAT_REACH:g} m: give it a chair or bench of '
+                                                f'its own ("at": {{"spot": "prop:<seat>"}}; see "Seats" in format.md)')
                 inside = self.footprint_at(pt.x, pt.y, seat)
                 if not inside:
                     continue
@@ -413,7 +499,7 @@ class Layout:
                                                  f'{MAX_CLEARING_MOVE:g} m. Move it beside the prop')
             self.placed[a["id"]] = pts
             for pt in pts:
-                pt.facing = self.facing_vector(pt.x, pt.y, a.get("facing"))
+                pt.facing = getattr(pt, "seat_facing", None) or self.facing_vector(pt.x, pt.y, a.get("facing"))
 
 
 class Point:
@@ -439,8 +525,10 @@ def check_blocking(L):
     # will once revealed, so check everything)
     reported = set()
     for i, (a, p) in enumerate(creatures):
+        # Sitters in seats are meant to be in their chair or bench, and side by side on a bench
+        seated = getattr(p, "seat_facing", None) is not None
         for b, q in creatures[i + 1:]:
-            if p.dist(q) < CREATURE_GAP:
+            if p.dist(q) < CREATURE_GAP and not (seated and getattr(q, "seat_facing", None) is not None):
                 key = (a["id"], b["id"])
                 if key not in reported:
                     reported.add(key)
@@ -449,7 +537,7 @@ def check_blocking(L):
                                                          f"spread them with spacing or offsets")
         for prop in props:
             for q in L.placed.get(prop["id"], []):
-                if p.dist(q) < PROP_GAP and (a["id"], prop["id"]) not in reported:
+                if p.dist(q) < PROP_GAP and not seated and (a["id"], prop["id"]) not in reported:
                     reported.add((a["id"], prop["id"]))
                     L.problem("NOTE", f"actors {a['id']}", f"{p.name} stands {p.dist(q):.1f} m from {q.name} (inside it)")
 

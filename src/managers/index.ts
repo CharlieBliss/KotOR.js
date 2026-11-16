@@ -42,6 +42,7 @@ export * from "@/managers/GMScenePlan";
 export * from "@/managers/gm/GMViewport";
 export * from "@/managers/gm/GMRouteMarkers";
 export * from "@/managers/gm/GMCombatStats";
+export * from "@/managers/gm/GMSeats";
 export * from "@/managers/gm/GMSpawner";
 export * from "@/managers/gm/GMReplication";
 export * from "@/managers/gm/GMPlayers";

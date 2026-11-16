@@ -89,6 +89,10 @@ export interface EngineHooks {
   holdsScriptAttack(creature: ModuleCreature): boolean;
   /** Creatures walk through this one rather than around it (it isn't there for them, e.g. hidden by the GM) */
   walksThrough(creature: ModuleObject): boolean;
+  /** A creature uses something it can sit on: sit in it. True when that's what happened (no other use) */
+  useSeat(creature: ModuleObject, target: ModuleObject): boolean;
+  /** Something to sit on (players can use it to sit) */
+  isSeat(object: ModuleObject): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -129,4 +133,6 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   onCombatRoundEnd: () => {},
   holdsScriptAttack: () => false,
   walksThrough: () => false,
+  useSeat: () => false,
+  isSeat: () => false,
 };

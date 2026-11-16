@@ -11,6 +11,30 @@ import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums";
 
 export class CombatRoundAction {
+
+  /**
+   * The attack animation to play, from the one the attack calls for (key, weapon wield, attack number: "f1a3" is
+   * a feat attack with a stun baton). Not every model has every one: a Trandoshan has no feat or dueling swings
+   * for a baton, and an attack whose animation is missing lands without moving. So the nearest one its model has:
+   * the same attack's first, the plain swing for that weapon, then a plain one-handed swing (or shot).
+   */
+  static pickAttackAnimation(owner: ModuleCreature | undefined, name: string): { name: string, animation: ITwoDAAnimation | undefined } {
+    const tries = [name];
+    const m = /^([a-z])(\d+)a(\d+)$/.exec(String(name || ''));
+    if(m){
+      const [, key, wield] = m;
+      tries.push(`${key}${wield}a1`);
+      if(key === 'f' || key === 'c' || key === 'm') tries.push(`m${wield}a1`, `m${wield}a2`, 'm2a1');
+      if(key === 'b') tries.push(`b${wield}a1`, 'b5a1');
+    }
+    const hasModel = !!owner?.model && typeof owner.hasModelAnimation === 'function';
+    for(const candidate of tries){
+      const animation = OdysseyModelAnimation.GetAnimation2DA(candidate);
+      if(!animation) continue;
+      if(!hasModel || owner!.hasModelAnimation(animation.name)) return { name: candidate, animation };
+    }
+    return { name, animation: OdysseyModelAnimation.GetAnimation2DA(name) };
+  }
   owner: ModuleObject;
 
   actionTimer: number = 0;
@@ -154,8 +178,9 @@ export class CombatRoundAction {
       animation = this.animationName;
     }
 
-    this.animationName = animation;
-    this.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(animation);
+    const picked = this.isCutsceneAttack ? { name: animation, animation: OdysseyModelAnimation.GetAnimation2DA(animation) } : CombatRoundAction.pickAttackAnimation(owner, animation);
+    this.animationName = picked.name;
+    this.twoDAAnimation = picked.animation;
   }
 
 }

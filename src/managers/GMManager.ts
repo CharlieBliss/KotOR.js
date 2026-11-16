@@ -42,6 +42,7 @@ import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMRouteMarkers } from "@/managers/gm/GMRouteMarkers";
+import { GMSeats } from "@/managers/gm/GMSeats";
 import type { GMRoute } from "@/managers/gm/GMRouteMarkers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
@@ -868,6 +869,33 @@ export class GMManager {
    * Hold a creature in a stance until changed ('' to stand normally). Returns false when its model can't do it.
    * Takes a stance id, its label or an animations.2da name.
    */
+  /**
+   * The GM picks a stance for a creature. A seated one near a free chair or bench (2.5 m) sits it in that seat,
+   * on the seat's own spot and facing; any other gets it up out of the seat it was in.
+   */
+  static setStanceOrSit(obj: ModuleObject, stance: string): boolean {
+    if (!obj || !GMObjectKind.isCreature(obj)) return false;
+    const cre = obj as ModuleCreature;
+    if (GMSeats.SEATED_STANCES.includes(stance)) {
+      const area = GameState.module?.area;
+      const spot = area ? GMSeats.nearestFree(area.placeables as ModuleObject[], cre.position, 2.5, cre.getFacing(), cre) : null;
+      if (spot) {
+        GMSeats.sitAt(cre, spot, stance);
+        this.broadcastPlaced(cre);
+        return true;
+      }
+    } else if ((cre as any).gmSeat) {
+      GMSeats.stand(cre);
+    }
+    return this.setCreatureStance(cre, stance);
+  }
+
+  /** Tell players where a creature now is and which way it faces (after the GM put it somewhere) */
+  static broadcastPlaced(obj: ModuleObject) {
+    if (GMNetworkManager.role !== 'offline') GMNetworkManager.broadcastActorUpdate(GMReplication.serializeSingleActor(obj));
+    this.notifyChange();
+  }
+
   static setCreatureStance(obj: ModuleObject, stance: string): boolean {
     if (!obj || !GMObjectKind.isCreature(obj)) return false;
     const cre = obj as ModuleCreature;
@@ -1237,6 +1265,7 @@ export class GMManager {
     if (!GameState.gmMode) return;
     GMViewport.init3DIndicators();
     GMViewport.updateSelectionRings(this.selectedObjects());
+    GMSeats.update();
     GMRouteMarkers.update(this.isGMUser() ? this.routesToShow() : []);
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
@@ -1365,6 +1394,8 @@ export class GMManager {
     onCombatRoundEnd: (creature) => GMCombatAI.onRoundEnd(creature),
     holdsScriptAttack: (creature) => GMCombatAI.holdsScriptAttack(creature),
     walksThrough: (creature) => !!creature.gmHidden,
+    useSeat: (creature, target) => GameState.gmMode && GMObjectKind.isCreature(creature) && GMSeats.sitIn(creature as ModuleCreature, target),
+    isSeat: (object) => GameState.gmMode && GMSeats.seatsOf(object).length > 0,
     openCharacterSheet: (section) => {
       // A player gets their own sheet; the GM (even playing a character) keeps the game's screens
       if (!GameState.gmMode || GMManager.isGMUser()) return false;

@@ -239,6 +239,8 @@ export interface GMClientInput {
   animState: number;
   /** The last GM teleport this player has seen; older positions are dropped */
   teleportSeq: number;
+  /** Our character's held stance, sent when it changes (sitting down, standing up) */
+  stance?: string;
 }
 
 /**
@@ -374,6 +376,17 @@ export class GMNetworkManager {
   static assignedActorNetId: string | null = null;
   /** Client: the latest GM teleport of our character we've applied; our position reports carry it */
   static teleportSeq: number = 0;
+
+  /** The stance our character last told the host about */
+  static sentStance: string | undefined = undefined;
+
+  /** Our character's held stance, when it has changed since we last sent it */
+  static stanceToSend(controlled: any): { stance?: string } {
+    const stance = String(controlled?.heldStance || '');
+    if (stance === this.sentStance) return {};
+    this.sentStance = stance;
+    return { stance };
+  }
   static joinState: GMJoinState = 'idle';
   static joinError: string = '';
   static joinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -871,7 +884,9 @@ export class GMNetworkManager {
             z: controlled.position.z,
             facing: typeof controlled.getFacing === 'function' ? controlled.getFacing() : 0,
             animState: controlled.animState || 0,
-            teleportSeq: this.teleportSeq
+            teleportSeq: this.teleportSeq,
+            // Our character sat down or stood up: the host's copy (and everyone's) does too
+            ...(this.stanceToSend(controlled))
           });
       }
     }

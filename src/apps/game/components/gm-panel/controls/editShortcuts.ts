@@ -60,7 +60,7 @@ export function editShortcut(e: KeyboardEvent): boolean {
 export const EDIT_SHORTCUT_HINTS: [string, string][] = [
   ['Click / Shift + click', 'select / add or take out'], ['Shift + drag', 'select with a box'], ['Ctrl + A', 'creatures on screen'],
   ['Esc', 'select nothing'], ['Drag it', 'move (the selection)'], ['Alt + drag', 'raise an object'],
-  ['Ctrl + wheel', 'turn each'], ['Ctrl + Shift + wheel', 'turn the group'], ['Delete', 'remove'],
+  ['Shift or Ctrl + wheel', 'turn each'], ['Ctrl + Shift + wheel', 'turn the group'], ['Delete', 'remove'],
   ['Ctrl + Z / Y', 'undo / redo'], ['Ctrl + C / V / D', 'copy / paste at mouse / duplicate'],
   ['Ctrl + 1–9', 'save group'], ['1–9', 'select group (twice: go to it)'], ['F', 'go to the selection'],
 ];

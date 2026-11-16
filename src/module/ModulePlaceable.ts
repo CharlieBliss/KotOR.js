@@ -349,7 +349,8 @@ export class ModulePlaceable extends ModuleLockable {
   }
 
   isUseable(){
-    return this.useable;
+    // In GM mode a chair or bench is there to sit on, whatever its template says
+    return this.useable || !!GameState.hooks?.isSeat?.(this);
   }
 
   isOpen(){

@@ -15,6 +15,8 @@ import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMViewport } from "@/managers/gm/GMViewport";
+import { GMSeats } from "@/managers/gm/GMSeats";
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import { CharacterRules } from "@/engine/rules/CharacterRules";
 
 /*
@@ -185,6 +187,9 @@ export class GMScenePlan {
     if (template === 'plc_chair1') return this.plan.content === 'tsl' ? undefined : id;
     return /chair|bench|stool|seat|couch|sofa/.test(`${template} ${String(prop.appearance || '').toLowerCase()}`) ? id : undefined;
   }
+
+  /** How far from where the plan puts a seated actor its seat may be (it sits in the nearest free one) */
+  static SEAT_REACH = 1.6;
 
   /** Room an actor needs beside a prop (metres, about a creature's half-width) */
   static ACTOR_CLEARANCE = 0.45;
@@ -410,7 +415,9 @@ export class GMScenePlan {
   /** Engine facing (radians) for a plan facing, seen from a point; default: toward the players */
   facingFrom(from: THREE.Vector3, facing: GMPlanFacing | undefined): number {
     let target: THREE.Vector3 | null = null;
-    if (typeof facing === 'number') return (facing * Math.PI) / 180;
+    // Degrees clockwise from north (90 = east); the engine's facing turns the other way (a creature at f looks
+    // along (-sin f, cos f)), so 90 must be -90 to it
+    if (typeof facing === 'number') return -(facing * Math.PI) / 180;
     if (typeof facing === 'string' && facing.startsWith('toward:')) target = this.resolveSpot(facing.slice(7));
     if (!target) target = this.resolveSpot('players');
     if (!target || target.distanceTo(from) < 0.1) return 0;
@@ -536,7 +543,11 @@ export class GMScenePlan {
     const seat = this.seatFor(actor);
     const moved: string[] = [];
     let stuck = 0;
+    // A sitter with a free seat within reach sits in it (below): it isn't moved clear of that seat's prop first
+    const seated = !!actor.stance && GMScenePlan.SEATED_STANCES.includes(actor.stance);
+    const seatProps = seated ? [...this.objects.values()].flat().filter((o) => GMObjectKind.isPlaceable(o)) : [];
     for (let i = 0; i < points.length; i++) {
+      if (seated && GMSeats.nearestFree(seatProps, points[i], GMScenePlan.SEAT_REACH)) continue;
       if (!this.footprintAt(points[i], seat)) continue;
       const clear = this.clearOfProps(points[i], seat);
       if (clear) {
@@ -583,6 +594,14 @@ export class GMScenePlan {
       if (!cre) continue;
       // Each model picks its own take on the stance (a droid lies dead differently)
       if (actor.stance && !GMManager.setCreatureStance(cre, actor.stance)) this.note(`Actor "${actor.id}": its model can't take the stance "${actor.stance}".`);
+      // Sitting: into the free seat nearest where the plan put it, at the seat's own spot and facing (each chair
+      // model faces its own way, and the sitter's hips sit behind its origin)
+      if (actor.stance && GMScenePlan.SEATED_STANCES.includes(actor.stance)) {
+        const props = [...this.objects.values()].flat().filter((o) => GMObjectKind.isPlaceable(o));
+        const spot = GMSeats.nearestFree(props, points[i], GMScenePlan.SEAT_REACH, this.facingFrom(points[i], actor.facing));
+        if (spot) GMSeats.sitAt(cre, spot, actor.stance);
+        else this.note(`Actor "${actor.id}": ${name} sits with no free seat within ${GMScenePlan.SEAT_REACH} m; give it a chair or bench of its own.`);
+      }
       if (actor.hidden) this.setHidden(cre, true);
       placed.push(cre);
     }

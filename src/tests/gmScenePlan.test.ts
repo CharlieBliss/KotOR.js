@@ -120,7 +120,9 @@ describe("scene plans", () => {
     runner.playerStart = new THREE.Vector3(0, 10, 0);
     // Due north of the actor: facing 0
     expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), undefined)).toBeCloseTo(0);
-    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(Math.PI / 2);
+    // 90 is east, as a target due east is (the engine turns the other way: east is -90 degrees to it)
+    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(-Math.PI / 2);
+    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(Math.atan2(-1, 0));
     expect(Math.abs(runner.facingFrom(new THREE.Vector3(0, 0, 0), "toward:waypoint:door"))).toBeCloseTo(Math.PI / 2);
   });
 

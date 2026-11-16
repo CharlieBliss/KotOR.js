@@ -2,6 +2,7 @@ import React from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { GMManager, GMNpcOrders, GMHistory, GMEditTools, GMViewport } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { deleteSelection } from "@/apps/game/components/gm-panel/controls/editShortcuts";
+import { GearEditor } from "@/apps/game/components/gm-panel/controls/GearEditor";
 
 type Creature = KotOR.ModuleCreature;
 
@@ -68,7 +69,7 @@ export const SelectionGroup: React.FC<{ list: KotOR.ModuleObject[] }> = ({ list 
       </div>
 
       <div className="gm-hint">
-        Drag one to move them all; Ctrl + wheel turns each, Ctrl + Shift + wheel turns the group; Delete removes them; Ctrl + Z undoes.
+        Drag one to move them all; Shift (or Ctrl) + wheel turns each, Ctrl + Shift + wheel turns the group; Delete removes them; Ctrl + Z undoes.
         Shift + click adds or takes out one, Shift + drag selects with a box.
       </div>
 
@@ -168,7 +169,7 @@ export const SelectionGroup: React.FC<{ list: KotOR.ModuleObject[] }> = ({ list 
             <div className="gm-grid-2" title="Each one that has the animation plays it">
               <div className="gm-field">
                 <label>Stance</label>
-                <select className="gm-select" value={stance} onChange={(e) => every('Stance', (c) => { GMManager.setCreatureStance(c, e.target.value); })()}>
+                <select className="gm-select" value={stance} onChange={(e) => every('Stance', (c) => { GMManager.setStanceOrSit(c, e.target.value); })()}>
                   {stanceMixed && <option value="__mixed" disabled>Mixed</option>}
                   <option value="">Standing</option>
                   {stance && stance !== '__mixed' && !stances.some((c) => c.id === stance) && <option value={stance}>{stance}</option>}
@@ -191,6 +192,13 @@ export const SelectionGroup: React.FC<{ list: KotOR.ModuleObject[] }> = ({ list 
                 </select>
               </div>
             </div>
+          )}
+
+          {npcs.length > 0 && (
+            <details className="gm-section">
+              <summary>Gear ({npcs.length})</summary>
+              <GearEditor creatures={npcs} id="selection-gear" />
+            </details>
           )}
 
           {orderable.length > 0 && (

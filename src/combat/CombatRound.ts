@@ -18,7 +18,7 @@ import { DiceType } from "@/enums/combat/DiceType";
 import { TextSprite3D } from "@/engine/TextSprite3D";
 import { BitWise } from "@/utility/BitWise";
 import { CombatAttackData } from "@/combat/CombatAttackData";
-import type { CombatRoundAction } from "@/combat/CombatRoundAction";
+import { CombatRoundAction } from "@/combat/CombatRoundAction";
 import type { TalentFeat } from "@/talents/TalentFeat";
 import { GameState } from "@/GameState";
 import { FeedbackMessageEntry } from "@/engine/FeedbackMessageEntry";
@@ -894,8 +894,9 @@ export class CombatRound {
         }
       }
 
-      combatAction.animationName = attackKey+weaponWield+'a'+attackType;
-      combatAction.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(combatAction.animationName);
+      const picked = CombatRoundAction.pickAttackAnimation(creature, attackKey+weaponWield+'a'+attackType);
+      combatAction.animationName = picked.name;
+      combatAction.twoDAAnimation = picked.animation;
     }
 
     if(this.action && this.action !== combatAction){

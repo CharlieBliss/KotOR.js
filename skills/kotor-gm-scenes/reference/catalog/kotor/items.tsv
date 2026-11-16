@@ -18,19 +18,19 @@ g1_i_implant304	Advanced Alacrity Impant	Implant_3
 g1_i_mask01	Advanced Bio-Stabilizer Mask	Mask	
 g1_i_mask02	Medical Interface Visor	Mask	
 g1_i_mask03	Advanced Agent Interface	Mask	
-g1_w_dblsbr001	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.27
-g1_w_dblsbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.67
-g1_w_dsrptrfl001	Baragwin Disruptor-X Weapon	Disrupter_Rifle	ranged 7.9 +1
-g1_w_hvrptbltr01	Baragwin Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 14.19
-g1_w_ionrfl01	Baragwin Ion-X Weapon	Ion_Rifle	ranged 8.13 +3
-g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 9.48
-g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.47
-g1_w_rptnblstr01	Baragwin Assault Gun	Repeating_Blaster	ranged 13.9
+g1_w_dblsbr001	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.23
+g1_w_dblsbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.29
+g1_w_dsrptrfl001	Baragwin Disruptor-X Weapon	Disrupter_Rifle	ranged 7.58 +1
+g1_w_hvrptbltr01	Baragwin Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 15.32
+g1_w_ionrfl01	Baragwin Ion-X Weapon	Ion_Rifle	ranged 7.94 +3
+g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 8.59
+g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.72
+g1_w_rptnblstr01	Baragwin Assault Gun	Repeating_Blaster	ranged 13.93
 g1_w_sbrcrstl20	Heart of the Guardian	Lightsaber_Crystals	
 g1_w_sbrcrstl21	Mantle of the Force	Lightsaber_Crystals	
-g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 6.81
-g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 7.38
-g1_w_vbroswrd01	Baragwin Assault Blade	Vibro_Sword	melee 16.04 +2
+g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 7
+g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 6.96
+g1_w_vbroswrd01	Baragwin Assault Blade	Vibro_Sword	melee 15.32 +2
 g_a_class4001	Combat Suit	Armor_Class_4	armour 4
 g_a_class4002	Zabrak Combat Suit	Armor_Class_4	armour 5
 g_a_class4003	Echani Light Armor	Armor_Class_4	armour 5
@@ -131,10 +131,10 @@ g_i_belt011	Adrenaline Stimulator	Belt
 g_i_belt012	CNS Strength Enhancer	Belt	
 g_i_belt013	Electrical Capacitance Shield	Belt	
 g_i_belt014	Thermal Shield Generator	Belt	
-g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 3.54
-g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 3.49
-g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 3.61
-g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 3.61
+g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 3.44
+g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 3.48
+g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 3.67
+g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 3.68
 g_i_cmbtshot001	Battle Stimulant	Combat_Shots	
 g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots	
 g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots	
@@ -355,38 +355,38 @@ g_i_upgrade007	Vibration Cell	Plot_Useable_Items
 g_i_upgrade008	Durasteel Bonding Alloy	Plot_Useable_Items	
 g_i_upgrade009	Energy Projector	Plot_Useable_Items	
 g_w_adhsvgren001	Adhesive Grenade	Adhesive_Grenade	
-g_w_blstrcrbn001	Blaster Carbine	Blaster_Carbine	ranged 4.5
-g_w_blstrcrbn002	Sith Assault Gun	Blaster_Carbine	ranged 5.37
-g_w_blstrcrbn003	Cinnagaran Carbine	Blaster_Carbine	ranged 5.85
-g_w_blstrcrbn004	Jurgan Kalta's Carbine	Blaster_Carbine	ranged 6.63
-g_w_blstrcrbn005	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.87
-g_w_blstrcrbn006	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 6.46
-g_w_blstrcrbn007	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.28
-g_w_blstrcrbn008	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.4
-g_w_blstrcrbn009	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.66 +5
-g_w_blstrpstl001	Blaster Pistol	Blaster_Pistol	ranged 3.15
-g_w_blstrpstl002	Mandalorian Blaster	Blaster_Pistol	ranged 3.45
-g_w_blstrpstl003	Arkanian Pistol	Blaster_Pistol	ranged 3.15
-g_w_blstrpstl004	Zabrak Blaster Pistol	Blaster_Pistol	ranged 3.46
-g_w_blstrpstl005	Bendak's Blaster	Blaster_Pistol	ranged 3.29
-g_w_blstrpstl006	Bendak's Blaster	Blaster_Pistol	ranged 5.03 +5
-g_w_blstrpstl007	Bendak's Blaster	Blaster_Pistol	ranged 7.89 +5
-g_w_blstrpstl008	Bendak's Blaster	Blaster_Pistol	ranged 8.49 +5
-g_w_blstrpstl009	Bendak's Blaster	Blaster_Pistol	ranged 8.79 +5
-g_w_blstrpstl010	Carth's Blaster	Blaster_Pistol	ranged 4.05
-g_w_blstrpstl020	Insta-kill Pistol	Blaster_Pistol	ranged 3.85
-g_w_blstrrfl001	Blaster Rifle	Blaster_Rifle	ranged 5.19
-g_w_blstrrfl002	Sith Sniper Rifle	Blaster_Rifle	ranged 4.62
-g_w_blstrrfl003	Mandalorian Assault Rifle	Blaster_Rifle	ranged 4.48
-g_w_blstrrfl004	Zabrak Battle Cannon	Blaster_Rifle	ranged 9.75 +3
-g_w_blstrrfl005	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 4.67 +3
-g_w_blstrrfl006	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.67 +3
-g_w_blstrrfl007	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 9.07 +4
-g_w_blstrrfl008	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.87 +4
-g_w_blstrrfl009	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.92 +5
-g_w_bowcstr001	Bowcaster	Bowcaster	ranged 8.12
-g_w_bowcstr002	Chuundar's Bowcaster	Bowcaster	ranged 9.74
-g_w_bowcstr003	Zaalbar's Bowcaster	Bowcaster	ranged 5.18 +1
+g_w_blstrcrbn001	Blaster Carbine	Blaster_Carbine	ranged 4.72
+g_w_blstrcrbn002	Sith Assault Gun	Blaster_Carbine	ranged 5.86
+g_w_blstrcrbn003	Cinnagaran Carbine	Blaster_Carbine	ranged 5.41
+g_w_blstrcrbn004	Jurgan Kalta's Carbine	Blaster_Carbine	ranged 6.21
+g_w_blstrcrbn005	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.86
+g_w_blstrcrbn006	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 6.81
+g_w_blstrcrbn007	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.64
+g_w_blstrcrbn008	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.12
+g_w_blstrcrbn009	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.41 +5
+g_w_blstrpstl001	Blaster Pistol	Blaster_Pistol	ranged 3.19
+g_w_blstrpstl002	Mandalorian Blaster	Blaster_Pistol	ranged 3.77
+g_w_blstrpstl003	Arkanian Pistol	Blaster_Pistol	ranged 3.43
+g_w_blstrpstl004	Zabrak Blaster Pistol	Blaster_Pistol	ranged 3.48
+g_w_blstrpstl005	Bendak's Blaster	Blaster_Pistol	ranged 3.44
+g_w_blstrpstl006	Bendak's Blaster	Blaster_Pistol	ranged 5.43 +5
+g_w_blstrpstl007	Bendak's Blaster	Blaster_Pistol	ranged 7.39 +5
+g_w_blstrpstl008	Bendak's Blaster	Blaster_Pistol	ranged 8.61 +5
+g_w_blstrpstl009	Bendak's Blaster	Blaster_Pistol	ranged 8.35 +5
+g_w_blstrpstl010	Carth's Blaster	Blaster_Pistol	ranged 4.52
+g_w_blstrpstl020	Insta-kill Pistol	Blaster_Pistol	ranged 3.65
+g_w_blstrrfl001	Blaster Rifle	Blaster_Rifle	ranged 4.93
+g_w_blstrrfl002	Sith Sniper Rifle	Blaster_Rifle	ranged 4.36
+g_w_blstrrfl003	Mandalorian Assault Rifle	Blaster_Rifle	ranged 4.24
+g_w_blstrrfl004	Zabrak Battle Cannon	Blaster_Rifle	ranged 9.47 +3
+g_w_blstrrfl005	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 4.29 +3
+g_w_blstrrfl006	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.55 +3
+g_w_blstrrfl007	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 9.11 +4
+g_w_blstrrfl008	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.89 +4
+g_w_blstrrfl009	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 9.02 +5
+g_w_bowcstr001	Bowcaster	Bowcaster	ranged 7.53
+g_w_bowcstr002	Chuundar's Bowcaster	Bowcaster	ranged 10.01
+g_w_bowcstr003	Zaalbar's Bowcaster	Bowcaster	ranged 5.56 +1
 g_w_crgore001	Katarn Slam	Creature_Item_Pierce	melee 0
 g_w_crgore002	Dire Katarn Slam	Creature_Item_Pierce	melee 0
 g_w_crslash001	Claw1d4	Creature_Item_Slash	melee 0
@@ -401,76 +401,76 @@ g_w_crslash009	Kinrath Claw	Creature_Item_Slash	melee 0
 g_w_crslash010	Tach Claw	Creature_Item_Slash	melee 0
 g_w_crslash011	Kinrath Claw	Creature_Item_Slash	melee 0
 g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash	melee 0
-g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.3
+g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.25
 g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
 g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc	melee 0
 g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
-g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 8.46
+g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 8.67
 g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade	
-g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.85
-g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.71
-g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.92
-g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.99
-g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.74
-g_w_dblsbr006	Bastila's Lightsaber	Double_Bladed_Lightsaber	melee 11.33
-g_w_dblswrd001	Double-Bladed Sword	Double_Bladed_Sword	melee 6.92
-g_w_dblswrd002	Echani Ritual Brand	Double_Bladed_Sword	melee 6.46
-g_w_dblswrd003	Krath Double Sword	Double_Bladed_Sword	melee 8
-g_w_dblswrd005	Ajunta Pall's Blade	Double_Bladed_Sword	melee 10.68
-g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 8.62
-g_w_drkjdisbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.69
-g_w_dsrptpstl001	Disruptor Pistol	Disrupter_Pistol	ranged 2.62
-g_w_dsrptpstl002	Mandalorian Ripper	Disrupter_Pistol	ranged 2.65
-g_w_dsrptrfl001	Disruptor Rifle	Disrupter_Rifle	ranged 3.72
-g_w_dsrptrfl002	Zabrak Disruptor Cannon	Disrupter_Rifle	ranged 8.65
+g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.8
+g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.48
+g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.08
+g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.41
+g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.8
+g_w_dblsbr006	Bastila's Lightsaber	Double_Bladed_Lightsaber	melee 11.19
+g_w_dblswrd001	Double-Bladed Sword	Double_Bladed_Sword	melee 7.04
+g_w_dblswrd002	Echani Ritual Brand	Double_Bladed_Sword	melee 6.75
+g_w_dblswrd003	Krath Double Sword	Double_Bladed_Sword	melee 8.36
+g_w_dblswrd005	Ajunta Pall's Blade	Double_Bladed_Sword	melee 10.61
+g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 9.14
+g_w_drkjdisbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.22
+g_w_dsrptpstl001	Disruptor Pistol	Disrupter_Pistol	ranged 2.4
+g_w_dsrptpstl002	Mandalorian Ripper	Disrupter_Pistol	ranged 2.47
+g_w_dsrptrfl001	Disruptor Rifle	Disrupter_Rifle	ranged 3.64
+g_w_dsrptrfl002	Zabrak Disruptor Cannon	Disrupter_Rifle	ranged 8.66
 g_w_firegren001	Plasma Grenade	Fire_Grenade	
 g_w_flashgren001	Plasma Grenade	Flash_Grenade	
 g_w_fraggren01	Frag Grenade	Fragmentation_Grenades	
-g_w_gaffi001	Gaffi Stick	Ghaffi_Stick	melee 4.41
-g_w_hldoblstr01	Hold Out Blaster	Hold_Out_Blaster	ranged 2.53
-g_w_hldoblstr02	Bothan Quick Draw	Hold_Out_Blaster	ranged 2.44
-g_w_hldoblstr03	Sith Assassin Pistol	Hold_Out_Blaster	ranged 2.51
-g_w_hldoblstr04	Bothan Needler	Hold_Out_Blaster	ranged 2.55
-g_w_hvrptbltr002	Ordo's Repeating Blaster	Heavy_Repeating_Blaster	ranged 6.47
-g_w_hvrptbltr01	Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 5.64 +1
-g_w_hvrptbltr02	Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 10.02 +1
-g_w_hvyblstr01	Heavy Blaster	Heavy_Blaster	ranged 4.43
-g_w_hvyblstr02	Arkanian Heavy Pistol	Heavy_Blaster	ranged 4.79
-g_w_hvyblstr03	Zabrak Tystel Mark III	Heavy_Blaster	ranged 6.55
-g_w_hvyblstr04	Mandalorian Heavy Pistol	Heavy_Blaster	ranged 6.42
-g_w_hvyblstr05	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 4.79
-g_w_hvyblstr06	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 7.29 +5
-g_w_hvyblstr07	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 8.84
-g_w_hvyblstr08	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.51
-g_w_hvyblstr09	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.43
-g_w_ionblstr01	Ion Blaster	Ion_Blaster	ranged 2.53
-g_w_ionblstr02	Verpine Prototype Ion Blaster	Ion_Blaster	ranged 2.31
+g_w_gaffi001	Gaffi Stick	Ghaffi_Stick	melee 4.28
+g_w_hldoblstr01	Hold Out Blaster	Hold_Out_Blaster	ranged 2.55
+g_w_hldoblstr02	Bothan Quick Draw	Hold_Out_Blaster	ranged 2.58
+g_w_hldoblstr03	Sith Assassin Pistol	Hold_Out_Blaster	ranged 2.45
+g_w_hldoblstr04	Bothan Needler	Hold_Out_Blaster	ranged 2.33
+g_w_hvrptbltr002	Ordo's Repeating Blaster	Heavy_Repeating_Blaster	ranged 6.39
+g_w_hvrptbltr01	Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 5.53 +1
+g_w_hvrptbltr02	Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 9.88 +1
+g_w_hvyblstr01	Heavy Blaster	Heavy_Blaster	ranged 4.51
+g_w_hvyblstr02	Arkanian Heavy Pistol	Heavy_Blaster	ranged 4.6
+g_w_hvyblstr03	Zabrak Tystel Mark III	Heavy_Blaster	ranged 6.95
+g_w_hvyblstr04	Mandalorian Heavy Pistol	Heavy_Blaster	ranged 6.59
+g_w_hvyblstr05	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 4.42
+g_w_hvyblstr06	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 7.4 +5
+g_w_hvyblstr07	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.08
+g_w_hvyblstr08	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.54
+g_w_hvyblstr09	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.22
+g_w_ionblstr01	Ion Blaster	Ion_Blaster	ranged 2.55
+g_w_ionblstr02	Verpine Prototype Ion Blaster	Ion_Blaster	ranged 2.41
 g_w_iongren01	Ion Grenade	Ion_Grenade	
-g_w_ionrfl01	Ion Rifle	Ion_Rifle	ranged 3.48
-g_w_ionrfl02	Bothan Droid Disruptor	Ion_Rifle	ranged 3.68
-g_w_ionrfl03	Verpine Droid Disruptor	Ion_Rifle	ranged 3.26
-g_w_lghtsbr01	Lightsaber	Lightsaber	melee 8.87
-g_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.9
-g_w_lghtsbr03	Lightsaber	Lightsaber	melee 9.06
-g_w_lghtsbr04	Lightsaber	Lightsaber	melee 9.42
-g_w_lghtsbr05	Lightsaber	Lightsaber	melee 8.9
-g_w_lghtsbr06	Malak's Lightsaber	Lightsaber	melee 9.54
-g_w_lngswrd01	Long Sword	Long_Sword	melee 6.71
-g_w_lngswrd02	Krath War Blade	Long_Sword	melee 6.53
-g_w_lngswrd03	Naga Sadow's Poison Blade	Long_Sword	melee 6.32
-g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 3.37
-g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 4.8
-g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 3.47
-g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 4.55
-g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 4.73
-g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 4.49
+g_w_ionrfl01	Ion Rifle	Ion_Rifle	ranged 3.43
+g_w_ionrfl02	Bothan Droid Disruptor	Ion_Rifle	ranged 3.35
+g_w_ionrfl03	Verpine Droid Disruptor	Ion_Rifle	ranged 3.37
+g_w_lghtsbr01	Lightsaber	Lightsaber	melee 8.88
+g_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.73
+g_w_lghtsbr03	Lightsaber	Lightsaber	melee 9.31
+g_w_lghtsbr04	Lightsaber	Lightsaber	melee 9.29
+g_w_lghtsbr05	Lightsaber	Lightsaber	melee 8.81
+g_w_lghtsbr06	Malak's Lightsaber	Lightsaber	melee 8.72
+g_w_lngswrd01	Long Sword	Long_Sword	melee 6.31
+g_w_lngswrd02	Krath War Blade	Long_Sword	melee 6.44
+g_w_lngswrd03	Naga Sadow's Poison Blade	Long_Sword	melee 6.05
+g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 3.45
+g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 4.35
+g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 3.06
+g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 4.71
+g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 4.54
+g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 4.8
 g_w_poisngren01	Poison Grenade	Poison_Grenade	
-g_w_qtrstaff01	Quarterstaff	Quarter_Staff	melee 3.49
-g_w_qtrstaff02	Massassi Battle Staff	Quarter_Staff	melee 3.31
-g_w_qtrstaff03	Raito's Gaderffii	Ghaffi_Stick	melee 5.02
-g_w_rptnblstr01	Light Repeating Blaster	Repeating_Blaster	ranged 4.9
-g_w_rptnblstr02	Medium Repeating Blaster	Repeating_Blaster	ranged 4.51
-g_w_rptnblstr03	Blaster Cannon	Repeating_Blaster	ranged 4.28
+g_w_qtrstaff01	Quarterstaff	Quarter_Staff	melee 3.01
+g_w_qtrstaff02	Massassi Battle Staff	Quarter_Staff	melee 3.43
+g_w_qtrstaff03	Raito's Gaderffii	Ghaffi_Stick	melee 4.46
+g_w_rptnblstr01	Light Repeating Blaster	Repeating_Blaster	ranged 4.15
+g_w_rptnblstr02	Medium Repeating Blaster	Repeating_Blaster	ranged 4.67
+g_w_rptnblstr03	Blaster Cannon	Repeating_Blaster	ranged 4.53
 g_w_sbrcrstl01	Crystal, Rubat	Lightsaber_Crystals	
 g_w_sbrcrstl02	Crystal, Damind	Lightsaber_Crystals	
 g_w_sbrcrstl03	Crystal, Eralam	Lightsaber_Crystals	
@@ -490,58 +490,58 @@ g_w_sbrcrstl16	Crystal, Green	Lightsaber_Crystals
 g_w_sbrcrstl17	Crystal, Violet	Lightsaber_Crystals	
 g_w_sbrcrstl18	Crystal, Red	Lightsaber_Crystals	
 g_w_sbrcrstl19	Crystal, Solari	Lightsaber_Crystals	
-g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 7.2
-g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 6.94
-g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 6.98
-g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 6.6
-g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 7
-g_w_shortswrd01	Short Sword	Short_Sword	melee 3.52
-g_w_shortswrd02	Massassi Brand	Short_Sword	melee 3.63
-g_w_shortswrd03	Teta's Blade	Short_Sword	melee 3.14
+g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 6.87
+g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 6.76
+g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 6.99
+g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 7.18
+g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 7.07
+g_w_shortswrd01	Short Sword	Short_Sword	melee 3.5
+g_w_shortswrd02	Massassi Brand	Short_Sword	melee 3.52
+g_w_shortswrd03	Teta's Blade	Short_Sword	melee 3.04
 g_w_sonicgren01	Sonic Grenade	Sonic_Grenade	
-g_w_sonicpstl01	Sonic Pistol	Sonic_Pistol	ranged 2.36
-g_w_sonicpstl02	Bothan Shrieker	Sonic_Pistol	ranged 2.61
-g_w_sonicrfl01	Sonic Rifle	Sonic_Rifle	ranged 3.9
-g_w_sonicrfl02	Bothan Discord Gun	Sonic_Rifle	ranged 3.63
-g_w_sonicrfl03	Arkanian Sonic Rifle	Sonic_Rifle	ranged 3.51
-g_w_stunbaton01	Stun Baton	Stun_Baton	melee 4.07
-g_w_stunbaton02	Bothan Stun Stick	Stun_Baton	melee 4.29
-g_w_stunbaton03	Bothan Chuka	Stun_Baton	melee 4.44
-g_w_stunbaton04	Rakatan Battle Wand	Stun_Baton	melee 4.58
-g_w_stunbaton05	Rakatan Battle Wand	Stun_Baton	melee 4.84
-g_w_stunbaton06	Rakatan Battle Wand	Stun_Baton	melee 4.75
-g_w_stunbaton07	Rakatan Battle Wand	Stun_Baton	melee 8.54
+g_w_sonicpstl01	Sonic Pistol	Sonic_Pistol	ranged 2.78
+g_w_sonicpstl02	Bothan Shrieker	Sonic_Pistol	ranged 2.57
+g_w_sonicrfl01	Sonic Rifle	Sonic_Rifle	ranged 3.46
+g_w_sonicrfl02	Bothan Discord Gun	Sonic_Rifle	ranged 3.47
+g_w_sonicrfl03	Arkanian Sonic Rifle	Sonic_Rifle	ranged 3.46
+g_w_stunbaton01	Stun Baton	Stun_Baton	melee 4.61
+g_w_stunbaton02	Bothan Stun Stick	Stun_Baton	melee 4.45
+g_w_stunbaton03	Bothan Chuka	Stun_Baton	melee 4.89
+g_w_stunbaton04	Rakatan Battle Wand	Stun_Baton	melee 4.49
+g_w_stunbaton05	Rakatan Battle Wand	Stun_Baton	melee 4.44
+g_w_stunbaton06	Rakatan Battle Wand	Stun_Baton	melee 4.42
+g_w_stunbaton07	Rakatan Battle Wand	Stun_Baton	melee 8.78
 g_w_stungren01	Concussion Grenade	Stun_Grenades	
 g_w_thermldet01	Thermal Detonator	Thermal_Detonator	
-g_w_vbrdblswd01	Vibro Double-Blade	Vibro_Double_Blade	melee 8.86
-g_w_vbrdblswd02	Sith War Sword	Vibro_Double_Blade	melee 9.29
-g_w_vbrdblswd03	Echani Double-Brand	Vibro_Double_Blade	melee 11.29
-g_w_vbrdblswd04	Yusanis' Brand	Vibro_Double_Blade	melee 8.88
-g_w_vbrdblswd05	Yusanis' Brand	Vibro_Double_Blade	melee 13.6
-g_w_vbrdblswd06	Yusanis' Brand	Vibro_Double_Blade	melee 11.7
-g_w_vbrdblswd07	Yusanis' Brand	Vibro_Double_Blade	melee 12.4
-g_w_vbroshort01	Vibroblade	Vibro_Blade	melee 5.55
-g_w_vbroshort02	Krath Blood Blade	Vibro_Blade	melee 5.95
-g_w_vbroshort03	Echani Vibroblade	Vibro_Blade	melee 7.37
-g_w_vbroshort04	Sanasiki's Blade	Vibro_Blade	melee 5.79
-g_w_vbroshort05	Sanasiki's Blade	Vibro_Blade	melee 10.38
-g_w_vbroshort06	Sanasiki's Blade	Vibro_Blade	melee 10.35
-g_w_vbroshort07	Sanasiki's Blade	Vibro_Blade	melee 9.81
-g_w_vbroshort08	Mission's Vibroblade	Vibro_Blade	melee 7.09
-g_w_vbroshort09	Prototype Vibroblade	Vibro_Blade	melee 6.76
-g_w_vbroswrd01	Vibrosword	Vibro_Sword	melee 7.01
-g_w_vbroswrd02	Krath Dire Sword	Vibro_Sword	melee 7.62
-g_w_vbroswrd03	Sith Tremor Sword	Vibro_Sword	melee 8.65
-g_w_vbroswrd04	Echani Foil	Vibro_Sword	melee 6.85
-g_w_vbroswrd05	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.09
-g_w_vbroswrd06	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.42 +5
-g_w_vbroswrd07	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.47 +5
-g_w_vbroswrd08	Bacca's Ceremonial Blade	Vibro_Sword	melee 16.18 +5
-g_w_waraxe001	Gamorrean Battleaxe	Gammorean_Battleaxe	melee 6.34
-g_w_warblade001	Wookiee Warblade	Wookie_Warblade	melee 5.1
+g_w_vbrdblswd01	Vibro Double-Blade	Vibro_Double_Blade	melee 8.84
+g_w_vbrdblswd02	Sith War Sword	Vibro_Double_Blade	melee 8.52
+g_w_vbrdblswd03	Echani Double-Brand	Vibro_Double_Blade	melee 11.79
+g_w_vbrdblswd04	Yusanis' Brand	Vibro_Double_Blade	melee 9.06
+g_w_vbrdblswd05	Yusanis' Brand	Vibro_Double_Blade	melee 13.78
+g_w_vbrdblswd06	Yusanis' Brand	Vibro_Double_Blade	melee 12.06
+g_w_vbrdblswd07	Yusanis' Brand	Vibro_Double_Blade	melee 11.82
+g_w_vbroshort01	Vibroblade	Vibro_Blade	melee 5.46
+g_w_vbroshort02	Krath Blood Blade	Vibro_Blade	melee 5.19
+g_w_vbroshort03	Echani Vibroblade	Vibro_Blade	melee 7.8
+g_w_vbroshort04	Sanasiki's Blade	Vibro_Blade	melee 5.35
+g_w_vbroshort05	Sanasiki's Blade	Vibro_Blade	melee 10.62
+g_w_vbroshort06	Sanasiki's Blade	Vibro_Blade	melee 10.63
+g_w_vbroshort07	Sanasiki's Blade	Vibro_Blade	melee 9.84
+g_w_vbroshort08	Mission's Vibroblade	Vibro_Blade	melee 6.72
+g_w_vbroshort09	Prototype Vibroblade	Vibro_Blade	melee 6.63
+g_w_vbroswrd01	Vibrosword	Vibro_Sword	melee 7.4
+g_w_vbroswrd02	Krath Dire Sword	Vibro_Sword	melee 6.45
+g_w_vbroswrd03	Sith Tremor Sword	Vibro_Sword	melee 9.57
+g_w_vbroswrd04	Echani Foil	Vibro_Sword	melee 6.93
+g_w_vbroswrd05	Bacca's Ceremonial Blade	Vibro_Sword	melee 10.71
+g_w_vbroswrd06	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.36 +5
+g_w_vbroswrd07	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.65 +5
+g_w_vbroswrd08	Bacca's Ceremonial Blade	Vibro_Sword	melee 15.33 +5
+g_w_waraxe001	Gamorrean Battleaxe	Gammorean_Battleaxe	melee 6.81
+g_w_warblade001	Wookiee Warblade	Wookie_Warblade	melee 5.2
 geno_armor	GenoHaradan Mesh Armor	Armor_Class_4	armour 7
-geno_blade	GenoHaradan Poison Blade	Vibro_Sword	melee 7.08
-geno_blaster	GenoHaradan Blaster	Blaster_Pistol	ranged 4.38 +5
+geno_blade	GenoHaradan Poison Blade	Vibro_Sword	melee 7.26
+geno_blaster	GenoHaradan Blaster	Blaster_Pistol	ranged 4.64 +5
 geno_datapad	Datapad	Data_Pad	
 geno_gloves	GenoHaradan Power Gloves	Gauntlets	
 geno_stealth	GenoHaradan Stealth Unit	Stealth_Unit	

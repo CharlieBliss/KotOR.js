@@ -461,6 +461,9 @@ export class GMReplication {
         actor.setFacing(payload.facing, false);
       }
     }
+    if (typeof payload.stance === 'string' && (actor.heldStance || '') !== payload.stance) {
+      actor.setHeldStance(payload.stance);
+    }
   }
 
   /** Host only, and only for objects clients know about */

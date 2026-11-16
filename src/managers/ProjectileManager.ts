@@ -230,6 +230,10 @@ export class ProjectileManager {
         model.position.lerpVectors(projectile.from, projectile.to, t);
         const dir = this.tmpDir.copy(projectile.to).sub(projectile.from).normalize();
         model.quaternion.setFromUnitVectors(this.boltAxis, dir);
+        // The bolt's emitters place their particles through its world matrix: bring it up to date before they
+        // tick, or they use last frame's (on the shot's first frame, the world's origin, where the model waited),
+        // and the particles born then are drawn metres from the bolt, behind it for the whole flight
+        model.updateMatrixWorld(true);
         model.update(delta);
       }
       if(t >= 1) this.Finish(projectile);

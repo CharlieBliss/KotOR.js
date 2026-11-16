@@ -36,14 +36,10 @@ SEATED = {"chair", "chair_drunk", "chair_pazaak"}
 
 
 def is_seat(prop, content):
-    """A chair or bench prop (KotOR II's plc_chair1 is a food pile; KotOR's is a chair named "Food pile")"""
-    template = str(prop.get("template", "")).lower()
-    if content == "tsl" and template == "plc_chair1":
-        return False
-    if template == "plc_chair1":
-        return True
-    name = f'{template} {prop.get("appearance", "")}'.lower()
-    return any(word in name for word in ("chair", "bench", "stool", "seat", "couch", "sofa"))
+    """A chair or bench: one the catalog finds seats on (layout.is_seat)"""
+    return layout.is_seat(prop, content)
+
+
 GESTURES = VOCAB["gestures"]
 
 

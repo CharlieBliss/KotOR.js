@@ -1,6 +1,7 @@
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import { GMFaction } from "@/managers/gm/GMVocab";
 import * as THREE from "three";
+import { GMSeats } from "@/managers/gm/GMSeats";
 import { GameState } from "@/GameState";
 import { EngineMode } from "@/enums/engine/EngineMode";
 import type { GMPoint } from "@/managers/GMNpcOrders";
@@ -210,7 +211,8 @@ export class GMViewport {
       this.updateHover(e.clientX, e.clientY);
     });
 
-    // While placing, the mouse wheel turns what's being placed; in select mode, Ctrl + wheel turns the selection
+    // While placing, the mouse wheel turns what's being placed; in select mode, Ctrl or Shift + wheel turns each
+    // selected object, Ctrl + Shift + wheel the selection as one
     window.addEventListener('wheel', (e: WheelEvent) => {
       if (!GameState.gmMode || !GMManager.isGMUser()) return;
       const target = e.target as HTMLElement;
@@ -223,14 +225,14 @@ export class GMViewport {
         this.rotatePlacement(step * this.PLACEMENT_WHEEL_STEP);
         return;
       }
-      if (e.ctrlKey && GMManager.activeTool === 'select' && GMManager.controlMode !== 'POSSESS') {
+      if ((e.ctrlKey || e.shiftKey) && GMManager.activeTool === 'select' && GMManager.controlMode !== 'POSSESS') {
         // Ctrl + wheel would zoom the page otherwise
         e.preventDefault();
         const list = this.movableSelection();
         if (!list.length) return;
         const radians = (-step * this.ROTATE_WHEEL_STEP * Math.PI) / 180;
-        // With Shift too, the group turns around its middle as one
-        if (e.shiftKey && list.length > 1) GMEditTools.rotateAround(list, radians);
+        // Both, the group turns around its middle as one
+        if (e.ctrlKey && e.shiftKey && list.length > 1) GMEditTools.rotateAround(list, radians);
         else GMHistory.track(`Turn ${GMHistory.nameOf(list)}`, list, () => GMManager.rotateObjects(list, radians));
       }
     }, { passive: false });
@@ -463,6 +465,15 @@ export class GMViewport {
       // Where each one ended up reaches the players
       const moved = press.moving.filter((m) => !m.obj.destroyed);
       for (const m of moved) GMManager.teleportObject(m.obj, m.obj.position.clone());
+      // A sitter dropped on a chair or bench sits in it (dragged off one, it got up: GMSeats.update)
+      const area = GameState.module?.area;
+      for (const m of moved) {
+        const cre = m.obj as ModuleCreature;
+        const stance = (cre as any).gmSeatStance || cre.heldStance;
+        if (!GMObjectKind.isCreature(cre) || !GMSeats.SEATED_STANCES.some((s) => GMManager.findAnimationChoice('stance', s)?.anims?.includes(String(stance)) || s === stance) || !area) continue;
+        const spot = GMSeats.nearestFree(area.placeables as ModuleObject[], cre.position, 1.2, cre.getFacing(), cre);
+        if (spot) { GMSeats.sitAt(cre, spot, GMSeats.SEATED_STANCES.includes((cre as any).gmSeatStance) ? (cre as any).gmSeatStance : 'chair'); GMManager.broadcastPlaced(cre); }
+      }
       press.history?.commit();
       GMLog.info('world', `Moved ${moved.length} object${moved.length === 1 ? '' : 's'}`);
       return;

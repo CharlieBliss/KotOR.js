@@ -211,7 +211,7 @@ export const GMPanel: React.FC = () => {
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
   if (isPlayerView) {
-    controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
+    controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Tab', 'next target'], ['Esc', 'options']];
   } else if (GMViewport.isPlacementTool(tool)) {
     statusChip = `Placing: ${placingName || 'object'} · ${GMViewport.placementYawOffset}°`;
     controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc / Right-click', 'done']];
@@ -242,7 +242,7 @@ export const GMPanel: React.FC = () => {
   } else {
     controlHints = [
       ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Shift + drag', 'box'], ['Drag it', 'move'],
-      ['Ctrl + wheel', 'turn'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'], ['F2', `play as ${possessCandidateName}`],
+      ['Shift + wheel', 'turn'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'], ['F2', `play as ${possessCandidateName}`],
     ];
   }
 

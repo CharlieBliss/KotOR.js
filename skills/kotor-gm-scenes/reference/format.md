@@ -145,14 +145,18 @@ The checker and the game both catch the rest. An actor standing inside a prop is
 
 ### Seats
 
-The seated stances (`chair`, `chair_drunk`, `chair_pazaak`) don't bring a chair: put a seat prop down and the actor on it, facing the same way.
+The seated stances (`chair`, `chair_drunk`, `chair_pazaak`) don't bring a chair: put a seat prop down and the actor on it. The game seats it: it sits in the free seat nearest where the plan puts it (within 1.6 m), on the seat's own spot and facing the way the seat does. So the actor's `facing` doesn't matter, and the seat can face any way.
 
 ```jsonc
-"props":  [ { "id": "seat1", "template": "plc_chair_mil_01", "at": { "spot": "room:207tel_1", "offset": [10.5, -4.4] }, "facing": 0 } ],
-"actors": [ { "id": "gambler", "template": "n_rodian", "at": { "spot": "prop:seat1" }, "facing": 0, "stance": "chair_pazaak" } ]
+"props":  [ { "id": "seat1", "template": "plc_chair_mil_01", "at": { "spot": "room:207tel_1", "offset": [10.5, -4.4] }, "facing": 90 } ],
+"actors": [ { "id": "gambler", "template": "n_rodian", "at": { "spot": "prop:seat1" }, "stance": "chair_pazaak" } ]
 ```
 
-One seat per seated actor: give a group a seat each (props and actors with the same `count`, `formation` and `spacing`, so the copies line up), or a bench per two. Put the table 1.3 m in front of the seat (in the facing direction) for `chair_pazaak`.
+- **Which way a seat faces.** Each seat model faces its own way: `plc_chair_mil_01` faces 90 degrees to the left of its `facing` (turn it to 0 and its sitter faces west). Work out where sitters look from `seats` in `placeables.tsv` / `models.tsv`: each seat is `x,y,fx,fy` in the model's frame (unturned, north up): where the sitter's hips go and the way it faces; `,e` marks a backless seat it can face either way (the side nearest the actor's `facing`). The checker's map shows each sitter's facing.
+- **One seat per seated actor.** A chair seats one, a bench two or three (one per `seats` entry). A group: a seat each (props and actors with the same `count`, `formation` and `spacing`), or `"spot": "prop:<bench>"` with `count` 2.
+- **At a table** (`chair_pazaak`): the seat's facing, not the actor's, decides which way it looks: turn the chair so it faces the table, about 1.3 m away.
+
+Chairs and benches are usable: a player who clicks one walks over and sits in it (moving gets them up). The GM can sit an NPC by dragging a seated one onto a seat, or by giving one standing next to a seat a seated stance.
 
 | Seat | KotOR (`content: "kotor"`) | KotOR II (`content: "tsl"`) |
 |---|---|---|

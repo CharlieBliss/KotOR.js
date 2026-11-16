@@ -221,7 +221,7 @@ d_g0t0_01	Droid Stealth Booster	Droid_Computer_Spike_Mount_x
 d_g0t0_02	Droid Omniscience Unit	Droid_Targeting_Computers	
 d_g0t0_03	Droid Singulararity Projector	Droid_Computer_Spike_Mount_x	
 d_g0t0_04	Goto Targeting Module	Droid_Computer_Spike_Mount_x	
-d_hk47_01	{hk47 01}Droid Assassin's Rifle	Disrupter_Rifle	ranged 5.45 +5
+d_hk47_01	{hk47 01}Droid Assassin's Rifle	Disrupter_Rifle	ranged 5.18 +5
 d_hk47_02	Droid Capacitor Armor	Droid_Heavy_Plating	armour 13
 d_hk47_03	Droid Assassination Module	Droid_Targeting_Computers	
 d_interface_01	Droid Optimized Interface	Droid_Computer_Spike_Mount_x	
@@ -303,14 +303,14 @@ e_imp4_07	{imp4 07}Skills D-Package	Implant_3
 e_imp4_08	{imp4 08}Universal D-Package	Implant_3	
 e_imp4_09	{imp4 09}Physical Boost D-Package	Implant_3	
 e_imp4_10	{imp4 10}Mental Boost D-Package	Implant_3	
-g1_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.4
-g1_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.14
-g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 11
-g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 10.51
+g1_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.64
+g1_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.71
+g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 11.22
+g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 10.9
 g1_w_sbrcrstl20	Door Cutting	Lightsaber_Crystals	
 g1_w_sbrcrstl21	+ dual strike <CUSTOM0>	Lightsaber_Crystals	
-g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.84
-g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 9.46
+g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.87
+g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 8.58
 g_a_armrdfsuit	Armored Flight Suit	Armor_Armd_Flight_Suit	armour 5
 g_a_clothes01	Clothing	Basic_Clothing	
 g_a_clothes010	Clothing {Variant 09}	Basic_Clothing	
@@ -335,10 +335,10 @@ g_i_adrnaline004	Hyper-adrenal Strength	Adrenaline
 g_i_adrnaline005	Hyper-adrenal Alacrity	Adrenaline	
 g_i_adrnaline006	Hyper-adrenal Stamina	Adrenaline	
 g_i_asthitem001	Aesthetic Item	Aesthetic_Item	
-g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 4.97
-g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 4.55
-g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 4.42
-g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 4.51
+g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 4.82
+g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 5.16
+g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 4.6
+g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 4.67
 g_i_cmbtshot001	Battle Stimulant	Combat_Shots	
 g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots	
 g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots	
@@ -464,54 +464,54 @@ g_w_crslash009	Kinrath Claw	Creature_Item_Slash	melee 0
 g_w_crslash010	Tach Claw	Creature_Item_Slash	melee 0
 g_w_crslash011	Kinrath Claw	Creature_Item_Slash	melee 0
 g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash	melee 0
-g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.53
+g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.26
 g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
 g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc	melee 0
 g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
-g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 9.01
+g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 9.29
 g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade	
-g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.51
-g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.64
-g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.42
-g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.21
-g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.98
-g_w_dblsbr007	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.73
-g_w_dblsbr008	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.62
-g_w_dblsbr009	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.49
-g_w_dblsbr010	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.92
-g_w_dblsbr011	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.18
-g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 10.53
-g_w_drkjdisbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.37
+g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.22
+g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.06
+g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.03
+g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.73
+g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13
+g_w_dblsbr007	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.97
+g_w_dblsbr008	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.04
+g_w_dblsbr009	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.1
+g_w_dblsbr010	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.65
+g_w_dblsbr011	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.49
+g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 11.12
+g_w_drkjdisbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.72
 g_w_firegren001	Plasma Grenade	Fire_Grenade	
 g_w_fraggren01	Frag Grenade	Fragmentation_Grenades	
 g_w_iongren01	Ion Grenade	Ion_Grenade	
-g_w_lghtsbr01	Lightsaber	Lightsaber	melee 11.18
-g_w_lghtsbr02	Lightsaber	Lightsaber	melee 10.85
-g_w_lghtsbr03	Lightsaber	Lightsaber	melee 11.05
-g_w_lghtsbr04	Lightsaber	Lightsaber	melee 11.6
-g_w_lghtsbr05	Lightsaber	Lightsaber	melee 11.2
-g_w_lghtsbr07	Lightsaber	Lightsaber	melee 11.78
-g_w_lghtsbr08	Lightsaber	Lightsaber	melee 11.1
-g_w_lghtsbr09	Lightsaber	Lightsaber	melee 10.61
-g_w_lghtsbr10	Lightsaber	Lightsaber	melee 10.53
-g_w_lghtsbr11	Lightsaber	Lightsaber	melee 10.18
-g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 4.54
-g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 5.73
-g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 5.16
-g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 7.22
-g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 6.37
-g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 6.34
+g_w_lghtsbr01	Lightsaber	Lightsaber	melee 11.01
+g_w_lghtsbr02	Lightsaber	Lightsaber	melee 11.27
+g_w_lghtsbr03	Lightsaber	Lightsaber	melee 11.43
+g_w_lghtsbr04	Lightsaber	Lightsaber	melee 10.98
+g_w_lghtsbr05	Lightsaber	Lightsaber	melee 10.91
+g_w_lghtsbr07	Lightsaber	Lightsaber	melee 10.52
+g_w_lghtsbr08	Lightsaber	Lightsaber	melee 11.16
+g_w_lghtsbr09	Lightsaber	Lightsaber	melee 10.92
+g_w_lghtsbr10	Lightsaber	Lightsaber	melee 11.35
+g_w_lghtsbr11	Lightsaber	Lightsaber	melee 10.49
+g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 4.64
+g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 5.57
+g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 5.46
+g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 7.54
+g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 6.68
+g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 6.18
 g_w_poisngren01	Poison Grenade	Poison_Grenade	
-g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.59
-g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 8.77
-g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 9.2
-g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 9.27
-g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 9.03
-g_w_shortsbr07	Short Lightsaber	Short_Lightsaber	melee 8.62
-g_w_shortsbr08	Short Lightsaber	Short_Lightsaber	melee 8.93
-g_w_shortsbr09	Short Lightsaber	Short_Lightsaber	melee 9.05
-g_w_shortsbr10	Short Lightsaber	Short_Lightsaber	melee 9.35
-g_w_shortsbr11	Short Lightsaber	Short_Lightsaber	melee 8.65
+g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.87
+g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 9.05
+g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 9.01
+g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 8.69
+g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 8.3
+g_w_shortsbr07	Short Lightsaber	Short_Lightsaber	melee 8.5
+g_w_shortsbr08	Short Lightsaber	Short_Lightsaber	melee 8.45
+g_w_shortsbr09	Short Lightsaber	Short_Lightsaber	melee 8.75
+g_w_shortsbr10	Short Lightsaber	Short_Lightsaber	melee 8.98
+g_w_shortsbr11	Short Lightsaber	Short_Lightsaber	melee 8.89
 g_w_sonicdet01	Minor Sonic Detonator	Sonic_Grenade	
 g_w_sonicdet02	Sonic Detonator	Sonic_Grenade	
 g_w_sonicgren01	Sonic Grenade	Sonic_Grenade	
@@ -522,93 +522,93 @@ hkpart02	HK Chassis	Plot_Useable_Items
 hkpart03	HK Control Cluster	Plot_Useable_Items	
 hkpart04	HK Vocabulator	Plot_Useable_Items	
 hkpart05	HK Protocol Pacifist Package	Plot_Useable_Items	
-killblaster	KillBlaster	Blaster_Pistol	ranged 4.17 +5
-killstick	Killstick	Quarter_Staff	melee 13.29 +5
+killblaster	KillBlaster	Blaster_Pistol	ranged 4.51 +5
+killstick	Killstick	Quarter_Staff	melee 12.91 +5
 lspart01	Lightsaber Energy Cell Fixture	Plot_Useable_Items	
 lspart02	Lightsaber Emitter Fixture	Plot_Useable_Items	
 lspart03	Lightsaber Focusing Lens Fixture	Plot_Useable_Items	
 mineruniform	Miner Uniform	Miner_Uniform	armour 1
 mininglaser	Mining Laser		
-propbc01	{Prop BC 01}	Blaster_Carbine	ranged 6.42
-propbc02	{Prop BC 02}	Blaster_Carbine	ranged 6.6
-propbc03	{Prop BC 03}	Blaster_Carbine	ranged 6.14
-propbc04	{Prop BC 04}	Blaster_Carbine	ranged 6.01
-propbc05	{Prop BC 05}	Blaster_Carbine	ranged 6.19
-propbp01	{Prop BP 01}	Blaster_Pistol	ranged 4.35
-propbp02	{Prop BP 02}	Blaster_Pistol	ranged 4.34
-propbp03	{Prop BP 03}	Blaster_Pistol	ranged 4.46
-propbp04	{Prop BP 04}	Blaster_Pistol	ranged 4.77
-propbp05	{Prop BP 05}	Blaster_Pistol	ranged 4.54
-propbr01	{Prop BR 01}	Blaster_Rifle	ranged 6.48
-propbr02	{Prop BR 02}	Blaster_Rifle	ranged 5.91
-propbr03	{Prop BR 03}	Blaster_Rifle	ranged 6.23
-propbr04	{Prop BR 04}	Blaster_Rifle	ranged 6.12
-propbr05	{Prop BR 05}	Blaster_Rifle	ranged 6.31
-propdb01	{Prop DB 01}	Double_Bladed_Sword	melee 6.58
-propdb02	{Prop DB 02}	Double_Bladed_Sword	melee 6.88
-propdb03	{Prop DB 03}	Double_Bladed_Sword	melee 6.4
-propdb04	{Prop DB 04}	Double_Bladed_Sword	melee 6.87
-propdp01	{Prop DP 01}	Disrupter_Pistol	ranged 3.36
-propdp02	{Prop DP 02}	Disrupter_Pistol	ranged 3.54
-propdr01	{Prop DR 01}	Disrupter_Rifle	ranged 5.64
-propdr02	{Prop DR 02}	Disrupter_Rifle	ranged 5.81
-propfp01	{Prop FP 01}	Force_Pike	melee 7.19
-propga01	{Prop GA 01}	Gammorean_Battleaxe	melee 6.05
-prophb01	{Prop HB 01}	Heavy_Blaster	ranged 5.46
-prophb02	{Prop HB 02}	Heavy_Blaster	ranged 5.76
-prophb03	{Prop HB 03}	Heavy_Blaster	ranged 5.5
-prophb04	{Prop HB 04}	Heavy_Blaster	ranged 5.39
-prophb05	{Prop HB 05}	Heavy_Blaster	ranged 5.78
-propho01	{Prop HO 01}	Hold_Out_Blaster	ranged 2.25
-propho02	{Prop HO 02}	Hold_Out_Blaster	ranged 2.4
-propho03	{Prop HO 03}	Hold_Out_Blaster	ranged 2.58
-propho04	{Prop HO 04}	Hold_Out_Blaster	ranged 2.49
-prophr01	{Prop HR 01}	Heavy_Repeating_Blaster	ranged 9.36
-prophr02	{Prop HR 02}	Heavy_Repeating_Blaster	ranged 8.7
-propip01	{Prop IP 01}	Ion_Blaster	ranged 3.78
-propip02	{Prop IP 02}	Ion_Blaster	ranged 3.48
-propir01	{Prop IR 01}	Ion_Rifle	ranged 4.91
-propir02	{Prop IR 02}	Ion_Rifle	ranged 5.14
-propir03	{Prop IR 03}	Ion_Rifle	ranged 5.13
-propls01	{Prop LS 01}	Long_Sword	melee 6.84
-propls02	{Prop LS 02}	Long_Sword	melee 6.72
-propls03	{Prop LS 03}	Long_Sword	melee 7.1
-propls04	{Prop LS 04}	Long_Sword	melee 6.19
-propls05	{Prop LS 05}	Long_Sword	melee 6.78
-propqs01	{Prop QS 01}	Quarter_Staff	melee 3.09
-propqs02	{Prop QS 02}	Quarter_Staff	melee 3.56
-propqs03	{Prop QS 03}	Quarter_Staff	melee 3.61
-proprb01	{Prop RB 01}	Repeating_Blaster	ranged 7.19
-proprb02	{Prop RB 02}	Repeating_Blaster	ranged 6.72
-proprb03	{Prop RB 03}	Repeating_Blaster	ranged 7.24
-propsb01	{Prop SB 01}	Stun_Baton	melee 4.75
-propsb02	{Prop SB 02}	Stun_Baton	melee 4.57
-propsb03	{Prop SB 03}	Stun_Baton	melee 4.25
-propsp01	{Prop SP 01}	Sonic_Pistol	ranged 2.46
-propsp02	{Prop SP 02}	Sonic_Pistol	ranged 2.38
-propsr01	{Prop SR 01}	Sonic_Rifle	ranged 5.68
-propsr02	{Prop SR 02}	Sonic_Rifle	ranged 5.81
-propsr03	{Prop SR 03}	Sonic_Rifle	ranged 5.58
-propss01	{Prop SS 01}	Short_Sword	melee 3.39
-propss02	{Prop SS 02}	Short_Sword	melee 4.04
+propbc01	{Prop BC 01}	Blaster_Carbine	ranged 6.86
+propbc02	{Prop BC 02}	Blaster_Carbine	ranged 6.87
+propbc03	{Prop BC 03}	Blaster_Carbine	ranged 6.49
+propbc04	{Prop BC 04}	Blaster_Carbine	ranged 6.7
+propbc05	{Prop BC 05}	Blaster_Carbine	ranged 6.6
+propbp01	{Prop BP 01}	Blaster_Pistol	ranged 4.6
+propbp02	{Prop BP 02}	Blaster_Pistol	ranged 4.52
+propbp03	{Prop BP 03}	Blaster_Pistol	ranged 4.08
+propbp04	{Prop BP 04}	Blaster_Pistol	ranged 4.8
+propbp05	{Prop BP 05}	Blaster_Pistol	ranged 4.79
+propbr01	{Prop BR 01}	Blaster_Rifle	ranged 6.72
+propbr02	{Prop BR 02}	Blaster_Rifle	ranged 6.34
+propbr03	{Prop BR 03}	Blaster_Rifle	ranged 6.39
+propbr04	{Prop BR 04}	Blaster_Rifle	ranged 7.29
+propbr05	{Prop BR 05}	Blaster_Rifle	ranged 7.02
+propdb01	{Prop DB 01}	Double_Bladed_Sword	melee 7.26
+propdb02	{Prop DB 02}	Double_Bladed_Sword	melee 6.75
+propdb03	{Prop DB 03}	Double_Bladed_Sword	melee 6.95
+propdb04	{Prop DB 04}	Double_Bladed_Sword	melee 7.07
+propdp01	{Prop DP 01}	Disrupter_Pistol	ranged 3.43
+propdp02	{Prop DP 02}	Disrupter_Pistol	ranged 3.79
+propdr01	{Prop DR 01}	Disrupter_Rifle	ranged 5.83
+propdr02	{Prop DR 02}	Disrupter_Rifle	ranged 5.74
+propfp01	{Prop FP 01}	Force_Pike	melee 7.12
+propga01	{Prop GA 01}	Gammorean_Battleaxe	melee 6.78
+prophb01	{Prop HB 01}	Heavy_Blaster	ranged 5.13
+prophb02	{Prop HB 02}	Heavy_Blaster	ranged 5.5
+prophb03	{Prop HB 03}	Heavy_Blaster	ranged 5.22
+prophb04	{Prop HB 04}	Heavy_Blaster	ranged 5.89
+prophb05	{Prop HB 05}	Heavy_Blaster	ranged 5.72
+propho01	{Prop HO 01}	Hold_Out_Blaster	ranged 2.61
+propho02	{Prop HO 02}	Hold_Out_Blaster	ranged 2.46
+propho03	{Prop HO 03}	Hold_Out_Blaster	ranged 2.32
+propho04	{Prop HO 04}	Hold_Out_Blaster	ranged 2.35
+prophr01	{Prop HR 01}	Heavy_Repeating_Blaster	ranged 8.87
+prophr02	{Prop HR 02}	Heavy_Repeating_Blaster	ranged 9.1
+propip01	{Prop IP 01}	Ion_Blaster	ranged 3.76
+propip02	{Prop IP 02}	Ion_Blaster	ranged 3.07
+propir01	{Prop IR 01}	Ion_Rifle	ranged 5.36
+propir02	{Prop IR 02}	Ion_Rifle	ranged 5.63
+propir03	{Prop IR 03}	Ion_Rifle	ranged 5.61
+propls01	{Prop LS 01}	Long_Sword	melee 6.34
+propls02	{Prop LS 02}	Long_Sword	melee 5.88
+propls03	{Prop LS 03}	Long_Sword	melee 6.68
+propls04	{Prop LS 04}	Long_Sword	melee 6.94
+propls05	{Prop LS 05}	Long_Sword	melee 6.07
+propqs01	{Prop QS 01}	Quarter_Staff	melee 3.62
+propqs02	{Prop QS 02}	Quarter_Staff	melee 3.53
+propqs03	{Prop QS 03}	Quarter_Staff	melee 3.52
+proprb01	{Prop RB 01}	Repeating_Blaster	ranged 7.02
+proprb02	{Prop RB 02}	Repeating_Blaster	ranged 6.92
+proprb03	{Prop RB 03}	Repeating_Blaster	ranged 6.41
+propsb01	{Prop SB 01}	Stun_Baton	melee 4.56
+propsb02	{Prop SB 02}	Stun_Baton	melee 4.73
+propsb03	{Prop SB 03}	Stun_Baton	melee 4.64
+propsp01	{Prop SP 01}	Sonic_Pistol	ranged 2.6
+propsp02	{Prop SP 02}	Sonic_Pistol	ranged 2.59
+propsr01	{Prop SR 01}	Sonic_Rifle	ranged 5.35
+propsr02	{Prop SR 02}	Sonic_Rifle	ranged 5.55
+propsr03	{Prop SR 03}	Sonic_Rifle	ranged 5.41
+propss01	{Prop SS 01}	Short_Sword	melee 3.28
+propss02	{Prop SS 02}	Short_Sword	melee 3.44
 propss03	{Prop SS 03}	Short_Sword	melee 3.36
-propvb01	{Prop VB 01}	Vibro_Blade	melee 5.6
-propvb02	{Prop VB 02}	Vibro_Blade	melee 5.66
-propvb03	{Prop VB 03}	Vibro_Blade	melee 5.86
-propvb04	{Prop VB 04}	Vibro_Blade	melee 5.69
-propvd01	{Prop VD 01}	Vibro_Double_Blade	melee 8.56
-propvd02	{Prop VD 02}	Vibro_Double_Blade	melee 8.58
-propvd03	{Prop VD 03}	Vibro_Double_Blade	melee 8.58
-propvd04	{Prop VD 04}	Vibro_Double_Blade	melee 8.97
-propvs01	{Prop VS 01}	Vibro_Sword	melee 7.07
-propvs02	{Prop VS 02}	Vibro_Sword	melee 7.36
-propvs03	{Prop VS 03}	Vibro_Sword	melee 6.86
-propvs04	{Prop VS 04}	Vibro_Sword	melee 6.53
-propvs05	{Prop VS 05}	Vibro_Sword	melee 7.27
+propvb01	{Prop VB 01}	Vibro_Blade	melee 5.19
+propvb02	{Prop VB 02}	Vibro_Blade	melee 5.6
+propvb03	{Prop VB 03}	Vibro_Blade	melee 5.79
+propvb04	{Prop VB 04}	Vibro_Blade	melee 5.88
+propvd01	{Prop VD 01}	Vibro_Double_Blade	melee 8.8
+propvd02	{Prop VD 02}	Vibro_Double_Blade	melee 8.97
+propvd03	{Prop VD 03}	Vibro_Double_Blade	melee 9.25
+propvd04	{Prop VD 04}	Vibro_Double_Blade	melee 9.14
+propvs01	{Prop VS 01}	Vibro_Sword	melee 6.46
+propvs02	{Prop VS 02}	Vibro_Sword	melee 7.1
+propvs03	{Prop VS 03}	Vibro_Sword	melee 7.01
+propvs04	{Prop VS 04}	Vibro_Sword	melee 7.07
+propvs05	{Prop VS 05}	Vibro_Sword	melee 6.98
 propvs06	{Prop VS 06}	Vibro_Sword	melee 7.03
-propwb01	{Prop WB 01}	Bowcaster	ranged 5.22
-propwb02	{Prop WB 02}	Bowcaster	ranged 5.57
-propww01	{Prop WW 01}	Wookie_Warblade	melee 5.71
+propwb01	{Prop WB 01}	Bowcaster	ranged 5.58
+propwb02	{Prop WB 02}	Bowcaster	ranged 5.62
+propww01	{Prop WW 01}	Wookie_Warblade	melee 4.97
 qcrystal_1_0	<FullName> Crystal{01_VD}	Lightsaber_Crystals	
 qcrystal_1_1	<FullName> Crystal{01_D}	Lightsaber_Crystals	
 qcrystal_1_2	<FullName> Crystal{01_N}	Lightsaber_Crystals	
@@ -880,107 +880,107 @@ u_r_targ_12	{sc 12}Crippling Scope Mark III	Plot_Useable_Items
 u_r_targ_13	{sc 13}Pinpoint Scope Mark IV	Plot_Useable_Items	
 u_r_targ_14	{sc 14}Accuracy Scope Mark IV	Plot_Useable_Items	
 u_r_targ_15	{sc 15}Targeting Scope Mark IV	Plot_Useable_Items	
-vibrocutter	Vibrocutter	Vibro_Blade	melee 5.9
-w_blaste_01	{01}Blaster Pistol	Blaster_Pistol	ranged 4.04
-w_blaste_02	{02}Ion Blaster	Ion_Blaster	ranged 3.63
-w_blaste_03	{03}Field Survival Pistol	Hold_Out_Blaster	ranged 2.71
-w_blaste_04	{04}Sonic Pistol	Sonic_Pistol	ranged 2.69
-w_blaste_05	{05}Disruptor Pistol	Disrupter_Pistol	ranged 3.52
-w_blaste_06	{06}Heavy Blaster	Heavy_Blaster	ranged 5.87
-w_blaste_07	{07}Scout Enforcer	Hold_Out_Blaster	ranged 2.55
-w_blaste_08	{08}Systech Aural Blaster	Sonic_Pistol	ranged 4.5
-w_blaste_09	{09}Republic Blaster	Blaster_Pistol	ranged 4.62
-w_blaste_10	{10}Aratech Droid Oxidizer	Ion_Blaster	ranged 5.74 +1
-w_blaste_11	{11}Arkanian Heavy Pistol	Heavy_Blaster	ranged 5.56
-w_blaste_12	{12}Mandalorian Blaster	Blaster_Pistol	ranged 4.1
-w_blaste_13	{13}Systech Static Blaster	Blaster_Pistol	ranged 8.92
-w_blaste_14	{14}Arkanian Sonic Blaster	Sonic_Pistol	ranged 3.64
-w_blaste_15	{15}Sith Disruptor	Disrupter_Pistol	ranged 4.57
-w_blaste_16	{16}Mandalorian Heavy Blaster	Heavy_Blaster	ranged 6.17
-w_blaste_17	{17}Heavy Sonic Blaster	Sonic_Pistol	ranged 7.62
-w_blaste_18	{18}Watchman Blaster	Hold_Out_Blaster	ranged 7.46
-w_blaste_19	{19}Zabrak Blaster Pistol	Blaster_Pistol	ranged 4.4
-w_blaste_20	{20}Mandalorian Ripper	Disrupter_Pistol	ranged 3.47
-w_blaste_21	{21}Aratech Ionmaster	Ion_Blaster	ranged 8.13 +2
-w_blaste_22	{22}Onasi Blaster	Blaster_Pistol	ranged 5.26
-w_blaste_23	{23}Dashade Sonic Blaster	Sonic_Pistol	ranged 4.64
-w_blaste_24	{24}Zabrak Heavy Blaster	Heavy_Blaster	ranged 7.29
-w_blaste_25	{25}Systech Electric Blaster	Blaster_Pistol	ranged 13.56 +1
-w_blaste_26	{26}Micro-Pulse Blaster	Blaster_Pistol	ranged 8.79
-w_blaste_27	{27}Elite Watchman Blaster	Hold_Out_Blaster	ranged 6.7
-w_blaste_28	{28}Mandalorian Disintegrator	Disrupter_Pistol	ranged 7.75
-w_blaste_29	{29}Dashade Sonic Disruptor	Sonic_Pistol	ranged 6.49
-w_blaste_30	{30}Freedon Nadd's Blaster	Heavy_Blaster	ranged 14.34
-w_blaste_x05	{x05}Luxa's Disruptor	Disrupter_Pistol	ranged 3.65 +1
-w_blaste_x20	{x20}Remote's Blaster	Blaster_Pistol	ranged 4.55 +5
-w_brifle_01	{01}Blaster Carbine	Blaster_Carbine	ranged 6.5
-w_brifle_02	{02}Ion Carbine	Ion_Rifle	ranged 5.77
-w_brifle_03	{03}Sonic Carbine	Sonic_Rifle	ranged 6.05
-w_brifle_04	{04}Blaster Rifle	Blaster_Rifle	ranged 6.29
-w_brifle_05	{05}Bowcaster	Bowcaster	ranged 6.37
-w_brifle_06	{06}Repeating Blaster Carbine	Repeating_Blaster	ranged 6.76
-w_brifle_07	{07}Ion Rifle	Ion_Rifle	ranged 5.68
-w_brifle_08	{08}Disruptor Carbine	Disrupter_Rifle	ranged 5.54
-w_brifle_09	{09}Sonic Rifle	Sonic_Rifle	ranged 9.86
-w_brifle_10	{10}Repeating Blaster Rifle	Repeating_Blaster	ranged 7.11
-w_brifle_11	{11}War Bowcaster	Bowcaster	ranged 6.01
-w_brifle_12	{12}Arkanian Blaster Rifle	Blaster_Rifle	ranged 7.75
-w_brifle_13	{13}Disruptor Rifle	Disrupter_Rifle	ranged 5.7
-w_brifle_14	{14}Argazdan Riot Buster	Sonic_Rifle	ranged 5.25
-w_brifle_15	{15}Bothan Droid Disruptor	Ion_Rifle	ranged 5.81
-w_brifle_16	{16}Combat Enforcer	Repeating_Blaster	ranged 7.37
-w_brifle_17	{17}Heavy Repeating Carbine	Heavy_Repeating_Blaster	ranged 14.36
-w_brifle_18	{18}Plasma Projector	Blaster_Rifle	ranged 11.29
-w_brifle_19	{19}Mandalorian Assault Rifle	Blaster_Rifle	ranged 6.51
-w_brifle_20	{20}Verpine Droid Disruptor	Ion_Rifle	ranged 5.48
-w_brifle_21	{21}Ceremonial Bowcaster	Bowcaster	ranged 5.5
-w_brifle_22	{22}Heavy Repeating Rifle	Heavy_Repeating_Blaster	ranged 13.79
-w_brifle_23	{23}Charric	Disrupter_Rifle	ranged 5.5 +4
-w_brifle_24	{24}Zabrak Blaster Carbine	Blaster_Carbine	ranged 11.09
-w_brifle_25	{25}Slavemaster Stun Carbine	Blaster_Carbine	ranged 6.59
-w_brifle_26	{26}Onderon Repeating Carbine	Repeating_Blaster	ranged 15.86
-w_brifle_27	{27}Sonic Disruptor	Sonic_Rifle	ranged 9.89
-w_brifle_28	{28}Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 12.79
-w_brifle_29	{29}Verpine Droid Disintegrator	Ion_Rifle	ranged 9.58
-w_brifle_30	{30}Zersium Rifle	Blaster_Rifle	ranged 10.43
-w_drink_01	{Special}Drink In Hand	Blaster_Pistol	ranged 4.38
-w_emptyhnd_01	{Special}Empty Hand	Blaster_Pistol	ranged 4.33
-w_ls_x01	Visas Marr's Lightsaber	Lightsaber	melee 12.98 +1
-w_melee_01	{01}Short Sword	Short_Sword	melee 3.6
-w_melee_02	{02}Long Sword	Long_Sword	melee 6.69
-w_melee_03	{03}Energy Baton	Stun_Baton	melee 8.7
-w_melee_04	{04}Quarterstaff	Quarter_Staff	melee 3.37
-w_melee_05	{05}Vibroblade	Vibro_Blade	melee 5.12
-w_melee_06	{06}Vibrosword	Vibro_Sword	melee 7.22
-w_melee_07	{07}Double-Bladed Sword	Double_Bladed_Sword	melee 6.98
-w_melee_08	{08}Exchange Negotiator	Stun_Baton	melee 9.12
-w_melee_09	{09}Gamorrean War Axe	Gammorean_Battleaxe	melee 11.07
-w_melee_10	{10}Zabrak Vibroblade	Vibro_Blade	melee 8.15
-w_melee_11	{11}Rodian Blade	Short_Sword	melee 3.39 +1
-w_melee_12	{12}Sith War Sword	Vibro_Double_Blade	melee 9.39
-w_melee_13	{13}Trandoshan Sword	Long_Sword	melee 10.37 +1
-w_melee_14	{14}Force Pike	Force_Pike	melee 7.19
-w_melee_15	{15}Vibro Double-Blade	Vibro_Double_Blade	melee 9.31
-w_melee_16	{16}Gamorrean Cleaver	Gammorean_Battleaxe	melee 11.19
-w_melee_17	{17}Rodian Death Blade	Short_Sword	melee 4.51 +1
-w_melee_18	{18}Gand Silencer	Stun_Baton	melee 9.19 +1
-w_melee_19	{19}Ryyk Blade	Short_Sword	melee 6.45
-w_melee_20	{20}Trandoshan Double-Blade	Vibro_Double_Blade	melee 13.36 +2
-w_melee_21	{21}Echani Vibrosword	Vibro_Sword	melee 8.65
-w_melee_22	{22}Sith Tremor Sword	Vibro_Sword	melee 9.86
-w_melee_23	{23}Gand Shockstaff	Force_Pike	melee 6.82
-w_melee_24	{24}Shyarn	Long_Sword	melee 11.94 +1
-w_melee_25	{25}Arg'garok	Gammorean_Battleaxe	melee 10.94
-w_melee_26	{26}Geonosian Electro-Staff	Quarter_Staff	melee 8.48
-w_melee_27	{27}Tehk'la Blade	Vibro_Blade	melee 10.64 +1
-w_melee_28	{28}Zhaboka	Vibro_Double_Blade	melee 14.42
-w_melee_29	{29}Gand Discharger	Stun_Baton	melee 13.29 +1
-w_melee_30	{30}Freyyr's Warblade	Wookie_Warblade	melee 7.95 +1
-w_melee_x01	{x01}Handmaiden's Staff	Quarter_Staff	melee 8.33 +2
-w_melee_x02	{x02}Twi'lek Spinning Blade	Short_Sword	melee 3.34 +1
-w_melee_x03	{x03}Twi'lek Spinning Blade	Short_Sword	melee 6.03
-w_melee_x12	{x12}Ludo Kressh's War Sword	Vibro_Double_Blade	melee 11.16 +1
-w_pazaak_01	{Special}Pazaak Cards In Hand	Blaster_Pistol	ranged 4.7
+vibrocutter	Vibrocutter	Vibro_Blade	melee 5.53
+w_blaste_01	{01}Blaster Pistol	Blaster_Pistol	ranged 4.6
+w_blaste_02	{02}Ion Blaster	Ion_Blaster	ranged 3.43
+w_blaste_03	{03}Field Survival Pistol	Hold_Out_Blaster	ranged 2.51
+w_blaste_04	{04}Sonic Pistol	Sonic_Pistol	ranged 2.55
+w_blaste_05	{05}Disruptor Pistol	Disrupter_Pistol	ranged 3.57
+w_blaste_06	{06}Heavy Blaster	Heavy_Blaster	ranged 5.68
+w_blaste_07	{07}Scout Enforcer	Hold_Out_Blaster	ranged 2.45
+w_blaste_08	{08}Systech Aural Blaster	Sonic_Pistol	ranged 4.51
+w_blaste_09	{09}Republic Blaster	Blaster_Pistol	ranged 4.56
+w_blaste_10	{10}Aratech Droid Oxidizer	Ion_Blaster	ranged 5.5 +1
+w_blaste_11	{11}Arkanian Heavy Pistol	Heavy_Blaster	ranged 5.79
+w_blaste_12	{12}Mandalorian Blaster	Blaster_Pistol	ranged 4.56
+w_blaste_13	{13}Systech Static Blaster	Blaster_Pistol	ranged 9.33
+w_blaste_14	{14}Arkanian Sonic Blaster	Sonic_Pistol	ranged 3.55
+w_blaste_15	{15}Sith Disruptor	Disrupter_Pistol	ranged 4.41
+w_blaste_16	{16}Mandalorian Heavy Blaster	Heavy_Blaster	ranged 5.33
+w_blaste_17	{17}Heavy Sonic Blaster	Sonic_Pistol	ranged 6.79
+w_blaste_18	{18}Watchman Blaster	Hold_Out_Blaster	ranged 7
+w_blaste_19	{19}Zabrak Blaster Pistol	Blaster_Pistol	ranged 4.97
+w_blaste_20	{20}Mandalorian Ripper	Disrupter_Pistol	ranged 3.58
+w_blaste_21	{21}Aratech Ionmaster	Ion_Blaster	ranged 7.72 +2
+w_blaste_22	{22}Onasi Blaster	Blaster_Pistol	ranged 5.09
+w_blaste_23	{23}Dashade Sonic Blaster	Sonic_Pistol	ranged 4.57
+w_blaste_24	{24}Zabrak Heavy Blaster	Heavy_Blaster	ranged 7.46
+w_blaste_25	{25}Systech Electric Blaster	Blaster_Pistol	ranged 13.14 +1
+w_blaste_26	{26}Micro-Pulse Blaster	Blaster_Pistol	ranged 8.94
+w_blaste_27	{27}Elite Watchman Blaster	Hold_Out_Blaster	ranged 7.1
+w_blaste_28	{28}Mandalorian Disintegrator	Disrupter_Pistol	ranged 8.6
+w_blaste_29	{29}Dashade Sonic Disruptor	Sonic_Pistol	ranged 6.66
+w_blaste_30	{30}Freedon Nadd's Blaster	Heavy_Blaster	ranged 14.85
+w_blaste_x05	{x05}Luxa's Disruptor	Disrupter_Pistol	ranged 3.27 +1
+w_blaste_x20	{x20}Remote's Blaster	Blaster_Pistol	ranged 4.63 +5
+w_brifle_01	{01}Blaster Carbine	Blaster_Carbine	ranged 6.12
+w_brifle_02	{02}Ion Carbine	Ion_Rifle	ranged 5.11
+w_brifle_03	{03}Sonic Carbine	Sonic_Rifle	ranged 5.3
+w_brifle_04	{04}Blaster Rifle	Blaster_Rifle	ranged 6.96
+w_brifle_05	{05}Bowcaster	Bowcaster	ranged 6.35
+w_brifle_06	{06}Repeating Blaster Carbine	Repeating_Blaster	ranged 6.89
+w_brifle_07	{07}Ion Rifle	Ion_Rifle	ranged 5.9
+w_brifle_08	{08}Disruptor Carbine	Disrupter_Rifle	ranged 5.09
+w_brifle_09	{09}Sonic Rifle	Sonic_Rifle	ranged 9.95
+w_brifle_10	{10}Repeating Blaster Rifle	Repeating_Blaster	ranged 7.13
+w_brifle_11	{11}War Bowcaster	Bowcaster	ranged 6.21
+w_brifle_12	{12}Arkanian Blaster Rifle	Blaster_Rifle	ranged 8.15
+w_brifle_13	{13}Disruptor Rifle	Disrupter_Rifle	ranged 5.81
+w_brifle_14	{14}Argazdan Riot Buster	Sonic_Rifle	ranged 5.63
+w_brifle_15	{15}Bothan Droid Disruptor	Ion_Rifle	ranged 5.68
+w_brifle_16	{16}Combat Enforcer	Repeating_Blaster	ranged 6.99
+w_brifle_17	{17}Heavy Repeating Carbine	Heavy_Repeating_Blaster	ranged 13.77
+w_brifle_18	{18}Plasma Projector	Blaster_Rifle	ranged 11.05
+w_brifle_19	{19}Mandalorian Assault Rifle	Blaster_Rifle	ranged 6.27
+w_brifle_20	{20}Verpine Droid Disruptor	Ion_Rifle	ranged 5.77
+w_brifle_21	{21}Ceremonial Bowcaster	Bowcaster	ranged 5.42
+w_brifle_22	{22}Heavy Repeating Rifle	Heavy_Repeating_Blaster	ranged 12.9
+w_brifle_23	{23}Charric	Disrupter_Rifle	ranged 5.64 +4
+w_brifle_24	{24}Zabrak Blaster Carbine	Blaster_Carbine	ranged 10.82
+w_brifle_25	{25}Slavemaster Stun Carbine	Blaster_Carbine	ranged 6.5
+w_brifle_26	{26}Onderon Repeating Carbine	Repeating_Blaster	ranged 15.91
+w_brifle_27	{27}Sonic Disruptor	Sonic_Rifle	ranged 10.51
+w_brifle_28	{28}Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 12.99
+w_brifle_29	{29}Verpine Droid Disintegrator	Ion_Rifle	ranged 9.25
+w_brifle_30	{30}Zersium Rifle	Blaster_Rifle	ranged 10.75
+w_drink_01	{Special}Drink In Hand	Blaster_Pistol	ranged 4.24
+w_emptyhnd_01	{Special}Empty Hand	Blaster_Pistol	ranged 4.5
+w_ls_x01	Visas Marr's Lightsaber	Lightsaber	melee 13.17 +1
+w_melee_01	{01}Short Sword	Short_Sword	melee 3.59
+w_melee_02	{02}Long Sword	Long_Sword	melee 6.18
+w_melee_03	{03}Energy Baton	Stun_Baton	melee 8.65
+w_melee_04	{04}Quarterstaff	Quarter_Staff	melee 3.29
+w_melee_05	{05}Vibroblade	Vibro_Blade	melee 5.36
+w_melee_06	{06}Vibrosword	Vibro_Sword	melee 6.53
+w_melee_07	{07}Double-Bladed Sword	Double_Bladed_Sword	melee 6.46
+w_melee_08	{08}Exchange Negotiator	Stun_Baton	melee 9.03
+w_melee_09	{09}Gamorrean War Axe	Gammorean_Battleaxe	melee 11.09
+w_melee_10	{10}Zabrak Vibroblade	Vibro_Blade	melee 7.95
+w_melee_11	{11}Rodian Blade	Short_Sword	melee 3.54 +1
+w_melee_12	{12}Sith War Sword	Vibro_Double_Blade	melee 8.22
+w_melee_13	{13}Trandoshan Sword	Long_Sword	melee 10.28 +1
+w_melee_14	{14}Force Pike	Force_Pike	melee 7.14
+w_melee_15	{15}Vibro Double-Blade	Vibro_Double_Blade	melee 9.11
+w_melee_16	{16}Gamorrean Cleaver	Gammorean_Battleaxe	melee 10.62
+w_melee_17	{17}Rodian Death Blade	Short_Sword	melee 4.11 +1
+w_melee_18	{18}Gand Silencer	Stun_Baton	melee 8.72 +1
+w_melee_19	{19}Ryyk Blade	Short_Sword	melee 6.99
+w_melee_20	{20}Trandoshan Double-Blade	Vibro_Double_Blade	melee 13.24 +2
+w_melee_21	{21}Echani Vibrosword	Vibro_Sword	melee 9.28
+w_melee_22	{22}Sith Tremor Sword	Vibro_Sword	melee 10.11
+w_melee_23	{23}Gand Shockstaff	Force_Pike	melee 7.01
+w_melee_24	{24}Shyarn	Long_Sword	melee 11.87 +1
+w_melee_25	{25}Arg'garok	Gammorean_Battleaxe	melee 10.58
+w_melee_26	{26}Geonosian Electro-Staff	Quarter_Staff	melee 8.27
+w_melee_27	{27}Tehk'la Blade	Vibro_Blade	melee 10.27 +1
+w_melee_28	{28}Zhaboka	Vibro_Double_Blade	melee 13.22
+w_melee_29	{29}Gand Discharger	Stun_Baton	melee 13.96 +1
+w_melee_30	{30}Freyyr's Warblade	Wookie_Warblade	melee 7.71 +1
+w_melee_x01	{x01}Handmaiden's Staff	Quarter_Staff	melee 7.89 +2
+w_melee_x02	{x02}Twi'lek Spinning Blade	Short_Sword	melee 3.41 +1
+w_melee_x03	{x03}Twi'lek Spinning Blade	Short_Sword	melee 5.79
+w_melee_x12	{x12}Ludo Kressh's War Sword	Vibro_Double_Blade	melee 11.08 +1
+w_pazaak_01	{Special}Pazaak Cards In Hand	Blaster_Pistol	ranged 4.13
 w_rocket_01	Explosive Rocket	Rocket	
 w_rocket_02	Tranquilizer Dart	Rocket	
 w_rocket_03	Buster Rocket	Rocket	
@@ -992,4 +992,4 @@ w_rocket_08	Piercing Dart	Rocket
 w_rocket_09	Paralysis Dart	Rocket	
 w_rocket_10	Ion Rocket	Rocket	
 w_rocket_11	Concussion Rocket	Rocket	
-w_sls_x02	Freedon Nadd's Short Lightsaber	Short_Lightsaber	melee 14.12 +2
+w_sls_x02	Freedon Nadd's Short Lightsaber	Short_Lightsaber	melee 13.83 +2

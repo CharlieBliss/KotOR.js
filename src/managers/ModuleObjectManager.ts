@@ -699,6 +699,23 @@ export class ModuleObjectManager {
     }
   }
 
+  /**
+   * Tab targeting: the next (or previous, step -1) thing the player can use or fight, after the current one.
+   * They're in order of distance from the player, nearest first, and only ones on screen: the order the player
+   * sees, which doesn't reshuffle as the list is rebuilt each frame.
+   */
+  static CycleTarget(current: ModuleObject | undefined, step: 1 | -1 = 1): ModuleObject | undefined {
+    const player = GameState.getCurrentPlayer();
+    if(!player) return undefined;
+    const list = (this.playerSelectableObjects.length ? this.playerSelectableObjects : this.playerHoverableObjects)
+      .filter((o) => o && o !== player && !(o as any).destroyed && (typeof o.isOnScreen !== 'function' || o.isOnScreen()))
+      .sort((a, b) => a.position.distanceToSquared(player.position) - b.position.distanceToSquared(player.position));
+    if(!list.length) return undefined;
+    const at = current ? list.indexOf(current) : -1;
+    if(at < 0) return step > 0 ? list[0] : list[list.length - 1];
+    return list[(at + step + list.length) % list.length];
+  }
+
   static GetNextPlayerVisibleObject(){
     this.#currentVisibleObjectIndex++;
     if(this.#currentVisibleObjectIndex >= this.playerSelectableObjects.length){

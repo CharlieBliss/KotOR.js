@@ -63,6 +63,16 @@ export class IngameControls {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       // Typing into a page text field (e.g. the GM panel) must not also move the camera or character
       if(IngameControls.isTypingInPageField(e)) return;
+      // Tab / Shift + Tab: the next or previous thing to use or fight, instead of moving the page's focus
+      if(e.code === 'Tab' && GameState.Mode == EngineMode.INGAME && GameState.getCurrentPlayer()){
+        e.preventDefault();
+        const target = GameState.ModuleObjectManager.CycleTarget(GameState.CursorManager.selectedObject, e.shiftKey ? -1 : 1);
+        if(target){
+          GameState.CursorManager.setReticleSelectedObject(target);
+          GameState.CursorManager.setReticleHoveredObject(target);
+        }
+        return;
+      }
       this.keyboard.onKeyDown(e);
 
       if(GameState.MenuManager.activeGUIElement){

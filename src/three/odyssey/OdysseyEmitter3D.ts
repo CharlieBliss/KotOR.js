@@ -539,6 +539,11 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     }
   }
 
+  /** Normal and Motion_Blur particles live in world space: they're born at the emitter's world position (getRandomPosition) */
+  particlesInWorld(): boolean {
+    return this.node.renderMode == 'Normal' || this.node.renderMode == 'Motion_Blur';
+  }
+
   getRandomPosition(){
     const spread = OdysseyEmitter3D._v3A.copy(this.size);
     const quat = OdysseyEmitter3D._quat.set(0, 0, 0, 1);
@@ -786,6 +791,17 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     // KotOR MDL can set P2P flags on Linked trail emitters (e.g. v_heal_imp); those must not early-return here.
     if(this.node.flags.isP2P && this.node.renderMode !== 'Linked' && this.node.renderMode !== 'Fountain'){
       this.emitterLog('tick:earlyReturn', { reason: this.node.flags.isP2PSel ? 'P2PBezier' : 'P2PGravity', delta });
+      // Inherit moves live particles with the emitter, here as on the main path: a blaster bolt is a P2P emitter
+      // in flight, and without it its particles stayed where they were born, by the gun, until they died
+      if(this.particlesInWorld() && this.node.flags.canInherit && this._hasLastWorldPos && this._worldPosDelta.lengthSq() > 0){
+        for(let i = 0; i < this.offsets.count; i++){
+          if(this.props.getZ(i) !== 1) continue;
+          this.offsets.setX(i, this.offsets.getX(i) + this._worldPosDelta.x);
+          this.offsets.setY(i, this.offsets.getY(i) + this._worldPosDelta.y);
+          this.offsets.setZ(i, this.offsets.getZ(i) + this._worldPosDelta.z);
+        }
+        this.offsets.needsUpdate = true;
+      }
       if(this.node.flags.isP2PSel){
         this.tickP2PBezier(delta);
       }else{
@@ -1235,8 +1251,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
         const py = this.offsets.getY(i);
         const pz = this.offsets.getZ(i);
 
+        const inWorld = this.particlesInWorld();
         pW.set(px, py, pz);
-        this.localToWorld(pW);
+        if(!inWorld) this.localToWorld(pW);
 
         toRef.copy(refW).sub(pW);
         const dist = toRef.length();
@@ -1269,7 +1286,7 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
           this.velocities.setZ(i, velW.z);
 
           pW.addScaledVector(velW, delta);
-          this.worldToLocal(pW);
+          if(!inWorld) this.worldToLocal(pW);
 
           this.offsets.setX(i, pW.x);
           this.offsets.setY(i, pW.y);

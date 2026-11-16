@@ -47,7 +47,7 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
      - then another template.
 
      Reskin with `customize.appearance` when the look you want only comes on the wrong creature.
-   - **Seated actors need a seat.** `chair`, `chair_drunk` and `chair_pazaak` sit on nothing unless the plan places a chair or bench under them. Give each seated actor its own seat prop and put the actor on it: `"at": { "spot": "prop:<seat id>" }`, with the same `facing` as the seat. Seats are in `reference/format.md` ("Seats"). `sit` and `meditate_sit` are on the floor and need none.
+   - **Seated actors need a seat.** `chair`, `chair_drunk` and `chair_pazaak` sit on nothing unless the plan places a chair or bench there. Put each seated actor on a seat prop (`"at": { "spot": "prop:<seat id>" }`): the game sits it in the nearest free seat, at the seat's own spot and facing, so turn the *seat* the way the sitter should look (a chair's facing isn't its sitter's: see "Seats" in `reference/format.md`). `sit` and `meditate_sit` are on the floor and need none.
 6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners, chairs and benches. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
    - **Search by model as well as name.** A template's name can be wrong (KotOR II's `plc_chair1` is a food pile); its `model` column says what it really is.
    - **Props are obstacles.** Tables, crates and chairs block the way. Leave walkways a couple of metres wide between them, especially on routes NPCs are ordered along.

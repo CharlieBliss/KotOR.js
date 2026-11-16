@@ -218,9 +218,31 @@ async function exportCatalog() {
     footprints.set(key, fp);
     return fp;
   };
+  /**
+   * A seat model's seats (GMSeats, from its geometry, as the game works them out): "x,y,fx,fy" each, in the
+   * model's frame (x,y where the sitter's hips go, fx,fy the way it faces), "e" after a backless one (either way)
+   */
+  const seatCache = new Map();
+  const seatsOf = async (model, label) => {
+    const key = String(model || '').toLowerCase();
+    if (!key || key === '****' || !K.GMSeats.looksLikeSeat(`${key} ${label || ''}`)) return '';
+    if (seatCache.has(key)) return seatCache.get(key);
+    let text = '';
+    // A model that never finishes loading (a missing texture it waits on) mustn't hold up the whole catalog
+    const within = (p, ms) => Promise.race([p, new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), ms))]);
+    try {
+      const mdl = await within(K.MDLLoader.loader.load(key), 5000);
+      const m = await within(K.OdysseyModel3D.FromMDL(mdl, { manageLighting: false, context: undefined, loadTextures: false }), 5000);
+      m.updateMatrixWorld(true);
+      text = K.GMSeats.fromModel(m, key).map((s) => `${s.x},${s.y},${s.fx},${s.fy}${s.either ? ',e' : ''}`).join(';');
+      m.dispose && m.dispose();
+    } catch (e) { console.log(`seats: ${key}: ${e && e.message}`); }
+    seatCache.set(key, text);
+    return text;
+  };
   for (const row of Object.values(plcRows)) {
     if (!row.label || row.label === '****') continue;
-    out.models.push({ id: Number(row.__index), label: row.label, model: row.modelname || '', name: row.strref && row.strref !== '****' ? tlk(row.strref) : '', footprint: await footprintOf(row.modelname) });
+    out.models.push({ id: Number(row.__index), label: row.label, model: row.modelname || '', name: row.strref && row.strref !== '****' ? tlk(row.strref) : '', footprint: await footprintOf(row.modelname), seats: await seatsOf(row.modelname, row.label) });
   }
   const utps = [...new Set(keys.filter((k) => k.resType == RT.utp).map((k) => k.resRef.toLowerCase()))].sort();
   for (const resRef of utps) {
@@ -237,6 +259,7 @@ async function exportCatalog() {
         useable: !!g('Useable', 0),
         locked: !!g('Locked', 0),
         footprint: await footprintOf(row.modelname),
+        seats: await seatsOf(row.modelname, `${row.label || ''} ${resRef}`),
       });
     } catch (e) {}
   }
@@ -328,12 +351,12 @@ function writeCatalog(game, data) {
     ...data.classes.map((c) => [c.id, c.label, c.name, c.hitdie, c.forcedie, c.bab.join(','), c.ac.join(','), c.featAc.join(','), c.dueling.join(','), c.toughness.join(','), c.fpBonus.join(','), c.powers.join(';')]),
   ]));
   fs.writeFileSync(path.join(dir, 'placeables.tsv'), tsv([
-    ['template', 'name', 'model', 'container', 'useable', 'locked', 'footprint'],
-    ...data.placeables.map((p) => [p.resRef, p.name, p.model, p.container ? 'yes' : '', p.useable ? 'yes' : '', p.locked ? 'yes' : '', p.footprint || '']),
+    ['template', 'name', 'model', 'container', 'useable', 'locked', 'footprint', 'seats'],
+    ...data.placeables.map((p) => [p.resRef, p.name, p.model, p.container ? 'yes' : '', p.useable ? 'yes' : '', p.locked ? 'yes' : '', p.footprint || '', p.seats || '']),
   ]));
   fs.writeFileSync(path.join(dir, 'models.tsv'), tsv([
-    ['appearance', 'model', 'name', 'footprint'],
-    ...data.models.map((m) => [m.label, m.model, m.name, m.footprint || '']),
+    ['appearance', 'model', 'name', 'footprint', 'seats'],
+    ...data.models.map((m) => [m.label, m.model, m.name, m.footprint || '', m.seats || '']),
   ]));
   fs.writeFileSync(path.join(dir, 'items.tsv'), tsv([
     ['template', 'name', 'base item', 'combat'],
