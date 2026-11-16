@@ -57,7 +57,7 @@ export class ActionPhysicalAttacks extends Action {
     const target: ModuleCreature = this.target as any;
 
     owner.resetExcitedDuration();
-    let range = ( owner.isRangedEquipped() ? 15.0 : 2.0 );
+    let range = ( owner.isRangedEquipped() ? 15.0 : (owner.getMeleeRange?.(this.target) ?? 2.0) );
 
     if(target.isDead()){
       //todo: we may need to end combatround early here if it has already started

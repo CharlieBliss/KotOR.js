@@ -41,6 +41,8 @@ import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
 import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
+import { GMRouteMarkers } from "@/managers/gm/GMRouteMarkers";
+import type { GMRoute } from "@/managers/gm/GMRouteMarkers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
@@ -1126,7 +1128,7 @@ export class GMManager {
       const incoming = this.approachingMelee(cre, everyone);
       if (incoming) {
         const current = this.attackTargetOf(cre);
-        const engaged = !!current && !current.isDead?.() && cre.position.distanceTo(current.position) <= this.MELEE_REACH;
+        const engaged = !!current && !current.isDead?.() && cre.position.distanceTo(current.position) <= this.meleeReach(cre, current);
         if (!engaged) {
           GMNpcOrders.stopFighting(cre);
           continue;
@@ -1141,8 +1143,31 @@ export class GMManager {
     }
   }
 
-  /** How close a melee attacker has to be to swing (ActionPhysicalAttacks uses 2 m), with a little slack */
-  static MELEE_REACH: number = 2.5;
+  /** Slack on top of how close a melee attacker has to be to swing */
+  static MELEE_REACH_SLACK: number = 0.5;
+
+  /** How close two creatures are when one can swing at the other (2.5 m for people; more for big monsters) */
+  static meleeReach(a: ModuleCreature, b: ModuleCreature): number {
+    return (a.getMeleeRange?.(b) ?? 2) + this.MELEE_REACH_SLACK;
+  }
+
+  /** The routes drawn on the ground: the patrol being placed, and where each selected NPC is patrolling or going */
+  static routesToShow(): GMRoute[] {
+    const routes: GMRoute[] = [];
+    if (this.activeTool === 'order_patrol' && GMViewport.patrolDraft.length) {
+      routes.push({ points: GMViewport.patrolDraft, loop: GMViewport.patrolDraft.length > 1, draft: true, numbered: true });
+    }
+    for (const obj of this.selectedObjects()) {
+      if (!GMObjectKind.isCreature(obj)) continue;
+      const order = GMNpcOrders.getOrder(obj as ModuleCreature);
+      if (order?.kind === 'patrol' && order.points.length) {
+        routes.push({ points: order.points, loop: true, next: order.index % order.points.length, numbered: true });
+      } else if (order?.kind === 'move') {
+        routes.push({ points: [order.point], loop: false });
+      }
+    }
+    return routes;
+  }
 
   /** Who a creature is attacking or about to attack, if anyone */
   static attackTargetOf(cre: ModuleCreature): ModuleCreature | undefined {
@@ -1166,7 +1191,7 @@ export class GMManager {
         : this.isAutonomousNpc(other) && this.attackTargetOf(other) === cre && other.id < cre.id;
       if (!coming) continue;
       const distance = cre.position.distanceTo(other.position);
-      if (distance > this.MELEE_REACH && distance <= this.NPC_AI_RETALIATE_RANGE) return other;
+      if (distance > this.meleeReach(other, cre) && distance <= this.NPC_AI_RETALIATE_RANGE) return other;
     }
     return null;
   }
@@ -1212,6 +1237,7 @@ export class GMManager {
     if (!GameState.gmMode) return;
     GMViewport.init3DIndicators();
     GMViewport.updateSelectionRings(this.selectedObjects());
+    GMRouteMarkers.update(this.isGMUser() ? this.routesToShow() : []);
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);

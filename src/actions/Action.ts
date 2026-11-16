@@ -227,7 +227,7 @@ export class Action {
       }
 
       // Close enough to bump: its size and the mover's own (collision stops them that far apart)
-      const hitDistance = (creature.getAppearance().hitdist + (owner.getAppearance()?.hitdist || 0)) * SAFETY_BUFFER;
+      const hitDistance = (creature.getHitDistance() + (owner.getHitDistance?.() || 0)) * SAFETY_BUFFER;
       const creaturePos = creature.position;
 
       // Check both look-ahead points

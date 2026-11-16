@@ -2710,8 +2710,27 @@ export class ModuleCreature extends ModuleObject {
     return ((this.isWalking() || this.stealthMode) ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
   }
 
+  /**
+   * How much room it takes up, for steering and pathing round it. appearance.2da's hitdist (1 for nearly
+   * everything) is the reach of a big monster's attacks, not its size: a rancor's is 7. So it's hitdist up to 1,
+   * or its body (creperspace, what collision keeps clear) when that's bigger: a rancor is 3.06 m.
+   */
   getHitDistance(){
-    return this.creatureAppearance?.hitdist ?? 1;
+    const hitdist = this.creatureAppearance?.hitdist ?? 1;
+    const body = this.creatureAppearance?.creperspace ?? 0.4;
+    return Math.max(body, Math.min(hitdist, 1));
+  }
+
+  /**
+   * How close it has to be to hit something in melee: 2 m between two people, more when bodies are big enough
+   * that collision keeps them further apart than that (a rancor can't get within 3.5 m of anyone)
+   */
+  getMeleeRange(target?: ModuleObject): number {
+    const own = this.creatureAppearance?.creperspace ?? 0.4;
+    const other = target && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)
+      ? ((target as ModuleCreature).getAppearance?.()?.creperspace ?? 0.4)
+      : 0.4;
+    return Math.max(2.0, own + other + 1.2);
   }
 
   getMainClass(){

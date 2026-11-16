@@ -171,7 +171,8 @@ export class TalentFeat extends TalentObject {
 
     //MELEE
     if(this.category == 0x1104){
-      return distance <= 2.0 + rangeTolerance;
+      const reach = (oCaster as any).getMeleeRange?.(oTarget) ?? 2.0;
+      return distance <= reach + rangeTolerance;
     }
 
     //RANGED

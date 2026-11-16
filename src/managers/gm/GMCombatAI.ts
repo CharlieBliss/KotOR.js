@@ -289,7 +289,7 @@ export class GMCombatAI {
       hurtAlly: hurt,
       hpRatio: hpRatio(npc),
       fp: Number(npc.getFP?.()) || 0,
-      enemyInMelee: enemies.some((c) => c.position.distanceTo(npc.position) <= this.MELEE_DISTANCE),
+      enemyInMelee: enemies.some((c) => c.position.distanceTo(npc.position) <= (c.getMeleeRange?.(npc) ?? 2) + this.MELEE_DISTANCE - 2),
       kit: this.kitOf(npc),
       now: performance.now(),
     };

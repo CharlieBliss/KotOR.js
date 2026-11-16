@@ -40,6 +40,7 @@ export * from "@/managers/GMConversationManager";
 export * from "@/managers/GMNpcOrders";export * from "@/managers/OtherGameManager";
 export * from "@/managers/GMScenePlan";
 export * from "@/managers/gm/GMViewport";
+export * from "@/managers/gm/GMRouteMarkers";
 export * from "@/managers/gm/GMSpawner";
 export * from "@/managers/gm/GMReplication";
 export * from "@/managers/gm/GMPlayers";
