@@ -88,6 +88,7 @@ export class GMReplication {
       facing: isPlaceable ? (obj.bearing || 0) : (obj as ModuleCreature).getFacing(),
       scale: obj.gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
+      combat: isPlaceable ? undefined : !!(obj as ModuleCreature).combatData?.combatState,
       hidden: !!obj.gmHidden,
       stealth: !!(obj as any).stealthMode,
       hostDriven: !!obj.gmHostDriven,
@@ -237,6 +238,8 @@ export class GMReplication {
             GMManager.setCreatureHP(localObj as ModuleCreature, actor.hp, actor.maxHp);
             const own = localObj as ModuleCreature;
             if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
+            // Fights happen on the host: under attack there, our character takes its combat stance here too
+            if (actor.combat) own.resetExcitedDuration();
           } else {
             localObj.setMaxHP(actor.maxHp);
             localObj.currentHP = actor.hp;
@@ -253,7 +256,11 @@ export class GMReplication {
     const existing = GMManager.netIdMap.get(actor.netId);
     if (existing) {
       if (actor.kind === 'placeable') {
-        existing.position.set(actor.x, actor.y, actor.z);
+        if (existing.position.x !== actor.x || existing.position.y !== actor.y || existing.position.z !== actor.z) {
+          existing.position.set(actor.x, actor.y, actor.z);
+          if (existing.container) existing.container.position.copy(existing.position);
+          existing.computeBoundingBox?.(true);
+        }
       } else {
         this.setNetTarget(existing, actor.x, actor.y, actor.z);
         existing.gmNetAnim = actor.animState;
@@ -281,6 +288,7 @@ export class GMReplication {
       } else {
         const cre = existing as ModuleCreature;
         cre.setFacing(actor.facing, false);
+        this.syncCombatState(cre, actor.combat);
         if (!!cre.stealthMode !== !!actor.stealth) cre.setStealthMode(!!actor.stealth, true);
         if (actor.stance !== undefined && (cre.heldStance || '') !== actor.stance) cre.setHeldStance(actor.stance);
         if (cre.factionId !== actor.factionId) {
@@ -624,10 +632,32 @@ export class GMReplication {
     target.set(x, y, z);
     // Snap on first sync or teleports instead of sliding across the map
     if (obj.position.distanceTo(target) > this.NET_SNAP_DISTANCE) {
+      this.moveBox(obj, target.x - obj.position.x, target.y - obj.position.y, target.z - obj.position.z);
       obj.position.copy(target);
       obj.getCurrentRoom();
     }
   }
+
+  /** A replica fights in step with the host's copy: its combat stance and powered weapons come and go with it */
+  static syncCombatState(cre: ModuleCreature, combat: boolean | undefined) {
+    if (combat === undefined || !cre.combatData) return;
+    if (combat) cre.resetExcitedDuration();
+    else if (cre.combatData.combatState) cre.cancelExcitedDuration();
+  }
+
+  /**
+   * Keep a replica's bounding box with it. Its box is set where it spawned, and only the engine's own movement
+   * (collision) moves it; a replica moves by network updates instead. The box decides whether its model is on
+   * screen, so a stale one hid creatures that had walked away from their spawn whenever that spot was off camera.
+   */
+  static moveBox(obj: ModuleObject, dx: number, dy: number, dz: number) {
+    const box = obj.box as THREE.Box3 | undefined;
+    if (!box || box.isEmpty() || (!dx && !dy && !dz)) return;
+    this.boxShift.set(dx, dy, dz);
+    box.translate(this.boxShift);
+  }
+
+  static boxShift = new THREE.Vector3();
 
   /**
    * Smooth a network-driven creature toward its latest synced position and pick a locomotion animation from its speed
@@ -643,6 +673,7 @@ export class GMReplication {
       cre.position.x += dx;
       cre.position.y += dy;
       cre.position.z += dz;
+      this.moveBox(cre, dx, dy, dz);
       speed = Math.sqrt(dx * dx + dy * dy) / delta;
       if (speed > 0.05) {
         cre.getCurrentRoom();
@@ -652,19 +683,22 @@ export class GMReplication {
     if (cre.isDead()) return;
     const anim = cre.animationState.index;
     const isLocomotion = anim === ModuleCreatureAnimState.RUNNING || anim === ModuleCreatureAnimState.WALKING;
-    if (speed > cre.getWalkSpeed() * 1.25) {
-      if (anim !== ModuleCreatureAnimState.RUNNING) cre.setAnimationState(ModuleCreatureAnimState.RUNNING);
-    } else if (speed > 0.4) {
-      if (anim !== ModuleCreatureAnimState.WALKING) cre.setAnimationState(ModuleCreatureAnimState.WALKING);
+    const hostAnim = cre.gmNetAnim as number | undefined;
+    const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
+    if (speed > 0.4) {
+      // Walking or running is the host's call (smoothing slows the replica's apparent speed, so a running rancor
+      // looked like it walked); from speed only when the host's state isn't locomotion yet
+      const want = hostIsLocomotion ? hostAnim! : (speed > cre.getWalkSpeed() * 1.25 ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);
+      if (anim !== want) cre.setAnimationState(want);
     } else {
-      const hostAnim = cre.gmNetAnim as number | undefined;
-      const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
       const hostIsFxDriven = this.FX_DRIVEN_ANIM_STATES.includes(hostAnim);
       // Let a replayed attack/reaction animation finish before applying the tick's state
       const fxPlaying = !!cre.gmFxAnimation && cre.animationState.animation === cre.gmFxAnimation;
       if (hostAnim && !hostIsLocomotion && !hostIsFxDriven && !fxPlaying && hostAnim !== anim) {
         cre.setAnimationState(hostAnim);
-      } else if (isLocomotion) {
+      } else if (isLocomotion && !hostIsLocomotion) {
+        // Stopped here and there. While the host says it's still on the move, it is: between updates the
+        // smoothing catches up with the last position and the replica pauses a moment, which isn't stopping
         cre.setAnimationState(cre.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
       }
     }

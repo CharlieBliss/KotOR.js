@@ -156,6 +156,8 @@ export interface GMSerializedActor {
   z: number;
   facing: number;
   animState?: number;
+  /** In combat on the host (its combat stance and powered weapons) */
+  combat?: boolean;
   /** Host is executing an intent for this player-owned actor, so the host owns its position */
   hostDriven?: boolean;
   /** Last client intent sequence number the host has applied to this actor */

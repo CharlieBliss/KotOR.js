@@ -1329,6 +1329,47 @@ describe("GM multiplayer host authority", () => {
       expect(cre.animationState.index).toBe(ModuleCreatureAnimState.PAUSE);
     });
 
+    test("its bounding box goes with it, so it isn't culled where it spawned", () => {
+      const cre = mockCreature("cre_0", { box: new THREE.Box3(new THREE.Vector3(-1, -1, 0), new THREE.Vector3(1, 1, 2)) });
+      GMReplication.setNetTarget(cre, 0, 0, 0);
+      GMReplication.setNetTarget(cre, 3, 0, 0);
+      for (let i = 0; i < 240; i++) GMReplication.updateNetMotion(cre, 1 / 60);
+      const centre = cre.box.getCenter(new THREE.Vector3());
+      expect(centre.x).toBeCloseTo(cre.position.x, 3);
+      // A teleport snaps it, box and all
+      GMReplication.setNetTarget(cre, 40, 0, 0);
+      expect(cre.box.getCenter(new THREE.Vector3()).x).toBeCloseTo(40, 3);
+    });
+
+    test("keeps running while the host runs it, though it catches up between updates", () => {
+      const cre = mockCreature("cre_0");
+      GMReplication.setNetTarget(cre, 0, 0, 0);
+      cre.gmNetAnim = ModuleCreatureAnimState.RUNNING;
+      GMReplication.setNetTarget(cre, 1, 0, 0);
+      for (let i = 0; i < 60; i++) GMReplication.updateNetMotion(cre, 1 / 60);
+      expect(cre.position.x).toBeCloseTo(1, 2);
+      expect(cre.animationState.index).toBe(ModuleCreatureAnimState.RUNNING);
+      // The host stops: so does it
+      cre.gmNetAnim = ModuleCreatureAnimState.PAUSE;
+      GMReplication.updateNetMotion(cre, 1 / 60);
+      expect(cre.animationState.index).toBe(ModuleCreatureAnimState.PAUSE);
+    });
+
+    test("fights when the host's copy does", () => {
+      const cre = mockCreature("cre_0", { resetExcitedDuration: jest.fn(), cancelExcitedDuration: jest.fn() });
+      GMReplication.syncCombatState(cre, true);
+      expect(cre.resetExcitedDuration).toHaveBeenCalled();
+      cre.combatData.combatState = true;
+      GMReplication.syncCombatState(cre, false);
+      expect(cre.cancelExcitedDuration).toHaveBeenCalled();
+    });
+
+    test("a weapon drawn from its pack is sent by its carried resref (its equipped one is empty)", () => {
+      const item = (equipped: string, carried: string) => ({ getEquippedRes: () => equipped, getInventoryRes: () => carried, getTemplateResRef: () => carried });
+      const cre: any = { equipment: { RIGHTHAND: item("", "g_w_shortswrd01"), ARMOR: item("g_a_class4001", "") } };
+      expect(GMSpawner.gearOf(cre)).toEqual({ rightHandResRef: "g_w_shortswrd01", leftHandResRef: "", armorResRef: "g_a_class4001" });
+    });
+
     test("plays the host's non-locomotion animation once the replica stops moving", () => {
       const cre = mockCreature("cre_0");
       GMReplication.setNetTarget(cre, 0, 0, 0);

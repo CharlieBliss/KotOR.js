@@ -878,11 +878,13 @@ export class GMSpawner {
 
   /** A creature's hands and armour as item resrefs ('' for empty) */
   static gearOf(cre: ModuleCreature): Required<GMGear> {
+    // An item equipped after spawning (the combat AI drawing a sword from its pack) has no equipped resref: its
+    // carried or template one names it
     const eq = cre?.equipment;
     return {
-      rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
-      leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
-      armorResRef: eq?.ARMOR?.getEquippedRes() || '',
+      rightHandResRef: gmItemResRef(eq?.RIGHTHAND),
+      leftHandResRef: gmItemResRef(eq?.LEFTHAND),
+      armorResRef: gmItemResRef(eq?.ARMOR),
     };
   }
 
