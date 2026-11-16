@@ -85,6 +85,9 @@ export const GMPanel: React.FC = () => {
           const target = findPossessCandidate();
           if (target) GMManager.possessCharacter(target);
         }
+      } else if (e.key === 'Delete' && GMManager.activeTool === 'select') {
+        // Delete removes what's selected (not characters players are playing)
+        if (GMManager.deleteObjects(GMManager.selectedObjects())) e.preventDefault();
       } else if (e.code === 'KeyR' && GMViewport.isPlacementTool(GMManager.activeTool)) {
         GMViewport.rotatePlacement(e.shiftKey ? -GMViewport.PLACEMENT_KEY_STEP : GMViewport.PLACEMENT_KEY_STEP);
       }
@@ -183,7 +186,7 @@ export const GMPanel: React.FC = () => {
       { id: 'scenes', label: 'Scene', title: 'Load an area, or import a scene plan' },
       { id: 'actors', label: 'Place', title: 'Choose what the Place tool puts down: creatures, objects, mines or whole kits' },
       { id: 'players', label: `Players (${GMManager.spawnedPlayers.length})`, title: 'Player characters, checks, and adding characters' },
-      { id: 'inspector', label: selectedObj ? `Inspect: ${selectedObj.getName() || 'Selected'}` : 'Inspect', title: 'Edit the selected object, or browse everything in the scene' },
+      { id: 'inspector', label: GMManager.selection.length > 1 ? `Inspect: ${GMManager.selection.length} selected` : selectedObj ? `Inspect: ${selectedObj.getName() || 'Selected'}` : 'Inspect', title: 'Edit the selected object, or browse everything in the scene' },
       { id: 'multiplayer', label: 'Session', title: 'Hosting, rules, saves and chat' },
     ];
 
@@ -233,7 +236,8 @@ export const GMPanel: React.FC = () => {
   } else {
     controlHints = [
       ['WASD', 'fly'], ['Q / E or Space', 'down / up'], ['Shift', 'faster'], ['Drag', 'look'],
-      ['Click', 'select'], ['Double-click', 'inspect'], ['F2', `play as ${possessCandidateName}`],
+      ['Click', 'select'], ['Shift + click / drag', 'select more'], ['Drag it', 'move'], ['Ctrl + wheel', 'turn'],
+      ['Delete', 'remove'], ['Double-click', 'inspect'], ['F2', `play as ${possessCandidateName}`],
     ];
   }
 

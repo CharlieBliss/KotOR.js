@@ -10,6 +10,7 @@ import type { GMToolMode } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMMines } from "@/managers/gm/GMMines";
+import { GMLog } from "@/managers/gm/GMLog";
 
 /** The GM's viewport: picking, placement and order tools, the selection and placement rings, and where the camera is looking. */
 export class GMViewport {
@@ -29,8 +30,35 @@ export class GMViewport {
   /** Patrol points clicked so far with the order_patrol tool */
   static patrolDraft: GMPoint[] = [];
 
-  // 3D viewport visual indicators
+  // 3D viewport visual indicators: a ring under each selected object
   static selectionRing: THREE.Mesh | null = null;
+
+  static selectionRings: THREE.Mesh[] = [];
+
+  /** Degrees each wheel notch turns the selection, with Ctrl held */
+  static ROTATE_WHEEL_STEP: number = 15;
+
+  /** Pixels the mouse moves with the button down before a press becomes a drag */
+  static DRAG_THRESHOLD: number = 6;
+
+  /** Milliseconds between position updates sent to players while dragging */
+  static DRAG_SEND_MS: number = 120;
+
+  /**
+   * A press in select mode that may become a drag: on an object, moving the selection (it, if it
+   * wasn't selected); with Shift on empty ground, drawing a box to select what's in it
+   */
+  static press: {
+    kind: 'move' | 'box';
+    x: number; y: number;
+    picked: ModuleObject | null;
+    ground: THREE.Vector3 | null;
+    started: boolean;
+    moving: { obj: ModuleObject; start: THREE.Vector3 }[];
+    lastSent: number;
+  } | null = null;
+
+  static boxElement: HTMLDivElement | null = null;
 
   static placementRing: THREE.Mesh | null = null;
 
@@ -51,16 +79,33 @@ export class GMViewport {
 
   static DOUBLE_CLICK_MS = 400;
 
-  /** The ring under the selected object, coloured by its side (red hostile, green party, amber others, cyan objects) */
-  static updateSelectionRing(selected: ModuleObject | null) {
+  /** A ring under each selected object */
+  static updateSelectionRings(selected: ModuleObject[]) {
     if (!this.selectionRing) return;
+    const list = selected.filter((o) => o?.position);
+    while (this.selectionRings.length < list.length) {
+      const ring = this.selectionRing.clone();
+      ring.material = (this.selectionRing.material as THREE.Material).clone();
+      GameState.scene?.add(ring);
+      this.selectionRings.push(ring);
+    }
+    this.selectionRings.forEach((ring, i) => {
+      if (i < list.length) this.updateSelectionRing(list[i], ring);
+      else ring.visible = false;
+    });
+    this.selectionRing.visible = false;
+  }
+
+  /** The ring under a selected object, coloured by its side (red hostile, green party, amber others, cyan objects) */
+  static updateSelectionRing(selected: ModuleObject | null, ring: THREE.Mesh | null = this.selectionRing) {
+    if (!ring) return;
     if (!selected?.position) {
-      this.selectionRing.visible = false;
+      ring.visible = false;
       return;
     }
-    this.selectionRing.visible = true;
-    this.selectionRing.position.set(selected.position.x, selected.position.y, selected.position.z + 0.08);
-    const mat = this.selectionRing.material as THREE.MeshBasicMaterial;
+    ring.visible = true;
+    ring.position.set(selected.position.x, selected.position.y, selected.position.z + 0.08);
+    const mat = ring.material as THREE.MeshBasicMaterial;
     if (GMObjectKind.isCreature(selected)) {
       if (selected.factionId === GMFaction.HOSTILE) mat.color.setHex(0xff3333);
       else if (selected.factionId === GMFaction.PARTY || GameState.PartyManager.party.includes(selected)) mat.color.setHex(0x00ff88);
@@ -113,10 +158,15 @@ export class GMViewport {
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
       this.pointerDownPos = { x: e.clientX, y: e.clientY };
+      if (e.button === 0) this.beginPress(e.clientX, e.clientY, e.shiftKey);
     });
 
     window.addEventListener('pointermove', (e: PointerEvent) => {
       if (!GameState.gmMode) return;
+      if (this.press) {
+        this.updatePress(e.clientX, e.clientY);
+        return;
+      }
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) {
         if (this.placementRing) this.placementRing.visible = false;
@@ -125,23 +175,42 @@ export class GMViewport {
       this.updateMouseRaycast(e.clientX, e.clientY);
     });
 
-    // While placing, the mouse wheel turns what's being placed
+    // While placing, the mouse wheel turns what's being placed; in select mode, Ctrl + wheel turns the selection
     window.addEventListener('wheel', (e: WheelEvent) => {
-      if (!GameState.gmMode || !this.isPlacementTool(GMManager.activeTool) || !GMManager.isGMUser()) return;
+      if (!GameState.gmMode || !GMManager.isGMUser()) return;
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
-      this.rotatePlacement(e.deltaY > 0 ? this.PLACEMENT_WHEEL_STEP : -this.PLACEMENT_WHEEL_STEP);
-    }, { passive: true });
+      const step = e.deltaY > 0 ? 1 : -1;
+      if (this.isPlacementTool(GMManager.activeTool)) {
+        this.rotatePlacement(step * this.PLACEMENT_WHEEL_STEP);
+        return;
+      }
+      if (e.ctrlKey && GMManager.activeTool === 'select' && GMManager.controlMode !== 'POSSESS') {
+        // Ctrl + wheel would zoom the page otherwise
+        e.preventDefault();
+        const list = this.movableSelection();
+        if (list.length) GMManager.rotateObjects(list, (-step * this.ROTATE_WHEEL_STEP * Math.PI) / 180);
+      }
+    }, { passive: false });
+
+    // A drag let go of outside the window, or the window losing focus mid-drag, still ends it
+    window.addEventListener('blur', () => this.endPress(null));
 
     window.addEventListener('pointerup', (e: PointerEvent) => {
       if (!GameState.gmMode || (e.button !== 0 && e.button !== 2) || !GMManager.isGMUser()) return;
+      // Moving or box-selecting: that was the whole gesture
+      if (e.button === 0 && this.press) {
+        const dragged = this.press.started;
+        this.endPress({ x: e.clientX, y: e.clientY });
+        if (dragged) return;
+      }
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
 
       // Ignore drags (camera rotation)
       const dx = e.clientX - this.pointerDownPos.x;
       const dy = e.clientY - this.pointerDownPos.y;
-      if (Math.hypot(dx, dy) > 6) return;
+      if (Math.hypot(dx, dy) > this.DRAG_THRESHOLD) return;
 
       // A right-click (not a right-drag, which looks around) puts down the placement or teleport tool
       if (e.button === 2) {
@@ -159,8 +228,150 @@ export class GMViewport {
       const isDoubleClick = now - last.at < this.DOUBLE_CLICK_MS && Math.hypot(e.clientX - last.x, e.clientY - last.y) <= 6;
       this.lastViewportClick = isDoubleClick ? { x: 0, y: 0, at: 0 } : { x: e.clientX, y: e.clientY, at: now };
 
-      this.handleViewportClick(e.clientX, e.clientY, isDoubleClick);
+      this.handleViewportClick(e.clientX, e.clientY, isDoubleClick, e.shiftKey);
     });
+  }
+
+  /** The selected objects that can be moved and turned (doors stay in their frames) */
+  static movableSelection(): ModuleObject[] {
+    return GMManager.selectedObjects().filter((o) => o?.position && !GMObjectKind.isDoor(o));
+  }
+
+  /** The left button went down in the viewport: maybe the start of moving objects, or of a selection box */
+  static beginPress(clientX: number, clientY: number, shift: boolean) {
+    this.press = null;
+    if (!GMManager.isGMUser() || GMManager.activeTool !== 'select' || GMManager.controlMode === 'POSSESS') return;
+    this.updateMouseRaycast(clientX, clientY);
+    const picked = this.pickObjectAtCursor();
+    const ground = this.hasValidRaycastPoint ? this.lastRaycastPoint.clone() : null;
+    if (picked && !shift) {
+      if (GMObjectKind.isDoor(picked) || !ground) return;
+      this.press = { kind: 'move', x: clientX, y: clientY, picked, ground, started: false, moving: [], lastSent: 0 };
+    } else if (!picked && shift) {
+      this.press = { kind: 'box', x: clientX, y: clientY, picked: null, ground, started: false, moving: [], lastSent: 0 };
+    } else {
+      return;
+    }
+    // The free camera doesn't turn while this press is ours
+    GMManager.viewportDragging = true;
+  }
+
+  static updatePress(clientX: number, clientY: number) {
+    const press = this.press;
+    if (!press) return;
+    if (!press.started) {
+      if (Math.hypot(clientX - press.x, clientY - press.y) <= this.DRAG_THRESHOLD) return;
+      press.started = true;
+      if (press.kind === 'move' && press.picked) {
+        // Dragging something not selected moves it alone; dragging part of the selection moves all of it
+        if (!GMManager.isSelected(press.picked)) GMManager.selectObject(press.picked);
+        press.moving = this.movableSelection().map((obj) => ({ obj, start: obj.position.clone() }));
+      }
+    }
+    if (press.kind === 'box') {
+      this.drawBox(press.x, press.y, clientX, clientY);
+      return;
+    }
+    this.updateMouseRaycast(clientX, clientY);
+    if (!this.hasValidRaycastPoint || !press.ground) return;
+    const delta = this.lastRaycastPoint.clone().sub(press.ground);
+    // Grid snap puts the one grabbed on the grid, and moves the rest with it
+    if (this.gridSnapSize > 0) {
+      const lead = press.moving.find((m) => m.obj === press.picked) || press.moving[0];
+      if (lead) {
+        const snapped = this.snapVectorToGrid(lead.start.clone().add(delta));
+        delta.x = snapped.x - lead.start.x;
+        delta.y = snapped.y - lead.start.y;
+      }
+    }
+    const now = performance.now();
+    const send = now - press.lastSent >= this.DRAG_SEND_MS;
+    if (send) press.lastSent = now;
+    for (const m of press.moving) this.moveTo(m, delta, send);
+  }
+
+  /** A dragged object at its start plus how far the mouse has moved over the ground, standing on the ground there */
+  static moveTo(m: { obj: ModuleObject; start: THREE.Vector3 }, delta: THREE.Vector3, send: boolean) {
+    if (m.obj.destroyed) return;
+    const x = m.start.x + delta.x;
+    const y = m.start.y + delta.y;
+    const pos = new THREE.Vector3(x, y, this.floorBelow(x, y, m.start.z + delta.z));
+    if (send) GMManager.teleportObject(m.obj, pos);
+    else GMManager.placeAt(m.obj, pos);
+  }
+
+  /**
+   * The walkable floor under a point, looking down from a little above it (from high up, indoors, the first
+   * thing under it would be a roof); the point's own height when there's no floor there
+   */
+  static floorBelow(x: number, y: number, z: number): number {
+    const walkmeshes = GameState.walkmeshList || [];
+    if (!walkmeshes.length) return z;
+    const ray = new THREE.Raycaster(new THREE.Vector3(x, y, z + 1.5), new THREE.Vector3(0, 0, -1), 0, 20);
+    const hit = ray.intersectObjects(walkmeshes, true)[0];
+    return hit ? hit.point.z : z;
+  }
+
+  /** The button came up (at a point), or the window lost focus (null): finish the move or the box */
+  static endPress(at: { x: number; y: number } | null) {
+    const press = this.press;
+    this.press = null;
+    GMManager.viewportDragging = false;
+    this.hideBox();
+    if (!press?.started) return;
+    if (press.kind === 'move') {
+      // Where each one ended up reaches the players
+      const moved = press.moving.filter((m) => !m.obj.destroyed);
+      for (const m of moved) GMManager.teleportObject(m.obj, m.obj.position.clone());
+      GMLog.info('world', `Moved ${moved.length} object${moved.length === 1 ? '' : 's'}`);
+      return;
+    }
+    if (!at) return;
+    GMManager.setSelection([...GMManager.selectedObjects(), ...this.objectsInBox(press.x, press.y, at.x, at.y)]);
+  }
+
+  /** Creatures and placeables standing inside a box drawn on the screen */
+  static objectsInBox(x0: number, y0: number, x1: number, y1: number): ModuleObject[] {
+    const area = GameState.module?.area;
+    const canvas = GameState.canvas;
+    const cam = this.getActiveThreeCamera();
+    if (!area || !canvas || !cam) return [];
+    const rect = canvas.getBoundingClientRect();
+    const left = Math.min(x0, x1), right = Math.max(x0, x1);
+    const top = Math.min(y0, y1), bottom = Math.max(y0, y1);
+    const candidates = [...new Set([...GameState.PartyManager.party, ...area.creatures, ...area.placeables])] as ModuleObject[];
+    const v = new THREE.Vector3();
+    return candidates.filter((obj) => {
+      if (!obj?.position || obj.destroyed) return false;
+      v.copy(obj.position).project(cam);
+      if (v.z < -1 || v.z > 1) return false; // behind the camera
+      const sx = rect.left + ((v.x + 1) / 2) * rect.width;
+      const sy = rect.top + ((1 - v.y) / 2) * rect.height;
+      return sx >= left && sx <= right && sy >= top && sy <= bottom;
+    });
+  }
+
+  static drawBox(x0: number, y0: number, x1: number, y1: number) {
+    if (typeof document === 'undefined') return;
+    if (!this.boxElement) {
+      const el = document.createElement('div');
+      el.className = 'gm-select-box';
+      Object.assign(el.style, {
+        position: 'fixed', pointerEvents: 'none', zIndex: '50',
+        border: '1px solid #00e5ff', background: 'rgba(0, 229, 255, 0.12)',
+      });
+      document.body.appendChild(el);
+      this.boxElement = el;
+    }
+    Object.assign(this.boxElement.style, {
+      display: 'block',
+      left: `${Math.min(x0, x1)}px`, top: `${Math.min(y0, y1)}px`,
+      width: `${Math.abs(x1 - x0)}px`, height: `${Math.abs(y1 - y0)}px`,
+    });
+  }
+
+  static hideBox() {
+    if (this.boxElement) this.boxElement.style.display = 'none';
   }
 
   static getActiveThreeCamera(): THREE.Camera {
@@ -238,11 +449,16 @@ export class GMViewport {
     }
   }
 
-  static async handleViewportClick(clientX: number, clientY: number, isDoubleClick: boolean = false) {
+  static async handleViewportClick(clientX: number, clientY: number, isDoubleClick: boolean = false, shift: boolean = false) {
     this.updateMouseRaycast(clientX, clientY);
 
     if (GMManager.activeTool === 'select') {
       const picked = this.pickObjectAtCursor();
+      // Shift + click adds to the selection, or takes out what's already in it; Shift + click on nothing keeps it
+      if (shift) {
+        if (picked) GMManager.selectObject(picked, 'toggle');
+        return;
+      }
       GMManager.selectObject(picked);
       if (isDoubleClick && picked) {
         // The GM panel opens its Inspect tab on this

@@ -71,8 +71,20 @@ export class GMManager {
 
   static worldPaused: boolean = false;
 
-  // Currently selected object in the GM Inspector
-  static selectedObject: ModuleObject | null = null;
+  /** What the GM has selected, in the order it was picked (the Inspector edits all of them together) */
+  static selection: ModuleObject[] = [];
+
+  /** The selected object the Inspector shows: the last one picked. Setting it selects it alone. */
+  static get selectedObject(): ModuleObject | null {
+    return this.selection.length ? this.selection[this.selection.length - 1] : null;
+  }
+
+  static set selectedObject(obj: ModuleObject | null) {
+    this.selection = obj ? [obj] : [];
+  }
+
+  /** The GM is dragging objects in the viewport: the free camera holds still */
+  static viewportDragging: boolean = false;
 
   // Player characters loaded into the GM session
   static spawnedPlayers: ModuleCreature[] = [];
@@ -265,9 +277,61 @@ export class GMManager {
     this.notifyChange();
   }
 
-  static selectObject(obj: ModuleObject | null) {
-    this.selectedObject = obj;
+  /**
+   * Select something: on its own ('only'), or added to or taken out of the selection ('toggle'), or
+   * added ('add'). Nothing clears the selection (unless toggling or adding, where it changes nothing).
+   */
+  static selectObject(obj: ModuleObject | null, mode: 'only' | 'toggle' | 'add' = 'only') {
+    if (mode === 'only' || !obj) {
+      if (mode === 'only') this.selectedObject = obj;
+    } else if (this.selection.includes(obj)) {
+      if (mode === 'toggle') this.selection = this.selection.filter((o) => o !== obj);
+    } else {
+      this.selection = [...this.selection, obj];
+    }
     this.notifyChange();
+  }
+
+  /** Select exactly these (a box drawn in the viewport) */
+  static setSelection(list: ModuleObject[]) {
+    this.selection = [...new Set(list.filter(Boolean))];
+    this.notifyChange();
+  }
+
+  static isSelected(obj: ModuleObject | null | undefined): boolean {
+    return !!obj && this.selection.includes(obj);
+  }
+
+  /** The selection, without anything that has gone from the scene since */
+  static selectedObjects(): ModuleObject[] {
+    const live = this.selection.filter((o) => o && !o.destroyed);
+    if (live.length !== this.selection.length) this.selection = live;
+    return live;
+  }
+
+  /**
+   * What the Delete key removes: anything but a character a connected player is playing (taking a
+   * player's character away is the Inspector's Delete button, on purpose, one at a time)
+   */
+  static isDeletable(obj: ModuleObject): boolean {
+    return !!obj && !obj.destroyed && !obj.gmOwnerPeerId;
+  }
+
+  /** Delete several objects; returns how many went */
+  static deleteObjects(list: ModuleObject[]): number {
+    let n = 0;
+    for (const obj of [...list]) {
+      if (!this.isDeletable(obj)) continue;
+      this.deleteObject(obj);
+      n++;
+    }
+    if (n) GMLog.info('world', `Deleted ${n} object${n === 1 ? '' : 's'}`);
+    return n;
+  }
+
+  /** Turn several objects in place, each by the same angle */
+  static rotateObjects(list: ModuleObject[], deltaRadians: number) {
+    for (const obj of list) this.rotateObject(obj, deltaRadians);
   }
 
   /** An open, quiet area to start GM mode in, for each game */
@@ -896,8 +960,8 @@ export class GMManager {
   static deleteObject(obj: ModuleObject) {
     if (!obj) return;
     const netId = obj.gmNetId;
-    if (this.selectedObject === obj) {
-      this.selectedObject = null;
+    if (this.selection.includes(obj)) {
+      this.selection = this.selection.filter((o) => o !== obj);
     }
 
     const partyIdx = GameState.PartyManager.party.indexOf(obj as ModuleCreature);
@@ -1126,7 +1190,7 @@ export class GMManager {
   static update(delta: number) {
     if (!GameState.gmMode) return;
     GMViewport.init3DIndicators();
-    GMViewport.updateSelectionRing(this.selectedObject);
+    GMViewport.updateSelectionRings(this.selectedObjects());
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);

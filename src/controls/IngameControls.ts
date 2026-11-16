@@ -1000,7 +1000,9 @@ export class IngameControls {
       // camera, e.g. after something aimed it with lookAt, rights itself)
       const dx = Mouse.MouseX - Mouse.OldMouseX;
       const dy = Mouse.MouseY - Mouse.OldMouseY;
-      const looking = (Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy);
+      // Not while the GM drags objects or a selection box with the left button
+      const holding = GameState.gmMode && GameState.GMManager?.viewportDragging && !Mouse.rightDown;
+      const looking = (Mouse.leftDown || Mouse.rightDown || Mouse.pointerLock) && (dx || dy) && !holding;
       const turnSpeed = 2.0 * delta;
       let yawDelta = looking ? -dx * FREELOOK_MOUSE_SENSITIVITY : 0;
       const pitchDelta = looking ? -dy * FREELOOK_MOUSE_SENSITIVITY : 0;

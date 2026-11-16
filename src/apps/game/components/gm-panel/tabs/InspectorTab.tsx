@@ -4,6 +4,7 @@ import {
   GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders, GMChecks, GMPlayers, GMSpawner, GMViewport, useGMStore,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { ItemOptions, PlayerOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
+import { SelectionGroup } from "@/apps/game/components/gm-panel/tabs/SelectionGroup";
 
 /** Inspect tab: edit the selected object, or browse everything in the scene */
 export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active }) => {
@@ -18,6 +19,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
   const factionName = KotOR.gmFactionName;
   const currentArea = KotOR.GameState.module?.area;
   const selectedObj = GMManager.selectedObject;
+  const selection = GMManager.selectedObjects();
   const connectedPeers = [...GMNetworkManager.peers.values()];
   const recentPrompts = [...GMPlayers.dmPrompts.values()].slice(-3).reverse();
   // Everything in the current area, for the list under the editor
@@ -69,6 +71,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
 
   return (
     <>
+      {selection.length > 1 ? <SelectionGroup list={selection} /> : (
       <div className="gm-section">
         <div className="gm-section-title">
           <span>Selected</span>
@@ -498,6 +501,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
           </>
         )}
       </div>
+      )}
 
       <div className="gm-section">
         <div className="gm-section-title">
@@ -518,9 +522,10 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
           {worldObjects.map((entry, idx) => (
             <div
               key={entry.obj.id || idx}
-              className={`gm-card ${selectedObj === entry.obj ? 'selected' : ''}`}
-              onClick={() => {
-                GMManager.selectObject(entry.obj);
+              className={`gm-card ${GMManager.isSelected(entry.obj) ? 'selected' : ''}`}
+              title="Click: select it. Shift + click: add it to the selection, or take it out"
+              onClick={(e) => {
+                GMManager.selectObject(entry.obj, e.shiftKey ? 'toggle' : 'only');
                 setInspectorBarkInput(entry.obj.gmBarkText || '');
               }}
             >
