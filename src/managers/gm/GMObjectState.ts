@@ -67,6 +67,8 @@ export interface GMObjectState {
   gmNetAnim?: number;
   /** Replica: an animation an effect from the host is playing on it */
   gmFxAnimation?: ITwoDAAnimation;
+  /** Replica: until when (performance clock, ms) that animation holds against the replica's own motion */
+  gmFxUntil?: number;
 
   // ---- Players
   /** Host: a network player's inventory, kept as resrefs */

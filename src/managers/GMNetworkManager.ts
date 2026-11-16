@@ -78,6 +78,9 @@ export type GMFxEvent =
       /** A beam (Force Lightning, Drain Life): from the caster's model to this object's */
       beam?: { casterNetId: string; bodyPart: number } }
   | { kind: 'vfx.remove'; netId: string; fxId: string }
+  /** A visual effect at a spot (an area power's burst, a grenade blast, a beam aimed at a spot) */
+  | { kind: 'vfx.at'; fxId: string; vfx: number; miss: number; durationType: number; duration: number; x: number; y: number; z: number;
+      beam?: { casterNetId: string; bodyPart: number } }
   | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number };
 
 /** A question the GM asks players, as an NPC or as the GM, with replies to pick from */

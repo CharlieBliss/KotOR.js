@@ -220,11 +220,8 @@ export class Action {
         return;
       }
 
-      // For NPCs, avoid both other NPCs and party members
-      if (!isPlayerCharacter && GameState.PartyManager.party.indexOf(creature) >= 0) {
-        // Skip party members for NPCs to prevent them from avoiding each other
-        return;
-      }
+      // NPCs avoid party members too (in GM mode, the players' characters): they skipped them, and walked
+      // into a player standing in their way and stuck there
 
       // Close enough to bump: its size and the mover's own (collision stops them that far apart)
       const hitDistance = (creature.getHitDistance() + (owner.getHitDistance?.() || 0)) * SAFETY_BUFFER;

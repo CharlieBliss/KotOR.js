@@ -1732,7 +1732,6 @@ NWScriptDefK1.Actions = {
     action: function(this: NWScriptInstance, args: [number, number, EngineLocation, number, number, THREE.Vector3]){
       this.objectInSphapeIndex.set(args[0], 0);
       const ls = GameState.ModuleObjectManager.GetObjectsInShape(args[0], args[1], args[2], !!args[3], args[4], args[5], 0);
-      console.log('GetFirstObjectInShape', ls, args);
       return ls;
     }
   },
@@ -1745,7 +1744,6 @@ NWScriptDefK1.Actions = {
       const nextId = this.objectInSphapeIndex.get(args[0]) + 1;
       this.objectInSphapeIndex.set(args[0], nextId);
       const ls = GameState.ModuleObjectManager.GetObjectsInShape(args[0], args[1], args[2], !!args[3], args[4], args[5], nextId);
-      console.log('GetNextObjectInShape', ls, args, nextId);
       return ls;
     }
   },
@@ -2293,6 +2291,8 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.INTEGER,
     args: [NWScriptDataType.OBJECT, NWScriptDataType.OBJECT],
     action: function(this: NWScriptInstance, args: [ModuleObject, ModuleObject]){
+      // Either invalid (a target that died or left mid-cast): FALSE, as documented; it threw and stopped the power
+      if(!args[0] || !args[1] || typeof args[1].resistForce !== 'function') return NW_FALSE;
       return args[1].resistForce(args[0]);
     }
   },
@@ -2978,6 +2978,11 @@ NWScriptDefK1.Actions = {
       }
       if(BitWise.InstanceOfObject(this.caller?.combatData?.lastSpellTarget, ModuleObjectType.ModuleObject)){
         return this.caller.combatData.lastSpellTarget.getLocation();
+      }
+      // No target left (it died mid-cast and the round let it go): where the caster is, not the world's origin,
+      // where an area power went off on whatever stood there (an exit trigger, in Onderon's palace)
+      if(BitWise.InstanceOfObject(this.caller, ModuleObjectType.ModuleObject) && typeof this.caller.getLocation === 'function'){
+        return this.caller.getLocation();
       }
       return new EngineLocation();
     }

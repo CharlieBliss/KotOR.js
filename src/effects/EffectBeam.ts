@@ -129,11 +129,13 @@ export class EffectBeam extends GameEffect {
   attachBeam(){
     if(!(this.model instanceof OdysseyModel3D) || this.model.parent) return;
     const caster = this.getCaster();
-    if(caster?.model instanceof OdysseyModel3D && this.object?.model){
+    // Aimed at a creature, its model; aimed at a spot (Module.addEffect), the marker made for it there
+    const target = this.object?.model || this.creator?.model;
+    if(caster?.model instanceof OdysseyModel3D && target){
       //Add the effect to the casters model
       caster.model.add(this.model);
       //Set the target node of the BeamEffect emitter
-      this.model.setEmitterTarget(this.object.model);
+      this.model.setEmitterTarget(target);
     }
   }
 

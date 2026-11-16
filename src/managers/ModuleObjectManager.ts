@@ -613,8 +613,18 @@ export class ModuleObjectManager {
 
     //console.log('GetObjectsInShape', objectFilter, shape);
 
+    // Nowhere to look around (a location with no position)
+    if(!target?.position){
+      return idx == -1 ? results : undefined;
+    }
+
     if((oType & NWModuleObjectType.CREATURE) == NWModuleObjectType.CREATURE){ //CREATURE
       object_pool = object_pool.concat(this.module.area.creatures);
+      // The party isn't in the area's creature list: area powers and grenades passed over it (in GM mode, every
+      // player's character)
+      for(const member of GameState.PartyManager?.party || []){
+        if(member && !object_pool.includes(member)) object_pool.push(member);
+      }
     }
 
     if((oType & NWModuleObjectType.ITEM) == NWModuleObjectType.ITEM){ //ITEM

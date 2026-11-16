@@ -35,6 +35,9 @@ export class GMReplication {
 
   static NET_SNAP_DISTANCE: number = 6;
 
+  /** How long a replayed swing, shot or reaction keeps its replica from going back to walking or running */
+  static FX_HOLD_MS: number = 900;
+
   // Animation states set alongside a replayed 2DA animation (see applyFxEventOnClient)
   static FX_DRIVEN_ANIM_STATES: number[] = [
     ModuleCreatureAnimState.ATTACK,
@@ -503,6 +506,23 @@ export class GMReplication {
   }
 
   static onHostVisualEffectApplied(effect: GameEffect) {
+    // At a spot: scripts apply area bursts, grenade blasts and some beams at a location (Module.addEffect), on a
+    // marker with no network id. Players replay them at the same spot
+    const marker = (effect as any).creator;
+    if ((effect.object as any) === GameState.module && GMNetworkManager.role === 'host' && marker?.position) {
+      let beam: { casterNetId: string; bodyPart: number } | undefined;
+      if (effect.type === GameEffectType.EffectBeam) {
+        const casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
+        if (!casterNetId) return;
+        beam = { casterNetId, bodyPart: effect.getInt(1) };
+      }
+      GMNetworkManager.broadcastFx({
+        kind: 'vfx.at', fxId: GMManager.getNextNetId('fx'), vfx: effect.getInt(0), miss: effect.getInt(2),
+        durationType: effect.getDurationType(), duration: effect.getDuration(),
+        x: marker.position.x, y: marker.position.y, z: marker.position.z, ...(beam ? { beam } : {}),
+      });
+      return;
+    }
     const netId = this.getHostFxNetId(effect.object);
     if (!netId) return;
     // A beam is drawn from its caster: players need to know who that is
@@ -534,10 +554,32 @@ export class GMReplication {
     GMNetworkManager.broadcastFx({ kind: 'vfx.remove', netId, fxId });
   }
 
+  /** Client: a visual effect the host put at a spot (an area burst, a grenade blast, a beam at a spot) */
+  static applyFxAtOnClient(event: Extract<GMFxEvent, { kind: 'vfx.at' }>) {
+    if (!GameState.module) return;
+    let effect: GameEffect;
+    if (event.beam) {
+      const caster = GMManager.netIdMap.get(event.beam.casterNetId);
+      if (!caster) return;
+      effect = new GameState.GameEffectFactory.EffectBeam();
+      effect.setInt(1, event.beam.bodyPart);
+      effect.setObject(0, caster);
+    } else {
+      effect = new GameState.GameEffectFactory.EffectVisualEffect();
+    }
+    effect.setInt(0, event.vfx);
+    effect.setInt(2, event.miss);
+    effect.setDurationType(event.durationType);
+    effect.setDuration(event.duration);
+    effect.initialize();
+    GameState.module.addEffect(effect, { position: new THREE.Vector3(event.x, event.y, event.z) } as any);
+  }
+
   /**
    * Client: replay a host visual on our copy of the object
    */
   static applyFxEventOnClient(event: GMFxEvent) {
+    if (event?.kind === 'vfx.at') { this.applyFxAtOnClient(event); return; }
     const obj = GMManager.netIdMap.get(event?.netId);
     if (!obj) return;
     switch (event.kind) {
@@ -549,6 +591,14 @@ export class GMReplication {
         cre.playTwoDAAnimation(animation);
         cre.animationState.index = event.index;
         cre.gmFxAnimation = cre.animationState.animation;
+        cre.gmFxUntil = performance.now() + this.FX_HOLD_MS;
+        // The same swing or shot again: the model still has the last one as its animation (a replica isn't put
+        // back to its ready stance between them, as the host's fighters are), so it wouldn't start over. Start it
+        const name = String(animation.name || '').toLowerCase();
+        if (cre.model && String(cre.model.getAnimationName?.() || '').toLowerCase() === name) {
+          cre.model.playAnimation(name, false);
+          cre.animationState.started = true;
+        }
         break;
       }
       case 'text':
@@ -721,7 +771,12 @@ export class GMReplication {
     const isLocomotion = anim === ModuleCreatureAnimState.RUNNING || anim === ModuleCreatureAnimState.WALKING;
     const hostAnim = cre.gmNetAnim as number | undefined;
     const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
-    if (speed > 0.4) {
+    // A swing, shot or reaction the host just played: it plays out, though the replica is still gliding the last
+    // of the way to where the host stopped (the run put straight back over it was most of what players missed)
+    const fxActive = !!cre.gmFxAnimation && cre.animationState.animation === cre.gmFxAnimation && performance.now() < (cre.gmFxUntil || 0);
+    if (fxActive) {
+      // keep it
+    } else if (speed > 0.4) {
       // Walking or running is the host's call (smoothing slows the replica's apparent speed, so a running rancor
       // looked like it walked); from speed only when the host's state isn't locomotion yet
       const want = hostIsLocomotion ? hostAnim! : (speed > cre.getWalkSpeed() * 1.25 ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);

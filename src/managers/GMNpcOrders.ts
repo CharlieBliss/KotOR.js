@@ -152,7 +152,8 @@ export class GMNpcOrders {
       }
 
       case 'guard': {
-        const enemy = this.retaliateTarget(cre) || this.nearestEnemy(cre, everyone, order.radius, true, order.point);
+        const enemy = this.keptTarget(cre, order.radius + this.KEEP_TARGET_SLACK, order.point)
+          || this.retaliateTarget(cre) || this.nearestEnemy(cre, everyone, order.radius, true, order.point);
         if (enemy) {
           if (!busy) GMCombatAI.engage(cre, enemy, everyone);
           return;
@@ -166,7 +167,8 @@ export class GMNpcOrders {
 
       case 'patrol': {
         if (!order.points.length) return;
-        const enemy = this.retaliateTarget(cre) || GameState.GMManager?.chooseNpcTarget(cre, everyone);
+        const enemy = this.keptTarget(cre, (GameState.GMManager?.NPC_AI_RETALIATE_RANGE || 30))
+          || this.retaliateTarget(cre) || GameState.GMManager?.chooseNpcTarget(cre, everyone);
         if (enemy) {
           if (!busy) GMCombatAI.engage(cre, enemy, everyone);
           return;
@@ -188,6 +190,23 @@ export class GMNpcOrders {
   static creature(netId: string): ModuleCreature | null {
     const obj = GameState.GMManager?.netIdMap.get(netId);
     return obj && GMObjectKind.isCreature(obj) ? obj as ModuleCreature : null;
+  }
+
+  /** Metres past its guard radius a guard still keeps after the enemy it's fighting */
+  static KEEP_TARGET_SLACK = 4;
+
+  /**
+   * The enemy it's already fighting, while that one is alive, hostile and within range (of a point): it sees
+   * the fight through rather than turning on whoever hit it last. Guards in a melee took each new attacker as
+   * their target and bounced between them.
+   */
+  static keptTarget(cre: ModuleCreature, range: number, around?: GMPoint): ModuleCreature | null {
+    const G = GameState.GMManager;
+    const current = (G?.attackTargetOf?.(cre) || cre.combatData?.lastAttackTarget) as ModuleCreature | undefined;
+    if (!current || current === cre || !GMObjectKind.isCreature(current) || current.isDead?.() || !cre.isHostile(current)) return null;
+    if (G?.isUntargetable?.(current)) return null;
+    const from = around ? this.vector(around) : cre.position;
+    return this.distance2D(from, current.position) <= range ? current : null;
   }
 
   /** Whoever last attacked it, if still alive, hostile and nearby */
