@@ -380,9 +380,12 @@ export class GMViewport {
       }
       return;
     }
+    if (!press.ground) return;
     this.updateMouseRaycast(clientX, clientY);
-    if (!this.hasValidRaycastPoint || !press.ground) return;
-    const delta = this.lastRaycastPoint.clone().sub(press.ground);
+    // Off the floor (over a gap, or the sky), it follows the cursor across the height it was grabbed at
+    const point = this.hasValidRaycastPoint ? this.lastRaycastPoint.clone() : this.rayAtHeight(press.ground.z);
+    if (!point) return;
+    const delta = point.sub(press.ground);
     // Grid snap puts the one grabbed on the grid, and moves the rest with it
     if (this.gridSnapSize > 0) {
       const lead = press.moving.find((m) => m.obj === press.picked) || press.moving[0];
@@ -412,11 +415,41 @@ export class GMViewport {
    * thing under it would be a roof); the point's own height when there's no floor there
    */
   static floorBelow(x: number, y: number, z: number): number {
-    const walkmeshes = GameState.walkmeshList || [];
-    if (!walkmeshes.length) return z;
     const ray = new THREE.Raycaster(new THREE.Vector3(x, y, z + 1.5), new THREE.Vector3(0, 0, -1), 0, 20);
-    const hit = ray.intersectObjects(walkmeshes, true)[0];
+    const hit = this.floorHit(ray, false);
     return hit ? hit.point.z : z;
+  }
+
+  /** How far past the first surface the ray meets a walkable floor can be and still count as that surface */
+  static FLOOR_BEHIND = 1.5;
+
+  /**
+   * Where a ray meets the ground. Props and doors aren't ground: aiming at a table puts you on the floor
+   * behind it, not on its top. The rooms are: the first walkable face of a room's walkmesh, or the first
+   * thing hit (a room model's own floor, a wall, a cliff) when a walkable face isn't just behind it, so the
+   * point never jumps through what's under the cursor to floor far beyond.
+   */
+  static floorHit(ray: THREE.Raycaster, models: boolean = true): THREE.Intersection | null {
+    const meshes: THREE.Object3D[] = [];
+    const walkmeshOf = new Map<THREE.Object3D, any>();
+    for (const room of GameState.module?.area?.rooms || []) {
+      const wm = room?.collisionManager?.walkmesh;
+      if (!wm?.mesh) continue;
+      meshes.push(wm.mesh);
+      walkmeshOf.set(wm.mesh, wm);
+    }
+    const hits = meshes.length ? ray.intersectObjects(meshes, false) : [];
+    const walkable = hits.find((h) => walkmeshOf.get(h.object)?.faces?.[h.faceIndex ?? -1]?.walk) || null;
+    const model = models && GameState.group?.rooms ? ray.intersectObject(GameState.group.rooms, true)[0] || null : null;
+    const first = [hits[0], model].filter(Boolean).sort((a, b) => a!.distance - b!.distance)[0] || null;
+    if (walkable && (!first || walkable.distance - first.distance <= this.FLOOR_BEHIND)) return walkable;
+    return first;
+  }
+
+  /** Where the cursor's ray crosses a level at some height */
+  static rayAtHeight(z: number): THREE.Vector3 | null {
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -z);
+    return this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
   }
 
   /** The button came up (at a point), or the window lost focus (null): finish the move or the box */
@@ -499,20 +532,12 @@ export class GMViewport {
   }
 
   static getGroundZAt(x: number, y: number, fallbackZ: number = 0): number {
-    const targets: THREE.Object3D[] = [];
-    if (GameState.walkmeshList?.length) targets.push(...GameState.walkmeshList);
-    if (GameState.group?.rooms) targets.push(GameState.group.rooms);
-    if (!targets.length) return fallbackZ;
-
     const downRay = new THREE.Raycaster(
       new THREE.Vector3(x, y, fallbackZ + 15),
       new THREE.Vector3(0, 0, -1)
     );
-    const hits = downRay.intersectObjects(targets, true);
-    if (hits.length > 0) {
-      return hits[0].point.z;
-    }
-    return fallbackZ;
+    const hit = this.floorHit(downRay);
+    return hit ? hit.point.z : fallbackZ;
   }
 
   static updateMouseRaycast(clientX: number, clientY: number) {
@@ -530,18 +555,9 @@ export class GMViewport {
 
     this.raycaster.setFromCamera(this.mouseNDC, cam);
 
-    // Raycast against walkmeshes and room models
-    const targets: THREE.Object3D[] = [];
-    if (GameState.walkmeshList?.length) {
-      targets.push(...GameState.walkmeshList);
-    }
-    if (GameState.group?.rooms) {
-      targets.push(GameState.group.rooms);
-    }
-
-    const hits = this.raycaster.intersectObjects(targets, true);
-    if (hits.length > 0) {
-      const snapped = GMManager.activeTool !== 'select' ? this.snapVectorToGrid(hits[0].point) : hits[0].point.clone();
+    const hit = this.floorHit(this.raycaster);
+    if (hit) {
+      const snapped = GMManager.activeTool !== 'select' ? this.snapVectorToGrid(hit.point) : hit.point.clone();
       this.lastRaycastPoint.copy(snapped);
       this.hasValidRaycastPoint = true;
       if (this.placementRing && GMManager.activeTool !== 'select') {
@@ -672,22 +688,37 @@ export class GMViewport {
       }
     }
 
-    // Fallback: closest object to walkmesh intersection point within 1.75m
+    // Missed its model: the floor it stands on still counts (a creature's footprint, a prop's outline), but
+    // not the floor beside it, so a click next to something is a click on the floor
     if (this.hasValidRaycastPoint) {
+      const p = this.lastRaycastPoint;
       let best: ModuleObject | null = null;
-      let bestDist = 1.75;
+      let bestDist = Infinity;
       for (const obj of candidates) {
-        if (!obj?.position) continue;
-        const d = Math.hypot(obj.position.x - this.lastRaycastPoint.x, obj.position.y - this.lastRaycastPoint.y);
-        if (d < bestDist) {
-          bestDist = d;
-          best = obj;
-        }
+        if (!obj?.position || GMObjectKind.isDoor(obj)) continue;
+        const d = Math.hypot(obj.position.x - p.x, obj.position.y - p.y);
+        if (d >= bestDist || !this.standsOn(obj, p, d)) continue;
+        bestDist = d;
+        best = obj;
       }
       return best;
     }
 
     return null;
+  }
+
+  /** Whether a point on the floor is under an object: within a creature's own size, or a prop's outline */
+  static standsOn(obj: ModuleObject, p: THREE.Vector3, distance: number): boolean {
+    if (GMObjectKind.isCreature(obj)) {
+      const size = (obj as ModuleCreature).getHitDistance?.() || 0.5;
+      return distance <= Math.max(0.5, size) + 0.2;
+    }
+    const box = obj.box;
+    if (box && !box.isEmpty()) {
+      const m = 0.15;
+      return p.x >= box.min.x - m && p.x <= box.max.x + m && p.y >= box.min.y - m && p.y <= box.max.y + m;
+    }
+    return distance <= 0.5;
   }
 
   static isOrderTool(tool: GMToolMode): boolean {

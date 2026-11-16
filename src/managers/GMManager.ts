@@ -784,6 +784,11 @@ export class GMManager {
       cre.force = 0;
       cre.speed = 0;
       cre.setAnimationState(ModuleCreatureAnimState.PAUSE);
+      // Put somewhere by the GM, a guard guards there: it doesn't walk back to where it was (a move order
+      // ends here too, or it would walk on to where it was heading)
+      const order = cre.gmOrder as GMNpcOrder | undefined;
+      if (order?.kind === 'guard') order.point = { x: pos.x, y: pos.y, z: pos.z };
+      else if (order?.kind === 'move') cre.gmOrder = { kind: 'guard', point: { x: pos.x, y: pos.y, z: pos.z }, radius: GMNpcOrders.GUARD_RADIUS };
     }
     obj.position.copy(pos);
     if (obj.container) {
@@ -798,6 +803,8 @@ export class GMManager {
       obj.position.z = pos.z;
       if (obj.container) obj.container.position.z = pos.z;
     }
+    // Its collision goes with it
+    if (!GMObjectKind.isCreature(obj)) (obj as ModulePlaceable).syncWalkmesh?.();
     obj.computeBoundingBox(true);
   }
 
@@ -809,6 +816,7 @@ export class GMManager {
     } else {
       obj.bearing = Utility.NormalizeRadian((obj.bearing || 0) + deltaRadians);
       obj.rotation.z = obj.bearing;
+      (obj as ModulePlaceable).syncWalkmesh?.();
     }
     obj.computeBoundingBox(true);
     if (GMNetworkManager.role !== 'offline') {

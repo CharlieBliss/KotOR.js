@@ -124,6 +124,23 @@ describe("GM orders for NPCs", () => {
     expect(moves(npc)[0].target.x).toBe(0);
   });
 
+  test("a guard (or someone moving) put somewhere by the GM stays there instead of walking back", () => {
+    const placeable = { setAnimationState: jest.fn(), getCurrentRoom: jest.fn(), computeBoundingBox: jest.fn() };
+    const guard = creature("cre_0", 0, placeable);
+    GMManager.giveOrder(guard, { kind: "guard", point: { x: 0, y: 0, z: 0 }, radius: 8 });
+    GMManager.placeAt(guard, new THREE.Vector3(6, 2, 0));
+    expect((guard.gmOrder as any).point).toEqual({ x: 6, y: 2, z: 0 });
+    GMNpcOrders.think(guard, [guard]);
+    expect(moves(guard)).toEqual([]);
+
+    const walker = creature("cre_1", 0, placeable);
+    GMManager.giveOrder(walker, { kind: "move", point: { x: 10, y: 0, z: 0 } });
+    GMManager.placeAt(walker, new THREE.Vector3(3, 0, 0));
+    expect(walker.gmOrder).toMatchObject({ kind: "guard", point: { x: 3, y: 0, z: 0 } });
+    GMNpcOrders.think(walker, [walker]);
+    expect(moves(walker)).toEqual([]);
+  });
+
   test("patrol: walks from point to point in a loop", () => {
     const npc = creature("cre_0", 0);
     GMManager.giveOrder(npc, { kind: "patrol", points: [{ x: 0, y: 0, z: 0 }, { x: 10, y: 0, z: 0 }], index: 1 });
