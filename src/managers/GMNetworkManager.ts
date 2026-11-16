@@ -74,7 +74,9 @@ export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item';
 export type GMFxEvent =
   | { kind: 'anim'; netId: string; anim: string; index: number }
   | { kind: 'text'; netId: string; text: string; style: number; timer: number }
-  | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number }
+  | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number;
+      /** A beam (Force Lightning, Drain Life): from the caster's model to this object's */
+      beam?: { casterNetId: string; bodyPart: number } }
   | { kind: 'vfx.remove'; netId: string; fxId: string }
   | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number };
 

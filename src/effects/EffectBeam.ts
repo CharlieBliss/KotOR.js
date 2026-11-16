@@ -105,6 +105,8 @@ export class EffectBeam extends GameEffect {
           context: this.object.context,
           onComplete: (model: OdysseyModel3D) => {
             this.model = model;
+            // Applied while the model was loading (addEffect applies at once): attach it now
+            if(this.applied) this.attachBeam();
             resolve();
           }
         });
@@ -119,15 +121,30 @@ export class EffectBeam extends GameEffect {
       return;
       
     super.onApply();
-    
-    if(this.model instanceof OdysseyModel3D){
-      if(this.getCaster().model instanceof OdysseyModel3D){
-        //Add the effect to the casters model
-        this.getCaster().model.add(this.model);
-        //Set the target node of the BeamEffect emitter
-        this.model.setEmitterTarget(this.object.model);
-      }
+    this.attachBeam();
+    GameState.hooks.onHostVisualEffectApplied(this);
+  }
+
+  /** Hang the beam on its caster's model, its emitters aimed at the target (once both models are there) */
+  attachBeam(){
+    if(!(this.model instanceof OdysseyModel3D) || this.model.parent) return;
+    const caster = this.getCaster();
+    if(caster?.model instanceof OdysseyModel3D && this.object?.model){
+      //Add the effect to the casters model
+      caster.model.add(this.model);
+      //Set the target node of the BeamEffect emitter
+      this.model.setEmitterTarget(this.object.model);
     }
+  }
+
+  /** The beam goes with the effect: off the caster's model (it stayed there after the power ended) */
+  onRemove(){
+    if(this.model instanceof OdysseyModel3D){
+      this.model.removeFromParent();
+      this.model.dispose();
+      this.model = undefined;
+    }
+    super.onRemove();
   }
 
   update(delta = 0){

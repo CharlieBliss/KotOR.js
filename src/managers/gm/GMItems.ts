@@ -96,6 +96,38 @@ export class GMItems {
   }
 
   /** Whether the running game has this item template */
+  /**
+   * The same item in the other game, by name and base item: KotOR II renamed its armour, robes and blasters
+   * (KotOR's g_a_jedirobe01 is its a_robe_08). The presets, plans and the GM's saved gear name KotOR's, so in
+   * KotOR II a character came out in its underwear with an empty holster. Both ways round.
+   */
+  static CROSS_GAME: Record<string, string> = (() => {
+    const pairs: [string, string][] = [
+      ['g_a_jedirobe01', 'a_robe_08'],      // Jedi Robe
+      ['g_a_kghtrobe01', 'a_robe_13'],      // Jedi Knight Robe
+      ['g_a_mstrrobe01', 'a_robe_17'],      // Jedi Master Robe
+      ['g_a_mstrrobe02', 'a_robe_18'],      // Dark Jedi Master Robe
+      ['g_a_class4001', 'a_light_02'],      // Combat Suit
+      ['g_a_class6001', 'a_medium_01'],     // Military Suit
+      ['g_a_class8001', 'a_heavy_01'],      // Battle Armor
+      ['g_w_blstrpstl001', 'w_blaste_01'],  // Blaster Pistol
+      ['g_w_blstrrfl001', 'w_brifle_04'],   // Blaster Rifle
+      ['g_w_bowcstr001', 'w_brifle_05'],    // Bowcaster
+      ['g_w_hvrptbltr01', 'w_brifle_22'],   // Heavy Repeating Blaster / Rifle
+    ];
+    const map: Record<string, string> = {};
+    for (const [kotor, tsl] of pairs) { map[kotor] = tsl; map[tsl] = kotor; }
+    return map;
+  })();
+
+  /** An item resref as this game has it: itself, or the other game's name for the same item */
+  static forThisGame(resRef: string): string {
+    const key = String(resRef || '').toLowerCase().trim();
+    if (!key || this.exists(key)) return resRef;
+    const other = this.CROSS_GAME[key];
+    return other && this.exists(other) ? other : resRef;
+  }
+
   static exists(resRef: string): boolean {
     if (!resRef) return false;
     if (this.index) return this.index.some((i) => i.resRef === resRef);

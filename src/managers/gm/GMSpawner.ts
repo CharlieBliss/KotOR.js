@@ -1,4 +1,5 @@
 import { GMFaction, gmItemResRef } from "@/managers/gm/GMVocab";
+import { GMItems } from "@/managers/gm/GMItems";
 import { GMTemplates } from "@/managers/gm/GMTemplates";
 import type { GMGear } from "@/managers/gm/GMTemplates";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
@@ -768,7 +769,7 @@ export class GMSpawner {
   }
 
   static async createItemFromResRefAsync(itemResRef: string): Promise<ModuleItem> {
-    const resKey = itemResRef.toLowerCase().trim();
+    const resKey = GMItems.forThisGame(itemResRef).toLowerCase().trim();
     const buffer = await GMTemplates.loadBuffer(ResourceTypes.uti, resKey);
     if (buffer) {
       const gff = new GFFObject(buffer);

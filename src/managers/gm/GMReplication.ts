@@ -11,6 +11,7 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import type { GameEffect } from "@/effects/GameEffect";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
+import { GameEffectType } from "@/enums/effects/GameEffectType";
 import {
   GMNetworkManager,
   GMSerializedActor,
@@ -504,6 +505,13 @@ export class GMReplication {
   static onHostVisualEffectApplied(effect: GameEffect) {
     const netId = this.getHostFxNetId(effect.object);
     if (!netId) return;
+    // A beam is drawn from its caster: players need to know who that is
+    let beam: { casterNetId: string; bodyPart: number } | undefined;
+    if (effect.type === GameEffectType.EffectBeam) {
+      const casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
+      if (!casterNetId) return;
+      beam = { casterNetId, bodyPart: effect.getInt(1) };
+    }
     const fxId = GMManager.getNextNetId('fx');
     (effect as any).gmFxId = fxId;
     GMNetworkManager.broadcastFx({
@@ -514,6 +522,7 @@ export class GMReplication {
       miss: effect.getInt(2),
       durationType: effect.getDurationType(),
       duration: effect.getDuration(),
+      ...(beam ? { beam } : {}),
     });
   }
 
@@ -546,7 +555,16 @@ export class GMReplication {
         TextSprite3D.CreateOnObject(obj, event.text, event.style, event.timer);
         break;
       case 'vfx.add': {
-        const effect = new GameState.GameEffectFactory.EffectVisualEffect();
+        let effect: GameEffect;
+        if (event.beam) {
+          const caster = GMManager.netIdMap.get(event.beam.casterNetId);
+          if (!caster) return;
+          effect = new GameState.GameEffectFactory.EffectBeam();
+          effect.setInt(1, event.beam.bodyPart);
+          effect.setObject(0, caster);
+        } else {
+          effect = new GameState.GameEffectFactory.EffectVisualEffect();
+        }
         effect.setInt(0, event.vfx);
         effect.setInt(2, event.miss);
         effect.setDurationType(event.durationType);
