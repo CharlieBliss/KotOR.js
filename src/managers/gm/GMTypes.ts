@@ -4,7 +4,9 @@ import type { ICharacterAttributes } from "@/engine/rules/CharacterBuilder";
 export type GMControlMode = 'FREECAM' | 'POSSESS';
 export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine'
   // Ordering an NPC (GMNpcOrders): click the ground to move it, a creature to attack or follow, points to patrol
-  | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol';
+  | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol'
+  // Turning the selection to face a clicked point or creature
+  | 'face';
 
 export interface GMModuleEntry {
   resRef: string;
@@ -211,6 +213,15 @@ export interface GMSavedObject {
   stance?: string;
   /** What it fights with (GMCombatAI), when not everything */
   combatStyle?: 'weapons' | 'attack';
+  /** Pinned: can't be clicked or dragged in the scene */
+  pinned?: boolean;
+}
+
+/** A saved group (number key 1-9): placed objects by their index in the save, the rest by net id */
+export interface GMSavedGroup {
+  n: number;
+  objects: number[];
+  netIds: string[];
 }
 
 /** A player character as saved in a session; network players are matched back by name */
@@ -239,6 +250,10 @@ export interface GMSessionSave {
   players: GMSavedPlayer[];
   /** Added later; older saves use the default rules */
   rules?: GMSessionRules;
+  /** The scene's own objects the GM pinned (placed objects carry their own flag) */
+  pinnedNetIds?: string[];
+  /** Saved groups of the selection */
+  groups?: GMSavedGroup[];
 }
 
 /**

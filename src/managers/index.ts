@@ -51,3 +51,5 @@ export * from "@/managers/gm/GMItems";
 export * from "@/managers/gm/GMLog";
 export * from "@/managers/gm/GMPlayerRequests";
 export * from "@/managers/gm/GMCombatAI";
+export * from "@/managers/gm/GMHistory";
+export * from "@/managers/gm/GMEditTools";

@@ -2,7 +2,16 @@ import React, { useEffect, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import {
   GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders, GMChecks, GMPlayers, GMSpawner, GMViewport, useGMStore,
+  GMHistory, GMEditTools,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { deleteSelection, EDIT_SHORTCUT_HINTS } from "@/apps/game/components/gm-panel/controls/editShortcuts";
+
+/** What the history log calls each Inspector edit */
+const EDIT_LABELS: Record<string, string> = {
+  healObject: 'Heal', killObject: 'Kill', rotateObject: 'Turn', nudgeObjectPosition: 'Nudge', setObjectScale: 'Resize',
+  setObjectFaction: 'Change side of', giveOrder: 'Order', setCreatureStance: 'Change stance of', setObjectHidden: 'Hide or reveal',
+  toggleDoorOrPlaceableLock: 'Lock or unlock', setStyle: 'Change how it fights:', setObjectBark: 'Change bark of',
+};
 import { ItemOptions, PlayerOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
 import { SelectionGroup } from "@/apps/game/components/gm-panel/tabs/SelectionGroup";
 
@@ -20,6 +29,13 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
   const currentArea = KotOR.GameState.module?.area;
   const selectedObj = GMManager.selectedObject;
   const selection = GMManager.selectedObjects();
+  /** An edit to the selected object, as one undoable step */
+  const edit = (what: string, change: () => unknown) => {
+    if (!selectedObj) return;
+    GMHistory.track(`${EDIT_LABELS[what] || what} ${GMHistory.nameOf([selectedObj])}`, [selectedObj], change);
+  };
+  const groups = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => ({ n, members: GMEditTools.groupMembers(n) })).filter((g) => g.members.length);
+  const history = GMHistory.log(12);
   const connectedPeers = [...GMNetworkManager.peers.values()];
   const recentPrompts = [...GMPlayers.dmPrompts.values()].slice(-3).reverse();
   // Everything in the current area, for the list under the editor
@@ -76,7 +92,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
         <div className="gm-section-title">
           <span>Selected</span>
           {selectedObj && (
-            <button className="gm-btn small danger" onClick={() => GMManager.deleteObject(selectedObj)} title="Remove it from the scene">
+            <button className="gm-btn small danger" onClick={() => deleteSelection([selectedObj])} title="Remove it from the scene">
               Delete
             </button>
           )}
@@ -114,10 +130,10 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   >
                     Play as
                   </button>
-                  <button className="gm-btn small" onClick={() => GMManager.healObject(selectedObj)} title="Full health">
+                  <button className="gm-btn small" onClick={() => edit('healObject', () => GMManager.healObject(selectedObj))} title="Full health">
                     Heal
                   </button>
-                  <button className="gm-btn small danger" onClick={() => GMManager.killObject(selectedObj)}>
+                  <button className="gm-btn small danger" onClick={() => edit('killObject', () => GMManager.killObject(selectedObj))}>
                     Kill
                   </button>
                 </div>
@@ -126,25 +142,25 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Side</span>
                     <button
                       className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.HOSTILE ? 'danger' : ''}`}
-                      onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.HOSTILE)}
+                      onClick={() => edit('setObjectFaction', () => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.HOSTILE))}
                     >
                       Hostile
                     </button>
                     <button
                       className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.FRIENDLY ? 'success' : ''}`}
-                      onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.FRIENDLY)}
+                      onClick={() => edit('setObjectFaction', () => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.FRIENDLY))}
                     >
                       Friendly
                     </button>
                     <button
                       className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.NEUTRAL ? 'active' : ''}`}
-                      onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.NEUTRAL)}
+                      onClick={() => edit('setObjectFaction', () => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.NEUTRAL))}
                     >
                       Neutral
                     </button>
                     <button
                       className={`gm-btn small ${(selectedObj as KotOR.ModuleCreature).factionId === KotOR.GMFaction.PARTY ? 'active' : ''}`}
-                      onClick={() => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.PARTY)}
+                      onClick={() => edit('setObjectFaction', () => GMManager.setObjectFaction(selectedObj, KotOR.GMFaction.PARTY))}
                     >
                       Party
                     </button>
@@ -159,7 +175,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                           key={style.id}
                           className={`gm-btn small ${(selectedObj.gmCombatStyle || 'all') === style.id ? 'active' : ''}`}
                           title={style.title}
-                          onClick={() => KotOR.GMCombatAI.setStyle(selectedObj as KotOR.ModuleCreature, style.id)}
+                          onClick={() => edit('setStyle', () => KotOR.GMCombatAI.setStyle(selectedObj as KotOR.ModuleCreature, style.id))}
                         >
                           {style.label}
                         </button>
@@ -179,7 +195,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     <div className="gm-grid-2" title="A stance holds whenever it would just stand: after walking, after a gesture, and after a fight">
                       <div className="gm-field">
                         <label>Stance</label>
-                        <select className="gm-select" value={current} onChange={(e) => GMManager.setCreatureStance(cre, e.target.value)}>
+                        <select className="gm-select" value={current} onChange={(e) => edit('setCreatureStance', () => GMManager.setCreatureStance(cre, e.target.value))}>
                           <option value="">Standing</option>
                           {current && !stances.some((c) => c.id === current) && <option value={current}>{current}</option>}
                           {groups(stances).map((g) => (
@@ -259,7 +275,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   <button
                     className={`gm-btn ${(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'warning' : ''}`}
                     style={{ flex: 1 }}
-                    onClick={() => GMManager.toggleDoorOrPlaceableLock(selectedObj)}
+                    onClick={() => edit('toggleDoorOrPlaceableLock', () => GMManager.toggleDoorOrPlaceableLock(selectedObj))}
                   >
                     {(selectedObj as KotOR.ModuleDoor | KotOR.ModulePlaceable).isLocked() ? 'Unlock' : 'Lock'}
                   </button>
@@ -330,9 +346,20 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                 <input
                   type="checkbox"
                   checked={GMManager.isHiddenFromPlayers(selectedObj)}
-                  onChange={e => GMManager.setObjectHidden(selectedObj, e.target.checked)}
+                  onChange={e => edit('setObjectHidden', () => GMManager.setObjectHidden(selectedObj, e.target.checked))}
                 />
                 Hidden from players
+              </label>
+            )}
+
+            {!KotOR.GMObjectKind.isDoor(selectedObj) && (
+              <label className="gm-checkbox" title="Pinned things can't be clicked, boxed, dragged or deleted in the scene; change them from the list below">
+                <input
+                  type="checkbox"
+                  checked={!!selectedObj.gmPinned}
+                  onChange={e => GMEditTools.setPinned([selectedObj], e.target.checked)}
+                />
+                Pinned in the scene
               </label>
             )}
 
@@ -341,7 +368,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
             <div className="gm-row">
               <button
                 className="gm-btn small success"
-                onClick={() => GMSpawner.duplicateObject(selectedObj)}
+                onClick={() => void GMEditTools.duplicate([selectedObj])}
                 title="Spawn an exact duplicate of this Placeable or Creature next to it"
               >
                 Duplicate
@@ -363,10 +390,10 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
               >
                 Move to click
               </button>
-              <button className="gm-btn small" onClick={() => GMManager.rotateObject(selectedObj, -Math.PI / 4)}>
+              <button className="gm-btn small" onClick={() => edit('rotateObject', () => GMManager.rotateObject(selectedObj, -Math.PI / 4))}>
                 ⟲ 45°
               </button>
-              <button className="gm-btn small" onClick={() => GMManager.rotateObject(selectedObj, Math.PI / 4)}>
+              <button className="gm-btn small" onClick={() => edit('rotateObject', () => GMManager.rotateObject(selectedObj, Math.PI / 4))}>
                 ⟳ 45°
               </button>
             </div>
@@ -374,19 +401,19 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
             <div className="gm-field">
               <label>Nudge</label>
               <div className="gm-row">
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, -0.5, 0, 0)}>X -0.5</button>
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0.5, 0, 0)}>X +0.5</button>
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0, -0.5, 0)}>Y -0.5</button>
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0, 0.5, 0)}>Y +0.5</button>
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0, 0, -0.25)}>Z -0.25</button>
-                <button className="gm-btn small" onClick={() => GMManager.nudgeObjectPosition(selectedObj, 0, 0, 0.25)}>Z +0.25</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, -0.5, 0, 0))}>X -0.5</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, 0.5, 0, 0))}>X +0.5</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, 0, -0.5, 0))}>Y -0.5</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, 0, 0.5, 0))}>Y +0.5</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, 0, 0, -0.25))}>Z -0.25</button>
+                <button className="gm-btn small" onClick={() => edit('nudgeObjectPosition', () => GMManager.nudgeObjectPosition(selectedObj, 0, 0, 0.25))}>Z +0.25</button>
               </div>
               <div className="gm-row" style={{ marginTop: 4 }}>
                 {([0.75, 1.0, 1.25, 1.5, 2.0] as const).map(sc => (
                   <button
                     key={sc}
                     className={`gm-btn small ${Math.abs((selectedObj.gmScale || 1.0) - sc) < 0.05 ? 'active' : ''}`}
-                    onClick={() => GMManager.setObjectScale(selectedObj, sc)}
+                    onClick={() => edit('setObjectScale', () => GMManager.setObjectScale(selectedObj, sc))}
                   >
                     {sc}x
                   </button>
@@ -431,10 +458,10 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     <button className="gm-btn small" onClick={() => GMViewport.startOrderTool('order_patrol', npc)} title="Click points on the ground, then Esc: it walks the loop and fights what it meets">Patrol…</button>
                   </div>
                   <div className="gm-row">
-                    <button className="gm-btn small" onClick={() => GMManager.giveOrder(npc, { kind: 'guard', point: GMManager.pointOf(npc), radius: GMNpcOrders.GUARD_RADIUS })} title={`Holds this spot and fights enemies within ${GMNpcOrders.GUARD_RADIUS}m`}>Guard here</button>
-                    <button className="gm-btn small warning" onClick={() => GMManager.giveOrder(npc, { kind: 'flee' })} title="Runs from the nearest enemy and doesn't fight">Flee</button>
-                    <button className="gm-btn small warning" onClick={() => GMManager.giveOrder(npc, { kind: 'standDown' })} title="Stops fighting, even if attacked">Stand down</button>
-                    <button className="gm-btn small" disabled={!order} onClick={() => GMManager.giveOrder(npc, undefined)} title="Back to its own judgement: fights the nearest enemy">Clear order</button>
+                    <button className="gm-btn small" onClick={() => edit('giveOrder', () => GMManager.giveOrder(npc, { kind: 'guard', point: GMManager.pointOf(npc), radius: GMNpcOrders.GUARD_RADIUS }))} title={`Holds this spot and fights enemies within ${GMNpcOrders.GUARD_RADIUS}m`}>Guard here</button>
+                    <button className="gm-btn small warning" onClick={() => edit('giveOrder', () => GMManager.giveOrder(npc, { kind: 'flee' }))} title="Runs from the nearest enemy and doesn't fight">Flee</button>
+                    <button className="gm-btn small warning" onClick={() => edit('giveOrder', () => GMManager.giveOrder(npc, { kind: 'standDown' }))} title="Stops fighting, even if attacked">Stand down</button>
+                    <button className="gm-btn small" disabled={!order} onClick={() => edit('giveOrder', () => GMManager.giveOrder(npc, undefined))} title="Back to its own judgement: fights the nearest enemy">Clear order</button>
                   </div>
                   {players.length > 0 && (
                     <select
@@ -503,9 +530,57 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
       </div>
       )}
 
+      {groups.length > 0 && (
+        <div className="gm-section">
+          <div className="gm-section-title"><span>Groups</span><span className="gm-summary-note">number key selects · twice goes to it</span></div>
+          <div className="gm-row" style={{ flexWrap: 'wrap' }}>
+            {groups.map(({ n, members }) => (
+              <button
+                key={n}
+                className="gm-btn small"
+                title={`Select group ${n} (key ${n}; Shift + click adds it)`}
+                onClick={(e) => GMEditTools.recallGroup(n, e.shiftKey)}
+              >
+                {n}: {GMHistory.nameOf(members)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <details className="gm-section" open={history.length > 0}>
+        <summary>
+          History <span className="gm-summary-note">Ctrl+Z undo · Ctrl+Y redo</span>
+        </summary>
+        <div className="gm-row">
+          <button className="gm-btn small" style={{ flex: 1 }} disabled={!GMHistory.canUndo()} onClick={() => void GMHistory.undo()}>Undo</button>
+          <button className="gm-btn small" style={{ flex: 1 }} disabled={!GMHistory.canRedo()} onClick={() => void GMHistory.redo()}>Redo</button>
+        </div>
+        {history.length === 0 && <div className="gm-hint">Changes you make show here, newest first.</div>}
+        {history.map((h, i) => (
+          <div key={`${h.at}-${i}`} className="gm-card-sub" style={{ opacity: h.undone ? 0.45 : 1, textDecoration: h.undone ? 'line-through' : 'none' }}>
+            {new Date(h.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · {h.label}
+          </div>
+        ))}
+      </details>
+
+      <details className="gm-section">
+        <summary>Keys <span className="gm-summary-note">select mode, GM camera</span></summary>
+        {EDIT_SHORTCUT_HINTS.map(([k, what]) => (
+          <div key={k} className="gm-card-sub"><b>{k}</b> · {what}</div>
+        ))}
+      </details>
+
       <div className="gm-section">
         <div className="gm-section-title">
           <span>Everything here ({worldObjects.length})</span>
+          <button
+            className="gm-btn small"
+            onClick={() => GMEditTools.pinSceneObjects()}
+            title="Pin the objects the scene came with, so clicking and box-selecting only finds what you've added (unpin any from this list)"
+          >
+            Pin scenery
+          </button>
         </div>
         <div className="gm-row">
           {(['all', 'creatures', 'placeables', 'doors'] as const).map(f => (
@@ -533,7 +608,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                 <div className="gm-card-title">
                   {entry.obj.getName() || (entry.obj as any).firstName || entry.obj.getTag() || 'Unnamed'}
                 </div>
-                <div className="gm-card-sub">{entry.kind} • Tag: {entry.obj.getTag() || 'none'}</div>
+                <div className="gm-card-sub">{entry.kind} • Tag: {entry.obj.getTag() || 'none'}{entry.obj.gmPinned ? ' • pinned' : ''}{entry.obj.gmHidden ? ' • hidden' : ''}</div>
               </div>
               <div className="gm-row">
                 <span className="gm-badge">{entry.badge}</span>

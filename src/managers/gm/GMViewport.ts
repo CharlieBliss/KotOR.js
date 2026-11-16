@@ -11,6 +11,8 @@ import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMLog } from "@/managers/gm/GMLog";
+import { GMHistory, GMHistoryChange } from "@/managers/gm/GMHistory";
+import { GMEditTools } from "@/managers/gm/GMEditTools";
 
 /** The GM's viewport: picking, placement and order tools, the selection and placement rings, and where the camera is looking. */
 export class GMViewport {
@@ -24,8 +26,17 @@ export class GMViewport {
 
   static PLACEMENT_WHEEL_STEP: number = 15;
 
-  /** The NPC an order tool (order_move, order_attack...) is giving its order to */
-  static orderSubject: ModuleCreature | null = null;
+  /** The NPCs an order tool (order_move, order_attack...) is giving its order to */
+  static orderSubjects: ModuleCreature[] = [];
+
+  /** The first of them (the panel names it); setting it gives the order to that one alone */
+  static get orderSubject(): ModuleCreature | null {
+    return this.orderSubjects[0] || null;
+  }
+
+  static set orderSubject(cre: ModuleCreature | null) {
+    this.orderSubjects = cre ? [cre] : [];
+  }
 
   /** Patrol points clicked so far with the order_patrol tool */
   static patrolDraft: GMPoint[] = [];
@@ -49,16 +60,29 @@ export class GMViewport {
    * wasn't selected); with Shift on empty ground, drawing a box to select what's in it
    */
   static press: {
-    kind: 'move' | 'box';
+    kind: 'move' | 'box' | 'lift';
     x: number; y: number;
     picked: ModuleObject | null;
     ground: THREE.Vector3 | null;
     started: boolean;
     moving: { obj: ModuleObject; start: THREE.Vector3 }[];
     lastSent: number;
+    history?: GMHistoryChange;
   } | null = null;
 
+  /** Metres an Alt + drag raises a placeable per pixel the mouse moves up */
+  static LIFT_PER_PIXEL = 0.01;
+
   static boxElement: HTMLDivElement | null = null;
+
+  /** The ring under what the mouse is over, and the label with its name */
+  static hoverRing: THREE.Mesh | null = null;
+
+  static hoverLabel: HTMLDivElement | null = null;
+
+  static hovered: ModuleObject | null = null;
+
+  static lastHoverPick = 0;
 
   static placementRing: THREE.Mesh | null = null;
 
@@ -133,6 +157,15 @@ export class GMViewport {
       GameState.scene.add(this.selectionRing);
     }
 
+    if (!this.hoverRing) {
+      const geo = new THREE.RingGeometry(0.7, 0.76, 32);
+      const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.55, depthWrite: false });
+      this.hoverRing = new THREE.Mesh(geo, mat);
+      this.hoverRing.visible = false;
+      this.hoverRing.renderOrder = 998;
+      GameState.scene.add(this.hoverRing);
+    }
+
     if (!this.placementRing) {
       const geo = new THREE.RingGeometry(0.5, 0.72, 32);
       const mat = new THREE.MeshBasicMaterial({
@@ -158,7 +191,7 @@ export class GMViewport {
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
       this.pointerDownPos = { x: e.clientX, y: e.clientY };
-      if (e.button === 0) this.beginPress(e.clientX, e.clientY, e.shiftKey);
+      if (e.button === 0) this.beginPress(e.clientX, e.clientY, e.shiftKey, e.altKey);
     });
 
     window.addEventListener('pointermove', (e: PointerEvent) => {
@@ -170,9 +203,11 @@ export class GMViewport {
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) {
         if (this.placementRing) this.placementRing.visible = false;
+        this.setHovered(null);
         return;
       }
       this.updateMouseRaycast(e.clientX, e.clientY);
+      this.updateHover(e.clientX, e.clientY);
     });
 
     // While placing, the mouse wheel turns what's being placed; in select mode, Ctrl + wheel turns the selection
@@ -180,7 +215,10 @@ export class GMViewport {
       if (!GameState.gmMode || !GMManager.isGMUser()) return;
       const target = e.target as HTMLElement;
       if (target && target.closest('.gm-panel-root')) return;
-      const step = e.deltaY > 0 ? 1 : -1;
+      // Shift turns a vertical wheel into a horizontal one in some browsers
+      const amount = e.deltaY || e.deltaX;
+      if (!amount) return;
+      const step = amount > 0 ? 1 : -1;
       if (this.isPlacementTool(GMManager.activeTool)) {
         this.rotatePlacement(step * this.PLACEMENT_WHEEL_STEP);
         return;
@@ -189,7 +227,11 @@ export class GMViewport {
         // Ctrl + wheel would zoom the page otherwise
         e.preventDefault();
         const list = this.movableSelection();
-        if (list.length) GMManager.rotateObjects(list, (-step * this.ROTATE_WHEEL_STEP * Math.PI) / 180);
+        if (!list.length) return;
+        const radians = (-step * this.ROTATE_WHEEL_STEP * Math.PI) / 180;
+        // With Shift too, the group turns around its middle as one
+        if (e.shiftKey && list.length > 1) GMEditTools.rotateAround(list, radians);
+        else GMHistory.track(`Turn ${GMHistory.nameOf(list)}`, list, () => GMManager.rotateObjects(list, radians));
       }
     }, { passive: false });
 
@@ -237,14 +279,64 @@ export class GMViewport {
     return GMManager.selectedObjects().filter((o) => o?.position && !GMObjectKind.isDoor(o));
   }
 
-  /** The left button went down in the viewport: maybe the start of moving objects, or of a selection box */
-  static beginPress(clientX: number, clientY: number, shift: boolean) {
+  /** What the mouse is over, for the hover ring and label (checked a few times a second, not every move) */
+  static updateHover(clientX: number, clientY: number) {
+    if (!GMManager.isGMUser() || GMManager.activeTool !== 'select' || GMManager.controlMode === 'POSSESS') {
+      this.setHovered(null);
+      return;
+    }
+    const now = performance.now();
+    if (now - this.lastHoverPick >= 70) {
+      this.lastHoverPick = now;
+      this.setHovered(this.pickObjectAtCursor(true));
+    }
+    if (this.hoverLabel && this.hovered) {
+      this.hoverLabel.style.left = `${clientX + 16}px`;
+      this.hoverLabel.style.top = `${clientY + 14}px`;
+    }
+  }
+
+  static setHovered(obj: ModuleObject | null) {
+    this.hovered = obj;
+    if (this.hoverRing) {
+      this.hoverRing.visible = !!obj;
+      if (obj) this.hoverRing.position.set(obj.position.x, obj.position.y, obj.position.z + 0.06);
+    }
+    if (typeof document === 'undefined') return;
+    if (!obj) {
+      if (this.hoverLabel) this.hoverLabel.style.display = 'none';
+      return;
+    }
+    if (!this.hoverLabel) {
+      const el = document.createElement('div');
+      el.className = 'gm-hover-label';
+      Object.assign(el.style, {
+        position: 'fixed', pointerEvents: 'none', zIndex: '60', padding: '2px 7px', borderRadius: '4px',
+        font: '12px/1.4 system-ui, sans-serif', color: '#e8f4ff', background: 'rgba(8, 20, 34, 0.85)',
+        border: '1px solid rgba(0, 229, 255, 0.4)', whiteSpace: 'nowrap',
+      });
+      document.body.appendChild(el);
+      this.hoverLabel = el;
+    }
+    const name = obj.getName?.() || (obj as any).firstName || obj.getTag?.() || 'Object';
+    const bits = [name];
+    if (GMObjectKind.isCreature(obj)) bits.push(`${obj.getHP()}/${obj.getMaxHP()} HP`);
+    if (obj.gmHidden) bits.push('hidden');
+    if (GMManager.isSelected(obj)) bits.push('selected');
+    this.hoverLabel.textContent = bits.join(' · ');
+    this.hoverLabel.style.display = 'block';
+  }
+
+  /** The left button went down in the viewport: maybe the start of moving or lifting objects, or of a selection box */
+  static beginPress(clientX: number, clientY: number, shift: boolean, alt: boolean = false) {
     this.press = null;
     if (!GMManager.isGMUser() || GMManager.activeTool !== 'select' || GMManager.controlMode === 'POSSESS') return;
     this.updateMouseRaycast(clientX, clientY);
-    const picked = this.pickObjectAtCursor();
+    const picked = this.pickObjectAtCursor(true);
     const ground = this.hasValidRaycastPoint ? this.lastRaycastPoint.clone() : null;
-    if (picked && !shift) {
+    if (picked && alt && GMObjectKind.isPlaceable(picked)) {
+      this.press = { kind: 'lift', x: clientX, y: clientY, picked, ground, started: false, moving: [], lastSent: 0 };
+    } else if (picked && !shift) {
       if (GMObjectKind.isDoor(picked) || !ground) return;
       this.press = { kind: 'move', x: clientX, y: clientY, picked, ground, started: false, moving: [], lastSent: 0 };
     } else if (!picked && shift) {
@@ -262,14 +354,30 @@ export class GMViewport {
     if (!press.started) {
       if (Math.hypot(clientX - press.x, clientY - press.y) <= this.DRAG_THRESHOLD) return;
       press.started = true;
-      if (press.kind === 'move' && press.picked) {
+      this.setHovered(null);
+      if (press.kind !== 'box' && press.picked) {
         // Dragging something not selected moves it alone; dragging part of the selection moves all of it
         if (!GMManager.isSelected(press.picked)) GMManager.selectObject(press.picked);
-        press.moving = this.movableSelection().map((obj) => ({ obj, start: obj.position.clone() }));
+        const list = this.movableSelection().filter((o) => press.kind === 'move' || GMObjectKind.isPlaceable(o));
+        press.moving = list.map((obj) => ({ obj, start: obj.position.clone() }));
+        press.history = GMHistory.begin(`${press.kind === 'lift' ? 'Raise' : 'Move'} ${GMHistory.nameOf(list)}`, list);
       }
     }
     if (press.kind === 'box') {
       this.drawBox(press.x, press.y, clientX, clientY);
+      return;
+    }
+    const now = performance.now();
+    if (press.kind === 'lift') {
+      const dz = (press.y - clientY) * this.LIFT_PER_PIXEL;
+      const sendLift = now - press.lastSent >= this.DRAG_SEND_MS;
+      if (sendLift) press.lastSent = now;
+      for (const m of press.moving) {
+        const pos = m.start.clone();
+        pos.z += dz;
+        if (sendLift) GMManager.teleportObject(m.obj, pos);
+        else GMManager.placeAt(m.obj, pos);
+      }
       return;
     }
     this.updateMouseRaycast(clientX, clientY);
@@ -284,7 +392,6 @@ export class GMViewport {
         delta.y = snapped.y - lead.start.y;
       }
     }
-    const now = performance.now();
     const send = now - press.lastSent >= this.DRAG_SEND_MS;
     if (send) press.lastSent = now;
     for (const m of press.moving) this.moveTo(m, delta, send);
@@ -319,10 +426,11 @@ export class GMViewport {
     GMManager.viewportDragging = false;
     this.hideBox();
     if (!press?.started) return;
-    if (press.kind === 'move') {
+    if (press.kind !== 'box') {
       // Where each one ended up reaches the players
       const moved = press.moving.filter((m) => !m.obj.destroyed);
       for (const m of moved) GMManager.teleportObject(m.obj, m.obj.position.clone());
+      press.history?.commit();
       GMLog.info('world', `Moved ${moved.length} object${moved.length === 1 ? '' : 's'}`);
       return;
     }
@@ -342,7 +450,7 @@ export class GMViewport {
     const candidates = [...new Set([...GameState.PartyManager.party, ...area.creatures, ...area.placeables])] as ModuleObject[];
     const v = new THREE.Vector3();
     return candidates.filter((obj) => {
-      if (!obj?.position || obj.destroyed) return false;
+      if (!obj?.position || obj.destroyed || obj.gmPinned) return false;
       v.copy(obj.position).project(cam);
       if (v.z < -1 || v.z > 1) return false; // behind the camera
       const sx = rect.left + ((v.x + 1) / 2) * rect.width;
@@ -453,7 +561,7 @@ export class GMViewport {
     this.updateMouseRaycast(clientX, clientY);
 
     if (GMManager.activeTool === 'select') {
-      const picked = this.pickObjectAtCursor();
+      const picked = this.pickObjectAtCursor(true);
       // Shift + click adds to the selection, or takes out what's already in it; Shift + click on nothing keeps it
       if (shift) {
         if (picked) GMManager.selectObject(picked, 'toggle');
@@ -472,6 +580,14 @@ export class GMViewport {
       return;
     }
 
+    if (GMManager.activeTool === 'face') {
+      const picked = this.pickObjectAtCursor();
+      const point = picked && !GMManager.isSelected(picked) ? picked.position : (this.hasValidRaycastPoint ? this.lastRaycastPoint : null);
+      if (point) GMEditTools.faceToward(this.movableSelection(), point.clone());
+      GMManager.setToolMode('select');
+      return;
+    }
+
     if (!this.hasValidRaycastPoint) return;
     const spawnPos = this.snapVectorToGrid(this.lastRaycastPoint);
     const cam = this.getActiveThreeCamera();
@@ -481,10 +597,10 @@ export class GMViewport {
 
     if (GMManager.activeTool === 'place_creature') {
       const creature = await GMSpawner.spawnCreature(GMManager.pendingCreatureConfig, spawnPos, facing);
-      if (creature) GMManager.selectObject(creature);
+      if (creature) this.placed(creature);
     } else if (GMManager.activeTool === 'place_placeable') {
       const plc = await GMSpawner.spawnPlaceable(GMManager.pendingPlaceableConfig, spawnPos, facing);
-      if (plc) GMManager.selectObject(plc);
+      if (plc) this.placed(plc);
     } else if (GMManager.activeTool === 'place_player') {
       const player = await GMSpawner.spawnPlayerCharacter(GMManager.pendingPlayerConfig, spawnPos, facing);
       if (player) GMManager.selectObject(player);
@@ -497,6 +613,13 @@ export class GMViewport {
         GMManager.teleportObject(target, spawnPos);
       }
     }
+  }
+
+  /** Something just placed: hidden if the GM is setting a scene up out of sight, selected, and undoable */
+  static placed(obj: ModuleObject) {
+    if (GMEditTools.placeHidden) GMManager.setObjectHidden(obj, true);
+    GMHistory.created(`Place ${GMHistory.nameOf([obj])}`, [obj]);
+    GMManager.selectObject(obj);
   }
 
   static isPlacementTool(tool: GMToolMode): boolean {
@@ -518,7 +641,8 @@ export class GMViewport {
     return null;
   }
 
-  static pickObjectAtCursor(): ModuleObject | null {
+  /** What's under the mouse; with skipPinned, pinned scenery is see-through (selecting and dragging) */
+  static pickObjectAtCursor(skipPinned: boolean = false): ModuleObject | null {
     const area = GameState.module?.area;
     if (!area) return null;
 
@@ -527,7 +651,7 @@ export class GMViewport {
       ...area.creatures,
       ...area.placeables,
       ...area.doors
-    ];
+    ].filter((o) => !(skipPinned && o?.gmPinned));
 
     // First try 3D mesh raycast
     const meshes: THREE.Object3D[] = [];
@@ -539,7 +663,7 @@ export class GMViewport {
     for (const hit of hits) {
       let cur: THREE.Object3D | null = hit.object;
       while (cur) {
-        if (cur.userData?.moduleObject) {
+        if (cur.userData?.moduleObject && candidates.includes(cur.userData.moduleObject)) {
           return cur.userData.moduleObject as ModuleObject;
         }
         const match = candidates.find(c => c.container === cur || c.model === cur);
@@ -620,19 +744,33 @@ export class GMViewport {
     return { position: fallbackPos, facing };
   }
 
-  /** Start an order that needs a click in the world (where to go, whom to attack or follow, patrol points) */
-  static startOrderTool(tool: GMToolMode, cre: ModuleCreature) {
-    if (!this.isOrderTool(tool) || !GMManager.canOrder(cre)) return;
+  /**
+   * Start an order that needs a click in the world (where to go, whom to attack or follow, patrol points),
+   * for one NPC or several: a group keeps its layout around where it's sent
+   */
+  static startOrderTool(tool: GMToolMode, who: ModuleCreature | ModuleCreature[]) {
+    const subjects = (Array.isArray(who) ? who : [who]).filter((c) => GMManager.canOrder(c));
+    if (!this.isOrderTool(tool) || !subjects.length) return;
     GMManager.setToolMode(tool);
-    this.orderSubject = cre;
-    this.patrolDraft = tool === 'order_patrol' ? [GMManager.pointOf(cre)] : [];
+    this.orderSubjects = subjects;
+    this.patrolDraft = tool === 'order_patrol' ? [this.groupPoint(subjects)] : [];
     GMManager.notifyChange();
+  }
+
+  /** The middle of a group of NPCs (one NPC: where it stands) */
+  static groupPoint(list: ModuleCreature[]): GMPoint {
+    return GMManager.pointOf({ position: GMEditTools.centreOf(list) });
+  }
+
+  /** A point moved by where an NPC stands from the middle of its group, so the group arrives in its layout */
+  static offsetPoint(p: GMPoint, cre: ModuleCreature, centre: GMPoint): GMPoint {
+    return { x: p.x + cre.position.x - centre.x, y: p.y + cre.position.y - centre.y, z: p.z };
   }
 
   /** A click in the world with an order tool */
   static handleOrderClick() {
-    const cre = this.orderSubject;
-    if (!cre || !GMManager.canOrder(cre)) {
+    const subjects = this.orderSubjects.filter((c) => GMManager.canOrder(c));
+    if (!subjects.length) {
       GMManager.setToolMode('select');
       return;
     }
@@ -641,7 +779,11 @@ export class GMViewport {
       if (!this.hasValidRaycastPoint) return;
       const p = this.lastRaycastPoint;
       if (tool === 'order_move') {
-        GMManager.giveOrder(cre, { kind: 'move', point: { x: p.x, y: p.y, z: p.z } });
+        const centre = this.groupPoint(subjects);
+        const target = { x: p.x, y: p.y, z: p.z };
+        GMHistory.track(`Send ${GMHistory.nameOf(subjects)}`, subjects, () => {
+          for (const cre of subjects) GMManager.giveOrder(cre, { kind: 'move', point: subjects.length > 1 ? this.offsetPoint(target, cre, centre) : target });
+        });
         GMManager.setToolMode('select');
       } else {
         this.patrolDraft.push({ x: p.x, y: p.y, z: p.z });
@@ -650,18 +792,29 @@ export class GMViewport {
       return;
     }
     const picked = this.pickObjectAtCursor();
-    if (!picked || picked === cre || !GMObjectKind.isCreature(picked)) return;
+    if (!picked || !GMObjectKind.isCreature(picked)) return;
     const netId = picked.gmNetId as string | undefined;
-    if (!netId) return;
-    GMManager.giveOrder(cre, tool === 'order_attack' ? { kind: 'attack', targetNetId: netId } : { kind: 'follow', targetNetId: netId });
+    const who = subjects.filter((c) => c !== picked);
+    if (!netId || !who.length) return;
+    const verb = tool === 'order_attack' ? 'attack' : 'follow';
+    GMHistory.track(`Order ${GMHistory.nameOf(who)} to ${verb}`, who, () => {
+      for (const cre of who) GMManager.giveOrder(cre, tool === 'order_attack' ? { kind: 'attack', targetNetId: netId } : { kind: 'follow', targetNetId: netId });
+    });
     GMManager.setToolMode('select');
   }
 
   /** Putting down the patrol tool: patrol the points clicked (with where it started), if any were */
   static finishPatrolOrder() {
-    const cre = this.orderSubject;
+    const subjects = this.orderSubjects.filter((c) => GMManager.canOrder(c));
     const points = this.patrolDraft;
     this.patrolDraft = [];
-    if (cre && points.length >= 2) GMManager.giveOrder(cre, { kind: 'patrol', points, index: 1 });
+    if (!subjects.length || points.length < 2) return;
+    const centre = points[0];
+    GMHistory.track(`Patrol ${GMHistory.nameOf(subjects)}`, subjects, () => {
+      for (const cre of subjects) {
+        const own = subjects.length > 1 ? points.map((p) => this.offsetPoint(p, cre, centre)) : points;
+        GMManager.giveOrder(cre, { kind: 'patrol', points: own, index: 1 });
+      }
+    });
   }
 }

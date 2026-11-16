@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import {
-  GMManager, GMNetworkManager, GMMines, GMSpawner, GMViewport,
+  GMManager, GMNetworkManager, GMMines, GMSpawner, GMViewport, GMHistory, GMEditTools,
   useGMStore, possessCandidate as findPossessCandidate, setPanelPolling,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { editShortcut } from "@/apps/game/components/gm-panel/controls/editShortcuts";
 import type { DrawerTab } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { JoinCard } from "@/apps/game/components/gm-panel/overlays/JoinCard";
 import type { GMJoinForm } from "@/apps/game/components/gm-panel/overlays/JoinCard";
@@ -77,6 +78,11 @@ export const GMPanel: React.FC = () => {
         return;
       }
       if (KotOR.IngameControls.isTypingInPageField(e)) return;
+      if (editShortcut(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if (e.key === 'F2') {
         e.preventDefault();
         if (GMManager.controlMode === 'POSSESS') {
@@ -85,9 +91,6 @@ export const GMPanel: React.FC = () => {
           const target = findPossessCandidate();
           if (target) GMManager.possessCharacter(target);
         }
-      } else if (e.key === 'Delete' && GMManager.activeTool === 'select') {
-        // Delete removes what's selected (not characters players are playing)
-        if (GMManager.deleteObjects(GMManager.selectedObjects())) e.preventDefault();
       } else if (e.code === 'KeyR' && GMViewport.isPlacementTool(GMManager.activeTool)) {
         GMViewport.rotatePlacement(e.shiftKey ? -GMViewport.PLACEMENT_KEY_STEP : GMViewport.PLACEMENT_KEY_STEP);
       }
@@ -228,6 +231,9 @@ export const GMPanel: React.FC = () => {
       statusChip = `Order ${who}: patrol · ${points} point${points === 1 ? '' : 's'}`;
       controlHints = [['Click ground', 'add a point'], ['Esc / Right-click', points ? 'start patrolling' : 'cancel']];
     }
+  } else if (tool === 'face') {
+    statusChip = `Turn ${GMManager.selection.length} to face…`;
+    controlHints = [['Click ground or a creature', 'face it'], ['Esc / Right-click', 'cancel']];
   } else if (tool === 'teleport') {
     statusChip = teleportTarget ? `Teleport: ${teleportTarget.getName() || 'selected object'}` : 'Teleport: select something first';
     controlHints = [['Click ground', 'move it there'], ['Esc / Right-click', 'done']];
@@ -235,9 +241,8 @@ export const GMPanel: React.FC = () => {
     controlHints = [['WASD', 'move'], ['Click', 'interact'], ['F2', 'back to GM camera']];
   } else {
     controlHints = [
-      ['WASD', 'fly'], ['Q / E or Space', 'down / up'], ['Shift', 'faster'], ['Drag', 'look'],
-      ['Click', 'select'], ['Shift + click / drag', 'select more'], ['Drag it', 'move'], ['Ctrl + wheel', 'turn'],
-      ['Delete', 'remove'], ['Double-click', 'inspect'], ['F2', `play as ${possessCandidateName}`],
+      ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Shift + drag', 'box'], ['Drag it', 'move'],
+      ['Ctrl + wheel', 'turn'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'], ['F2', `play as ${possessCandidateName}`],
     ];
   }
 
@@ -308,6 +313,37 @@ export const GMPanel: React.FC = () => {
                 Teleport
               </button>
             </div>
+
+            <div className="gm-segmented" role="group" aria-label="Undo and redo">
+              <button
+                className="gm-btn small"
+                disabled={!GMHistory.canUndo()}
+                onClick={() => void GMHistory.undo()}
+                aria-label="Undo"
+                title={GMHistory.undoStack.length ? `Undo: ${GMHistory.undoStack[GMHistory.undoStack.length - 1].label} (Ctrl+Z)` : 'Nothing to undo'}
+              >
+                ↶
+              </button>
+              <button
+                className="gm-btn small"
+                disabled={!GMHistory.canRedo()}
+                onClick={() => void GMHistory.redo()}
+                aria-label="Redo"
+                title={GMHistory.redoStack.length ? `Redo: ${GMHistory.redoStack[GMHistory.redoStack.length - 1].label} (Ctrl+Y)` : 'Nothing to redo'}
+              >
+                ↷
+              </button>
+            </div>
+
+            <button
+              className={`gm-btn small ${GMEditTools.placeHidden ? 'warning' : ''}`}
+              onClick={() => { GMEditTools.placeHidden = !GMEditTools.placeHidden; GMManager.notifyChange(); }}
+              title={GMEditTools.placeHidden
+                ? "New creatures and objects arrive hidden from players. Select them and untick Hidden to reveal them all at once. Click to place them visible again."
+                : "Click to place new creatures and objects hidden from players, to reveal together when you're ready"}
+            >
+              {GMEditTools.placeHidden ? 'Hidden' : 'Visible'}
+            </button>
 
             <div className="gm-segmented" role="group" aria-label="Control mode (F2)">
               <button

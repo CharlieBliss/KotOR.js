@@ -11,13 +11,14 @@ import type {
   GMSceneBlueprintCreature,
   GMSceneBlueprint,
   GMPlayerSpawnConfig,
-  GMSavedObject,
+  GMSavedObject, GMSavedGroup,
   GMSavedPlayer,
   GMSessionSave,
 } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMEditTools } from "@/managers/gm/GMEditTools";
 
 /** Saving GM work in this browser: whole sessions to pick back up later, and kits (saved layouts) to place again. */
 export class GMSessions {
@@ -129,6 +130,8 @@ export class GMSessions {
     const objects: GMSavedObject[] = [];
     const players: GMSavedPlayer[] = [];
     const seen = new Set<ModuleObject>();
+    // Where each placed object is in the save, for the groups
+    const savedIndex = new Map<ModuleObject, number>();
 
     for (const obj of [...area.creatures, ...GameState.PartyManager.party, ...GMManager.spawnedPlayers]) {
       if (!obj || seen.has(obj) || obj.destroyed) continue;
@@ -148,6 +151,7 @@ export class GMSessions {
         continue;
       }
       if (!cre.gmSpawnConfig) continue; // part of the module itself; reloaded with the scene
+      savedIndex.set(cre, objects.length);
       objects.push({
         kind: 'creature',
         config: { ...GMSpawner.describeCreature(cre), lootResRefs: undefined },
@@ -161,11 +165,13 @@ export class GMSessions {
         barkText: cre.gmBarkText || '',
         stance: cre.heldStance || undefined,
         combatStyle: cre.gmCombatStyle && cre.gmCombatStyle !== 'all' ? cre.gmCombatStyle : undefined,
+        pinned: cre.gmPinned || undefined,
       });
     }
 
     for (const plc of area.placeables) {
       if (!plc || !plc.gmSpawnConfig || plc.destroyed) continue;
+      savedIndex.set(plc, objects.length);
       objects.push({
         kind: 'placeable',
         config: { ...GMSpawner.describePlaceable(plc), lootResRefs: [] },
@@ -175,7 +181,22 @@ export class GMSessions {
         hidden: !!plc.gmHidden,
         loot: GMPlayers.toLootItems(plc.inventory).map((e) => e.resRef),
         barkText: plc.gmBarkText || '',
+        pinned: plc.gmPinned || undefined,
       });
+    }
+
+    const pinnedNetIds = [...area.creatures, ...area.placeables]
+      .filter((o) => o && !o.destroyed && o.gmPinned && !o.gmSpawnConfig && o.gmNetId)
+      .map((o) => o.gmNetId as string);
+    const groups: GMSavedGroup[] = [];
+    for (const [n] of GMEditTools.groups) {
+      const members = GMEditTools.groupMembers(n);
+      const group: GMSavedGroup = { n, objects: [], netIds: [] };
+      for (const m of members) {
+        if (savedIndex.has(m)) group.objects.push(savedIndex.get(m)!);
+        else if (m.gmNetId) group.netIds.push(m.gmNetId);
+      }
+      if (group.objects.length || group.netIds.length) groups.push(group);
     }
 
     const doors = area.doors
@@ -197,6 +218,8 @@ export class GMSessions {
       doors,
       players,
       rules: GMManager.sessionRules(),
+      pinnedNetIds: pinnedNetIds.length ? pinnedNetIds : undefined,
+      groups: groups.length ? groups : undefined,
     };
   }
 
@@ -293,6 +316,7 @@ export class GMSessions {
       else if (!shouldBeOpen && obj.isOpen()) obj.closeDoor(obj);
     }
 
+    const spawned: (ModuleObject | null)[] = [];
     for (const saved of save.objects || []) {
       const pos = new THREE.Vector3(saved.x, saved.y, saved.z);
       let obj: ModuleObject | null = null;
@@ -315,6 +339,21 @@ export class GMSessions {
         );
       }
       if (obj && saved.hidden) GMManager.setObjectHidden(obj, true);
+      if (obj && saved.pinned) obj.gmPinned = true;
+      spawned.push(obj);
+    }
+
+    for (const netId of save.pinnedNetIds || []) {
+      const obj = GMManager.netIdMap.get(netId);
+      if (obj) obj.gmPinned = true;
+    }
+    GMEditTools.groups.clear();
+    for (const g of save.groups || []) {
+      const members = [
+        ...g.objects.map((i) => spawned[i]),
+        ...g.netIds.map((id) => GMManager.netIdMap.get(id) || null),
+      ].filter((o): o is ModuleObject => !!o);
+      if (members.length) GMEditTools.groups.set(g.n, members);
     }
 
     for (const saved of save.players.filter((p) => p.local)) {

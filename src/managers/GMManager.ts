@@ -36,6 +36,7 @@ import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
 import { GMLog } from "@/managers/gm/GMLog";
+import { GMHistory } from "@/managers/gm/GMHistory";
 import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
@@ -271,7 +272,7 @@ export class GMManager {
         else if (tool === 'place_placeable') mat.color.setHex(0xffaa00);
         else if (tool === 'place_player') mat.color.setHex(0x00ff88);
         else if (tool === 'teleport') mat.color.setHex(0x00e5ff);
-        else if (GMViewport.isOrderTool(tool)) mat.color.setHex(0xffd740);
+        else if (GMViewport.isOrderTool(tool) || tool === 'face') mat.color.setHex(0xffd740);
       }
     }
     this.notifyChange();
@@ -502,6 +503,8 @@ export class GMManager {
 
     this.sceneLoading = true;
     this.selectedObject = null;
+    // What could be undone was in the old scene
+    GMHistory.clear();
     // A new scene starts unfrozen, with its own start point (a scene plan sets them again)
     this.sceneStartPoint = null;
     if (this.playersFrozen) this.setPlayersFrozen(false);
@@ -785,6 +788,12 @@ export class GMManager {
     const netTarget = obj.gmNetTarget as THREE.Vector3 | undefined;
     if (netTarget) netTarget.copy(pos);
     obj.getCurrentRoom();
+    // Finding its room stands it on the floor below; a placeable stays at the height it was put (raised with
+    // Alt + drag or the Z buttons)
+    if (!GMObjectKind.isCreature(obj) && obj.position.z !== pos.z) {
+      obj.position.z = pos.z;
+      if (obj.container) obj.container.position.z = pos.z;
+    }
     obj.computeBoundingBox(true);
   }
 

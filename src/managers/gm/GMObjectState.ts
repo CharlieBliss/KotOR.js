@@ -27,6 +27,8 @@ export interface GMObjectState {
   gmScale?: number;
   /** Hidden from players: not sent to them, and not targetable */
   gmHidden?: boolean;
+  /** Pinned scenery: the GM can't click, box-select, drag or Delete it in the scene (the Inspector still can) */
+  gmPinned?: boolean;
   /** Using it takes this skill check first */
   gmSkillGate?: GMSkillGate;
   /** Someone passed the skill gate: it stays open */

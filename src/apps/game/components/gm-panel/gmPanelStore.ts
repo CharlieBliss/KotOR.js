@@ -5,7 +5,7 @@ import * as KotOR from "@/apps/game/KotOR";
 // second copy of the whole engine into game.js)
 export const {
   GMManager, GMNetworkManager, GMConversationManager, GMNpcOrders,
-  GMChecks, GMMines, GMPlayers, GMSessions, GMSpawner, GMViewport,
+  GMChecks, GMMines, GMPlayers, GMSessions, GMSpawner, GMViewport, GMHistory, GMEditTools,
 } = KotOR;
 
 /** The GM panel's drawer tabs (null: the drawer is closed) */
