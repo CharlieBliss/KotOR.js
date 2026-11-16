@@ -15,6 +15,7 @@ import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMViewport } from "@/managers/gm/GMViewport";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
 
 /*
  * A scene plan: a whole GM scene written as data, so it can be drafted outside the game (by Claude, from a
@@ -74,7 +75,7 @@ export interface GMPlanActor {
   /** A stance they hold (a GMManager.STANCES id, e.g. "meditate", "kneel_sad", "dead") */
   stance?: string;
   order?: GMPlanOrder;
-  customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string };
+  customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string; level?: number; class?: string | number };
   loot?: string[];
 }
 
@@ -255,6 +256,8 @@ export class GMScenePlan {
         if (kind === 'actor') {
           if (!entry.template) error(where, 'Needs a creature "template".');
           if (!this.FACTIONS[entry.faction as GMPlanFaction]) error(where, 'Faction is "hostile", "friendly" or "neutral".');
+          const level = entry.customize?.level;
+          if (level !== undefined && !(Number.isInteger(level) && level >= 1 && level <= 50)) error(where, 'customize.level is a whole number, 1 to 50.');
         } else if (!entry.template && !entry.appearance) {
           error(where, 'Needs a placeable "template" or an "appearance".');
         }
@@ -353,6 +356,18 @@ export class GMScenePlan {
     let best = centroids[0];
     for (const c of centroids) if (c.distanceToSquared(centre) < best.distanceToSquared(centre)) best = c;
     return best.clone();
+  }
+
+  /** A classes.2da row by its label or name ("Soldier", "jedi guardian", "Combat_Droid"), or its number */
+  static classIdOf(name: string | number): number | undefined {
+    if (typeof name === 'number' || /^\d+$/.test(String(name))) return Number(name);
+    const norm = (s: any) => String(s || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const key = norm(name);
+    const rows = GameState.TwoDAManager?.datatables.get('classes')?.rows || {};
+    for (const [id, row] of Object.entries(rows) as [string, any][]) {
+      if (norm(row.label) === key || norm(CharacterRules.text(row.name, '')) === key) return Number(id);
+    }
+    return undefined;
   }
 
   /** Points for count copies at a placement: offset from the spot, in a formation, on walkable ground */
@@ -537,14 +552,23 @@ export class GMScenePlan {
     if (!info) { this.note(`Actor "${actor.id}": no creature template "${actor.template}".`); return; }
     const base = GMSpawner.creatureConfigFromTemplate(info);
     const custom = actor.customize;
+    // Level and class rebuild its stats; the rest of customize replaces its look and gear
+    const restyled = !!custom && ['appearance', 'hp', 'rightHand', 'leftHand', 'armor'].some((k) => (custom as any)[k] !== undefined);
+    let restat: GMCreatureSpawnConfig['restat'];
+    if (custom && (custom.level !== undefined || custom.class !== undefined)) {
+      const classId = custom.class !== undefined ? GMScenePlan.classIdOf(custom.class) : undefined;
+      if (custom.class !== undefined && classId === undefined) this.note(`Actor "${actor.id}": no class "${custom.class}"; it keeps its own.`);
+      restat = { level: Number(custom.level) || base.level || 1, classId, hp: custom.hp };
+    }
     const config: GMCreatureSpawnConfig = {
       ...base,
       name: actor.name || base.name,
       factionId: GMScenePlan.FACTIONS[actor.faction] ?? base.factionId,
       barkText: actor.bark,
       lootResRefs: actor.loot,
-      customized: !!custom,
-      ...(custom ? {
+      customized: restyled,
+      restat,
+      ...(restyled && custom ? {
         appearanceLabel: custom.appearance,
         hp: custom.hp ?? base.hp,
         rightHandResRef: custom.rightHand,

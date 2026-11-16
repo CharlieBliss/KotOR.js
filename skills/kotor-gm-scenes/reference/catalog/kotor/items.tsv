@@ -1,558 +1,558 @@
-template	name	base item
-g1_a_class5001	Light Exoskeleton	Armor_Class_4
-g1_a_class5002	Baragwin Shadow Armor	Armor_Class_5
-g1_a_class6001	Environmental Bastion Armor	Armor_Class_6
-g1_a_class8001	Heavy Exoskeleton	Armor_Class_7
-g1_i_belt001	Baragwin Stealth Unit	Stealth_Unit
-g1_i_drdcomspk01	Advanced Droid Interface	Droid_Computer_Spike_Mount_x
-g1_i_drdhvplat01	Composite Heavy Plating	Droid_Heavy_Plating
-g1_i_drdshld001	Baragwin Droid Shield	Droid_Shield
-g1_i_drdutldev01	Baragwin Flame Thrower	Droid_Utility_Device
-g1_i_drdutldev02	Baragwin Stun Ray	Droid_Utility_Device
-g1_i_drdutldev03	Baragwin Shield Disruptor	Droid_Utility_Device
-g1_i_gauntlet01	Advanced Stabilizer Gloves	Gauntlets
-g1_i_implant301	Advanced Sensory Implant	Implant_3
-g1_i_implant302	Advanced Bio-Stabilizer Implant	Implant_3
-g1_i_implant303	Advanced Combat Implant	Implant_3
-g1_i_implant304	Advanced Alacrity Impant	Implant_3
-g1_i_mask01	Advanced Bio-Stabilizer Mask	Mask
-g1_i_mask02	Medical Interface Visor	Mask
-g1_i_mask03	Advanced Agent Interface	Mask
-g1_w_dblsbr001	Double Bladed Lightsaber	Double_Bladed_Lightsaber
-g1_w_dblsbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber
-g1_w_dsrptrfl001	Baragwin Disruptor-X Weapon	Disrupter_Rifle
-g1_w_hvrptbltr01	Baragwin Heavy Repeating Blaster	Heavy_Repeating_Blaster
-g1_w_ionrfl01	Baragwin Ion-X Weapon	Ion_Rifle
-g1_w_lghtsbr01	Lightsaber	Lightsaber
-g1_w_lghtsbr02	Lightsaber	Lightsaber
-g1_w_rptnblstr01	Baragwin Assault Gun	Repeating_Blaster
-g1_w_sbrcrstl20	Heart of the Guardian	Lightsaber_Crystals
-g1_w_sbrcrstl21	Mantle of the Force	Lightsaber_Crystals
-g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber
-g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber
-g1_w_vbroswrd01	Baragwin Assault Blade	Vibro_Sword
-g_a_class4001	Combat Suit	Armor_Class_4
-g_a_class4002	Zabrak Combat Suit	Armor_Class_4
-g_a_class4003	Echani Light Armor	Armor_Class_4
-g_a_class4004	Cinnagar Weave Armor	Armor_Class_4
-g_a_class4005	Massassi Ceremonial Armor	Armor_Class_4
-g_a_class4006	Darth Bandon's Fiber Armor	Armor_Class_4
-g_a_class4007	Darth Bandon's Fiber Armor	Armor_Class_4
-g_a_class4008	Darth Bandon's Fiber Armor	Armor_Class_4
-g_a_class4009	Echani Fiber Armor	Armor_Class_4
-g_a_class5001	Heavy Combat Suit	Armor_Class_5
-g_a_class5002	Bonadan Alloy Heavy Suit	Armor_Class_5
-g_a_class5003	Zabrak Battle Armor	Armor_Class_5
-g_a_class5004	Zabrak Field Armor	Armor_Class_5
-g_a_class5005	Reinforced Fiber Armor	Armor_Class_5
-g_a_class5006	Ulic Qel Droma's Mesh Suit	Armor_Class_5
-g_a_class5007	Eriadu Prototype Armor	Armor_Class_5
-g_a_class5008	Eriadu Prototype Armor	Armor_Class_5
-g_a_class5009	Eriadu Prototype Armor	Armor_Class_5
-g_a_class5010	Republic Mod Armor	Armor_Class_5
-g_a_class6001	Military Suit	Armor_Class_6
-g_a_class6002	Echani Battle Armor	Armor_Class_6
-g_a_class6003	Cinnagar War Suit	Armor_Class_6
-g_a_class6004	Verpine Fiber Mesh	Armor_Class_6
-g_a_class6005	Arkanian Bond Armor	Armor_Class_6
-g_a_class6006	Exar Kun's Light Battle Suit	Armor_Class_6
-g_a_class6007	Davik's War Suit	Armor_Class_6
-g_a_class6008	Davik's War Suit	Armor_Class_6
-g_a_class6009	Davik's War Suit	Armor_Class_6
-g_a_class7001	Light Battle Armor	Armor_Class_7
-g_a_class7002	Bronzium Light Battle Armor	Armor_Class_7
-g_a_class7003	Powered Light Battle Armor	Armor_Class_7
-g_a_class7004	Krath Heavy Armor	Armor_Class_7
-g_a_class7005	Krath Holy Battle Suit	Armor_Class_7
-g_a_class7006	Jamoh Hogra's Battle Armor	Armor_Class_7
-g_a_class8001	Battle Armor	Armor_Class_8
-g_a_class8002	Powered Battle Armor	Armor_Class_8
-g_a_class8003	Cinnagar Plate Armor	Armor_Class_8
-g_a_class8004	Mandalorian Armor	Armor_Class_8
-g_a_class8005	Calo Nord's Battle Armor	Armor_Class_8
-g_a_class8006	Calo Nord's Battle Armor	Armor_Class_8
-g_a_class8007	Calo Nord's Battle Armor	Armor_Class_8
-g_a_class8009	Verpine Zal Alloy Mesh	Armor_Class_8
-g_a_class9001	Heavy Battle Armor	Armor_Class_9
-g_a_class9002	Durasteel Heavy Armor	Armor_Class_9
-g_a_class9003	Mandalorian Battle Armor	Armor_Class_9
-g_a_class9004	Mandalorian Heavy Armor	Armor_Class_9
-g_a_class9005	Jurgan Kalta's Power Suit	Armor_Class_9
-g_a_class9006	Jurgan Kalta's Power Suit	Armor_Class_9
-g_a_class9007	Jurgan Kalta's Power Suit	Armor_Class_9
-g_a_class9009	Cassus Fett's Battle Armor	Armor_Class_9
-g_a_class9010	Mandalorian Assault Armor	Armor_Class_9
-g_a_class9011	Cassus Fett's Battle Armor	Armor_Class_9
-g_a_clothes01	Clothing	Basic_Clothing
-g_a_clothes02	Clothing Variant 2	Basic_Clothing
-g_a_clothes03	Clothing Variant 3	Basic_Clothing
-g_a_clothes04	Clothing Variant 4	Basic_Clothing
-g_a_clothes05	Clothing Variant 5	Basic_Clothing
-g_a_clothes06	Clothing Variant 6	Basic_Clothing
-g_a_clothes07	Clothing Variant 1	Basic_Clothing
-g_a_clothes08	Clothing Variant 7	Basic_Clothing
-g_a_clothes09	Clothing Variant 8	Basic_Clothing
-g_a_jedirobe01	Jedi Robe	Jedi_Robe
-g_a_jedirobe02	Dark Jedi Robe	Jedi_Robe
-g_a_jedirobe03	Jedi Robe	Jedi_Robe
-g_a_jedirobe04	Jedi Robe	Jedi_Robe
-g_a_jedirobe05	Dark Jedi Robe	Jedi_Robe
-g_a_jedirobe06	Qel-Droma Robes	Jedi_Robe
-g_a_kghtrobe01	Jedi Knight Robe	Jedi_Knight_Robe
-g_a_kghtrobe02	Dark Jedi Knight Robe	Jedi_Knight_Robe
-g_a_kghtrobe03	Jedi Knight Robe	Jedi_Knight_Robe
-g_a_kghtrobe04	Jedi Knight Robe	Jedi_Knight_Robe
-g_a_kghtrobe05	Dark Jedi Knight Robe	Jedi_Knight_Robe
-g_a_mstrrobe01	Jedi Master Robe	Jedi_Master_Robe
-g_a_mstrrobe02	Dark Jedi Master Robe	Jedi_Master_Robe
-g_a_mstrrobe03	Jedi Master Robe	Jedi_Master_Robe
-g_a_mstrrobe04	Jedi Master Robe	Jedi_Master_Robe
-g_a_mstrrobe05	Dark Jedi Master Robe	Jedi_Master_Robe
-g_a_mstrrobe06	Darth Revan's Robes	Revan_Armor
-g_a_mstrrobe07	Star Forge Robes	Revan_Armor
-g_i_adrnaline001	Adrenal Strength	Adrenaline
-g_i_adrnaline002	Adrenal Alacrity	Adrenaline
-g_i_adrnaline003	Adrenal Stamina	Adrenaline
-g_i_adrnaline004	Hyper-adrenal Strength	Adrenaline
-g_i_adrnaline005	Hyper-adrenal Alacrity	Adrenaline
-g_i_adrnaline006	Hyper-adrenal Stamina	Adrenaline
-g_i_asthitem001	Aesthetic Item	Aesthetic_Item
-g_i_belt001	Cardio-Regulator	Belt
-g_i_belt002	Verpine Cardio-Regulator	Belt
-g_i_belt003	Adrenaline Amplifier	Belt
-g_i_belt004	Advanced Adrenaline Amplifier	Belt
-g_i_belt005	Nerve Amplifier Belt	Belt
-g_i_belt006	Sound Dampening Stealth Unit	Stealth_Unit
-g_i_belt007	Advanced Stealth Unit	Stealth_Unit
-g_i_belt008	Eriadu Stealth Unit	Stealth_Unit
-g_i_belt009	Calrissian's Utility Belt	Belt
-g_i_belt010	Stealth Field Generator	Stealth_Unit
-g_i_belt011	Adrenaline Stimulator	Belt
-g_i_belt012	CNS Strength Enhancer	Belt
-g_i_belt013	Electrical Capacitance Shield	Belt
-g_i_belt014	Thermal Shield Generator	Belt
-g_i_bithitem001	Bith Guitar	Blaster_Pistol
-g_i_bithitem002	Bith Clarinet	Blaster_Pistol
-g_i_bithitem003	Bith Trombone	Blaster_Pistol
-g_i_bithitem004	Bith Accordian	Blaster_Pistol
-g_i_cmbtshot001	Battle Stimulant	Combat_Shots
-g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots
-g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots
-g_i_collarlgt001	Collar Light	Collar_Light
-g_i_credits001	Credits	Credits
-g_i_credits002	Credits	Credits
-g_i_credits003	Credits	Credits
-g_i_credits004	Credits	Credits
-g_i_credits005	Credits	Credits
-g_i_credits006	Credits	Credits
-g_i_credits007	Credits	Credits
-g_i_credits008	Credits	Credits
-g_i_credits009	Credits	Credits
-g_i_credits010	Credits	Credits
-g_i_credits011	Credits	Credits
-g_i_credits012	Credits	Credits
-g_i_credits013	Credits	Credits
-g_i_credits014	Credits	Credits
-g_i_credits015	Credits	Credits
-g_i_crhide001	Assault Droid Mark I Hide	Creature_Hide_Item
-g_i_crhide002	Assault Droid Mark IV Hide	Creature_Hide_Item
-g_i_crhide003	Rakghoul Fiend & Kataarn Hide	Creature_Hide_Item
-g_i_crhide004	Tuk'ata Hide	Creature_Hide_Item
-g_i_crhide005	Katarn Hide	Creature_Hide_Item
-g_i_crhide006	Tuk'ata Hide	Creature_Hide_Item
-g_i_crhide007	Canderous' Hide	Creature_Hide_Item
-g_i_crhide008	Droid Hide	Creature_Hide_Item
-g_i_crhide009	HK-47 Hide 1	Creature_Hide_Item
-g_i_crhide010	HK-47 Hide 2	Creature_Hide_Item
-g_i_crhide011	HK-47 Hide 3	Creature_Hide_Item
-g_i_crhide012	HK-47 Hide 4	Creature_Hide_Item
-g_i_crhide013	HK-47 Hide 0	Creature_Hide_Item
-g_i_datapad001	Datapad	Data_Pad
-g_i_drdcomspk001	Computer Probe	Droid_Computer_Spike_Mount_x
-g_i_drdcomspk002	Universal Computer Interface	Droid_Computer_Spike_Mount_x
-g_i_drdcomspk003	Advanced Computer Tool	Droid_Computer_Spike_Mount_x
-g_i_drdhvplat001	Droid Heavy Plating Type 1	Droid_Heavy_Plating
-g_i_drdhvplat002	Droid Heavy Plating Type 2	Droid_Heavy_Plating
-g_i_drdhvplat003	Droid Heavy Plating Type 3	Droid_Heavy_Plating
-g_i_drdltplat001	Droid Light Plating Type 1	Droid_Light_Plating
-g_i_drdltplat002	Droid Light Plating Type 2	Droid_Light_Plating
-g_i_drdltplat003	Droid Light Plating Type 3	Droid_Light_Plating
-g_i_drdmdplat001	Droid Medium Plating Type 1	Droid_Medium_Plating
-g_i_drdmdplat002	Droid Medium Plating Type 2	Droid_Medium_Plating
-g_i_drdmdplat003	Droid Medium Plating Type 3	Droid_Medium_Plating
-g_i_drdmtnsen001	Droid Motion Sensors Type 1	Droid_Motion_Sensors_x
-g_i_drdmtnsen002	Droid Motion Sensors Type 2	Droid_Motion_Sensors_x
-g_i_drdmtnsen003	Droid Motion Sensors Type 3	Droid_Motion_Sensors_x
-g_i_drdrepeqp001	Repair Kit	Droid_Repair_Equipment
-g_i_drdrepeqp002	Advanced Repair Kit	Droid_Repair_Equipment
-g_i_drdrepeqp003	Construction Kit	Droid_Repair_Equipment
-g_i_drdsecspk001	Security Interface Tool	Droid_Security_Spike_Mount
-g_i_drdsecspk002	Security Domination Interface	Droid_Security_Spike_Mount
-g_i_drdsecspk003	Security Decryption Interface	Droid_Security_Spike_Mount
-g_i_drdshld001	Energy Shield Level 1	Droid_Shield
-g_i_drdshld002	Energy Shield Level 2	Droid_Shield
-g_i_drdshld003	Energy Shield Level 3	Droid_Shield
-g_i_drdshld005	Environment Shield Level 1	Droid_Shield
-g_i_drdshld006	Environment Shield Level 2	Droid_Shield
-g_i_drdshld007	Environment Shield Level 3	Droid_Shield
-g_i_drdsncsen001	Droid Sonic Sensors Type 1	Droid_Sonic_Sensors_x
-g_i_drdsncsen002	Droid Sonic Sensors Type 2	Droid_Sonic_Sensors_x
-g_i_drdsncsen003	Droid Sonic Sensors Type 3	Droid_Sonic_Sensors_x
-g_i_drdsrcscp001	Droid Search Scope Type 1	Droid_Search_Scope_x
-g_i_drdsrcscp002	Droid Search Scope Type 2	Droid_Search_Scope_x
-g_i_drdsrcscp003	Droid Search Scope Type 3	Droid_Search_Scope_x
-g_i_drdtrgcom001	Basic Targeting Computer	Droid_Targeting_Computers
-g_i_drdtrgcom002	Advanced Targeting Computer	Droid_Targeting_Computers
-g_i_drdtrgcom003	Superior Targeting Computer	Droid_Targeting_Computers
-g_i_drdtrgcom004	Sensor Probe	Droid_Targeting_Computers
-g_i_drdtrgcom005	Verpine Demolitions Probe	Droid_Targeting_Computers
-g_i_drdtrgcom006	Bothan Demolitions Probe	Droid_Targeting_Computers
-g_i_drdutldev001	Stun Ray	Droid_Utility_Device
-g_i_drdutldev002	Advanced Stun Ray	Droid_Utility_Device
-g_i_drdutldev003	Shield Disruptor	Droid_Utility_Device
-g_i_drdutldev004	Advanced Shield Disruptor	Droid_Utility_Device
-g_i_drdutldev005	Oil Slick	Droid_Utility_Device
-g_i_drdutldev006	Flame Thrower	Droid_Utility_Device
-g_i_drdutldev007	Advanced Flame Thrower	Droid_Utility_Device
-g_i_drdutldev008	Carbonite Projector	Droid_Utility_Device
-g_i_drdutldev009	Carbonite Projector Mark II	Droid_Utility_Device
-g_i_drdutldev010	Gravity Generator	Droid_Utility_Device
-g_i_drdutldev011	Adv. Gravity Generator	Droid_Utility_Device
-g_i_frarmbnds01	Energy Shield	Forearm_Bands
-g_i_frarmbnds02	Sith Energy Shield	Forearm_Bands
-g_i_frarmbnds03	Arkanian Energy Shield	Forearm_Bands
-g_i_frarmbnds04	Echani Shield	Forearm_Bands
-g_i_frarmbnds05	Mandalorian Melee Shield	Forearm_Bands
-g_i_frarmbnds06	Mandalorian Power Shield	Forearm_Bands
-g_i_frarmbnds07	Echani Dueling Shield	Forearm_Bands
-g_i_frarmbnds08	Yusanis' Dueling Shield	Forearm_Bands
-g_i_frarmbnds09	Verpine Prototype Shield	Forearm_Bands
-g_i_frarmbnds10	Lower Saves, All 2	Forearm_Bands
-g_i_frarmbnds11	Lower Saves, All 4	Forearm_Bands
-g_i_frarmbnds12	Lower Saves, All 5	Forearm_Bands
-g_i_frarmbnds13	Lower Saves, Fortitude 2	Forearm_Bands
-g_i_frarmbnds14	Lower Saves, Fortitude 4	Forearm_Bands
-g_i_frarmbnds15	Lower Saves, Fortitude 5	Forearm_Bands
-g_i_frarmbnds16	Lower Saves, Reflex 2	Forearm_Bands
-g_i_frarmbnds17	Lower Saves, Reflex 4	Forearm_Bands
-g_i_frarmbnds18	Lower Saves, Reflex 5	Forearm_Bands
-g_i_frarmbnds19	Lower Saves, Will 2	Forearm_Bands
-g_i_frarmbnds20	Lower Saves, Will 4	Forearm_Bands
-g_i_frarmbnds21	Lower Saves, Will 5	Forearm_Bands
-g_i_gauntlet01	Strength Gauntlets	Gauntlets
-g_i_gauntlet02	Eriadu Strength Amplifier	Gauntlets
-g_i_gauntlet03	Sith Power Gauntlets	Gauntlets
-g_i_gauntlet04	Stabilizer Gauntlets	Gauntlets
-g_i_gauntlet05	Bothan "Machinist" Gloves	Gauntlets
-g_i_gauntlet06	Verpine Bond Gauntlets	Gauntlets
-g_i_gauntlet07	Dominator Gauntlets	Gauntlets
-g_i_gauntlet08	Karakan Gauntlets	Gauntlets
-g_i_gauntlet09	Infiltrator Gloves	Gauntlets
-g_i_gizkapois001	Gizka Poison	Plot_Useable_Items
-g_i_glowrod01	Glow Rod	Glow_Rod
-g_i_implant101	Cardio Package	Implant_1
-g_i_implant102	Response Package	Implant_1
-g_i_implant103	Memory Package	Implant_1
-g_i_implant104	Done	Implant_1
-g_i_implant201	Biotech Package	Implant_2
-g_i_implant202	Retinal Combat Implant	Implant_2
-g_i_implant203	Nerve Enhancement Package	Implant_2
-g_i_implant204	I need to make the party selections screen available	Implant_2
-g_i_implant301	Bavakar Cardio Package	Implant_3
-g_i_implant302	Bavakar Reflex Enhancement	Implant_3
-g_i_implant303	Bavakar Memory Chip	Implant_3
-g_i_implant304	Bio-Antidote Package	Implant_3
-g_i_implant305	Cardio Power System	Implant_3
-g_i_implant306	Gordulan Reaction System	Implant_3
-g_i_implant307	Navardan Regenerator	Implant_3
-g_i_implant308	Sith Regenerator	Implant_3
-g_i_implant309	Beemon Package	Implant_3
-g_i_implant310	Cyber Reaction System	Implant_3
-g_i_mask01	Light-Scan Visor	Mask
-g_i_mask02	Motion Detection Goggles	Mask
-g_i_mask03	Bothan Perception Visor	Mask
-g_i_mask04	Verpine Ocular Enhancer	Mask
-g_i_mask05	Bothan Sensory Visor	Mask
-g_i_mask06	Vacuum Mask	Mask
-g_i_mask07	Sonic Nullifiers	Mask
-g_i_mask08	Aural Amplifier	Mask
-g_i_mask09	Advanced Aural Amplifier	Mask
-g_i_mask10	Neural Band	Mask
-g_i_mask11	Verpine Headband	Mask
-g_i_mask12	Breath Mask	Mask
-g_i_mask13	Teta's Royal Band	Mask
-g_i_mask14	Sith Mask	Mask
-g_i_mask15	Stabilizer Mask	Mask
-g_i_mask16	Interface Band	Mask
-g_i_mask17	Demolitions Sensor	Mask
-g_i_mask18	Combat Sensor	Mask
-g_i_mask19	Stealth Field Enhancer	Mask
-g_i_mask20	Stealth Field Reinforcement	Mask
-g_i_mask21	Interface Visor	Mask
-g_i_mask22	Circlet of Saresh	Mask
-g_i_mask23	Pistol Targetting Optics	Mask
-g_i_mask24	Heavy Targetting Optics	Mask
-g_i_medeqpmnt01	Medpac	Medical_Equipment
-g_i_medeqpmnt02	Advanced Medpac	Medical_Equipment
-g_i_medeqpmnt03	Life Support Pack	Medical_Equipment
-g_i_medeqpmnt04	Antidote Kit	Medical_Equipment
-g_i_medeqpmnt05	Antibiotic Kit	Medical_Equipment
-g_i_medeqpmnt06	Advanced Medpac	Medical_Equipment
-g_i_medeqpmnt07	Life Support Pack	Medical_Equipment
-g_i_medeqpmnt08	Squad Recovery Stim	Squad_Recovery_kit
-g_i_parts01	Parts	Programming_Spikes
-g_i_pazcard_001	Pazaak Card +1	Pazaak_Card
-g_i_pazcard_002	Pazaak Card +2	Pazaak_Card
-g_i_pazcard_003	Pazaak Card +3	Pazaak_Card
-g_i_pazcard_004	Pazaak Card +4	Pazaak_Card
-g_i_pazcard_005	Pazaak Card +5	Pazaak_Card
-g_i_pazcard_006	Pazaak Card +6	Pazaak_Card
-g_i_pazcard_007	Pazaak Card -1	Pazaak_Card
-g_i_pazcard_008	Pazaak Card -2	Pazaak_Card
-g_i_pazcard_009	Pazaak Card -3	Pazaak_Card
-g_i_pazcard_010	Pazaak Card -4	Pazaak_Card
-g_i_pazcard_011	Pazaak Card -5	Pazaak_Card
-g_i_pazcard_012	Pazaak Card -6	Pazaak_Card
-g_i_pazcard_013	Pazaak Card +/-1	Pazaak_Card
-g_i_pazcard_014	Pazaak Card +/-2	Pazaak_Card
-g_i_pazcard_015	Pazaak Card +/-3	Pazaak_Card
-g_i_pazcard_016	Pazaak Card +/-4	Pazaak_Card
-g_i_pazcard_017	Pazaak Card +/-5	Pazaak_Card
-g_i_pazcard_018	Pazaak Card +/-6	Pazaak_Card
-g_i_pazdeck	Pazaak Deck	Aesthetic_Item
-g_i_pazsidebd001	Pazaak Side Deck	Pazaak_Sideboard
-g_i_pltuseitm01	Keycard	Plot_Useable_Items
-g_i_progspike003	Repair Spike	Programming_Spikes
-g_i_progspike01	Computer Spike	Programming_Spikes
-g_i_progspike02	SYSTEM LOADING... COMPLETE ENTER COMMAND	Programming_Spikes
-g_i_recordrod01	Recording Rod	****
-g_i_secspike01	Security Spike	Security_Spikes
-g_i_secspike02	Security Spike Tunneler	Security_Spikes
-g_i_torch01	Torch	Torch
-g_i_trapkit001	Minor Flash Mine	Trap_Kit
-g_i_trapkit002	Average Flash Mine	Trap_Kit
-g_i_trapkit003	Deadly Flash Mine	Trap_Kit
-g_i_trapkit004	Minor Frag Mine	Trap_Kit
-g_i_trapkit005	Average Frag Mine	Trap_Kit
-g_i_trapkit006	Deadly Frag Mine	Trap_Kit
-g_i_trapkit007	Minor Plasma Mine	Trap_Kit
-g_i_trapkit008	Average Plasma Mine	Trap_Kit
-g_i_trapkit009	Deadly Plasma Mine	Trap_Kit
-g_i_trapkit01	Flash Mine	Trap_Kit
-g_i_trapkit010	Minor Gas Mine	Trap_Kit
-g_i_trapkit011	Average Gas Mine	Trap_Kit
-g_i_trapkit012	Deadly Gas Mine	Trap_Kit
-g_i_trapkit02	Frag Mine	Trap_Kit
-g_i_trapkit03	Laser Mine	Trap_Kit
-g_i_trapkit04	Gas Mine	Trap_Kit
-g_i_upgrade001	Scope	Plot_Useable_Items
-g_i_upgrade002	Improved Energy Cell	Plot_Useable_Items
-g_i_upgrade003	Beam Splitter	Plot_Useable_Items
-g_i_upgrade004	Hair Trigger	Plot_Useable_Items
-g_i_upgrade005	Armor Reinforcement	Plot_Useable_Items
-g_i_upgrade006	Mesh Underlay	Plot_Useable_Items
-g_i_upgrade007	Vibration Cell	Plot_Useable_Items
-g_i_upgrade008	Durasteel Bonding Alloy	Plot_Useable_Items
-g_i_upgrade009	Energy Projector	Plot_Useable_Items
-g_w_adhsvgren001	Adhesive Grenade	Adhesive_Grenade
-g_w_blstrcrbn001	Blaster Carbine	Blaster_Carbine
-g_w_blstrcrbn002	Sith Assault Gun	Blaster_Carbine
-g_w_blstrcrbn003	Cinnagaran Carbine	Blaster_Carbine
-g_w_blstrcrbn004	Jurgan Kalta's Carbine	Blaster_Carbine
-g_w_blstrcrbn005	Jamoh Hogra's Carbine	Blaster_Carbine
-g_w_blstrcrbn006	Jamoh Hogra's Carbine	Blaster_Carbine
-g_w_blstrcrbn007	Jamoh Hogra's Carbine	Blaster_Carbine
-g_w_blstrcrbn008	Jamoh Hogra's Carbine	Blaster_Carbine
-g_w_blstrcrbn009	Jamoh Hogra's Carbine	Blaster_Carbine
-g_w_blstrpstl001	Blaster Pistol	Blaster_Pistol
-g_w_blstrpstl002	Mandalorian Blaster	Blaster_Pistol
-g_w_blstrpstl003	Arkanian Pistol	Blaster_Pistol
-g_w_blstrpstl004	Zabrak Blaster Pistol	Blaster_Pistol
-g_w_blstrpstl005	Bendak's Blaster	Blaster_Pistol
-g_w_blstrpstl006	Bendak's Blaster	Blaster_Pistol
-g_w_blstrpstl007	Bendak's Blaster	Blaster_Pistol
-g_w_blstrpstl008	Bendak's Blaster	Blaster_Pistol
-g_w_blstrpstl009	Bendak's Blaster	Blaster_Pistol
-g_w_blstrpstl010	Carth's Blaster	Blaster_Pistol
-g_w_blstrpstl020	Insta-kill Pistol	Blaster_Pistol
-g_w_blstrrfl001	Blaster Rifle	Blaster_Rifle
-g_w_blstrrfl002	Sith Sniper Rifle	Blaster_Rifle
-g_w_blstrrfl003	Mandalorian Assault Rifle	Blaster_Rifle
-g_w_blstrrfl004	Zabrak Battle Cannon	Blaster_Rifle
-g_w_blstrrfl005	Jurgan Kalta's Assault Rifle	Blaster_Rifle
-g_w_blstrrfl006	Jurgan Kalta's Assault Rifle	Blaster_Rifle
-g_w_blstrrfl007	Jurgan Kalta's Assault Rifle	Blaster_Rifle
-g_w_blstrrfl008	Jurgan Kalta's Assault Rifle	Blaster_Rifle
-g_w_blstrrfl009	Jurgan Kalta's Assault Rifle	Blaster_Rifle
-g_w_bowcstr001	Bowcaster	Bowcaster
-g_w_bowcstr002	Chuundar's Bowcaster	Bowcaster
-g_w_bowcstr003	Zaalbar's Bowcaster	Bowcaster
-g_w_crgore001	Katarn Slam	Creature_Item_Pierce
-g_w_crgore002	Dire Katarn Slam	Creature_Item_Pierce
-g_w_crslash001	Claw1d4	Creature_Item_Slash
-g_w_crslash002	Claw1d6	Creature_Item_Slash
-g_w_crslash003	Claw1d10	Creature_Item_Slash
-g_w_crslash004	Claw2d12	Creature_Item_Slash
-g_w_crslash005	Claw3d6	Creature_Item_Slash
-g_w_crslash006	Claw10d6	Creature_Item_Slash
-g_w_crslash007	Selkath Lesser Claw	Creature_Item_Slash
-g_w_crslash008	Selkath Greater Claw	Creature_Item_Slash
-g_w_crslash009	Kinrath Claw	Creature_Item_Slash
-g_w_crslash010	Tach Claw	Creature_Item_Slash
-g_w_crslash011	Kinrath Claw	Creature_Item_Slash
-g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash
-g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc
-g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade
-g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr006	Bastila's Lightsaber	Double_Bladed_Lightsaber
-g_w_dblswrd001	Double-Bladed Sword	Double_Bladed_Sword
-g_w_dblswrd002	Echani Ritual Brand	Double_Bladed_Sword
-g_w_dblswrd003	Krath Double Sword	Double_Bladed_Sword
-g_w_dblswrd005	Ajunta Pall's Blade	Double_Bladed_Sword
-g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber
-g_w_drkjdisbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dsrptpstl001	Disruptor Pistol	Disrupter_Pistol
-g_w_dsrptpstl002	Mandalorian Ripper	Disrupter_Pistol
-g_w_dsrptrfl001	Disruptor Rifle	Disrupter_Rifle
-g_w_dsrptrfl002	Zabrak Disruptor Cannon	Disrupter_Rifle
-g_w_firegren001	Plasma Grenade	Fire_Grenade
-g_w_flashgren001	Plasma Grenade	Flash_Grenade
-g_w_fraggren01	Frag Grenade	Fragmentation_Grenades
-g_w_gaffi001	Gaffi Stick	Ghaffi_Stick
-g_w_hldoblstr01	Hold Out Blaster	Hold_Out_Blaster
-g_w_hldoblstr02	Bothan Quick Draw	Hold_Out_Blaster
-g_w_hldoblstr03	Sith Assassin Pistol	Hold_Out_Blaster
-g_w_hldoblstr04	Bothan Needler	Hold_Out_Blaster
-g_w_hvrptbltr002	Ordo's Repeating Blaster	Heavy_Repeating_Blaster
-g_w_hvrptbltr01	Heavy Repeating Blaster	Heavy_Repeating_Blaster
-g_w_hvrptbltr02	Mandalorian Heavy Repeater	Heavy_Repeating_Blaster
-g_w_hvyblstr01	Heavy Blaster	Heavy_Blaster
-g_w_hvyblstr02	Arkanian Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr03	Zabrak Tystel Mark III	Heavy_Blaster
-g_w_hvyblstr04	Mandalorian Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr05	Cassus Fett's Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr06	Cassus Fett's Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr07	Cassus Fett's Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr08	Cassus Fett's Heavy Pistol	Heavy_Blaster
-g_w_hvyblstr09	Cassus Fett's Heavy Pistol	Heavy_Blaster
-g_w_ionblstr01	Ion Blaster	Ion_Blaster
-g_w_ionblstr02	Verpine Prototype Ion Blaster	Ion_Blaster
-g_w_iongren01	Ion Grenade	Ion_Grenade
-g_w_ionrfl01	Ion Rifle	Ion_Rifle
-g_w_ionrfl02	Bothan Droid Disruptor	Ion_Rifle
-g_w_ionrfl03	Verpine Droid Disruptor	Ion_Rifle
-g_w_lghtsbr01	Lightsaber	Lightsaber
-g_w_lghtsbr02	Lightsaber	Lightsaber
-g_w_lghtsbr03	Lightsaber	Lightsaber
-g_w_lghtsbr04	Lightsaber	Lightsaber
-g_w_lghtsbr05	Lightsaber	Lightsaber
-g_w_lghtsbr06	Malak's Lightsaber	Lightsaber
-g_w_lngswrd01	Long Sword	Long_Sword
-g_w_lngswrd02	Krath War Blade	Long_Sword
-g_w_lngswrd03	Naga Sadow's Poison Blade	Long_Sword
-g_w_null001	Blaster Pistol: Null	Blaster_Pistol
-g_w_null002	Heavy Blaster: Null	Heavy_Blaster
-g_w_null003	Ion Rifle: Null	Ion_Rifle
-g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster
-g_w_null005	Blaster Rifle: Null	Blaster_Rifle
-g_w_null006	Blaster Carbine: Null	Blaster_Carbine
-g_w_poisngren01	Poison Grenade	Poison_Grenade
-g_w_qtrstaff01	Quarterstaff	Quarter_Staff
-g_w_qtrstaff02	Massassi Battle Staff	Quarter_Staff
-g_w_qtrstaff03	Raito's Gaderffii	Ghaffi_Stick
-g_w_rptnblstr01	Light Repeating Blaster	Repeating_Blaster
-g_w_rptnblstr02	Medium Repeating Blaster	Repeating_Blaster
-g_w_rptnblstr03	Blaster Cannon	Repeating_Blaster
-g_w_sbrcrstl01	Crystal, Rubat	Lightsaber_Crystals
-g_w_sbrcrstl02	Crystal, Damind	Lightsaber_Crystals
-g_w_sbrcrstl03	Crystal, Eralam	Lightsaber_Crystals
-g_w_sbrcrstl04	Crystal, Sapith	Lightsaber_Crystals
-g_w_sbrcrstl05	Crystal, Nextor	Lightsaber_Crystals
-g_w_sbrcrstl06	Crystal, Opila	Lightsaber_Crystals
-g_w_sbrcrstl07	Crystal, Jenruax	Lightsaber_Crystals
-g_w_sbrcrstl08	Crystal, Phond	Lightsaber_Crystals
-g_w_sbrcrstl09	Crystal, Luxum	Lightsaber_Crystals
-g_w_sbrcrstl10	Crystal, Firkrann	Lightsaber_Crystals
-g_w_sbrcrstl11	Crystal, Bondar	Lightsaber_Crystals
-g_w_sbrcrstl12	Crystal, Sigil	Lightsaber_Crystals
-g_w_sbrcrstl13	Crystal, Upari	Lightsaber_Crystals
-g_w_sbrcrstl14	Crystal, Blue	Lightsaber_Crystals
-g_w_sbrcrstl15	Crystal, Yellow	Lightsaber_Crystals
-g_w_sbrcrstl16	Crystal, Green	Lightsaber_Crystals
-g_w_sbrcrstl17	Crystal, Violet	Lightsaber_Crystals
-g_w_sbrcrstl18	Crystal, Red	Lightsaber_Crystals
-g_w_sbrcrstl19	Crystal, Solari	Lightsaber_Crystals
-g_w_shortsbr01	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr02	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr03	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr04	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr05	Short Lightsaber	Short_Lightsaber
-g_w_shortswrd01	Short Sword	Short_Sword
-g_w_shortswrd02	Massassi Brand	Short_Sword
-g_w_shortswrd03	Teta's Blade	Short_Sword
-g_w_sonicgren01	Sonic Grenade	Sonic_Grenade
-g_w_sonicpstl01	Sonic Pistol	Sonic_Pistol
-g_w_sonicpstl02	Bothan Shrieker	Sonic_Pistol
-g_w_sonicrfl01	Sonic Rifle	Sonic_Rifle
-g_w_sonicrfl02	Bothan Discord Gun	Sonic_Rifle
-g_w_sonicrfl03	Arkanian Sonic Rifle	Sonic_Rifle
-g_w_stunbaton01	Stun Baton	Stun_Baton
-g_w_stunbaton02	Bothan Stun Stick	Stun_Baton
-g_w_stunbaton03	Bothan Chuka	Stun_Baton
-g_w_stunbaton04	Rakatan Battle Wand	Stun_Baton
-g_w_stunbaton05	Rakatan Battle Wand	Stun_Baton
-g_w_stunbaton06	Rakatan Battle Wand	Stun_Baton
-g_w_stunbaton07	Rakatan Battle Wand	Stun_Baton
-g_w_stungren01	Concussion Grenade	Stun_Grenades
-g_w_thermldet01	Thermal Detonator	Thermal_Detonator
-g_w_vbrdblswd01	Vibro Double-Blade	Vibro_Double_Blade
-g_w_vbrdblswd02	Sith War Sword	Vibro_Double_Blade
-g_w_vbrdblswd03	Echani Double-Brand	Vibro_Double_Blade
-g_w_vbrdblswd04	Yusanis' Brand	Vibro_Double_Blade
-g_w_vbrdblswd05	Yusanis' Brand	Vibro_Double_Blade
-g_w_vbrdblswd06	Yusanis' Brand	Vibro_Double_Blade
-g_w_vbrdblswd07	Yusanis' Brand	Vibro_Double_Blade
-g_w_vbroshort01	Vibroblade	Vibro_Blade
-g_w_vbroshort02	Krath Blood Blade	Vibro_Blade
-g_w_vbroshort03	Echani Vibroblade	Vibro_Blade
-g_w_vbroshort04	Sanasiki's Blade	Vibro_Blade
-g_w_vbroshort05	Sanasiki's Blade	Vibro_Blade
-g_w_vbroshort06	Sanasiki's Blade	Vibro_Blade
-g_w_vbroshort07	Sanasiki's Blade	Vibro_Blade
-g_w_vbroshort08	Mission's Vibroblade	Vibro_Blade
-g_w_vbroshort09	Prototype Vibroblade	Vibro_Blade
-g_w_vbroswrd01	Vibrosword	Vibro_Sword
-g_w_vbroswrd02	Krath Dire Sword	Vibro_Sword
-g_w_vbroswrd03	Sith Tremor Sword	Vibro_Sword
-g_w_vbroswrd04	Echani Foil	Vibro_Sword
-g_w_vbroswrd05	Bacca's Ceremonial Blade	Vibro_Sword
-g_w_vbroswrd06	Bacca's Ceremonial Blade	Vibro_Sword
-g_w_vbroswrd07	Bacca's Ceremonial Blade	Vibro_Sword
-g_w_vbroswrd08	Bacca's Ceremonial Blade	Vibro_Sword
-g_w_waraxe001	Gamorrean Battleaxe	Gammorean_Battleaxe
-g_w_warblade001	Wookiee Warblade	Wookie_Warblade
-geno_armor	GenoHaradan Mesh Armor	Armor_Class_4
-geno_blade	GenoHaradan Poison Blade	Vibro_Sword
-geno_blaster	GenoHaradan Blaster	Blaster_Pistol
-geno_datapad	Datapad	Data_Pad
-geno_gloves	GenoHaradan Power Gloves	Gauntlets
-geno_stealth	GenoHaradan Stealth Unit	Stealth_Unit
-geno_visor	GenoHaradan Visor	Mask
-kas25_wookcrysta	Rough-cut Upari Amulet	Lightsaber_Crystals
-ptar_rakghoulser	Rakghoul Serum	Adrenaline
-ptar_sbpasscrd	Sith Base Passcard	Plot_Useable_Items
-ptar_sitharmor	Sith Armor	Disguise_Item
-tat17_sandperdis	Sand People Clothing	Disguise_Item
-tat18_dragonprl	Krayt Dragon Pearl	Plot_Useable_Items
-w_blhvy001	Heavy Blaster Pistol	Creature_Weapon_Sl_Prc
-w_bstrcrbn	Heavy Blaster Pistol	Basic_Clothing
-w_lghtsbr001	Lightsaber	Creature_Item_Pierce
-w_null	Heavy Blaster Pistol	Creature_Hide_Item
+template	name	base item	combat
+g1_a_class5001	Light Exoskeleton	Armor_Class_4	armour 6
+g1_a_class5002	Baragwin Shadow Armor	Armor_Class_5	armour 7
+g1_a_class6001	Environmental Bastion Armor	Armor_Class_6	armour 7
+g1_a_class8001	Heavy Exoskeleton	Armor_Class_7	armour 9
+g1_i_belt001	Baragwin Stealth Unit	Stealth_Unit	
+g1_i_drdcomspk01	Advanced Droid Interface	Droid_Computer_Spike_Mount_x	
+g1_i_drdhvplat01	Composite Heavy Plating	Droid_Heavy_Plating	armour 13
+g1_i_drdshld001	Baragwin Droid Shield	Droid_Shield	
+g1_i_drdutldev01	Baragwin Flame Thrower	Droid_Utility_Device	
+g1_i_drdutldev02	Baragwin Stun Ray	Droid_Utility_Device	
+g1_i_drdutldev03	Baragwin Shield Disruptor	Droid_Utility_Device	
+g1_i_gauntlet01	Advanced Stabilizer Gloves	Gauntlets	
+g1_i_implant301	Advanced Sensory Implant	Implant_3	
+g1_i_implant302	Advanced Bio-Stabilizer Implant	Implant_3	
+g1_i_implant303	Advanced Combat Implant	Implant_3	
+g1_i_implant304	Advanced Alacrity Impant	Implant_3	
+g1_i_mask01	Advanced Bio-Stabilizer Mask	Mask	
+g1_i_mask02	Medical Interface Visor	Mask	
+g1_i_mask03	Advanced Agent Interface	Mask	
+g1_w_dblsbr001	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.27
+g1_w_dblsbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.67
+g1_w_dsrptrfl001	Baragwin Disruptor-X Weapon	Disrupter_Rifle	ranged 7.9 +1
+g1_w_hvrptbltr01	Baragwin Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 14.19
+g1_w_ionrfl01	Baragwin Ion-X Weapon	Ion_Rifle	ranged 8.13 +3
+g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 9.48
+g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.47
+g1_w_rptnblstr01	Baragwin Assault Gun	Repeating_Blaster	ranged 13.9
+g1_w_sbrcrstl20	Heart of the Guardian	Lightsaber_Crystals	
+g1_w_sbrcrstl21	Mantle of the Force	Lightsaber_Crystals	
+g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 6.81
+g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 7.38
+g1_w_vbroswrd01	Baragwin Assault Blade	Vibro_Sword	melee 16.04 +2
+g_a_class4001	Combat Suit	Armor_Class_4	armour 4
+g_a_class4002	Zabrak Combat Suit	Armor_Class_4	armour 5
+g_a_class4003	Echani Light Armor	Armor_Class_4	armour 5
+g_a_class4004	Cinnagar Weave Armor	Armor_Class_4	armour 6
+g_a_class4005	Massassi Ceremonial Armor	Armor_Class_4	armour 5
+g_a_class4006	Darth Bandon's Fiber Armor	Armor_Class_4	armour 5
+g_a_class4007	Darth Bandon's Fiber Armor	Armor_Class_4	armour 7
+g_a_class4008	Darth Bandon's Fiber Armor	Armor_Class_4	armour 7
+g_a_class4009	Echani Fiber Armor	Armor_Class_4	armour 5
+g_a_class5001	Heavy Combat Suit	Armor_Class_5	armour 5
+g_a_class5002	Bonadan Alloy Heavy Suit	Armor_Class_5	armour 6
+g_a_class5003	Zabrak Battle Armor	Armor_Class_5	armour 6
+g_a_class5004	Zabrak Field Armor	Armor_Class_5	armour 7
+g_a_class5005	Reinforced Fiber Armor	Armor_Class_5	armour 7
+g_a_class5006	Ulic Qel Droma's Mesh Suit	Armor_Class_5	armour 8
+g_a_class5007	Eriadu Prototype Armor	Armor_Class_5	armour 6
+g_a_class5008	Eriadu Prototype Armor	Armor_Class_5	armour 9
+g_a_class5009	Eriadu Prototype Armor	Armor_Class_5	armour 9
+g_a_class5010	Republic Mod Armor	Armor_Class_5	armour 5
+g_a_class6001	Military Suit	Armor_Class_6	armour 6
+g_a_class6002	Echani Battle Armor	Armor_Class_6	armour 7
+g_a_class6003	Cinnagar War Suit	Armor_Class_6	armour 7
+g_a_class6004	Verpine Fiber Mesh	Armor_Class_6	armour 8
+g_a_class6005	Arkanian Bond Armor	Armor_Class_6	armour 8
+g_a_class6006	Exar Kun's Light Battle Suit	Armor_Class_6	armour 9
+g_a_class6007	Davik's War Suit	Armor_Class_6	armour 8
+g_a_class6008	Davik's War Suit	Armor_Class_6	armour 10
+g_a_class6009	Davik's War Suit	Armor_Class_6	armour 10
+g_a_class7001	Light Battle Armor	Armor_Class_7	armour 7
+g_a_class7002	Bronzium Light Battle Armor	Armor_Class_7	armour 8
+g_a_class7003	Powered Light Battle Armor	Armor_Class_7	armour 8
+g_a_class7004	Krath Heavy Armor	Armor_Class_7	armour 9
+g_a_class7005	Krath Holy Battle Suit	Armor_Class_7	armour 9
+g_a_class7006	Jamoh Hogra's Battle Armor	Armor_Class_7	armour 11
+g_a_class8001	Battle Armor	Armor_Class_8	armour 8
+g_a_class8002	Powered Battle Armor	Armor_Class_8	armour 9
+g_a_class8003	Cinnagar Plate Armor	Armor_Class_8	armour 10
+g_a_class8004	Mandalorian Armor	Armor_Class_8	armour 10
+g_a_class8005	Calo Nord's Battle Armor	Armor_Class_8	armour 9
+g_a_class8006	Calo Nord's Battle Armor	Armor_Class_8	armour 12
+g_a_class8007	Calo Nord's Battle Armor	Armor_Class_8	armour 12
+g_a_class8009	Verpine Zal Alloy Mesh	Armor_Class_8	armour 12
+g_a_class9001	Heavy Battle Armor	Armor_Class_9	armour 9
+g_a_class9002	Durasteel Heavy Armor	Armor_Class_9	armour 10
+g_a_class9003	Mandalorian Battle Armor	Armor_Class_9	armour 11
+g_a_class9004	Mandalorian Heavy Armor	Armor_Class_9	armour 12
+g_a_class9005	Jurgan Kalta's Power Suit	Armor_Class_9	armour 10
+g_a_class9006	Jurgan Kalta's Power Suit	Armor_Class_9	armour 13
+g_a_class9007	Jurgan Kalta's Power Suit	Armor_Class_9	armour 13
+g_a_class9009	Cassus Fett's Battle Armor	Armor_Class_9	armour 10
+g_a_class9010	Mandalorian Assault Armor	Armor_Class_9	armour 13
+g_a_class9011	Cassus Fett's Battle Armor	Armor_Class_9	armour 14
+g_a_clothes01	Clothing	Basic_Clothing	
+g_a_clothes02	Clothing Variant 2	Basic_Clothing	
+g_a_clothes03	Clothing Variant 3	Basic_Clothing	
+g_a_clothes04	Clothing Variant 4	Basic_Clothing	
+g_a_clothes05	Clothing Variant 5	Basic_Clothing	
+g_a_clothes06	Clothing Variant 6	Basic_Clothing	
+g_a_clothes07	Clothing Variant 1	Basic_Clothing	
+g_a_clothes08	Clothing Variant 7	Basic_Clothing	
+g_a_clothes09	Clothing Variant 8	Basic_Clothing	
+g_a_jedirobe01	Jedi Robe	Jedi_Robe	
+g_a_jedirobe02	Dark Jedi Robe	Jedi_Robe	
+g_a_jedirobe03	Jedi Robe	Jedi_Robe	
+g_a_jedirobe04	Jedi Robe	Jedi_Robe	
+g_a_jedirobe05	Dark Jedi Robe	Jedi_Robe	
+g_a_jedirobe06	Qel-Droma Robes	Jedi_Robe	
+g_a_kghtrobe01	Jedi Knight Robe	Jedi_Knight_Robe	
+g_a_kghtrobe02	Dark Jedi Knight Robe	Jedi_Knight_Robe	
+g_a_kghtrobe03	Jedi Knight Robe	Jedi_Knight_Robe	
+g_a_kghtrobe04	Jedi Knight Robe	Jedi_Knight_Robe	
+g_a_kghtrobe05	Dark Jedi Knight Robe	Jedi_Knight_Robe	
+g_a_mstrrobe01	Jedi Master Robe	Jedi_Master_Robe	
+g_a_mstrrobe02	Dark Jedi Master Robe	Jedi_Master_Robe	
+g_a_mstrrobe03	Jedi Master Robe	Jedi_Master_Robe	
+g_a_mstrrobe04	Jedi Master Robe	Jedi_Master_Robe	
+g_a_mstrrobe05	Dark Jedi Master Robe	Jedi_Master_Robe	
+g_a_mstrrobe06	Darth Revan's Robes	Revan_Armor	armour 5
+g_a_mstrrobe07	Star Forge Robes	Revan_Armor	armour 5
+g_i_adrnaline001	Adrenal Strength	Adrenaline	
+g_i_adrnaline002	Adrenal Alacrity	Adrenaline	
+g_i_adrnaline003	Adrenal Stamina	Adrenaline	
+g_i_adrnaline004	Hyper-adrenal Strength	Adrenaline	
+g_i_adrnaline005	Hyper-adrenal Alacrity	Adrenaline	
+g_i_adrnaline006	Hyper-adrenal Stamina	Adrenaline	
+g_i_asthitem001	Aesthetic Item	Aesthetic_Item	
+g_i_belt001	Cardio-Regulator	Belt	
+g_i_belt002	Verpine Cardio-Regulator	Belt	
+g_i_belt003	Adrenaline Amplifier	Belt	
+g_i_belt004	Advanced Adrenaline Amplifier	Belt	
+g_i_belt005	Nerve Amplifier Belt	Belt	
+g_i_belt006	Sound Dampening Stealth Unit	Stealth_Unit	
+g_i_belt007	Advanced Stealth Unit	Stealth_Unit	
+g_i_belt008	Eriadu Stealth Unit	Stealth_Unit	
+g_i_belt009	Calrissian's Utility Belt	Belt	
+g_i_belt010	Stealth Field Generator	Stealth_Unit	
+g_i_belt011	Adrenaline Stimulator	Belt	
+g_i_belt012	CNS Strength Enhancer	Belt	
+g_i_belt013	Electrical Capacitance Shield	Belt	
+g_i_belt014	Thermal Shield Generator	Belt	
+g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 3.54
+g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 3.49
+g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 3.61
+g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 3.61
+g_i_cmbtshot001	Battle Stimulant	Combat_Shots	
+g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots	
+g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots	
+g_i_collarlgt001	Collar Light	Collar_Light	
+g_i_credits001	Credits	Credits	
+g_i_credits002	Credits	Credits	
+g_i_credits003	Credits	Credits	
+g_i_credits004	Credits	Credits	
+g_i_credits005	Credits	Credits	
+g_i_credits006	Credits	Credits	
+g_i_credits007	Credits	Credits	
+g_i_credits008	Credits	Credits	
+g_i_credits009	Credits	Credits	
+g_i_credits010	Credits	Credits	
+g_i_credits011	Credits	Credits	
+g_i_credits012	Credits	Credits	
+g_i_credits013	Credits	Credits	
+g_i_credits014	Credits	Credits	
+g_i_credits015	Credits	Credits	
+g_i_crhide001	Assault Droid Mark I Hide	Creature_Hide_Item	
+g_i_crhide002	Assault Droid Mark IV Hide	Creature_Hide_Item	
+g_i_crhide003	Rakghoul Fiend & Kataarn Hide	Creature_Hide_Item	
+g_i_crhide004	Tuk'ata Hide	Creature_Hide_Item	
+g_i_crhide005	Katarn Hide	Creature_Hide_Item	
+g_i_crhide006	Tuk'ata Hide	Creature_Hide_Item	
+g_i_crhide007	Canderous' Hide	Creature_Hide_Item	
+g_i_crhide008	Droid Hide	Creature_Hide_Item	
+g_i_crhide009	HK-47 Hide 1	Creature_Hide_Item	
+g_i_crhide010	HK-47 Hide 2	Creature_Hide_Item	
+g_i_crhide011	HK-47 Hide 3	Creature_Hide_Item	
+g_i_crhide012	HK-47 Hide 4	Creature_Hide_Item	
+g_i_crhide013	HK-47 Hide 0	Creature_Hide_Item	
+g_i_datapad001	Datapad	Data_Pad	
+g_i_drdcomspk001	Computer Probe	Droid_Computer_Spike_Mount_x	
+g_i_drdcomspk002	Universal Computer Interface	Droid_Computer_Spike_Mount_x	
+g_i_drdcomspk003	Advanced Computer Tool	Droid_Computer_Spike_Mount_x	
+g_i_drdhvplat001	Droid Heavy Plating Type 1	Droid_Heavy_Plating	armour 9
+g_i_drdhvplat002	Droid Heavy Plating Type 2	Droid_Heavy_Plating	armour 10
+g_i_drdhvplat003	Droid Heavy Plating Type 3	Droid_Heavy_Plating	armour 11
+g_i_drdltplat001	Droid Light Plating Type 1	Droid_Light_Plating	armour 3
+g_i_drdltplat002	Droid Light Plating Type 2	Droid_Light_Plating	armour 4
+g_i_drdltplat003	Droid Light Plating Type 3	Droid_Light_Plating	armour 5
+g_i_drdmdplat001	Droid Medium Plating Type 1	Droid_Medium_Plating	armour 4
+g_i_drdmdplat002	Droid Medium Plating Type 2	Droid_Medium_Plating	armour 5
+g_i_drdmdplat003	Droid Medium Plating Type 3	Droid_Medium_Plating	armour 6
+g_i_drdmtnsen001	Droid Motion Sensors Type 1	Droid_Motion_Sensors_x	
+g_i_drdmtnsen002	Droid Motion Sensors Type 2	Droid_Motion_Sensors_x	
+g_i_drdmtnsen003	Droid Motion Sensors Type 3	Droid_Motion_Sensors_x	
+g_i_drdrepeqp001	Repair Kit	Droid_Repair_Equipment	
+g_i_drdrepeqp002	Advanced Repair Kit	Droid_Repair_Equipment	
+g_i_drdrepeqp003	Construction Kit	Droid_Repair_Equipment	
+g_i_drdsecspk001	Security Interface Tool	Droid_Security_Spike_Mount	
+g_i_drdsecspk002	Security Domination Interface	Droid_Security_Spike_Mount	
+g_i_drdsecspk003	Security Decryption Interface	Droid_Security_Spike_Mount	
+g_i_drdshld001	Energy Shield Level 1	Droid_Shield	
+g_i_drdshld002	Energy Shield Level 2	Droid_Shield	
+g_i_drdshld003	Energy Shield Level 3	Droid_Shield	
+g_i_drdshld005	Environment Shield Level 1	Droid_Shield	
+g_i_drdshld006	Environment Shield Level 2	Droid_Shield	
+g_i_drdshld007	Environment Shield Level 3	Droid_Shield	
+g_i_drdsncsen001	Droid Sonic Sensors Type 1	Droid_Sonic_Sensors_x	
+g_i_drdsncsen002	Droid Sonic Sensors Type 2	Droid_Sonic_Sensors_x	
+g_i_drdsncsen003	Droid Sonic Sensors Type 3	Droid_Sonic_Sensors_x	
+g_i_drdsrcscp001	Droid Search Scope Type 1	Droid_Search_Scope_x	
+g_i_drdsrcscp002	Droid Search Scope Type 2	Droid_Search_Scope_x	
+g_i_drdsrcscp003	Droid Search Scope Type 3	Droid_Search_Scope_x	
+g_i_drdtrgcom001	Basic Targeting Computer	Droid_Targeting_Computers	
+g_i_drdtrgcom002	Advanced Targeting Computer	Droid_Targeting_Computers	
+g_i_drdtrgcom003	Superior Targeting Computer	Droid_Targeting_Computers	
+g_i_drdtrgcom004	Sensor Probe	Droid_Targeting_Computers	
+g_i_drdtrgcom005	Verpine Demolitions Probe	Droid_Targeting_Computers	
+g_i_drdtrgcom006	Bothan Demolitions Probe	Droid_Targeting_Computers	
+g_i_drdutldev001	Stun Ray	Droid_Utility_Device	
+g_i_drdutldev002	Advanced Stun Ray	Droid_Utility_Device	
+g_i_drdutldev003	Shield Disruptor	Droid_Utility_Device	
+g_i_drdutldev004	Advanced Shield Disruptor	Droid_Utility_Device	
+g_i_drdutldev005	Oil Slick	Droid_Utility_Device	
+g_i_drdutldev006	Flame Thrower	Droid_Utility_Device	
+g_i_drdutldev007	Advanced Flame Thrower	Droid_Utility_Device	
+g_i_drdutldev008	Carbonite Projector	Droid_Utility_Device	
+g_i_drdutldev009	Carbonite Projector Mark II	Droid_Utility_Device	
+g_i_drdutldev010	Gravity Generator	Droid_Utility_Device	
+g_i_drdutldev011	Adv. Gravity Generator	Droid_Utility_Device	
+g_i_frarmbnds01	Energy Shield	Forearm_Bands	
+g_i_frarmbnds02	Sith Energy Shield	Forearm_Bands	
+g_i_frarmbnds03	Arkanian Energy Shield	Forearm_Bands	
+g_i_frarmbnds04	Echani Shield	Forearm_Bands	
+g_i_frarmbnds05	Mandalorian Melee Shield	Forearm_Bands	
+g_i_frarmbnds06	Mandalorian Power Shield	Forearm_Bands	
+g_i_frarmbnds07	Echani Dueling Shield	Forearm_Bands	
+g_i_frarmbnds08	Yusanis' Dueling Shield	Forearm_Bands	
+g_i_frarmbnds09	Verpine Prototype Shield	Forearm_Bands	
+g_i_frarmbnds10	Lower Saves, All 2	Forearm_Bands	
+g_i_frarmbnds11	Lower Saves, All 4	Forearm_Bands	
+g_i_frarmbnds12	Lower Saves, All 5	Forearm_Bands	
+g_i_frarmbnds13	Lower Saves, Fortitude 2	Forearm_Bands	
+g_i_frarmbnds14	Lower Saves, Fortitude 4	Forearm_Bands	
+g_i_frarmbnds15	Lower Saves, Fortitude 5	Forearm_Bands	
+g_i_frarmbnds16	Lower Saves, Reflex 2	Forearm_Bands	
+g_i_frarmbnds17	Lower Saves, Reflex 4	Forearm_Bands	
+g_i_frarmbnds18	Lower Saves, Reflex 5	Forearm_Bands	
+g_i_frarmbnds19	Lower Saves, Will 2	Forearm_Bands	
+g_i_frarmbnds20	Lower Saves, Will 4	Forearm_Bands	
+g_i_frarmbnds21	Lower Saves, Will 5	Forearm_Bands	
+g_i_gauntlet01	Strength Gauntlets	Gauntlets	
+g_i_gauntlet02	Eriadu Strength Amplifier	Gauntlets	
+g_i_gauntlet03	Sith Power Gauntlets	Gauntlets	
+g_i_gauntlet04	Stabilizer Gauntlets	Gauntlets	
+g_i_gauntlet05	Bothan "Machinist" Gloves	Gauntlets	
+g_i_gauntlet06	Verpine Bond Gauntlets	Gauntlets	
+g_i_gauntlet07	Dominator Gauntlets	Gauntlets	
+g_i_gauntlet08	Karakan Gauntlets	Gauntlets	
+g_i_gauntlet09	Infiltrator Gloves	Gauntlets	
+g_i_gizkapois001	Gizka Poison	Plot_Useable_Items	
+g_i_glowrod01	Glow Rod	Glow_Rod	
+g_i_implant101	Cardio Package	Implant_1	
+g_i_implant102	Response Package	Implant_1	
+g_i_implant103	Memory Package	Implant_1	
+g_i_implant104	Done	Implant_1	
+g_i_implant201	Biotech Package	Implant_2	
+g_i_implant202	Retinal Combat Implant	Implant_2	
+g_i_implant203	Nerve Enhancement Package	Implant_2	
+g_i_implant204	I need to make the party selections screen available	Implant_2	
+g_i_implant301	Bavakar Cardio Package	Implant_3	
+g_i_implant302	Bavakar Reflex Enhancement	Implant_3	
+g_i_implant303	Bavakar Memory Chip	Implant_3	
+g_i_implant304	Bio-Antidote Package	Implant_3	
+g_i_implant305	Cardio Power System	Implant_3	
+g_i_implant306	Gordulan Reaction System	Implant_3	
+g_i_implant307	Navardan Regenerator	Implant_3	
+g_i_implant308	Sith Regenerator	Implant_3	
+g_i_implant309	Beemon Package	Implant_3	
+g_i_implant310	Cyber Reaction System	Implant_3	
+g_i_mask01	Light-Scan Visor	Mask	
+g_i_mask02	Motion Detection Goggles	Mask	
+g_i_mask03	Bothan Perception Visor	Mask	
+g_i_mask04	Verpine Ocular Enhancer	Mask	
+g_i_mask05	Bothan Sensory Visor	Mask	
+g_i_mask06	Vacuum Mask	Mask	
+g_i_mask07	Sonic Nullifiers	Mask	
+g_i_mask08	Aural Amplifier	Mask	
+g_i_mask09	Advanced Aural Amplifier	Mask	
+g_i_mask10	Neural Band	Mask	
+g_i_mask11	Verpine Headband	Mask	
+g_i_mask12	Breath Mask	Mask	
+g_i_mask13	Teta's Royal Band	Mask	
+g_i_mask14	Sith Mask	Mask	
+g_i_mask15	Stabilizer Mask	Mask	
+g_i_mask16	Interface Band	Mask	
+g_i_mask17	Demolitions Sensor	Mask	
+g_i_mask18	Combat Sensor	Mask	
+g_i_mask19	Stealth Field Enhancer	Mask	
+g_i_mask20	Stealth Field Reinforcement	Mask	
+g_i_mask21	Interface Visor	Mask	
+g_i_mask22	Circlet of Saresh	Mask	
+g_i_mask23	Pistol Targetting Optics	Mask	
+g_i_mask24	Heavy Targetting Optics	Mask	
+g_i_medeqpmnt01	Medpac	Medical_Equipment	
+g_i_medeqpmnt02	Advanced Medpac	Medical_Equipment	
+g_i_medeqpmnt03	Life Support Pack	Medical_Equipment	
+g_i_medeqpmnt04	Antidote Kit	Medical_Equipment	
+g_i_medeqpmnt05	Antibiotic Kit	Medical_Equipment	
+g_i_medeqpmnt06	Advanced Medpac	Medical_Equipment	
+g_i_medeqpmnt07	Life Support Pack	Medical_Equipment	
+g_i_medeqpmnt08	Squad Recovery Stim	Squad_Recovery_kit	
+g_i_parts01	Parts	Programming_Spikes	
+g_i_pazcard_001	Pazaak Card +1	Pazaak_Card	
+g_i_pazcard_002	Pazaak Card +2	Pazaak_Card	
+g_i_pazcard_003	Pazaak Card +3	Pazaak_Card	
+g_i_pazcard_004	Pazaak Card +4	Pazaak_Card	
+g_i_pazcard_005	Pazaak Card +5	Pazaak_Card	
+g_i_pazcard_006	Pazaak Card +6	Pazaak_Card	
+g_i_pazcard_007	Pazaak Card -1	Pazaak_Card	
+g_i_pazcard_008	Pazaak Card -2	Pazaak_Card	
+g_i_pazcard_009	Pazaak Card -3	Pazaak_Card	
+g_i_pazcard_010	Pazaak Card -4	Pazaak_Card	
+g_i_pazcard_011	Pazaak Card -5	Pazaak_Card	
+g_i_pazcard_012	Pazaak Card -6	Pazaak_Card	
+g_i_pazcard_013	Pazaak Card +/-1	Pazaak_Card	
+g_i_pazcard_014	Pazaak Card +/-2	Pazaak_Card	
+g_i_pazcard_015	Pazaak Card +/-3	Pazaak_Card	
+g_i_pazcard_016	Pazaak Card +/-4	Pazaak_Card	
+g_i_pazcard_017	Pazaak Card +/-5	Pazaak_Card	
+g_i_pazcard_018	Pazaak Card +/-6	Pazaak_Card	
+g_i_pazdeck	Pazaak Deck	Aesthetic_Item	
+g_i_pazsidebd001	Pazaak Side Deck	Pazaak_Sideboard	
+g_i_pltuseitm01	Keycard	Plot_Useable_Items	
+g_i_progspike003	Repair Spike	Programming_Spikes	
+g_i_progspike01	Computer Spike	Programming_Spikes	
+g_i_progspike02	SYSTEM LOADING... COMPLETE ENTER COMMAND	Programming_Spikes	
+g_i_recordrod01	Recording Rod	****	
+g_i_secspike01	Security Spike	Security_Spikes	
+g_i_secspike02	Security Spike Tunneler	Security_Spikes	
+g_i_torch01	Torch	Torch	
+g_i_trapkit001	Minor Flash Mine	Trap_Kit	
+g_i_trapkit002	Average Flash Mine	Trap_Kit	
+g_i_trapkit003	Deadly Flash Mine	Trap_Kit	
+g_i_trapkit004	Minor Frag Mine	Trap_Kit	
+g_i_trapkit005	Average Frag Mine	Trap_Kit	
+g_i_trapkit006	Deadly Frag Mine	Trap_Kit	
+g_i_trapkit007	Minor Plasma Mine	Trap_Kit	
+g_i_trapkit008	Average Plasma Mine	Trap_Kit	
+g_i_trapkit009	Deadly Plasma Mine	Trap_Kit	
+g_i_trapkit01	Flash Mine	Trap_Kit	
+g_i_trapkit010	Minor Gas Mine	Trap_Kit	
+g_i_trapkit011	Average Gas Mine	Trap_Kit	
+g_i_trapkit012	Deadly Gas Mine	Trap_Kit	
+g_i_trapkit02	Frag Mine	Trap_Kit	
+g_i_trapkit03	Laser Mine	Trap_Kit	
+g_i_trapkit04	Gas Mine	Trap_Kit	
+g_i_upgrade001	Scope	Plot_Useable_Items	
+g_i_upgrade002	Improved Energy Cell	Plot_Useable_Items	
+g_i_upgrade003	Beam Splitter	Plot_Useable_Items	
+g_i_upgrade004	Hair Trigger	Plot_Useable_Items	
+g_i_upgrade005	Armor Reinforcement	Plot_Useable_Items	
+g_i_upgrade006	Mesh Underlay	Plot_Useable_Items	
+g_i_upgrade007	Vibration Cell	Plot_Useable_Items	
+g_i_upgrade008	Durasteel Bonding Alloy	Plot_Useable_Items	
+g_i_upgrade009	Energy Projector	Plot_Useable_Items	
+g_w_adhsvgren001	Adhesive Grenade	Adhesive_Grenade	
+g_w_blstrcrbn001	Blaster Carbine	Blaster_Carbine	ranged 4.5
+g_w_blstrcrbn002	Sith Assault Gun	Blaster_Carbine	ranged 5.37
+g_w_blstrcrbn003	Cinnagaran Carbine	Blaster_Carbine	ranged 5.85
+g_w_blstrcrbn004	Jurgan Kalta's Carbine	Blaster_Carbine	ranged 6.63
+g_w_blstrcrbn005	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.87
+g_w_blstrcrbn006	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 6.46
+g_w_blstrcrbn007	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.28
+g_w_blstrcrbn008	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.4
+g_w_blstrcrbn009	Jamoh Hogra's Carbine	Blaster_Carbine	ranged 8.66 +5
+g_w_blstrpstl001	Blaster Pistol	Blaster_Pistol	ranged 3.15
+g_w_blstrpstl002	Mandalorian Blaster	Blaster_Pistol	ranged 3.45
+g_w_blstrpstl003	Arkanian Pistol	Blaster_Pistol	ranged 3.15
+g_w_blstrpstl004	Zabrak Blaster Pistol	Blaster_Pistol	ranged 3.46
+g_w_blstrpstl005	Bendak's Blaster	Blaster_Pistol	ranged 3.29
+g_w_blstrpstl006	Bendak's Blaster	Blaster_Pistol	ranged 5.03 +5
+g_w_blstrpstl007	Bendak's Blaster	Blaster_Pistol	ranged 7.89 +5
+g_w_blstrpstl008	Bendak's Blaster	Blaster_Pistol	ranged 8.49 +5
+g_w_blstrpstl009	Bendak's Blaster	Blaster_Pistol	ranged 8.79 +5
+g_w_blstrpstl010	Carth's Blaster	Blaster_Pistol	ranged 4.05
+g_w_blstrpstl020	Insta-kill Pistol	Blaster_Pistol	ranged 3.85
+g_w_blstrrfl001	Blaster Rifle	Blaster_Rifle	ranged 5.19
+g_w_blstrrfl002	Sith Sniper Rifle	Blaster_Rifle	ranged 4.62
+g_w_blstrrfl003	Mandalorian Assault Rifle	Blaster_Rifle	ranged 4.48
+g_w_blstrrfl004	Zabrak Battle Cannon	Blaster_Rifle	ranged 9.75 +3
+g_w_blstrrfl005	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 4.67 +3
+g_w_blstrrfl006	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.67 +3
+g_w_blstrrfl007	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 9.07 +4
+g_w_blstrrfl008	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.87 +4
+g_w_blstrrfl009	Jurgan Kalta's Assault Rifle	Blaster_Rifle	ranged 8.92 +5
+g_w_bowcstr001	Bowcaster	Bowcaster	ranged 8.12
+g_w_bowcstr002	Chuundar's Bowcaster	Bowcaster	ranged 9.74
+g_w_bowcstr003	Zaalbar's Bowcaster	Bowcaster	ranged 5.18 +1
+g_w_crgore001	Katarn Slam	Creature_Item_Pierce	melee 0
+g_w_crgore002	Dire Katarn Slam	Creature_Item_Pierce	melee 0
+g_w_crslash001	Claw1d4	Creature_Item_Slash	melee 0
+g_w_crslash002	Claw1d6	Creature_Item_Slash	melee 0
+g_w_crslash003	Claw1d10	Creature_Item_Slash	melee 0
+g_w_crslash004	Claw2d12	Creature_Item_Slash	melee 0
+g_w_crslash005	Claw3d6	Creature_Item_Slash	melee 0
+g_w_crslash006	Claw10d6	Creature_Item_Slash	melee 0
+g_w_crslash007	Selkath Lesser Claw	Creature_Item_Slash	melee 0
+g_w_crslash008	Selkath Greater Claw	Creature_Item_Slash	melee 0
+g_w_crslash009	Kinrath Claw	Creature_Item_Slash	melee 0
+g_w_crslash010	Tach Claw	Creature_Item_Slash	melee 0
+g_w_crslash011	Kinrath Claw	Creature_Item_Slash	melee 0
+g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash	melee 0
+g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.3
+g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
+g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc	melee 0
+g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
+g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 8.46
+g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade	
+g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.85
+g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 11.71
+g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.92
+g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.99
+g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.74
+g_w_dblsbr006	Bastila's Lightsaber	Double_Bladed_Lightsaber	melee 11.33
+g_w_dblswrd001	Double-Bladed Sword	Double_Bladed_Sword	melee 6.92
+g_w_dblswrd002	Echani Ritual Brand	Double_Bladed_Sword	melee 6.46
+g_w_dblswrd003	Krath Double Sword	Double_Bladed_Sword	melee 8
+g_w_dblswrd005	Ajunta Pall's Blade	Double_Bladed_Sword	melee 10.68
+g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 8.62
+g_w_drkjdisbr002	Double Bladed Lightsaber	Double_Bladed_Lightsaber	melee 10.69
+g_w_dsrptpstl001	Disruptor Pistol	Disrupter_Pistol	ranged 2.62
+g_w_dsrptpstl002	Mandalorian Ripper	Disrupter_Pistol	ranged 2.65
+g_w_dsrptrfl001	Disruptor Rifle	Disrupter_Rifle	ranged 3.72
+g_w_dsrptrfl002	Zabrak Disruptor Cannon	Disrupter_Rifle	ranged 8.65
+g_w_firegren001	Plasma Grenade	Fire_Grenade	
+g_w_flashgren001	Plasma Grenade	Flash_Grenade	
+g_w_fraggren01	Frag Grenade	Fragmentation_Grenades	
+g_w_gaffi001	Gaffi Stick	Ghaffi_Stick	melee 4.41
+g_w_hldoblstr01	Hold Out Blaster	Hold_Out_Blaster	ranged 2.53
+g_w_hldoblstr02	Bothan Quick Draw	Hold_Out_Blaster	ranged 2.44
+g_w_hldoblstr03	Sith Assassin Pistol	Hold_Out_Blaster	ranged 2.51
+g_w_hldoblstr04	Bothan Needler	Hold_Out_Blaster	ranged 2.55
+g_w_hvrptbltr002	Ordo's Repeating Blaster	Heavy_Repeating_Blaster	ranged 6.47
+g_w_hvrptbltr01	Heavy Repeating Blaster	Heavy_Repeating_Blaster	ranged 5.64 +1
+g_w_hvrptbltr02	Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 10.02 +1
+g_w_hvyblstr01	Heavy Blaster	Heavy_Blaster	ranged 4.43
+g_w_hvyblstr02	Arkanian Heavy Pistol	Heavy_Blaster	ranged 4.79
+g_w_hvyblstr03	Zabrak Tystel Mark III	Heavy_Blaster	ranged 6.55
+g_w_hvyblstr04	Mandalorian Heavy Pistol	Heavy_Blaster	ranged 6.42
+g_w_hvyblstr05	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 4.79
+g_w_hvyblstr06	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 7.29 +5
+g_w_hvyblstr07	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 8.84
+g_w_hvyblstr08	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.51
+g_w_hvyblstr09	Cassus Fett's Heavy Pistol	Heavy_Blaster	ranged 9.43
+g_w_ionblstr01	Ion Blaster	Ion_Blaster	ranged 2.53
+g_w_ionblstr02	Verpine Prototype Ion Blaster	Ion_Blaster	ranged 2.31
+g_w_iongren01	Ion Grenade	Ion_Grenade	
+g_w_ionrfl01	Ion Rifle	Ion_Rifle	ranged 3.48
+g_w_ionrfl02	Bothan Droid Disruptor	Ion_Rifle	ranged 3.68
+g_w_ionrfl03	Verpine Droid Disruptor	Ion_Rifle	ranged 3.26
+g_w_lghtsbr01	Lightsaber	Lightsaber	melee 8.87
+g_w_lghtsbr02	Lightsaber	Lightsaber	melee 8.9
+g_w_lghtsbr03	Lightsaber	Lightsaber	melee 9.06
+g_w_lghtsbr04	Lightsaber	Lightsaber	melee 9.42
+g_w_lghtsbr05	Lightsaber	Lightsaber	melee 8.9
+g_w_lghtsbr06	Malak's Lightsaber	Lightsaber	melee 9.54
+g_w_lngswrd01	Long Sword	Long_Sword	melee 6.71
+g_w_lngswrd02	Krath War Blade	Long_Sword	melee 6.53
+g_w_lngswrd03	Naga Sadow's Poison Blade	Long_Sword	melee 6.32
+g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 3.37
+g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 4.8
+g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 3.47
+g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 4.55
+g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 4.73
+g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 4.49
+g_w_poisngren01	Poison Grenade	Poison_Grenade	
+g_w_qtrstaff01	Quarterstaff	Quarter_Staff	melee 3.49
+g_w_qtrstaff02	Massassi Battle Staff	Quarter_Staff	melee 3.31
+g_w_qtrstaff03	Raito's Gaderffii	Ghaffi_Stick	melee 5.02
+g_w_rptnblstr01	Light Repeating Blaster	Repeating_Blaster	ranged 4.9
+g_w_rptnblstr02	Medium Repeating Blaster	Repeating_Blaster	ranged 4.51
+g_w_rptnblstr03	Blaster Cannon	Repeating_Blaster	ranged 4.28
+g_w_sbrcrstl01	Crystal, Rubat	Lightsaber_Crystals	
+g_w_sbrcrstl02	Crystal, Damind	Lightsaber_Crystals	
+g_w_sbrcrstl03	Crystal, Eralam	Lightsaber_Crystals	
+g_w_sbrcrstl04	Crystal, Sapith	Lightsaber_Crystals	
+g_w_sbrcrstl05	Crystal, Nextor	Lightsaber_Crystals	
+g_w_sbrcrstl06	Crystal, Opila	Lightsaber_Crystals	
+g_w_sbrcrstl07	Crystal, Jenruax	Lightsaber_Crystals	
+g_w_sbrcrstl08	Crystal, Phond	Lightsaber_Crystals	
+g_w_sbrcrstl09	Crystal, Luxum	Lightsaber_Crystals	
+g_w_sbrcrstl10	Crystal, Firkrann	Lightsaber_Crystals	
+g_w_sbrcrstl11	Crystal, Bondar	Lightsaber_Crystals	
+g_w_sbrcrstl12	Crystal, Sigil	Lightsaber_Crystals	
+g_w_sbrcrstl13	Crystal, Upari	Lightsaber_Crystals	
+g_w_sbrcrstl14	Crystal, Blue	Lightsaber_Crystals	
+g_w_sbrcrstl15	Crystal, Yellow	Lightsaber_Crystals	
+g_w_sbrcrstl16	Crystal, Green	Lightsaber_Crystals	
+g_w_sbrcrstl17	Crystal, Violet	Lightsaber_Crystals	
+g_w_sbrcrstl18	Crystal, Red	Lightsaber_Crystals	
+g_w_sbrcrstl19	Crystal, Solari	Lightsaber_Crystals	
+g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 7.2
+g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 6.94
+g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 6.98
+g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 6.6
+g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 7
+g_w_shortswrd01	Short Sword	Short_Sword	melee 3.52
+g_w_shortswrd02	Massassi Brand	Short_Sword	melee 3.63
+g_w_shortswrd03	Teta's Blade	Short_Sword	melee 3.14
+g_w_sonicgren01	Sonic Grenade	Sonic_Grenade	
+g_w_sonicpstl01	Sonic Pistol	Sonic_Pistol	ranged 2.36
+g_w_sonicpstl02	Bothan Shrieker	Sonic_Pistol	ranged 2.61
+g_w_sonicrfl01	Sonic Rifle	Sonic_Rifle	ranged 3.9
+g_w_sonicrfl02	Bothan Discord Gun	Sonic_Rifle	ranged 3.63
+g_w_sonicrfl03	Arkanian Sonic Rifle	Sonic_Rifle	ranged 3.51
+g_w_stunbaton01	Stun Baton	Stun_Baton	melee 4.07
+g_w_stunbaton02	Bothan Stun Stick	Stun_Baton	melee 4.29
+g_w_stunbaton03	Bothan Chuka	Stun_Baton	melee 4.44
+g_w_stunbaton04	Rakatan Battle Wand	Stun_Baton	melee 4.58
+g_w_stunbaton05	Rakatan Battle Wand	Stun_Baton	melee 4.84
+g_w_stunbaton06	Rakatan Battle Wand	Stun_Baton	melee 4.75
+g_w_stunbaton07	Rakatan Battle Wand	Stun_Baton	melee 8.54
+g_w_stungren01	Concussion Grenade	Stun_Grenades	
+g_w_thermldet01	Thermal Detonator	Thermal_Detonator	
+g_w_vbrdblswd01	Vibro Double-Blade	Vibro_Double_Blade	melee 8.86
+g_w_vbrdblswd02	Sith War Sword	Vibro_Double_Blade	melee 9.29
+g_w_vbrdblswd03	Echani Double-Brand	Vibro_Double_Blade	melee 11.29
+g_w_vbrdblswd04	Yusanis' Brand	Vibro_Double_Blade	melee 8.88
+g_w_vbrdblswd05	Yusanis' Brand	Vibro_Double_Blade	melee 13.6
+g_w_vbrdblswd06	Yusanis' Brand	Vibro_Double_Blade	melee 11.7
+g_w_vbrdblswd07	Yusanis' Brand	Vibro_Double_Blade	melee 12.4
+g_w_vbroshort01	Vibroblade	Vibro_Blade	melee 5.55
+g_w_vbroshort02	Krath Blood Blade	Vibro_Blade	melee 5.95
+g_w_vbroshort03	Echani Vibroblade	Vibro_Blade	melee 7.37
+g_w_vbroshort04	Sanasiki's Blade	Vibro_Blade	melee 5.79
+g_w_vbroshort05	Sanasiki's Blade	Vibro_Blade	melee 10.38
+g_w_vbroshort06	Sanasiki's Blade	Vibro_Blade	melee 10.35
+g_w_vbroshort07	Sanasiki's Blade	Vibro_Blade	melee 9.81
+g_w_vbroshort08	Mission's Vibroblade	Vibro_Blade	melee 7.09
+g_w_vbroshort09	Prototype Vibroblade	Vibro_Blade	melee 6.76
+g_w_vbroswrd01	Vibrosword	Vibro_Sword	melee 7.01
+g_w_vbroswrd02	Krath Dire Sword	Vibro_Sword	melee 7.62
+g_w_vbroswrd03	Sith Tremor Sword	Vibro_Sword	melee 8.65
+g_w_vbroswrd04	Echani Foil	Vibro_Sword	melee 6.85
+g_w_vbroswrd05	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.09
+g_w_vbroswrd06	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.42 +5
+g_w_vbroswrd07	Bacca's Ceremonial Blade	Vibro_Sword	melee 11.47 +5
+g_w_vbroswrd08	Bacca's Ceremonial Blade	Vibro_Sword	melee 16.18 +5
+g_w_waraxe001	Gamorrean Battleaxe	Gammorean_Battleaxe	melee 6.34
+g_w_warblade001	Wookiee Warblade	Wookie_Warblade	melee 5.1
+geno_armor	GenoHaradan Mesh Armor	Armor_Class_4	armour 7
+geno_blade	GenoHaradan Poison Blade	Vibro_Sword	melee 7.08
+geno_blaster	GenoHaradan Blaster	Blaster_Pistol	ranged 4.38 +5
+geno_datapad	Datapad	Data_Pad	
+geno_gloves	GenoHaradan Power Gloves	Gauntlets	
+geno_stealth	GenoHaradan Stealth Unit	Stealth_Unit	
+geno_visor	GenoHaradan Visor	Mask	
+kas25_wookcrysta	Rough-cut Upari Amulet	Lightsaber_Crystals	
+ptar_rakghoulser	Rakghoul Serum	Adrenaline	
+ptar_sbpasscrd	Sith Base Passcard	Plot_Useable_Items	
+ptar_sitharmor	Sith Armor	Disguise_Item	
+tat17_sandperdis	Sand People Clothing	Disguise_Item	
+tat18_dragonprl	Krayt Dragon Pearl	Plot_Useable_Items	
+w_blhvy001	Heavy Blaster Pistol	Creature_Weapon_Sl_Prc	melee 0
+w_bstrcrbn	Heavy Blaster Pistol	Basic_Clothing	
+w_lghtsbr001	Lightsaber	Creature_Item_Pierce	melee 0
+w_null	Heavy Blaster Pistol	Creature_Hide_Item	

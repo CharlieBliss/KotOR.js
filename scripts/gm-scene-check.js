@@ -314,6 +314,35 @@ async function run() {
   }
   sections.push(lines.join('\n'));
 
+  // --- What each actor fights with, as the game built it (restats included): the offline check's encounter
+  // ratings estimate these, and this is the real thing to compare them with
+  const fighters = await evalIn(win, (K) => {
+    const runner = K.GMScenePlan.active;
+    if (!runner) return [];
+    const out = [];
+    for (const actor of runner.plan.actors || []) {
+      const cre = (runner.objects.get(actor.id) || [])[0];
+      if (!cre || !K.GMCombatStats) continue;
+      const p = K.GMCombatStats.profile(cre);
+      out.push({
+        id: actor.id, faction: actor.faction, count: (runner.objects.get(actor.id) || []).length,
+        level: p.level, hp: p.hp, fp: p.fp, ac: p.ac,
+        attacks: p.attacks.map((a) => `${a.bonus >= 0 ? '+' : ''}${a.bonus} for ${Math.round(a.damage)}`).join(', ') || 'none',
+        powers: p.harms.length, grenades: p.grenades.length, heals: p.heals,
+      });
+    }
+    return out;
+  });
+  if (fighters.length) {
+    sections.push([
+      '## What each actor fights with', '',
+      'As the game built them (restats and gear included), for the first of each group. Compare with the offline check\'s Encounters.', '',
+      '| id | side | count | level | HP | FP | AC | attacks (bonus for average damage) | hostile powers | grenades | heals |',
+      '|---|---|---|---|---|---|---|---|---|---|---|',
+      ...fighters.map((f) => `| ${f.id} | ${f.faction} | ${f.count} | ${f.level} | ${f.hp} | ${f.fp} | ${f.ac} | ${f.attacks} | ${f.powers || ''} | ${f.grenades || ''} | ${f.heals || ''} |`),
+    ].join('\n'));
+  }
+
   // --- Screenshots ------------------------------------------------------------------------------
   const all = Object.values(placed).flat();
   const pts = all.concat(imported.start ? [{ x: imported.start[0], y: imported.start[1], z: imported.start[2] }] : []);

@@ -4,7 +4,9 @@
  * Boots the game (dev server on :8080, in Electron), reads the installed game's data and writes plain-text
  * reference files the skill searches when it writes a scene plan:
  *   areas.md         every area: its name, entry point, rooms (size, centre) and waypoints
- *   creatures.tsv    creature templates (.utc): name, faction, class and level, HP, look, weapon
+ *   creatures.tsv    creature templates (.utc): name, faction, class and level, HP, look, weapon, and what it
+ *                    brings to a fight, measured with the engine's combat rules (GMCombatStats)
+ *   classes.tsv      classes: hit and Force dice, base attack and class AC bonus by level (for restatting)
  *   placeables.tsv   placeable templates (.utp): name, model, container / useable
  *   models.tsv       placeables.2da: every placeable model, by label
  *   items.tsv        item templates (.uti): name and base item (for loot and gear)
@@ -35,7 +37,7 @@ async function exportCatalog() {
   const r1 = (n) => Math.round(n * 10) / 10;
   const keys = K.KEYManager.Key.keys;
   const RT = K.ResourceTypes;
-  const out = { areas: [], creatures: [], placeables: [], models: [], items: [], errors: [] };
+  const out = { areas: [], creatures: [], placeables: [], models: [], items: [], classes: [], errors: [] };
 
   /**
    * The area's walkable floor as a grid of FLOOR_CELL-metre cells, each holding the index (1-based) of the
@@ -149,7 +151,48 @@ async function exportCatalog() {
   for (const resRef of utcs) {
     const info = await K.GMSpawner.describeCreatureTemplate(resRef);
     if (!info) continue;
+    // Its fight: loaded as the game would, without being placed anywhere
+    try {
+      const cre = new K.ModuleCreature(new K.GFFObject(await K.ResourceLoader.loadResource(RT.utc, resRef)));
+      cre.load();
+      await new Promise((r) => setTimeout(r, 15));
+      info.combat = K.GMCombatStats.profile(cre);
+      info.attackCodes = info.combat.attacks.map((a) => K.GMCombatStats.attackCode(a));
+    } catch (e) {}
     out.creatures.push(info);
+  }
+
+  // --- Classes ------------------------------------------------------------------------------------
+  const acRows = Object.values(T.get('acbonus')?.rows || {});
+  for (const [id, row] of Object.entries(T.get('classes').rows)) {
+    if (!row.label || row.label === '****') continue;
+    const table = String(row.attackbonustable || '').toLowerCase();
+    const bab = table && table !== '****' ? Object.values(T.get(table)?.rows || {}).map((r) => Number(r.bab) || 0) : [];
+    const acCol = String(row.armorclasscolumn || '').toLowerCase();
+    const ac = acCol && acCol !== '****' ? acRows.map((r) => Number(r[acCol]) || 0) : [];
+    // What a restat to each level gives, by the game's own builder (CharacterBuilder, as GMSpawner.restatTemplate
+    // uses it): AC from always-on feats (Jedi Sense, Scoundrel's Luck...), Dueling's attack and AC with one
+    // weapon, vitality per level from Toughness, Force points from Force Sensitive, and the dark side's hostile
+    // powers (spells.2da labels without FORCE_POWER_; * = area)
+    const levels = Math.max(bab.length, 20);
+    const featAc = [], dueling = [], toughness = [], fpBonus = [], powers = [];
+    const attributes = { str: 14, dex: 14, con: 14, int: 12, wis: 14, cha: 12 };
+    const spells = T.get('spells').rows;
+    for (let level = 1; level <= levels && K.CharacterRules.classRow(Number(id)); level++) {
+      let build;
+      try { build = K.CharacterBuilder.build({ classId: Number(id), level, attributes, alignment: 'dark' }); } catch (e) { break; }
+      const feats = new Set(build.feats);
+      const dummy = { getHasFeat: (f) => feats.has(f), isSimpleCreature: () => false, equipment: {} };
+      dummy.getFeatChainValue = K.ModuleCreature.prototype.getFeatChainValue.bind(dummy);
+      featAc.push(K.ModuleCreature.prototype.getFeatDefenseBonus.call(dummy));
+      dueling.push(K.CombatRound.prototype.calculateDuelingBonus.call({}, dummy));
+      const plain = K.CharacterRules.vitality(Number(id), level, attributes);
+      toughness.push(Math.round((build.maxHp - plain.maxHp) / level));
+      fpBonus.push(build.maxFp - plain.maxFp);
+      powers.push(build.powers.map((p) => spells[p]).filter((s) => s && s.forcehostile && s.forcehostile !== '****')
+        .map((s) => `${String(s.label).replace(/^FORCE_POWER_/, '')}${(parseInt(String(s.category || ''), 16) >> 12) === 2 ? '*' : ''}`).join(','));
+    }
+    out.classes.push({ id: Number(id), label: row.label, name: row.name && row.name !== '****' ? tlk(row.name) : '', hitdie: Number(row.hitdie) || 0, forcedie: Number(row.forcedie) || 0, bab, ac, featAc, dueling, toughness, fpBonus, powers });
   }
 
   // --- Placeable templates and models ------------------------------------------------------------
@@ -203,12 +246,26 @@ async function exportCatalog() {
   const utis = [...new Set(keys.filter((k) => k.resType == RT.uti).map((k) => k.resRef.toLowerCase()))].sort();
   for (const resRef of utis) {
     try {
-      const R = new K.GFFObject(await K.ResourceLoader.loadResource(RT.uti, resRef)).RootNode;
+      const buffer = await K.ResourceLoader.loadResource(RT.uti, resRef);
+      const R = new K.GFFObject(buffer).RootNode;
       const g = (l, d) => R.hasField(l) ? R.getFieldByLabel(l).getValue() : d;
       const base = baseRows[Number(g('BaseItem', -1))] || {};
       const name = R.hasField('LocalizedName') ? locName(R.getFieldByLabel('LocalizedName')) : '';
       if (!name) continue;
-      out.items.push({ resRef, name, base: base.label || '' });
+      // Weapons: average damage and attack bonus by the engine's item rules; armour: its AC
+      let combat = '';
+      try {
+        const item = new K.ModuleItem(new K.GFFObject(buffer));
+        item.load();
+        if (Number(base.weapontype) > 0) {
+          let dmg = 0;
+          for (let i = 0; i < 100; i++) dmg += Number(item.getBaseDamage()) + (item.hasDamageBonus() ? Number(item.getDamageBonus()) : 0);
+          combat = `${item.isRangedWeapon() ? 'ranged' : 'melee'} ${Math.round(dmg) / 100}${item.getAttackBonus() ? ` ${item.getAttackBonus() > 0 ? '+' : ''}${item.getAttackBonus()}` : ''}`;
+        } else if (Number(base.baseac) > 0 || /armor/i.test(base.label || '')) {
+          combat = `armour ${item.getACBonus()}`;
+        }
+      } catch (e) {}
+      out.items.push({ resRef, name, base: base.label || '', combat });
     } catch (e) {}
   }
   return JSON.stringify(out);
@@ -254,9 +311,21 @@ function writeCatalog(game, data) {
     areas: floors,
   }) + '\n');
 
+  // The fight columns (scripts/encounter.py reads them): level, first class id, engine vitality, Force points
+  // and AC, Str/Dex/Con/Wis, each attack per round as GMCombatStats.attackCode, hostile powers (label:cost, a =
+  // area), grenades, healing powers and items, combat feats
   fs.writeFileSync(path.join(dir, 'creatures.tsv'), tsv([
-    ['template', 'name', 'faction', 'classes', 'hp', 'fp', 'appearance', 'weapon'],
-    ...data.creatures.map((c) => [c.resRef, c.name, ({ 1: 'hostile', 2: 'friendly', 5: 'neutral' })[c.factionId] || `faction ${c.factionId}`, c.classes, c.hp, c.fp, c.appearanceLabel, [c.rightHandResRef, c.leftHandResRef].filter(Boolean).join('+')]),
+    ['template', 'name', 'faction', 'classes', 'hp', 'fp', 'appearance', 'weapon', 'level', 'class', 'ac', 'abilities', 'attacks', 'powers', 'grenades', 'heals', 'feats'],
+    ...data.creatures.map((c) => {
+      const f = c.combat;
+      return [c.resRef, c.name, ({ 1: 'hostile', 2: 'friendly', 5: 'neutral' })[c.factionId] || `faction ${c.factionId}`, c.classes, f ? f.hp : c.hp, f ? f.fp : c.fp, c.appearanceLabel, [c.rightHandResRef, c.leftHandResRef].filter(Boolean).join('+'),
+        f ? f.level : c.level, f ? f.classId : c.classId, f ? f.ac : '', f ? [f.str, f.dex, f.con, f.wis].join('/') : '', (c.attackCodes || []).join(';'),
+        f ? f.harms.map((h) => `${h.label.replace(/^FORCE_POWER_/, '')}:${h.cost}${h.area ? 'a' : ''}`).join(',') : '', f ? f.grenades.length || '' : '', f ? f.heals || '' : '', f ? f.combatFeats || '' : ''];
+    }),
+  ]));
+  fs.writeFileSync(path.join(dir, 'classes.tsv'), tsv([
+    ['id', 'label', 'name', 'hitdie', 'forcedie', 'bab by level', 'class AC by level', 'feat AC by level', 'dueling by level', 'toughness HP per level', 'FP bonus by level', 'dark powers by level'],
+    ...data.classes.map((c) => [c.id, c.label, c.name, c.hitdie, c.forcedie, c.bab.join(','), c.ac.join(','), c.featAc.join(','), c.dueling.join(','), c.toughness.join(','), c.fpBonus.join(','), c.powers.join(';')]),
   ]));
   fs.writeFileSync(path.join(dir, 'placeables.tsv'), tsv([
     ['template', 'name', 'model', 'container', 'useable', 'locked', 'footprint'],
@@ -267,8 +336,8 @@ function writeCatalog(game, data) {
     ...data.models.map((m) => [m.label, m.model, m.name, m.footprint || '']),
   ]));
   fs.writeFileSync(path.join(dir, 'items.tsv'), tsv([
-    ['template', 'name', 'base item'],
-    ...data.items.map((i) => [i.resRef, i.name, i.base]),
+    ['template', 'name', 'base item', 'combat'],
+    ...data.items.map((i) => [i.resRef, i.name, i.base, i.combat || '']),
   ]));
   console.log(`${game}: ${data.areas.length} areas, ${data.creatures.length} creatures, ${data.placeables.length} placeables, ${data.models.length} models, ${data.items.length} items${data.errors.length ? `, ${data.errors.length} areas unreadable` : ''}`);
 }

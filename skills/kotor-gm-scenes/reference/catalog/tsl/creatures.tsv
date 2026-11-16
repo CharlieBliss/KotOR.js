@@ -1,285 +1,285 @@
-template	name	faction	classes	hp	fp	appearance	weapon
-c_bantha	Bantha	neutral	Soldier 5	37	0	Creature_Bantha	
-c_boma01	Boma Beast	hostile	Minion 9	97	0	Creature_Bomabeast	
-c_boma_sm01	Young Boma	hostile	Minion 9	97	0	Creature_Bomabeast_Small	
-c_brith	Brith	neutral	Soldier 1	10	0	Creature_Brith	
-c_cannok01	Cannok	hostile	Minion 4	34	0	Creature_Cannok_01	
-c_dewback	Dewback	neutral	Soldier 5	42	0	Creature_Dewback	
-c_drdassassin	Assassin Droid	hostile	Combat Droid 6	59	0	Droid_Assassin	g_w_blstrrfl001
-c_drdastro	Utility Droid	neutral	Expert Droid 1	8	0	Droid_Astro_01	
-c_drdmkfour	Assault Droid Mark IV	hostile	Combat Droid 12	150	0	Droid_Mark_Four	g_w_null004
-c_drdmkone	Assault Droid Mark I	hostile	Combat Droid 4	40	0	Droid_Mark_One	g_w_null001+g_w_null001
-c_drdmktwo	Assault Droid Mark II	hostile	Combat Droid 8	80	1	Droid_Mark_Two	
-c_drdmouse01	Maintenance Droid{1}	neutral	Expert Droid 1	9	0	Droid_Mouse_01	
-c_drdmouse02	Maintenance Droid{2}	neutral	Expert Droid 1	9	0	Droid_Mouse_02	
-c_drdmouse03	Maintenance Droid{3}	neutral	Expert Droid 1	9	0	Droid_Mouse_03	
-c_drdmover01	Mover Droid{1}	neutral	Expert Droid 1	9	0	Droid_Mover_01	
-c_drdmover02	Mover Droid{2}	neutral	Expert Droid 1	9	0	Droid_Mover_02	
-c_drdprobe	Probe Droid	hostile	Combat Droid 2	16	0	Droid_Probe	g_w_null001
-c_drdprot	Protocol Droid	neutral	Expert Droid 1	9	0	Droid_Protocol_01	
-c_drdsentry	c_drdsentry	hostile	Combat Droid 3	15	0	Droid_Sentry	g_w_null001+g_w_null001
-c_drdspyder	Utility Droid	neutral	Expert Droid 1	8	0	Droid_Spyder	
-c_drdwar	c_drdwar	hostile	Minion 3	14	0	Droid_War_02	g_w_hvyblstr01
-c_drexl01	Drexl	hostile	Minion 3	66	0	Creature_Drexl_01	
-c_drexl_amb	Drexl	neutral	Soldier 1	10	0	Creature_Drexl_Ambient	
-c_firixa	Firaxa	neutral	Soldier 1	10	0	Creature_Firixa	
-c_gammorean	c_gammorean	hostile	Minion 1	6	0	Alien_Gammorean_01	g_w_waraxe001
-c_gizka	Gizka	hostile	Scoundrel 2	14	0	Creature_Gizka	
-c_hssiss	Hssiss	hostile	Minion 9	97	0	Creature_Hssiss	
-c_hutt	Hutt	neutral	Soldier 1	8	0	Alien_Hutt_01	
-c_iriaz	Iriaz	neutral	Soldier 1	10	0	Creature_Iriaz	
-c_ithorian	Ithorian	neutral	Soldier 1	8	0	Alien_Ithorian_01	
-c_jawa	Jawa	neutral	Scoundrel 1	8	0	Alien_Jawa	
-c_kataarn	Katarn	hostile	Soldier 4	54	0	Creature_Kataarn	
-c_khounda	Kath Hound	hostile	Minion 3	25	0	Creature_Kath_Hound_A01	
-c_khoundb	Horn Kath Hound	hostile	Minion 6	45	0	Creature_Kath_Hound_B01	
-c_kinrath	Kinrath	hostile	Minion 4	35	0	Creature_Kinrath	
-c_kraytdragon	Krayt Dragon	hostile	Soldier 20	750	0	Creature_Krayt_Dragon	
-c_laigrek_01	Laigrek	hostile	Minion 3	66	0	Creature_Laigrek_01	
-c_lightsaber	Lightsaber Floating	neutral	Minion 5	60	0	Lightsaber_Floating	g_w_lghtsbr05
-c_maalrass01	Maalrass	hostile	Minion 6	82	0	Creature_Maalrass	
-c_mykal	Mykal	hostile	Minion 1	7	0	Creature_Mykal	
-c_rakghoul	Rakghoul	hostile	Minion 1	6	0	Creature_Rakghoul	
-c_rancor	Rancor	hostile	Soldier 20	350	0	Creature_Rancor	
-c_ronto	Ronto	neutral	Soldier 5	32	0	Creature_Ronto	
-c_seabeast	Mannan Seabeast	neutral	Soldier 1	9	0	Creature_SeaBeast	
-c_stormbeast01	Storm Beast	hostile	Soldier 15	480	0	Malachor_Beast_01	
-c_stormbeast02	Greater Storm Beast	hostile	Soldier 20	750	0	Malachor_Beast_02	
-c_tach	Tach	hostile	Minion 2	12	0	Creature_Tach	
-c_tukata	Tuk'ata	hostile	Minion 1	9	0	Creature_Tukata	
-c_twohead	Two Head	neutral	Soldier 1	10	0	Alien_TwoHead	
-c_verkaal	Verkaal	hostile	Minion 3	20	0	Creature_Verkaal	
-c_wraid	Wraid	hostile	Minion 4	50	0	Creature_Wraid_01	
-c_zakkeg01	Zakkeg	hostile	Minion 9	97	0	Creature_Zakkeg	
-g_assassindrd01	Assassin Droid	hostile	Combat Droid 6	59	0	Droid_Assassin	g_w_blstrrfl001
-g_assassindrd02	Elite Assassin Droid	hostile	Combat Droid 12	93	0	Droid_Assassin	g_w_blstrrfl001
-g_assaultdroid01	Assault Droid Mark I	hostile	Combat Droid 4	40	0	Droid_Mark_One	g_w_null001+g_w_null001
-g_assaultdroid02	Assault Droid Mark II	hostile	Combat Droid 8	80	0	Droid_Mark_Two	
-g_assaultdroid03	Assault Droid Mark IV	hostile	Combat Droid 12	150	0	Droid_Mark_Four	g_w_null004
-g_bandon	Darth Bandon	neutral	Jedi Guardian 15	40	150	Unique_Darth_Bandon	g_w_drkjdisbr002
-g_bantha01	Bantha	neutral	Soldier 5	37	0	Creature_Bantha	
-g_blkvulkgang01	Black Vulkar Thug	hostile	Minion 1	5	0	Swoop_Gang_04	g_w_vbroswrd01
-g_blkvulkgang02	Black Vulkar Captain	hostile	Minion 2	10	0	Swoop_Gang_04	g_w_blstrpstl001
-g_brakatan01	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_qtrstaff01
-g_brakatan02	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroswrd01
-g_brakatan03	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroshort01+g_w_vbroshort01
-g_brakatan04	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbroswrd01+g_w_vbroshort01
-g_brakatan05	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbroswrd01+g_w_vbroswrd01
-g_brakatan06	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbrdblswd01
-g_brakatan07	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroshort01
-g_brith01	Brith	neutral	Soldier 1	10	0	Creature_Brith	
-g_cheatbot	Cheat Bot	friendly	Combat Droid 2	18	0	Droid_Protocol_01	g_w_null001
-g_combatdroid01	Sentry Droid Mark I	hostile	Combat Droid 3	15	0	Droid_Sentry	g_w_null001+g_w_null001
-g_dark_app01f	Dark Jedi Apprentice {Female}	hostile	Jedi Guardian 4	31	32	Dark_Jedi_Low_Female_01	g_w_drkjdisbr001
-g_dark_app01m	Dark Jedi Apprentice {Male}	hostile	Jedi Guardian 4	31	32	Dark_Jedi_Low_Male_01	g_w_drkjdisbr001
-g_dark_jed01f	Dark Jedi{Female}	hostile	Jedi Guardian 8	80	64	Dark_Jedi_Mid_Female_01	g_w_drkjdisbr001
-g_dark_jed01m	Dark Jedi{Male}	hostile	Jedi Guardian 8	80	64	Dark_Jedi_Mid_Male_01	g_w_drkjdisbr001
-g_dark_mas01f	Dark Jedi Master {Female}	hostile	Jedi Consular 15	165	128	Dark_Jedi_Hi_Female_01	g_w_drkjdisbr001
-g_dark_mas01m	Dark Jedi Master{Male}	hostile	Jedi Consular 15	165	128	Dark_Jedi_Hi_Male_02	g_w_drkjdisbr001
-g_darkjedi005	Dark Jedi	neutral	Jedi Guardian 8	80	64	Dark_Jedi_Female_01	g_w_drkjdisbr001
-g_darkjedi01	Dark Jedi Apprentice	hostile	Jedi Guardian 4	31	32	Dark_Jedi_Male_01	g_w_drkjdisbr001
-g_darkjedi02	Dark Jedi	hostile	Jedi Guardian 8	80	64	Dark_Jedi_Female_01	g_w_drkjdisbr001
-g_darkjedi03	Dark Jedi Master	hostile	Jedi Guardian 12	110	118	Dark_Jedi_Male_01	g_w_drkjdisbr001
-g_darkjedi04	Sith Lord	hostile	Jedi Guardian 16	124	0	Dark_Jedi_Male_01	g_w_lghtsbr02
-g_davink	Davin Kotras	friendly	Scout 1	8	0	Commoner_Mal_Old_Asian_01_A	
-g_dewback01	Dewback	neutral	Soldier 5	42	0	Creature_Dewback	
-g_drdtelmil	Telos Military Droid	hostile	Combat Droid 4	52	0	Droid_Telos_Military	g_w_hvyblstr01+g_w_hvyblstr01
-g_drdtelsentry	Telos Sentry Droid	hostile	Combat Droid 5	40	0	Droid_Telos_Sentry	g_w_hvyblstr01+g_w_hvyblstr01
-g_drexl_amb01	Drexl	neutral	Soldier 1	10	0	Creature_Drexl_Ambient	
-g_droid_con_boss	Construction Droid Boss	hostile	Combat Droid 15	225	0	Droid_Construction_Boss	g_w_rptnblstr03
-g_droid_con_lgt	Construction Droid Light	hostile	Combat Droid 5	62	0	Droid_Construction_Light	heavymininglaser
-g_droid_con_med	Construction Droid Medium	hostile	Combat Droid 5	62	0	Droid_Construction_Medium	heavymininglaser
-g_droid_foreman	Foreman Droid	hostile	Combat Droid 10	110	0	Droid_Foreman	heavymininglaser
-g_droid_mine_01	Mining Droid Mark I	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_A	mininglaser
-g_droid_mine_012	Mining Droid Mark I{Red}	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_B	mininglaser
-g_droid_mine_013	Mining Droid Mark I{Blue}	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_C	mininglaser
-g_droid_mine_02	Mining Droid Mark II	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_A	heavymininglaser
-g_droid_mine_022	Mining Droid Mark II{Red}	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_B	heavymininglaser
-g_droid_mine_023	Mining Droid Mark II{Blue}	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_C	heavymininglaser
-g_droid_tank	Tank Droid	hostile	Combat Droid 15	185	0	Droid_Tank	g_w_hvyblstr01+g_w_hvyblstr01
-g_firixa01	Firaxa	neutral	Soldier 1	10	0	Creature_Firixa	
-g_floatingmine	Floating Mine	hostile	Expert Droid 1	6	0	Droid_MineFloating	vibrocutter
-g_gammorean01	Gamorrean	hostile	Minion 1	6	0	Alien_Gammorean_02	g_w_waraxe001
-g_gammorean02	Gamorrean Warrior	hostile	Minion 2	12	0	Alien_Gammorean_03	g_w_waraxe001
-g_gammorean03	Gamorrean Chief	hostile	Soldier 4	25	0	Alien_Gammorean_04	g_w_waraxe001
-g_gizka01	Gizka	hostile	Scoundrel 2	14	0	Creature_Gizka	
-g_hidbekgang01	Hidden Bek Thug	hostile	Minion 1	5	0	Swoop_Gang_05	g_w_vbroswrd01
-g_hidbekgang02	Hidden Bek Captain	hostile	Minion 2	10	0	Swoop_Gang_05	g_w_blstrpstl001
-g_hutt01	Hutt	neutral	Scoundrel 5	25	0	Alien_Hutt_02	
-g_iriaz01	Iriaz	neutral	Soldier 1	10	0	Creature_Iriaz	
-g_ithorian01	Ithorian	neutral	Soldier 1	11	0	Alien_Ithorian_02	
-g_jagi	Jagi	neutral	Soldier 10	79	0	Commoner_Mal_Black_01_A	g_w_blstrrfl001
-g_jawa01	Jawa	neutral	Scoundrel 1	6	0	Alien_Jawa	
-g_jordo	Jordo	friendly	Scout 1	8	0	Commoner_Mal_Asian_01_A	
-g_kataarn01	Katarn	hostile	Soldier 4	54	0	Creature_Kataarn	
-g_kataarn02	Bull Katarn	hostile	Soldier 8	76	0	Creature_Kataarn	
-g_kataarn03	Dire Katarn	hostile	Minion 12	128	0	Creature_Kataarn	
-g_kathhound01	Kath Hound	hostile	Minion 3	25	0	Creature_Kath_Hound_A04	
-g_kathhound02	Horn Kath Hound	hostile	Minion 6	45	0	Creature_Kath_Hound_B04	
-g_kinrath01	Kinrath	hostile	Minion 4	35	0	Creature_Kinrath	
-g_kinrath02	Hive Kinrath	hostile	Soldier 8 / Scout 0 / Scout 0	65	0	Creature_Kinrath	
-g_kinrath03	Kinrath Stalker	hostile	Minion 5	75	0	Creature_Kinrath	
-g_kinrath04	Viper Kinrath	hostile	Minion 12	114	0	Creature_Kinrath	
-g_kraytdragon01	Krayt Dragon	hostile	Soldier 20	750	0	Creature_Krayt_Dragon	
-g_lena	Lena	friendly	Scout 1	8	0	Twilek_Female_03_C	
-g_malare	Malare	friendly	Scout 1	8	0	Twilek_Female_03_C	
-g_mandalor01	Mandalorian Warrior	hostile	Minion 4	34	0	Alien_Mandalorian_01	g_w_blstrrfl001
-g_mandalor02	Mandalorian Elite	hostile	Soldier 8	56	0	Alien_Mandalorian_02	g_w_rptnblstr01
-g_mandalor03	Mandalorian Captain	hostile	Soldier 12	94	0	Alien_Mandalorian_03	g_w_hvrptbltr02
-g_probedroid01	Probe Droid	hostile	Combat Droid 2	16	0	Droid_Probe	g_w_null001
-g_rakatan01	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_vbroshort01
-g_rakatan02	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_qtrstaff01
-g_rakatan03	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_stunbaton04
-g_rakatan04	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_vbroswrd01
-g_rakatan05	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_vbroswrd01+g_w_vbroshort01
-g_rakatan06	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_vbrdblswd01
-g_rakatan07	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_stunbaton04
-g_rakghoul01	Rakghoul	hostile	Minion 1	6	0	Creature_Rakghoul	
-g_rakghoul02	Rakghoul Fiend	hostile	Soldier 3	15	0	Creature_Rakghoul	
-g_rancor01	Rancor	hostile	Soldier 20	350	0	Creature_Rancor	
-g_rancor02	Young Rancor	hostile	Soldier 15	115	0	Creature_Rancor_Small	
-g_ronto01	Ronto	neutral	Soldier 5	32	0	Creature_Ronto	
-g_seabeast01	Mannan Seabeast	neutral	Soldier 1	9	0	Creature_SeaBeast	
-g_selkathmale01	Insane Selkath	hostile	Minion 3	20	0	Alien_Selkath_03	
-g_selkathmale02	Enraged Selkath	hostile	Minion 6	48	0	Alien_Selkath_01	
-g_selkathmale03	Fanatical Selkath	hostile	Minion 12	74	0	Alien_Selkath_03	g_w_blstrpstl003
-g_sennivek	Senni Vek	neutral	Soldier 1	8	0	Twilek_Male_02_C	g_w_blstrpstl001
-g_sithass01	Sith Assassin	hostile	Minion 3	8	0	Dark_Jedi_Low_Male_01	propqs01
-g_sithcomm01	Sith Lieutenant	hostile	Scout 5	42	0	Sith_Female_Albino	g_w_blstrpstl001
-g_sithcomm02	Sith Captain	hostile	Scout 8	64	0	Sith_Male_Albino	g_w_blstrpstl001
-g_sithtroop01	Sith Trooper	hostile	Minion 3	25	0	Sith_Soldier_01	g_w_blstrrfl001
-g_sithtroop02	Sith Elite Trooper	hostile	Soldier 5	35	0	Sith_Soldier_02	g_w_blstrrfl001
-g_sithtroop03	Sith Heavy Trooper	hostile	Soldier 8	48	0	Sith_Soldier_02	g_w_hvrptbltr01
-g_sithtroop04	Sith Grenadier	hostile	Soldier 6	30	0	Sith_Soldier_01	g_w_dsrptrfl001
-g_sithtroop05	Sith Grenadier	hostile	Soldier 9	45	0	Sith_Soldier_01	g_w_dsrptrfl001
-g_sithtroop06	Sith Grenadier	hostile	Soldier 12	60	0	Sith_Soldier_01	g_w_dsrptrfl001
-g_sithtroop07	Sith Assault Trooper	hostile	Soldier 12	96	0	Sith_Soldier_02	g_w_hvrptbltr01
-g_tach01	Tach	hostile	Minion 2	12	0	Creature_Tach	
-g_thug002	Rodian Crony	faction 8	Minion 3	20	0	Alien_Rodian_04	g_w_blstrpstl001
-g_thug01	Rodian Thug	neutral	Minion 3	20	0	Alien_Rodian_03	g_w_blstrpstl001
-g_thug02	Twi'lek Thug	hostile	Minion 3	20	0	Twilek_Male_02_C	g_w_blstrpstl001
-g_thug03	Aqualish Thug	neutral	Minion 3	20	0	Alien_Walrusman	g_w_blstrrfl001
-g_tukata01	Tuk'ata	hostile	Minion 1	9	0	Creature_Tukata	
-g_tukata02	Dire Tuk'ata	hostile	Minion 13	137	0	Creature_Tukata	
-g_turretbl001	Blaster Turret	hostile	Minion 1	11	0	Turret_02	w_blaste_01
-g_turretbl002	Heavy Blaster Turret	hostile	Minion 3	30	0	Turret_02	g_w_null002
-g_turretbl003	Ion Turret	hostile	Minion 3	30	0	Turret_02	g_w_null003
-g_turretbl004	Chain Gun Turret	hostile	Minion 3	30	0	Turret_02	g_w_null004
-g_turretbl005	Defense Turret	hostile	Minion 5	50	0	Turret_01	g_w_null001
-g_turretbl006	Heavy Defense Turret	hostile	Minion 1	15	0	Turret_01	w_brifle_01
-g_turretbl007	Ion Defense Turret	hostile	Minion 5	50	0	Turret_01	g_w_null003
-g_turretbl008	Chain Gun Turret	hostile	Minion 5	50	0	Turret_01	g_w_null004
-g_tuskenmale01	Sand People Warrior	hostile	Minion 3	16	0	Alien_Sand_People_01	g_w_gaffi001
-g_tuskenmale02	Elite Warrior	hostile	Minion 5	25	0	Alien_Sand_People_02	g_w_gaffi001
-g_tuskenmale03	Holy Warrior	hostile	Minion 12	55	0	Alien_Sand_People_03	g_w_gaffi001
-g_veerkal01	Verkaal	hostile	Minion 3	20	0	Creature_Shyrack_02	
-g_veerkal02	Shyrack	hostile	Minion 1	9	0	Creature_Shyrack_01	
-g_veerkal03	Mykal	hostile	Minion 1	7	0	Creature_Mykal	
-g_veerkal04	Shyrack Wyrm	hostile	Minion 1	9	0	Creature_Shyrack_01	
-g_wardroid01	War Droid Mark I	hostile	Minion 1	8	0	Droid_War_01	g_w_blstrpstl001
-g_wardroid02	War Droid Mark III	hostile	Minion 6	33	0	Droid_War_03	g_w_blstrcrbn001
-g_wardroid03	War Droid Mark IV	hostile	Minion 9	42	0	Droid_War_04	g_w_blstrrfl001
-g_wardroid04	War Droid Mark V	hostile	Minion 12	93	0	Droid_War_05	g_w_rptnblstr01
-g_wookiefemale01	Wookiee Warrior	friendly	Soldier 4	30	0	Alien_Wookie_Female_03	g_w_warblade001
-g_wookiefemale02	Wookiee Elite Warrior	friendly	Soldier 6	55	0	Alien_Wookie_Female_02	g_w_warblade001
-g_wookiemale01	Wookiee Warrior	friendly	Soldier 4	30	0	Alien_Wookie_Male_03	g_w_warblade001
-g_wookiemale02	Wookiee Elite Warrior	friendly	Soldier 6	55	0	Alien_Wookie_Male_04	g_w_warblade001
-g_wraid01	Wraid	hostile	Minion 4	50	0	Creature_Wraid_02	
-g_wraid02	Hulak Wraid	hostile	Minion 12	127	0	Creature_Wraid_03	
-g_xor	Xor	faction 8	Scoundrel 8	56	0	Commoner_Mal_White_01_A	g_w_blstrpstl001
-g_ziagrom	Ziagrom	neutral	Soldier 1	8	0	Twilek_Male_01_C	
-iz_citz_m1	Iziz Citizen	neutral	Jedi Guardian 1	8	0	Onderon_Commoner_Mal_01	
-n_admrlsaulkar	Admiral Saul Kar	neutral	Soldier 1	8	0	Unique_Admiral_Saul	
-n_azkulh	Azkulh	neutral	Soldier 1	8	0	Unique_Azkul	
-n_bith	Bith	neutral	Soldier 1	8	0	Alien_Bith_01	
-n_calonord	Calo Nord	neutral	Soldier 10 / Scoundrel 3	219	0	Unique_Calo_Nord	g_w_hvyblstr04+g_w_hldoblstr03
-n_coltobin	Colonel Tobin	neutral	Soldier 1	8	0	Unique_Colonel_Tobin	
-n_commf	Commoner	neutral	Soldier 1	8	0	Commoner_Fem_Asian_01_A	
-n_commkidf	Young Commoner	neutral	Scout 1	8	0	Child_Female	
-n_commkidm	Young Commoner	neutral	Scout 1	8	0	Child_Male	
-n_commm	Commoner	neutral	Soldier 1	8	0	Commoner_Mal_Asian_01_A	
-n_corrunfalt	Corrun Falt	neutral	Soldier 6	54	0	Unique_CorrunFalt	
-n_czerkaoff	Czerka Officer	neutral	Soldier 1	8	0	Czerka_Officer_Asian	
-n_darkjedif	Dark Jedi	hostile	Jedi Guardian 8	80	64	Dark_Jedi_Female_01	g_w_drkjdisbr001
-n_darkjedim	Dark Jedi	hostile	Jedi Guardian 8	80	64	Dark_Jedi_Male_01	g_w_drkjdisbr001
-n_darthmalak	Darth Malak	hostile	Jedi Guardian 20	114	0	Unique_Darth_Malak	g_w_lghtsbr02
-n_darthnihilus	Darth Nihilus	hostile	Jedi Guardian 20	114	0	Unique_Darth_Nihilus	g_w_lghtsbr02
-n_darthrevan	Darth Revan	hostile	Jedi Guardian 20	20	0	Unique_Darth_Revan	g_w_drkjdisbr001
-n_darthrevan002	Darth Revan	hostile	Jedi Guardian 20	20	0	Unique_Darth_Revan_Female_CUTSCN	
-n_darthsion	Darth Sion	neutral	Jedi Guardian 20	20	0	Unique_Darth_Sion	g_w_drkjdisbr001
-n_darthtraya	Darth Traya	hostile	Jedi Guardian 20	114	0	Unique_Darth_Traya	g_w_lghtsbr02
-n_devaronian01	Devaronian	neutral	Soldier 1	8	0	Alien_Devaronian_01	
-n_dodonna	Dodonna	hostile	Jedi Guardian 1	8	0	Unique_Admiral_Dodonna	
-n_duros	Duros	neutral	Soldier 1	8	0	Alien_Duros_01	
-n_fatcomf	Commoner	neutral	Soldier 1	8	0	Commoner_Female_Fat	
-n_fatcomm	Commoner	neutral	Soldier 1	8	0	Commoner_Male_Fat	
-n_forcezomb01	Force Zombie	hostile	Soldier 15	145	0	Force_Zombie	
-n_gand	Gand	neutral	Soldier 1	8	0	Alien_Gand_01	
-n_gran	Gran	neutral	Soldier 1	8	0	Alien_Gran_01	
-n_hk50_01	HK-50	friendly	Combat Droid 6	66	0	Droid_NPC_hk50	g_w_blstrrfl001
-n_hk51_01	n_hk51_01	friendly	Combat Droid 10	100	0	Droid_NPC_hk51	g_w_blstrrfl001
-n_hussef	Hussef	neutral	Soldier 1	8	0	Unique_Husef	
-n_janalorso	Jana Lorso	neutral	Soldier 6	54	0	Unique_JanaLorso	
-n_jedicounf	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_White_Female_01	g_w_lghtsbr01
-n_jedicounm	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_White_Male_02	g_w_lghtsbr03
-n_jedimalek	Malak	hostile	Jedi Guardian 1	8	0	Unique_Malek_Jedi	
-n_jedimemf	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_Council_Member_Female	g_w_lghtsbr04
-n_jedimemm	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_Black_Male_05	g_w_lghtsbr05
-n_mandalorian	Mandalorian	hostile	Minion 1	10	0	Alien_Mandalorian_01	g_w_blstrpstl001
-n_opochanno	Opo Chano	neutral	Soldier 5	30	0	Unique_Opo_Chano	
-n_quarren01	Quarren	neutral	Soldier 1	8	0	Alien_Quarren_01	
-n_rakata	Rakata	hostile	Soldier 1	10	0	Alien_Rakata_01	
-n_repcap01	Republic Captain {White Male}	neutral	Soldier 1	8	0	Republic_Captain_Mal_White_01	
-n_repoff	Republic Officer	neutral	Soldier 1	8	0	Republic_Officer_Mal_White	
-n_repsold	Republic Soldier	neutral	Soldier 1	8	0	Republic_Soldier_Mal_White	
-n_repsold_bh01	Republic Soldier {Blk Male w/ Helmet}	neutral	Soldier 1	8	0	Republic_Soldier_Mal_Black_02	
-n_rodian	Rodian	neutral	Scoundrel 1	8	0	Alien_Rodian_01	
-n_selkath	Selkath	hostile	Minion 1	9	0	Alien_Selkath_01	
-n_sithappren	Sith Apprentice	hostile	Jedi Guardian 4	8	24	Dark_Jedi_Sith_Apprentice	g_w_lghtsbr02
-n_sithcmndo	Sith Commando Sith Commando	hostile	Minion 1	10	0	Sith_Commando_01_C	w_brifle_01
-n_sithcomf	Sith Commoner	hostile	Jedi Guardian 1	8	0	Sith_Female_Albino	
-n_sithcomm	Sith Commoner	hostile	Jedi Guardian 1	8	0	Sith_Male_Albino	
-n_sithsoldier	Sith Soldier	hostile	Minion 1	8	0	Sith_Soldier_01	g_w_blstrpstl001
-n_smuggler	Smuggler	neutral	Scoundrel 1	8	0	P_MAL_C_MED_05	
-n_stuntsaber01	Stunt Saber	neutral	Soldier 1	8	0	Stunt_Saber_01	
-n_sullustan01	Sullustan	neutral	Soldier 1	11	0	Alien_Sullustan	
-n_swoopgang	Swoop Gang	hostile	Soldier 1	8	0	Swoop_Gang_01	
-n_trandobrn	Trandoshan {Brown}	neutral	Minion 5	27	0	Alien_Trandoshan_02	
-n_trandogrn	Trandoshan {Green}	neutral	Minion 5	27	0	Alien_Trandoshan_01	
-n_tsfcmdr	Republic Officer	neutral	Soldier 1	8	0	TSF_Commander_Mal_01	
-n_tsfoff	Republic Soldier	neutral	Soldier 1	8	0	TSF_Officer_Mal_01	
-n_tusken	Sand People Warrior	hostile	Minion 1	8	0	Alien_Sand_People_01	g_w_gaffi001
-n_tuskenf01	Sand People Peasant	neutral	Minion 1	8	0	Alien_Sand_Person_Female	
-n_twilekf	Twi'lek	neutral	Soldier 1	8	0	Twilek_Female_01_A	
-n_twilekm	Twi'lek	neutral	Soldier 1	8	0	Twilek_Male_01_C	
-n_walrusman	Aqualish	neutral	Soldier 1	8	0	Alien_Walrusman	
-n_weequay01	Weequay	neutral	Soldier 1	11	0	Alien_Weeqay	
-n_wookief	Wookie	neutral	Soldier 1	8	0	Alien_Wookie_Female_01	
-n_wookiem	Wookie	neutral	Soldier 1	8	0	Alien_Wookie_Male_02	
-n_yoda	Vandar	hostile	Jedi Guardian 1	8	0	Unique_Vandar	
-ond_officer	Sith Soldier	neutral	Soldier 7	76	0	Onderon_Officer_Mal_01	g_w_rptnblstr01
-ond_soldier	Sith Soldier	neutral	Soldier 4	32	0	Onderon_Soldier_Mal_01	g_w_hvyblstr01
-p_atris	Atris	friendly	Jedi Consular 15	18	0	Party_NPC_Atris	g_w_qtrstaff01
-p_atton	Atton	friendly	Scoundrel 3	24	0	Party_NPC_Atton	
-p_baodur	Bao-Dur	friendly	Tech Specialist 6	48	48	Party_NPC_BaoDur	w_blaste_01
-p_bastilla	Bastila	friendly	Jedi Sentinel 3	27	18	Party_NPC_Bastila	
-p_cand	Canderous	friendly	Soldier 5	65	0	Party_NPC_Cand	g_w_hvrptbltr002
-p_carth	Carth	friendly	Soldier 4	44	0	Party_NPC_Carth	g_w_blstrpstl010+g_w_blstrpstl001
-p_disciple	Disciple	friendly	Soldier 6	78	24	Party_NPC_Discipile	vibrocutter
-p_g0t0	G0-T0	friendly	Expert Droid 6	66	0	Party_NPC_G0T0	w_blaste_10
-p_handmaiden	Handmaiden	friendly	Soldier 6	78	24	Party_NPC_Handmaiden	w_melee_x01
-p_hanharr	Hanharr	friendly	Scout 4	52	0	Party_NPC_Hanharr	w_melee_19+w_melee_19
-p_hk47	HK-47	friendly	Combat Droid 6	72	0	Party_NPC_HK47	w_brifle_04
-p_jolee	Jolee	friendly	Jedi Consular 6	42	48	Party_NPC_Jolee	g_w_lghtsbr03
-p_juhani	Juhani	friendly	Jedi Guardian 6	78	24	Party_NPC_Juhani	g_w_lghtsbr01
-p_kreia	Kreia	friendly	Jedi Consular 3	18	24	Party_NPC_Kreia	
-p_kreia_evil	Kreia {Evil}	friendly	Jedi Consular 20	160	80	Party_NPC_Kreia_Evil	g_w_qtrstaff01
-p_mand	Mandalore	friendly	Soldier 5	65	0	Party_NPC_Mandalore	w_brifle_10
-p_mira	Mira	friendly	Scout 6	54	0	Party_NPC_Mira	
-p_mission	Mission	friendly	Scoundrel 3	21	0	Party_NPC_Mission	g_w_blstrpstl001
-p_remote	Remote	friendly	Combat Droid 1	150	0	Droid_SensorBall	w_blaste_03
-p_t3m4	T3-M4	friendly	Expert Droid 3	30	0	Party_NPC_T3M3	mininglaser
-p_visas	Visas	friendly	Sith Assassin 6	48	48	Party_NPC_Visas	
-p_zaalbar	Zaalbar	friendly	Scout 4	52	0	Party_NPC_Zaalbar	
-per_miner_01	Taris Citizen	neutral	Jedi Guardian 1	8	0	PER_Miner_Mal_01	
-toryn	toryn	faction 4	Scout 3	14	0	Republic_Officer_Fem_Old_Black	
+template	name	faction	classes	hp	fp	appearance	weapon	level	class	ac	abilities	attacks	powers	grenades	heals	feats
+c_bantha	Bantha	neutral	Soldier 5	37	0	Creature_Bantha		5	0	9	25/8/10/10	m+0/13.7				
+c_boma01	Boma Beast	hostile	Minion 9	97	0	Creature_Bomabeast		9	8	22	18/14/16/3	m+0/4.4;m+0/4.3				
+c_boma_sm01	Young Boma	hostile	Minion 9	97	0	Creature_Bomabeast_Small		9	8	22	18/14/16/3	m+0/4.8;m+0/4.4				
+c_brith	Brith	neutral	Soldier 1	10	0	Creature_Brith		1	0	10	10/10/10/10	m+0/4.4				
+c_cannok01	Cannok	hostile	Minion 4	34	0	Creature_Cannok_01		4	8	14	14/12/12/3	m+0/4.5;m+0/4.2				
+c_dewback	Dewback	neutral	Soldier 5	42	0	Creature_Dewback		5	0	20	30/8/15/8	m+0/13.7				
+c_drdassassin	Assassin Droid	hostile	Combat Droid 6	59	0	Droid_Assassin	g_w_blstrrfl001	6	6	22	14/16/19/11			3		
+c_drdastro	Utility Droid	neutral	Expert Droid 1	8	0	Droid_Astro_01		1	7	12	10/10/10/10	m+0/2.5				
+c_drdmkfour	Assault Droid Mark IV	hostile	Combat Droid 12	150	0	Droid_Mark_Four	g_w_null004	12	6	22	13/13/15/8	r+1/6.8				
+c_drdmkone	Assault Droid Mark I	hostile	Combat Droid 4	40	0	Droid_Mark_One	g_w_null001+g_w_null001	4	6	22	14/12/12/6	r+0/4.6;r+0/4.4				1
+c_drdmktwo	Assault Droid Mark II	hostile	Combat Droid 8	80	0	Droid_Mark_Two		8	6	28	14/12/12/8	m+0/9;m+0/9				
+c_drdmouse01	Maintenance Droid{1}	neutral	Expert Droid 1	9	0	Droid_Mouse_01		1	7	14	10/10/12/12					
+c_drdmouse02	Maintenance Droid{2}	neutral	Expert Droid 1	9	0	Droid_Mouse_02		1	7	14	10/10/12/12					
+c_drdmouse03	Maintenance Droid{3}	neutral	Expert Droid 1	9	0	Droid_Mouse_03		1	7	14	10/10/12/12					
+c_drdmover01	Mover Droid{1}	neutral	Expert Droid 1	9	0	Droid_Mover_01		1	7	14	10/10/12/12					
+c_drdmover02	Mover Droid{2}	neutral	Expert Droid 1	9	0	Droid_Mover_02		1	7	14	10/10/12/12					
+c_drdprobe	Probe Droid	hostile	Combat Droid 2	16	0	Droid_Probe	g_w_null001	2	6	16	10/10/14/14	r+0/4.4				
+c_drdprot	Protocol Droid	neutral	Expert Droid 1	9	0	Droid_Protocol_01		1	7	14	10/10/12/12					
+c_drdsentry	c_drdsentry	hostile	Combat Droid 3	15	0	Droid_Sentry	g_w_null001+g_w_null001	3	6	16	10/18/10/8	r+0/4.4;r+0/4.5				
+c_drdspyder	Utility Droid	neutral	Expert Droid 1	8	0	Droid_Spyder		1	7	12	10/10/10/10					
+c_drdwar	c_drdwar	hostile	Minion 3	14	0	Droid_War_02	g_w_hvyblstr01	3	8	12	14/10/14/8			2		
+c_drexl01	Drexl	hostile	Minion 3	66	0	Creature_Drexl_01		3	8	17	16/16/14/8	m+0/4.7				
+c_drexl_amb	Drexl	neutral	Soldier 1	10	0	Creature_Drexl_Ambient		1	0	10	10/10/10/10	m+0/4.5				
+c_firixa	Firaxa	neutral	Soldier 1	10	0	Creature_Firixa		1	0	10	10/10/10/10	m+0/4.2				
+c_gammorean	c_gammorean	hostile	Minion 1	6	0	Alien_Gammorean_01	g_w_waraxe001	1	8	10	15/11/12/10					1
+c_gizka	Gizka	hostile	Scoundrel 2	14	0	Creature_Gizka		2	2	16	12/10/14/4	m+0/4.6				
+c_hssiss	Hssiss	hostile	Minion 9	97	0	Creature_Hssiss		9	8	22	18/14/16/3	m+0/4.6;m+0/4.5				
+c_hutt	Hutt	neutral	Soldier 1	8	0	Alien_Hutt_01		1	0	10	10/10/10/10					
+c_iriaz	Iriaz	neutral	Soldier 1	10	0	Creature_Iriaz		1	0	10	10/10/10/10	m+0/4.4				
+c_ithorian	Ithorian	neutral	Soldier 1	8	0	Alien_Ithorian_01		1	0	10	10/10/10/10					
+c_jawa	Jawa	neutral	Scoundrel 1	8	0	Alien_Jawa		1	2	12	10/10/10/10					
+c_kataarn	Katarn	hostile	Soldier 4	54	0	Creature_Kataarn		4	0	14	16/10/12/6	m+0/13.3				
+c_khounda	Kath Hound	hostile	Minion 3	25	0	Creature_Kath_Hound_A01		3	8	14	12/16/12/3	m+0/4.7				
+c_khoundb	Horn Kath Hound	hostile	Minion 6	45	0	Creature_Kath_Hound_B01		6	8	18	14/18/12/3	m+0/4.5				
+c_kinrath	Kinrath	hostile	Minion 4	35	0	Creature_Kinrath		4	8	18	18/14/12/3	m+0/4.5;m+0/4.1				
+c_kraytdragon	Krayt Dragon	hostile	Soldier 20	750	0	Creature_Krayt_Dragon		20	0	38	60/8/32/6	m+0/45.3;m+0/45.5				
+c_laigrek_01	Laigrek	hostile	Minion 3	66	0	Creature_Laigrek_01		3	8	17	16/16/14/8	m+0/4.1				
+c_lightsaber	Lightsaber Floating	neutral	Minion 5	60	0	Lightsaber_Floating	g_w_lghtsbr05	5	8	20	10/10/14/14	m+1/10.9				
+c_maalrass01	Maalrass	hostile	Minion 6	82	0	Creature_Maalrass		6	8	21	16/20/14/5	m+0/4.4				
+c_mykal	Mykal	hostile	Minion 1	7	0	Creature_Mykal		1	8	15	12/18/12/4	m+0/4.3				
+c_rakghoul	Rakghoul	hostile	Minion 1	6	0	Creature_Rakghoul		1	8	11	10/12/10/8	m+0/4.3;m+0/4.6				
+c_rancor	Rancor	hostile	Soldier 20	350	0	Creature_Rancor		20	0	32	45/8/24/6	m+0/45.8;m+0/45.4				
+c_ronto	Ronto	neutral	Soldier 5	32	0	Creature_Ronto		5	0	14	25/8/10/10	m+0/13.8				
+c_seabeast	Mannan Seabeast	neutral	Soldier 1	9	0	Creature_SeaBeast		1	0	9	8/8/8/8	m+0/4.2				
+c_stormbeast01	Storm Beast	hostile	Soldier 15	480	0	Malachor_Beast_01		15	0	31	40/8/26/6	m+0/44.5;m+0/45.5				
+c_stormbeast02	Greater Storm Beast	hostile	Soldier 20	750	0	Malachor_Beast_02		20	0	38	60/8/32/6	m+0/45.3;m+0/45.3				
+c_tach	Tach	hostile	Minion 2	12	0	Creature_Tach		2	8	18	10/18/10/5	m+0/4.5;m+0/4.4				
+c_tukata	Tuk'ata	hostile	Minion 1	9	0	Creature_Tukata		1	8	8	6/6/6/8	m+5/4.4				
+c_twohead	Two Head	neutral	Soldier 1	10	0	Alien_TwoHead		1	0	11	13/12/10/10	m+0/4.6;m+0/4.3				
+c_verkaal	Verkaal	hostile	Minion 3	20	0	Creature_Verkaal		3	8	20	12/22/12/4	m+0/9				
+c_wraid	Wraid	hostile	Minion 4	50	0	Creature_Wraid_01		4	8	22	22/12/16/3	m+0/8.8;m+0/8.4				
+c_zakkeg01	Zakkeg	hostile	Minion 9	97	0	Creature_Zakkeg		9	8	22	18/14/16/3	m+0/4.6;m+0/4.4				
+g_assassindrd01	Assassin Droid	hostile	Combat Droid 6	59	0	Droid_Assassin	g_w_blstrrfl001	6	6	22	14/16/19/11			2		
+g_assassindrd02	Elite Assassin Droid	hostile	Combat Droid 12	93	0	Droid_Assassin	g_w_blstrrfl001	12	6	28	14/18/19/12			6		
+g_assaultdroid01	Assault Droid Mark I	hostile	Combat Droid 4	40	0	Droid_Mark_One	g_w_null001+g_w_null001	4	6	21	14/12/12/6	r+0/4.5;r+0/4.8				1
+g_assaultdroid02	Assault Droid Mark II	hostile	Combat Droid 8	80	0	Droid_Mark_Two		8	6	25	14/12/12/8	m+0/9;m+0/8.8				
+g_assaultdroid03	Assault Droid Mark IV	hostile	Combat Droid 12	150	0	Droid_Mark_Four	g_w_null004	12	6	22	13/13/15/8	r+1/6.7				
+g_bandon	Darth Bandon	neutral	Jedi Guardian 15	40	0	Unique_Darth_Bandon	g_w_drkjdisbr002	15	3	21	16/20/14/16	mx+1/13.1	CHOKE:12,DEATH_FIELD:16a,DRAIN_LIFE:16,FORCE_PUSH:18,LIGHTNING:12,PLAGUE:12,LIGHT_SABER_THROW:18			3
+g_bantha01	Bantha	neutral	Soldier 5	37	0	Creature_Bantha		5	0	9	25/8/10/10	m+0/13.4				
+g_blkvulkgang01	Black Vulkar Thug	hostile	Minion 1	5	0	Swoop_Gang_04	g_w_vbroswrd01	1	8	10	13/11/12/10	m+0/2.5				
+g_blkvulkgang02	Black Vulkar Captain	hostile	Minion 2	10	0	Swoop_Gang_04	g_w_blstrpstl001	2	8	10	14/11/12/10	m+0/2.5				
+g_brakatan01	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_qtrstaff01	8	8	15	10/17/17/14	m+0/2.5				3
+g_brakatan02	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroswrd01	8	8	15	10/17/17/14	m+0/2.5				3
+g_brakatan03	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroshort01+g_w_vbroshort01	8	8	15	10/17/17/14	m+0/2.5				3
+g_brakatan04	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbroswrd01+g_w_vbroshort01	12	8	18	10/18/20/14	m+0/2.5				3
+g_brakatan05	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbroswrd01+g_w_vbroswrd01	12	8	18	10/18/20/14	m+0/2.5				3
+g_brakatan06	Rakatan Elite Warrior	hostile	Minion 12	120	0	Alien_Rakata_03	g_w_vbrdblswd01	12	8	18	10/18/20/14	m+0/2.5				3
+g_brakatan07	Rakatan Warrior	hostile	Minion 8	70	0	Alien_Rakata_03	g_w_vbroshort01	8	8	15	10/17/17/14	m+0/2.5				3
+g_brith01	Brith	neutral	Soldier 1	10	0	Creature_Brith		1	0	10	10/10/10/10	m+0/4.4				
+g_cheatbot	Cheat Bot	friendly	Combat Droid 2	18	0	Droid_Protocol_01	g_w_null001	2	6	16	10/10/14/14	r+0/4.5				
+g_combatdroid01	Sentry Droid Mark I	hostile	Combat Droid 3	15	0	Droid_Sentry	g_w_null001+g_w_null001	3	6	16	10/18/10/8	r+0/4.4;r+0/4.6				
+g_dark_app01f	Dark Jedi Apprentice {Female}	hostile	Jedi Guardian 4	31	0	Dark_Jedi_Low_Female_01	g_w_drkjdisbr001	4	3	14	15/14/12/14	m+0/11	FORCE_PUSH:21,STASIS:34			
+g_dark_app01m	Dark Jedi Apprentice {Male}	hostile	Jedi Guardian 4	31	0	Dark_Jedi_Low_Male_01	g_w_drkjdisbr001	4	3	14	15/14/12/14	m+0/11.2	FORCE_PUSH:21,STASIS:34			
+g_dark_jed01f	Dark Jedi{Female}	hostile	Jedi Guardian 8	80	0	Dark_Jedi_Mid_Female_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/11.6	CHOKE:15,DRAIN_LIFE:19,LIGHTNING:15,FORCE_PUSH:21			3
+g_dark_jed01m	Dark Jedi{Male}	hostile	Jedi Guardian 8	80	0	Dark_Jedi_Mid_Male_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/11.1	CHOKE:15,DRAIN_LIFE:19,LIGHTNING:15,FORCE_PUSH:21			3
+g_dark_mas01f	Dark Jedi Master {Female}	hostile	Jedi Consular 15	165	0	Dark_Jedi_Hi_Female_01	g_w_drkjdisbr001	15	4	19	18/16/14/16	m+1/10.7	CHOKE:10,DEATH_FIELD:13a,DRAIN_FORCE:1,DRAIN_LIFE:13,LIGHTNING:10,FORCE_SCREAM:13,FORCE_STORM:10a,FORCE_WAVE:23a,FORCE_WHIRLWIND:23,HORROR:7,INSANITY:7a,WOUND:10			3
+g_dark_mas01m	Dark Jedi Master{Male}	hostile	Jedi Consular 15	165	0	Dark_Jedi_Hi_Male_02	g_w_drkjdisbr001	15	4	19	18/16/14/16	m+1/11.1	CHOKE:10,DEATH_FIELD:13a,DRAIN_FORCE:1,DRAIN_LIFE:13,LIGHTNING:10,FORCE_SCREAM:13,FORCE_STORM:10a,FORCE_WAVE:23a,FORCE_WHIRLWIND:23,HORROR:7,INSANITY:7a,WOUND:10			3
+g_darkjedi005	Dark Jedi	neutral	Jedi Guardian 8	80	0	Dark_Jedi_Female_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/11.3	CHOKE:15,DRAIN_LIFE:19,FORCE_PUSH:21,LIGHTNING:15			3
+g_darkjedi01	Dark Jedi Apprentice	hostile	Jedi Guardian 4	31	0	Dark_Jedi_Male_01	g_w_drkjdisbr001	4	3	14	15/14/12/14	m+0/11	FORCE_PUSH:21,STASIS:34			
+g_darkjedi02	Dark Jedi	hostile	Jedi Guardian 8	80	0	Dark_Jedi_Female_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/11.1	CHOKE:15,DRAIN_LIFE:19,FORCE_PUSH:21,LIGHTNING:15			3
+g_darkjedi03	Dark Jedi Master	hostile	Jedi Guardian 12	110	0	Dark_Jedi_Male_01	g_w_drkjdisbr001	12	3	16	16/14/13/14	m+1/10.9	LIGHT_SABER_THROW_ADVANCED:21,AFFLICTION:15,CHOKE:15,DRAIN_LIFE:19,FORCE_WHIRLWIND:26,LIGHTNING:15,LIGHT_SABER_THROW:21			3
+g_darkjedi04	Sith Lord	hostile	Jedi Guardian 16	124	0	Dark_Jedi_Male_01	g_w_lghtsbr02	16	3	18	16/14/14/18	m+1/11.1	LIGHT_SABER_THROW_ADVANCED:18,CHOKE:12,DRAIN_LIFE:16,FORCE_PUSH:18,FORCE_WHIRLWIND:23,LIGHTNING:12,LIGHT_SABER_THROW:18		1	2
+g_davink	Davin Kotras	friendly	Scout 1	8	0	Commoner_Mal_Old_Asian_01_A		1	1	10	10/10/10/10	m+0/2.5				
+g_dewback01	Dewback	neutral	Soldier 5	42	0	Creature_Dewback		5	0	20	30/8/15/8	m+0/13.7				
+g_drdtelmil	Telos Military Droid	hostile	Combat Droid 4	52	0	Droid_Telos_Military	g_w_hvyblstr01+g_w_hvyblstr01	4	6	23	14/16/12/6					1
+g_drdtelsentry	Telos Sentry Droid	hostile	Combat Droid 5	40	0	Droid_Telos_Sentry	g_w_hvyblstr01+g_w_hvyblstr01	5	6	20	10/18/10/8					
+g_drexl_amb01	Drexl	neutral	Soldier 1	10	0	Creature_Drexl_Ambient		1	0	10	10/10/10/10	m+0/4.4				
+g_droid_con_boss	Construction Droid Boss	hostile	Combat Droid 15	225	0	Droid_Construction_Boss	g_w_rptnblstr03	15	6	28	20/14/22/4					
+g_droid_con_lgt	Construction Droid Light	hostile	Combat Droid 5	62	0	Droid_Construction_Light	heavymininglaser	5	6	12	16/10/18/3					
+g_droid_con_med	Construction Droid Medium	hostile	Combat Droid 5	62	0	Droid_Construction_Medium	heavymininglaser	5	6	12	16/10/18/3					
+g_droid_foreman	Foreman Droid	hostile	Combat Droid 10	110	0	Droid_Foreman	heavymininglaser	10	6	14	16/10/18/3					
+g_droid_mine_01	Mining Droid Mark I	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_A	mininglaser	1	7							
+g_droid_mine_012	Mining Droid Mark I{Red}	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_B	mininglaser	1	7							
+g_droid_mine_013	Mining Droid Mark I{Blue}	hostile	Expert Droid 1	6	0	Droid_Mining_Mark_One_C	mininglaser	1	7							
+g_droid_mine_02	Mining Droid Mark II	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_A	heavymininglaser	1	6	9	16/4/18/3					
+g_droid_mine_022	Mining Droid Mark II{Red}	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_B	heavymininglaser	1	6	9	16/4/18/3					
+g_droid_mine_023	Mining Droid Mark II{Blue}	hostile	Combat Droid 1	12	0	Droid_Mining_Mark_Two_C	heavymininglaser	1	6	9	16/4/18/3					
+g_droid_tank	Tank Droid	hostile	Combat Droid 15	185	0	Droid_Tank	g_w_hvyblstr01+g_w_hvyblstr01	15	6	26	16/10/18/3					
+g_firixa01	Firaxa	neutral	Soldier 1	10	0	Creature_Firixa		1	0	10	10/10/10/10	m+0/4.5				
+g_floatingmine	Floating Mine	hostile	Expert Droid 1	6	0	Droid_MineFloating	vibrocutter	1	7	9	14/4/18/6	m+0/5.3				
+g_gammorean01	Gamorrean	hostile	Minion 1	6	0	Alien_Gammorean_02	g_w_waraxe001	1	8	10	15/11/12/10					1
+g_gammorean02	Gamorrean Warrior	hostile	Minion 2	12	0	Alien_Gammorean_03	g_w_waraxe001	2	8	10	16/11/12/10					1
+g_gammorean03	Gamorrean Chief	hostile	Soldier 4	25	0	Alien_Gammorean_04	g_w_waraxe001	4	0	10	18/11/12/10					1
+g_gizka01	Gizka	hostile	Scoundrel 2	14	0	Creature_Gizka		2	2	16	12/10/14/4	m+0/4.6				
+g_hidbekgang01	Hidden Bek Thug	hostile	Minion 1	5	0	Swoop_Gang_05	g_w_vbroswrd01	1	8	10	13/11/12/10	m+0/2.5				
+g_hidbekgang02	Hidden Bek Captain	hostile	Minion 2	10	0	Swoop_Gang_05	g_w_blstrpstl001	2	8	10	14/11/12/10	m+0/2.5				
+g_hutt01	Hutt	neutral	Scoundrel 5	25	0	Alien_Hutt_02		5	2	11	12/8/10/18					
+g_iriaz01	Iriaz	neutral	Soldier 1	10	0	Creature_Iriaz		1	0	10	10/10/10/10	m+0/4.5				
+g_ithorian01	Ithorian	neutral	Soldier 1	11	0	Alien_Ithorian_02		1	0	10	12/10/12/10					
+g_jagi	Jagi	neutral	Soldier 10	79	0	Commoner_Mal_Black_01_A	g_w_blstrrfl001	10	0	14	18/14/14/10	m+0/2.5				
+g_jawa01	Jawa	neutral	Scoundrel 1	6	0	Alien_Jawa		1	2	13	8/12/10/12					
+g_jordo	Jordo	friendly	Scout 1	8	0	Commoner_Mal_Asian_01_A		1	1	10	10/10/10/10	m+0/2.5				
+g_kataarn01	Katarn	hostile	Soldier 4	54	0	Creature_Kataarn		4	0	14	16/10/12/6	m+0/13.5				
+g_kataarn02	Bull Katarn	hostile	Soldier 8	76	0	Creature_Kataarn		8	0	18	18/10/14/8	m+0/13.3				
+g_kataarn03	Dire Katarn	hostile	Minion 12	128	0	Creature_Kataarn		12	8	22	22/14/18/8	m+0/26.7				
+g_kathhound01	Kath Hound	hostile	Minion 3	25	0	Creature_Kath_Hound_A04		3	8	14	12/16/12/3	m+0/4.2				
+g_kathhound02	Horn Kath Hound	hostile	Minion 6	45	0	Creature_Kath_Hound_B04		6	8	18	14/18/12/3	m+0/4.5				
+g_kinrath01	Kinrath	hostile	Minion 4	35	0	Creature_Kinrath		4	8	18	18/14/12/3	m+0/4.2;m+0/4.6				
+g_kinrath02	Hive Kinrath	hostile	Soldier 8 / Scout 0 / Scout 0	65	0	Creature_Kinrath		8	0	22	20/14/12/3	m+0/4.4;m+0/4.8				
+g_kinrath03	Kinrath Stalker	hostile	Minion 5	75	0	Creature_Kinrath		5	8	17	18/14/12/3	m+0/4.4;m+0/4.4				
+g_kinrath04	Viper Kinrath	hostile	Minion 12	114	0	Creature_Kinrath		12	8	26	24/18/16/3	m+0/9.4;m+0/9.2				
+g_kraytdragon01	Krayt Dragon	hostile	Soldier 20	750	0	Creature_Krayt_Dragon		20	0	38	60/8/32/6	m+0/44.9;m+0/44.4				
+g_lena	Lena	friendly	Scout 1	8	0	Twilek_Female_03_C		1	1	10	10/10/10/10	m+0/2.5				
+g_malare	Malare	friendly	Scout 1	8	0	Twilek_Female_03_C		1	1	10	10/10/10/10	m+0/2.5				
+g_mandalor01	Mandalorian Warrior	hostile	Minion 4	34	0	Alien_Mandalorian_01	g_w_blstrrfl001	4	8	12	13/15/15/12	m+0/2.5				
+g_mandalor02	Mandalorian Elite	hostile	Soldier 8	56	0	Alien_Mandalorian_02	g_w_rptnblstr01	8	0	15	13/16/15/12	m+0/2.5		1		2
+g_mandalor03	Mandalorian Captain	hostile	Soldier 12	94	0	Alien_Mandalorian_03	g_w_hvrptbltr02	12	0	17	13/16/16/12	m+0/2.5		1		3
+g_probedroid01	Probe Droid	hostile	Combat Droid 2	16	0	Droid_Probe	g_w_null001	2	6	16	10/10/14/14	r+0/4.4				
+g_rakatan01	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_vbroshort01	8	8	15	10/17/17/14	m+0/2.5				3
+g_rakatan02	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_qtrstaff01	8	8	15	10/17/17/14	m+0/2.5				3
+g_rakatan03	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_stunbaton04	8	8	15	10/17/17/14	m+0/2.5				3
+g_rakatan04	Elder Warrior	hostile	Minion 8	70	0	Alien_Rakata_02	g_w_vbroswrd01	8	8	15	10/17/17/14	m+0/2.5				3
+g_rakatan05	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_vbroswrd01+g_w_vbroshort01	12	8	18	10/18/18/14	m+0/2.5				3
+g_rakatan06	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_vbrdblswd01	12	8	18	10/18/18/14	m+0/2.5				3
+g_rakatan07	Elder Elite Warrior	hostile	Minion 12	108	0	Alien_Rakata_02	g_w_stunbaton04	12	8	18	10/18/18/14	m+0/2.5				3
+g_rakghoul01	Rakghoul	hostile	Minion 1	6	0	Creature_Rakghoul		1	8	10	10/11/10/8	m+0/4.5;m+0/4.6				
+g_rakghoul02	Rakghoul Fiend	hostile	Soldier 3	15	0	Creature_Rakghoul		3	0	12	12/14/10/8	m+0/4.1;m+0/4.6				
+g_rancor01	Rancor	hostile	Soldier 20	350	0	Creature_Rancor		20	0	32	45/8/24/6	m+0/45.2;m+0/45				
+g_rancor02	Young Rancor	hostile	Soldier 15	115	0	Creature_Rancor_Small		15	0	20	45/8/20/6	m+0/45.4;m+0/44.7				
+g_ronto01	Ronto	neutral	Soldier 5	32	0	Creature_Ronto		5	0	14	25/8/10/10	m+0/13.2				
+g_seabeast01	Mannan Seabeast	neutral	Soldier 1	9	0	Creature_SeaBeast		1	0	9	8/8/8/8	m+0/4.3				
+g_selkathmale01	Insane Selkath	hostile	Minion 3	20	0	Alien_Selkath_03		3	8	12	14/14/12/6					
+g_selkathmale02	Enraged Selkath	hostile	Minion 6	48	0	Alien_Selkath_01		6	8	15	16/16/12/6					
+g_selkathmale03	Fanatical Selkath	hostile	Minion 12	74	0	Alien_Selkath_03	g_w_blstrpstl003	12	8	17	16/16/12/6	m+0/4.5;m+0/4.4				
+g_sennivek	Senni Vek	neutral	Soldier 1	8	0	Twilek_Male_02_C	g_w_blstrpstl001	1	0	10	10/10/10/10	m+0/2.5				
+g_sithass01	Sith Assassin	hostile	Minion 3	8	0	Dark_Jedi_Low_Male_01	propqs01	3	8	11	10/12/10/10	mx+0/3.5				
+g_sithcomm01	Sith Lieutenant	hostile	Scout 5	42	0	Sith_Female_Albino	g_w_blstrpstl001	5	1	13	14/16/13/10	m+0/2.5				
+g_sithcomm02	Sith Captain	hostile	Scout 8	64	0	Sith_Male_Albino	g_w_blstrpstl001	8	1	13	14/16/13/10	m+0/2.5				
+g_sithtroop01	Sith Trooper	hostile	Minion 3	25	0	Sith_Soldier_01	g_w_blstrrfl001	3	8	11	10/12/10/10	m+0/2.5				
+g_sithtroop02	Sith Elite Trooper	hostile	Soldier 5	35	0	Sith_Soldier_02	g_w_blstrrfl001	5	0	11	10/12/10/10	m+0/2.5				
+g_sithtroop03	Sith Heavy Trooper	hostile	Soldier 8	48	0	Sith_Soldier_02	g_w_hvrptbltr01	8	0	13	10/12/10/10	m+0/2.5		1		
+g_sithtroop04	Sith Grenadier	hostile	Soldier 6	30	0	Sith_Soldier_01	g_w_dsrptrfl001	6	0	13	10/12/10/10	m+0/2.5		1		
+g_sithtroop05	Sith Grenadier	hostile	Soldier 9	45	0	Sith_Soldier_01	g_w_dsrptrfl001	9	0	13	10/12/10/10	m+0/2.5		1		
+g_sithtroop06	Sith Grenadier	hostile	Soldier 12	60	0	Sith_Soldier_01	g_w_dsrptrfl001	12	0	15	10/12/10/10	m+0/2.5		1		
+g_sithtroop07	Sith Assault Trooper	hostile	Soldier 12	96	0	Sith_Soldier_02	g_w_hvrptbltr01	12	0	18	16/18/16/10	m+0/2.5				
+g_tach01	Tach	hostile	Minion 2	12	0	Creature_Tach		2	8	18	10/18/10/5	m+0/4.3;m+0/4.4				
+g_thug002	Rodian Crony	faction 8	Minion 3	20	0	Alien_Rodian_04	g_w_blstrpstl001	3	8	12	10/14/12/10	m+0/2.5				
+g_thug01	Rodian Thug	neutral	Minion 3	20	0	Alien_Rodian_03	g_w_blstrpstl001	3	8	12	10/14/12/10	m+0/2.5				
+g_thug02	Twi'lek Thug	hostile	Minion 3	20	0	Twilek_Male_02_C	g_w_blstrpstl001	3	8	12	10/14/12/10	m+0/2.5				
+g_thug03	Aqualish Thug	neutral	Minion 3	20	0	Alien_Walrusman	g_w_blstrrfl001	3	8	12	10/14/12/10	m+0/2.5				
+g_tukata01	Tuk'ata	hostile	Minion 1	9	0	Creature_Tukata		1	8	8	18/6/6/6	m+5/4.7				
+g_tukata02	Dire Tuk'ata	hostile	Minion 13	137	0	Creature_Tukata		13	8	23	22/14/18/6	m+5/9.1				
+g_turretbl001	Blaster Turret	hostile	Minion 1	11	0	Turret_02	w_blaste_01	1	8	13	10/16/14/10	r+0/4.7				
+g_turretbl002	Heavy Blaster Turret	hostile	Minion 3	30	0	Turret_02	g_w_null002	3	8	15	10/16/10/10	r+0/5.6				
+g_turretbl003	Ion Turret	hostile	Minion 3	30	0	Turret_02	g_w_null003	3	8	15	10/16/10/10	r+0/5.8				
+g_turretbl004	Chain Gun Turret	hostile	Minion 3	30	0	Turret_02	g_w_null004	3	8	15	10/16/10/10	r+0/7				
+g_turretbl005	Defense Turret	hostile	Minion 5	50	0	Turret_01	g_w_null001	5	8	15	10/16/10/10	r+1/4.4				
+g_turretbl006	Heavy Defense Turret	hostile	Minion 1	15	0	Turret_01	w_brifle_01	1	8	15	10/16/16/10	r+1/6.3				
+g_turretbl007	Ion Defense Turret	hostile	Minion 5	50	0	Turret_01	g_w_null003	5	8	15	10/16/10/10	r+1/5.7				
+g_turretbl008	Chain Gun Turret	hostile	Minion 5	50	0	Turret_01	g_w_null004	5	8	15	10/16/10/10	r+1/7.3				
+g_tuskenmale01	Sand People Warrior	hostile	Minion 3	16	0	Alien_Sand_People_01	g_w_gaffi001	3	8	12	12/14/10/10	m+0/2.5				
+g_tuskenmale02	Elite Warrior	hostile	Minion 5	25	0	Alien_Sand_People_02	g_w_gaffi001	5	8	12	12/14/10/10	m+0/2.5				
+g_tuskenmale03	Holy Warrior	hostile	Minion 12	55	0	Alien_Sand_People_03	g_w_gaffi001	12	8	16	16/14/10/10	m+0/2.5				
+g_veerkal01	Verkaal	hostile	Minion 3	20	0	Creature_Shyrack_02		3	8	20	12/22/12/4	m+0/9.1				
+g_veerkal02	Shyrack	hostile	Minion 1	9	0	Creature_Shyrack_01		1	8	8	12/6/6/8	m+0/8.9				
+g_veerkal03	Mykal	hostile	Minion 1	7	0	Creature_Mykal		1	8	15	12/18/12/4	m+0/4.6				
+g_veerkal04	Shyrack Wyrm	hostile	Minion 1	9	0	Creature_Shyrack_01		1	8	12	12/14/12/12	m+0/18.2				
+g_wardroid01	War Droid Mark I	hostile	Minion 1	8	0	Droid_War_01	g_w_blstrpstl001	1	8	12	12/8/8/8					
+g_wardroid02	War Droid Mark III	hostile	Minion 6	33	0	Droid_War_03	g_w_blstrcrbn001	6	8	15	16/12/16/8			1		
+g_wardroid03	War Droid Mark IV	hostile	Minion 9	42	0	Droid_War_04	g_w_blstrrfl001	9	8	15	18/12/16/8			2		
+g_wardroid04	War Droid Mark V	hostile	Minion 12	93	0	Droid_War_05	g_w_rptnblstr01	12	8	17	20/12/18/8			1		
+g_wookiefemale01	Wookiee Warrior	friendly	Soldier 4	30	0	Alien_Wookie_Female_03	g_w_warblade001	4	0	11	18/12/14/8	m+0/2.5				1
+g_wookiefemale02	Wookiee Elite Warrior	friendly	Soldier 6	55	0	Alien_Wookie_Female_02	g_w_warblade001	6	0	13	20/12/14/8	m+0/2.5				1
+g_wookiemale01	Wookiee Warrior	friendly	Soldier 4	30	0	Alien_Wookie_Male_03	g_w_warblade001	4	0	11	18/12/14/8	m+0/2.5				1
+g_wookiemale02	Wookiee Elite Warrior	friendly	Soldier 6	55	0	Alien_Wookie_Male_04	g_w_warblade001	6	0	13	20/12/14/8	m+0/2.5				1
+g_wraid01	Wraid	hostile	Minion 4	50	0	Creature_Wraid_02		4	8	14	22/12/16/3	m+0/9;m+0/9.1				
+g_wraid02	Hulak Wraid	hostile	Minion 12	127	0	Creature_Wraid_03		12	8	30	24/12/16/3	m+0/8.7;m+0/8.9				
+g_xor	Xor	faction 8	Scoundrel 8	56	0	Commoner_Mal_White_01_A	g_w_blstrpstl001	8	2	17	10/16/14/12	m+0/2.5				
+g_ziagrom	Ziagrom	neutral	Soldier 1	8	0	Twilek_Male_01_C		1	0	10	10/10/10/10	m+0/2.5				
+iz_citz_m1	Iziz Citizen	neutral	Jedi Guardian 1	8	0	Onderon_Commoner_Mal_01		1	3	13	13/12/10/15	m+0/2.5				
+n_admrlsaulkar	Admiral Saul Kar	neutral	Soldier 1	8	0	Unique_Admiral_Saul		1	0	10	10/10/10/10	m+0/2.5				
+n_azkulh	Azkulh	neutral	Soldier 1	8	0	Unique_Azkul		1	0	10	10/10/10/10	m+0/2.5				
+n_bith	Bith	neutral	Soldier 1	8	0	Alien_Bith_01		1	0	10	10/10/10/10	m+0/2.5				
+n_calonord	Calo Nord	neutral	Soldier 10 / Scoundrel 3	219	0	Unique_Calo_Nord	g_w_hvyblstr04+g_w_hldoblstr03	13	0	18	16/18/16/12	m+0/2.5			1	3
+n_coltobin	Colonel Tobin	neutral	Soldier 1	8	0	Unique_Colonel_Tobin		1	0	10	10/10/10/10	m+0/2.5				
+n_commf	Commoner	neutral	Soldier 1	8	0	Commoner_Fem_Asian_01_A		1	0	10	10/10/10/10	m+0/2.5				
+n_commkidf	Young Commoner	neutral	Scout 1	8	0	Child_Female		1	1	10	10/10/10/10	m+0/2.5				
+n_commkidm	Young Commoner	neutral	Scout 1	8	0	Child_Male		1	1	10	10/10/10/10	m+0/2.5				
+n_commm	Commoner	neutral	Soldier 1	8	0	Commoner_Mal_Asian_01_A		1	0	10	10/10/10/10	m+0/2.5				
+n_corrunfalt	Corrun Falt	neutral	Soldier 6	54	0	Unique_CorrunFalt		6	0	15	12/16/14/14	m+0/2.5				1
+n_czerkaoff	Czerka Officer	neutral	Soldier 1	8	0	Czerka_Officer_Asian		1	0	10	10/10/10/10	m+0/2.5				
+n_darkjedif	Dark Jedi	hostile	Jedi Guardian 8	80	0	Dark_Jedi_Female_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/10.5	AFFLICTION:15,CHOKE:15,SUPRESS_FORCE:31,HORROR:12,LIGHTNING:15,SHOCK:15,SLOW:15,STUN:34,DROID_STUN:21a,LIGHT_SABER_THROW:21,WOUND:15			3
+n_darkjedim	Dark Jedi	hostile	Jedi Guardian 8	80	0	Dark_Jedi_Male_01	g_w_drkjdisbr001	8	3	16	16/14/12/14	m+1/11	LIGHT_SABER_THROW_ADVANCED:21,CHOKE:15,DROID_DESTROY:21a,DROID_DISABLE:21a,DRAIN_LIFE:19,FEAR:12,FORCE_PUSH:21			3
+n_darthmalak	Darth Malak	hostile	Jedi Guardian 20	114	0	Unique_Darth_Malak	g_w_lghtsbr02	20	3	20	12/14/10/15	m+1/11.1	LIGHT_SABER_THROW_ADVANCED:15,CHOKE:9,DEATH_FIELD:13a,DROID_DESTROY:15a,FORCE_BREACH:25,FORCE_PUSH:15,FORCE_WHIRLWIND:20,KILL:9,LIGHTNING:9,LIGHT_SABER_THROW:15		1	2
+n_darthnihilus	Darth Nihilus	hostile	Jedi Guardian 20	114	0	Unique_Darth_Nihilus	g_w_lghtsbr02	20	3	20	12/14/10/15	m+1/10.8	LIGHT_SABER_THROW_ADVANCED:15,CHOKE:9,DEATH_FIELD:13a,DROID_DESTROY:15a,FORCE_BREACH:25,LIGHTNING:9,FORCE_PUSH:15,FORCE_WHIRLWIND:20,KILL:9,LIGHT_SABER_THROW:15		1	2
+n_darthrevan	Darth Revan	hostile	Jedi Guardian 20	20	0	Unique_Darth_Revan	g_w_drkjdisbr001	20	3	20	13/15/10/15	m+1/11.5				3
+n_darthrevan002	Darth Revan	hostile	Jedi Guardian 20	20	0	Unique_Darth_Revan_Female_CUTSCN		20	3	20	13/15/10/15	m+0/2.5				3
+n_darthsion	Darth Sion	neutral	Jedi Guardian 20	20	0	Unique_Darth_Sion	g_w_drkjdisbr001	20	3	20	13/15/10/15	m+1/11				3
+n_darthtraya	Darth Traya	hostile	Jedi Guardian 20	114	0	Unique_Darth_Traya	g_w_lghtsbr02	20	3	20	12/14/10/15	m+1/11	LIGHT_SABER_THROW_ADVANCED:15,CHOKE:9,DEATH_FIELD:13a,DROID_DESTROY:15a,FORCE_BREACH:25,LIGHTNING:9,FORCE_PUSH:15,FORCE_WHIRLWIND:20,KILL:9,LIGHT_SABER_THROW:15		1	2
+n_devaronian01	Devaronian	neutral	Soldier 1	8	0	Alien_Devaronian_01		1	0	10	10/10/10/10	m+0/2.5				
+n_dodonna	Dodonna	hostile	Jedi Guardian 1	8	0	Unique_Admiral_Dodonna		1	3	13	13/12/10/15	m+0/2.5				
+n_duros	Duros	neutral	Soldier 1	8	0	Alien_Duros_01		1	0	10	10/10/10/10	m+0/2.5				
+n_fatcomf	Commoner	neutral	Soldier 1	8	0	Commoner_Female_Fat		1	0	10	10/10/10/10	m+0/2.5				
+n_fatcomm	Commoner	neutral	Soldier 1	8	0	Commoner_Male_Fat		1	0	10	10/10/10/10	m+0/2.5				
+n_forcezomb01	Force Zombie	hostile	Soldier 15	145	0	Force_Zombie		15	0	25	18/12/16/6	m+0/2.5				
+n_gand	Gand	neutral	Soldier 1	8	0	Alien_Gand_01		1	0	10	10/10/10/10	m+0/2.5				
+n_gran	Gran	neutral	Soldier 1	8	0	Alien_Gran_01		1	0	10	10/10/10/10	m+0/2.5				
+n_hk50_01	HK-50	friendly	Combat Droid 6	66	0	Droid_NPC_hk50	g_w_blstrrfl001	6	6	20	16/14/10/12	m+0/2.5				1
+n_hk51_01	n_hk51_01	friendly	Combat Droid 10	100	0	Droid_NPC_hk51	g_w_blstrrfl001	10	6	29	18/16/12/14	m+0/2.5				1
+n_hussef	Hussef	neutral	Soldier 1	8	0	Unique_Husef		1	0	10	10/10/10/10	m+0/2.5				
+n_janalorso	Jana Lorso	neutral	Soldier 6	54	0	Unique_JanaLorso		6	0	15	12/16/14/14	m+0/2.5				1
+n_jedicounf	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_White_Female_01	g_w_lghtsbr01	1	3	12	10/10/10/10	m+0/10.7				
+n_jedicounm	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_White_Male_02	g_w_lghtsbr03	1	3	12	10/10/10/10	m+0/11.4				
+n_jedimalek	Malak	hostile	Jedi Guardian 1	8	0	Unique_Malek_Jedi		1	3	13	13/12/10/15	m+0/2.5				
+n_jedimemf	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_Council_Member_Female	g_w_lghtsbr04	1	3	12	10/10/10/10	m+0/11				
+n_jedimemm	Jedi	neutral	Jedi Guardian 1	8	0	Jedi_Black_Male_05	g_w_lghtsbr05	1	3	12	10/10/10/10	m+0/11.4				
+n_mandalorian	Mandalorian	hostile	Minion 1	10	0	Alien_Mandalorian_01	g_w_blstrpstl001	1	8	12	13/15/15/12	m+0/2.5				
+n_opochanno	Opo Chano	neutral	Soldier 5	30	0	Unique_Opo_Chano		5	0	13	12/16/10/16	m+0/2.5				
+n_quarren01	Quarren	neutral	Soldier 1	8	0	Alien_Quarren_01		1	0	10	10/10/10/10	m+0/2.5				
+n_rakata	Rakata	hostile	Soldier 1	10	0	Alien_Rakata_01		1	0	12	13/15/15/12	m+0/2.5				
+n_repcap01	Republic Captain {White Male}	neutral	Soldier 1	8	0	Republic_Captain_Mal_White_01		1	0	10	10/10/10/10	m+0/2.5				
+n_repoff	Republic Officer	neutral	Soldier 1	8	0	Republic_Officer_Mal_White		1	0	10	10/10/10/10	m+0/2.5				
+n_repsold	Republic Soldier	neutral	Soldier 1	8	0	Republic_Soldier_Mal_White		1	0	10	10/10/10/10	m+0/2.5				
+n_repsold_bh01	Republic Soldier {Blk Male w/ Helmet}	neutral	Soldier 1	8	0	Republic_Soldier_Mal_Black_02		1	0	10	10/10/10/10	m+0/2.5				
+n_rodian	Rodian	neutral	Scoundrel 1	8	0	Alien_Rodian_01		1	2	12	10/10/10/10	m+0/2.5				
+n_selkath	Selkath	hostile	Minion 1	9	0	Alien_Selkath_01		1	8	12	14/14/12/6	m+0/4.5;m+0/4.5				
+n_sithappren	Sith Apprentice	hostile	Jedi Guardian 4	8	0	Dark_Jedi_Sith_Apprentice	g_w_lghtsbr02	4	3	13	13/12/10/15	m+0/11	FEAR:14,SHOCK:19,STUN:24,WOUND:19			
+n_sithcmndo	Sith Commando Sith Commando	hostile	Minion 1	10	0	Sith_Commando_01_C	w_brifle_01	1	8	11	12/12/12/12	r+1/6.7				
+n_sithcomf	Sith Commoner	hostile	Jedi Guardian 1	8	0	Sith_Female_Albino		1	3	13	13/12/10/15	m+0/2.5				
+n_sithcomm	Sith Commoner	hostile	Jedi Guardian 1	8	0	Sith_Male_Albino		1	3	13	13/12/10/15	m+0/2.5				
+n_sithsoldier	Sith Soldier	hostile	Minion 1	8	0	Sith_Soldier_01	g_w_blstrpstl001	1	8	11	10/12/10/10	m+0/2.5				
+n_smuggler	Smuggler	neutral	Scoundrel 1	8	0	P_MAL_C_MED_05		1	2	12	10/10/10/10	m+0/2.5				
+n_stuntsaber01	Stunt Saber	neutral	Soldier 1	8	0	Stunt_Saber_01		1	0	10	10/10/10/10					
+n_sullustan01	Sullustan	neutral	Soldier 1	11	0	Alien_Sullustan		1	0	10	10/10/10/10	m+0/2.5				
+n_swoopgang	Swoop Gang	hostile	Soldier 1	8	0	Swoop_Gang_01		1	0	10	10/10/10/10	m+0/2.5				
+n_trandobrn	Trandoshan {Brown}	neutral	Minion 5	27	0	Alien_Trandoshan_02		5	8	9	8/8/8/8	m+0/2.5				
+n_trandogrn	Trandoshan {Green}	neutral	Minion 5	27	0	Alien_Trandoshan_01		5	8	9	8/8/8/8	m+0/2.5				
+n_tsfcmdr	Republic Officer	neutral	Soldier 1	8	0	TSF_Commander_Mal_01		1	0	10	10/10/10/10	m+0/2.5				
+n_tsfoff	Republic Soldier	neutral	Soldier 1	8	0	TSF_Officer_Mal_01		1	0	10	10/10/10/10	m+0/2.5				
+n_tusken	Sand People Warrior	hostile	Minion 1	8	0	Alien_Sand_People_01	g_w_gaffi001	1	8	12	12/14/10/10	m+0/2.5				
+n_tuskenf01	Sand People Peasant	neutral	Minion 1	8	0	Alien_Sand_Person_Female		1	8	11	13/12/10/10	m+0/2.5				
+n_twilekf	Twi'lek	neutral	Soldier 1	8	0	Twilek_Female_01_A		1	0	10	10/10/10/10	m+0/2.5				
+n_twilekm	Twi'lek	neutral	Soldier 1	8	0	Twilek_Male_01_C		1	0	10	10/10/10/10	m+0/2.5				
+n_walrusman	Aqualish	neutral	Soldier 1	8	0	Alien_Walrusman		1	0	10	10/10/10/10	m+0/2.5				
+n_weequay01	Weequay	neutral	Soldier 1	11	0	Alien_Weeqay		1	0	10	10/10/10/10	m+0/2.5				
+n_wookief	Wookie	neutral	Soldier 1	8	0	Alien_Wookie_Female_01		1	0	10	10/10/10/10	m+0/2.5				
+n_wookiem	Wookie	neutral	Soldier 1	8	0	Alien_Wookie_Male_02		1	0	10	10/10/10/10	m+0/2.5				
+n_yoda	Vandar	hostile	Jedi Guardian 1	8	0	Unique_Vandar		1	3	13	13/12/10/15	m+0/2.5				
+ond_officer	Sith Soldier	neutral	Soldier 7	76	0	Onderon_Officer_Mal_01	g_w_rptnblstr01	7	0	14	14/14/16/14	m+0/2.5				
+ond_soldier	Sith Soldier	neutral	Soldier 4	32	0	Onderon_Soldier_Mal_01	g_w_hvyblstr01	4	0	11	12/12/12/10	m+0/2.5				
+p_atris	Atris	friendly	Jedi Consular 15	18	0	Party_NPC_Atris	g_w_qtrstaff01	15	4	21	10/16/10/16	m+0/2.5				1
+p_atton	Atton	friendly	Scoundrel 3	24	0	Party_NPC_Atton		3	2	21	12/16/12/10	m+0/2.5				2
+p_baodur	Bao-Dur	friendly	Tech Specialist 6	48	0	Party_NPC_BaoDur	w_blaste_01	6	9	10	14/10/14/14	r+0/4.6				1
+p_bastilla	Bastila	friendly	Jedi Sentinel 3	27	0	Party_NPC_Bastila		3	5	18	12/18/12/12	m+0/2.5	FORCE_PUSH:18,STUN:18,LIGHT_SABER_THROW:18			1
+p_cand	Canderous	friendly	Soldier 5	65	0	Party_NPC_Cand	g_w_hvrptbltr002	5	0	11	15/12/14/14	m+0/2.5				3
+p_carth	Carth	friendly	Soldier 4	44	0	Party_NPC_Carth	g_w_blstrpstl010+g_w_blstrpstl001	4	0	13	13/16/12/10	m+0/2.5				2
+p_disciple	Disciple	friendly	Soldier 6	78	0	Party_NPC_Discipile	vibrocutter	6	0	14	12/14/14/15	m+0/5.1				3
+p_g0t0	G0-T0	friendly	Expert Droid 6	66	0	Party_NPC_G0T0	w_blaste_10	6	7	28	8/18/16/10	r+1/5.5	DROID_ITEM_GRAVITY_GENERATOR_1:0,DROID_ITEM_STUN_RAY_2:0,DROID_ITEM_STUN_RAY_2:0,DROID_ITEM_GRAVITY_GENERATOR_1:0			
+p_handmaiden	Handmaiden	friendly	Soldier 6	78	0	Party_NPC_Handmaiden	w_melee_x01	6	0	15	14/16/14/10	mx+2/7.8				2
+p_hanharr	Hanharr	friendly	Scout 4	52	0	Party_NPC_Hanharr	w_melee_19+w_melee_19	4	1	11	18/13/18/12	m-3/6.3;mh-9/6.4				3
+p_hk47	HK-47	friendly	Combat Droid 6	72	0	Party_NPC_HK47	w_brifle_04	6	6	23	16/16/11/12	r+1/6.4				1
+p_jolee	Jolee	friendly	Jedi Consular 6	42	0	Party_NPC_Jolee	g_w_lghtsbr03	6	4	21	12/16/12/15	m+2/11.1	DROID_DISABLE:12a,FORCE_PUSH:18,STUN:22,DROID_STUN:12a,LIGHT_SABER_THROW:18		1	
+p_juhani	Juhani	friendly	Jedi Guardian 6	78	0	Party_NPC_Juhani	g_w_lghtsbr01	6	3	19	13/16/14/12	m+0/11.2	FORCE_PUSH:19,SLOW:23,STUN:19,LIGHT_SABER_THROW:19			1
+p_kreia	Kreia	friendly	Jedi Consular 3	18	0	Party_NPC_Kreia		3	4	16	10/12/14/16	m+1/2.5	FEAR:14,FORCE_PUSH:19			
+p_kreia_evil	Kreia {Evil}	friendly	Jedi Consular 20	160	0	Party_NPC_Kreia_Evil	g_w_qtrstaff01	20	4	23	10/16/14/16	m+0/2.5				1
+p_mand	Mandalore	friendly	Soldier 5	65	0	Party_NPC_Mandalore	w_brifle_10	5	0	22	15/12/14/14	r+0/7.1				4
+p_mira	Mira	friendly	Scout 6	54	0	Party_NPC_Mira		6	1	19	14/16/13/12	m+1/2.5				3
+p_mission	Mission	friendly	Scoundrel 3	21	0	Party_NPC_Mission	g_w_blstrpstl001	3	2	18	10/16/12/11	m+1/2.5				2
+p_remote	Remote	friendly	Combat Droid 1	150	0	Droid_SensorBall	w_blaste_03	1	6	18	10/18/10/10	r+0/2.5				
+p_t3m4	T3-M4	friendly	Expert Droid 3	30	0	Party_NPC_T3M3	mininglaser	3	7							
+p_visas	Visas	friendly	Sith Assassin 6	48	0	Party_NPC_Visas		6	16	23	12/16/10/12	m+0/2.5	FEAR:10,FORCE_PUSH:17,HORROR:10,SHOCK:14,WOUND:14,SLOW:14			1
+p_zaalbar	Zaalbar	friendly	Scout 4	52	0	Party_NPC_Zaalbar		4	1	11	20/13/20/12	m+0/2.5				3
+per_miner_01	Taris Citizen	neutral	Jedi Guardian 1	8	0	PER_Miner_Mal_01		1	3	13	13/12/10/15	m+0/2.5				
+toryn	toryn	faction 4	Scout 3	14	0	Republic_Officer_Fem_Old_Black		3	1	9	8/8/8/8	m+0/2.5				

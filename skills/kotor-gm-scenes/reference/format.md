@@ -20,6 +20,7 @@ The beats wait in the GM panel, and the GM runs them one at a time.
   "content": "tsl",                     // the game the GM runs: actors' and props' templates come from it
   "area": { "game": "kotor", "module": "danm13", "reason": "Why this area stands in for the story's place." },
   "settings": { "npcAi": true, "deathRule": "kotor" },   // optional
+  "party": { "size": 4, "level": 6, "difficulty": "hard" },   // who the players are, and how hard the fights should be (see Encounters)
 
   "players": {
     "at": { "spot": "waypoint:dan13_wp_pc01", "offset": [0, -2], "formation": "line" },
@@ -92,10 +93,17 @@ The floor map is flat: where floors stack (a walkway over a hall), they're merge
   "bark": "Line spoken when a player clicks them.",
   "stance": "meditate",                   // optional: held while idle (see Stances and gestures)
   "order": { "kind": "attack", "target": "jedi" },   // optional standing order (see Orders)
-  "customize": { "hp": 150, "rightHand": "g_w_lghtsbr02", "appearance": "Dark_Jedi_Male_01" },  // optional
+  "customize": { "level": 8, "hp": 150, "rightHand": "g_w_lghtsbr02", "appearance": "Dark_Jedi_Male_01" },  // optional (see below)
   "loot": ["g_i_credits001"]              // optional items from catalog/<content>/items.tsv
 }
 ```
+
+**Customize** changes an actor from its template:
+- `level` (1 to 50) and `class` restat it: the game rebuilds it at that level, as levelling up would. It gets its class's feats, Force powers (dark side for hostiles), skills, vitality and Force points for the level. It keeps its look, gear and its own special abilities.
+  - Going down, its Strength, Dexterity, Constitution and Wisdom shrink with it, but not below 14. Going up, its main ability gains a point per four levels.
+  - `class` is a name or number from `catalog/<content>/classes.tsv` (`"Soldier"`, `"Jedi Guardian"`, `"Combat Droid"`, `"Minion"` for beasts). Without it, it keeps its own (its first, for multiclass templates).
+- `hp` sets its vitality (after a restat too).
+- `rightHand`, `leftHand`, `armor` re-equip it (items from `items.tsv`; its `combat` column gives a weapon's average damage and attack bonus, and armour's AC). `appearance` reskins it: an `appearance.2da` label.
 
 **Factions:**
 - *hostile* creatures fight *friendly* ones and the players.
@@ -155,6 +163,53 @@ One seat per seated actor: give a group a seat each (props and actors with the s
 | Rakata bench | `plc_rbench` | `plc_rbench` |
 
 In KotOR II `plc_chair1` is a food pile, not a chair.
+
+## Encounters
+
+Fights should suit the party. Say who the players are, and the checker rates every fight the plan stages:
+
+```jsonc
+"party": { "size": 4, "level": 6, "difficulty": "medium" }
+// or each player: "party": { "members": [ { "level": 6, "class": "Jedi Guardian" }, { "level": 5 } ], "difficulty": "hard" }
+```
+
+`difficulty` is the fight you want: `trivial`, `easy`, `medium`, `hard` or `deadly`. The checker notes when the hardest fight misses it.
+
+**How the rating works.** `creatures.tsv` measures each template with the game's own combat rules:
+- `level`, `class`, `hp`, `fp`, `ac` and `abilities` (Str/Dex/Con/Wis);
+- `attacks`: each attack it makes per round, as `<kind><bonus>/<damage>`:
+  - `<kind>`: `m` melee, `r` ranged; `md` is melee on Dexterity.
+  - `<bonus>`: the weapon's and feats' attack bonus, on top of its base attack and ability modifier.
+  - `<damage>`: the average dice damage, before Strength.
+  - Flags: `h` off hand (half Strength), `x` two-handed (one and a half), `c` no Strength.
+- `powers`: its hostile Force powers with their cost (`a` = area);
+- `grenades`, `heals` (healing powers and items) and `feats` (combat feats).
+
+From these, the checker works out the actor as the plan has it (restatted, re-equipped), and each player character from the party's level. Every combatant gets two numbers:
+- **offense:** expected damage per round against the other side's AC, counting its powers while its Force points last, and its grenades;
+- **health:** vitality plus healing.
+
+Each side's strength is its total offense times its total health (Lanchester's square law: numbers count twice). From the two strengths it works out how much of its strength the party loses winning, or whether it loses:
+
+| Rating | The party loses | Feels like |
+|---|---|---|
+| trivial | under 10% | a warm-up |
+| easy | under 25% | a few hits taken |
+| medium | under 40% | a real fight; medpacs used |
+| hard | under 60% | someone goes down; Force points and grenades spent |
+| deadly | 60% or more, or the fight | a likely wipe |
+
+A fight is the hostiles fighting at the start, then each beat that reveals or turns hostiles. Each fight is rated alone, as if earlier ones were over. Friendly actors fight on the players' side. While the players are frozen, the fight is rated for their allies alone.
+
+It's an estimate: terrain, cover, focus fire and the players' tactics change fights. Use it to land in the right band, and adjust from the in-game check.
+
+**Making a fight fit**, in this order:
+1. **Numbers:** add or remove enemies. Numbers count twice.
+2. **Level:** `customize.level` restats an actor. It's the way to use a template whose level is wrong for the party: a level-4 Dark Jedi Apprentice at level 10 for a level-8 party.
+3. **Gear:** a better or worse weapon (`rightHand`), or `hp`.
+4. **Template:** a different creature.
+
+Some monsters stay strong at any level, because their claws' damage is part of the claw item, not their level. A rancor hits for about 60 a claw whatever its level. Use them as set pieces, or for parties that can take them (`level` around 15+).
 
 ## Orders
 

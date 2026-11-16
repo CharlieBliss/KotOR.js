@@ -80,6 +80,22 @@ describe("scene plans", () => {
     ]));
   });
 
+  test("customize.level restats an actor: a whole level 1 to 50, and a class by name or number", () => {
+    const at = (customize: any) => GMScenePlan.validate(plan({ actors: [{ id: "a", template: "x", faction: "hostile", at: { spot: "entry" }, customize }], props: [], beats: [] }))
+      .filter((p) => p.level === "error").map((p) => p.message);
+    expect(at({ level: 8 })).toEqual([]);
+    expect(at({ level: 0 })).toContain("customize.level is a whole number, 1 to 50.");
+    expect(at({ level: 7.5 })).toContain("customize.level is a whole number, 1 to 50.");
+
+    (GameState as any).TwoDAManager = { datatables: new Map([["classes", { rows: { 0: { label: "Soldier", name: "****" }, 3: { label: "JediGuardian", name: "****" }, 8: { label: "Minion", name: "****" } } }]]) };
+    (GameState as any).TLKManager = { GetStringById: () => ({ Value: "" }) };
+    expect(GMScenePlan.classIdOf("jedi guardian")).toBe(3);
+    expect(GMScenePlan.classIdOf("Jedi_Guardian")).toBe(3);
+    expect(GMScenePlan.classIdOf("minion")).toBe(8);
+    expect(GMScenePlan.classIdOf(0)).toBe(0);
+    expect(GMScenePlan.classIdOf("Bounty Hunter")).toBeUndefined();
+  });
+
   test("content from the other game is only a warning; the area of the other game is borrowed", () => {
     const problems = GMScenePlan.validate(plan({ content: "kotor" }));
     expect(problems.find((p) => p.where === "content")?.level).toBe("warning");

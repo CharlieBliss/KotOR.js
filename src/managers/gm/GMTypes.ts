@@ -51,6 +51,12 @@ export interface GMCreatureSpawnConfig {
   onlyIn?: 'kotor' | 'tsl';
   /** Items the creature carries, lootable from its body once it dies */
   lootResRefs?: string[];
+  /**
+   * Rebuild a template at another level (and optionally class), as levelling up would: its class levels, feats,
+   * Force powers, skills, vitality and Force points. Its look, gear and its own special feats stay. hp, when
+   * given, is its vitality instead of the class's.
+   */
+  restat?: { level: number; classId?: number; hp?: number };
 }
 
 /** A check the GM calls for: a skill (SKILL_*) or a saving throw */
