@@ -570,6 +570,7 @@ export class GMPlayers {
     levelup: (actor) => GMPlayers.levelUpOnHost(actor),
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
     cancel: () => false,
+    wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
     mine: (actor, intent) => {
       actor.gmNetTarget = undefined;
       return GMMines.useMineOnHost(actor, intent).then((ok) => {

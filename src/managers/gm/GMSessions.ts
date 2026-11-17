@@ -291,6 +291,7 @@ export class GMSessions {
   static async loadSession(save: GMSessionSave): Promise<boolean> {
     if (!save?.scene?.module) return false;
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
+    if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 

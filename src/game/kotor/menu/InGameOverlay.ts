@@ -945,15 +945,24 @@ export class InGameOverlay extends GameMenu {
     if (!oPC) return;
     GameState.ActionMenuManager.SetPC(oPC);
     GameState.ActionMenuManager.SetTarget(GameState.CursorManager.selectedObject);
-    GameState.ActionMenuManager.UpdateMenuActions();
-    this.UpdateTargetUIPanels();
-    this.UpdateSelfUIPanels();
-    this.UpdateHUDNotificationIcons(delta);
 
     //update minimap
     this.miniMap.setPosition(oPC.position.x, oPC.position.y);
     this.miniMap.setRotation(GameState.controls.camera.rotation.z);
     this.miniMap.render(delta);
+
+    // The mode draws its own targeting, actions, queue and portrait: only the map, menus and notices are ours
+    const customHud = !!GameState.hooks.ownsCombatHud();
+    if (customHud !== this.combatPanelsHidden) this.setCombatPanelsHidden(customHud);
+    if (customHud) {
+      this.UpdateHUDNotificationIcons(delta);
+      return;
+    }
+
+    GameState.ActionMenuManager.UpdateMenuActions();
+    this.UpdateTargetUIPanels();
+    this.UpdateSelfUIPanels();
+    this.UpdateHUDNotificationIcons(delta);
 
     this.TogglePartyMember(0, false);
     this.TogglePartyMember(1, false);
@@ -1009,6 +1018,31 @@ export class InGameOverlay extends GameMenu {
     } else {
       this.hideCombatUI();
     }
+  }
+
+  /** Whether KotOR's combat panels are hidden for a mode's own HUD (ownsCombatHud) */
+  combatPanelsHidden: boolean = false;
+
+  /** Hide (or bring back) the target frame and its actions, the action slots, the combat queue and the party */
+  setCombatPanelsHidden(hidden: boolean) {
+    this.combatPanelsHidden = hidden;
+    const each = (fn: (name: string) => void) => {
+      for (let i = 0; i < 6; i++) {
+        for (const prefix of ['BTN_ACTION', 'LBL_ACTION', 'BTN_ACTIONUP', 'BTN_ACTIONDOWN']) fn(prefix + i);
+      }
+    };
+    if (!hidden) {
+      each((name) => (this as any)[name]?.show?.());
+      return;
+    }
+    for (const name of ['LBL_NAME', 'LBL_NAMEBG', 'PB_HEALTH', 'LBL_HEALTHBG', 'LBL_ACTIONDESC', 'LBL_ACTIONDESCBG']) (this as any)[name]?.hide?.();
+    for (let i = 0; i < 3; i++) {
+      for (const prefix of ['BTN_TARGET', 'LBL_TARGET', 'BTN_TARGETUP', 'BTN_TARGETDOWN']) (this as any)[prefix + i]?.hide?.();
+      this.TogglePartyMember(i, false);
+    }
+    each((name) => (this as any)[name]?.hide?.());
+    this.hideCombatUI();
+    if (this.namePlateArrow) this.namePlateArrow.visible = false;
   }
 
   /**

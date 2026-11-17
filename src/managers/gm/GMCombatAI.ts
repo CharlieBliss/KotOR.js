@@ -125,7 +125,7 @@ export class GMCombatAI {
     // The AI closing a round itself (startFresh) isn't a round to decide on
     if (npc.gmCombatClosingRound) return;
     const GM = GameState.GMManager;
-    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldPaused) return;
+    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldHeld()) return;
     if (!GM.isAutonomousNpc(npc)) return;
     // With the GM's NPC AI off, only NPCs under an order fight on
     if (!GM.npcAiEnabled && !GMNpcOrders.getOrder(npc)) return;

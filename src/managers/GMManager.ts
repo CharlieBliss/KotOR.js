@@ -36,6 +36,7 @@ import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
 import { GMCutscene } from "@/managers/gm/GMCutscene";
+import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMHistory } from "@/managers/gm/GMHistory";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
@@ -123,7 +124,65 @@ export class GMManager {
   static sceneStartPoint: THREE.Vector3 | null = null;
 
   static sessionRules(): GMSessionRules {
-    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state() };
+    return {
+      deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state(),
+      tacticalPause: { enabled: this.tacticalPause, by: [...this.wheelHolds.values()].map((h) => h.name) },
+    };
+  }
+
+  /** Session rule: a player opening their power wheel holds the world until they pick (or WHEEL_HOLD_SECONDS pass) */
+  static tacticalPause: boolean = false;
+
+  /** The longest one open wheel holds the world (seconds), so nobody can stall the table */
+  static WHEEL_HOLD_SECONDS: number = 12;
+
+  /** Host: players holding the world with an open power wheel (peer id -> who, and until when) */
+  static wheelHolds: Map<string, { name: string; until: number }> = new Map();
+
+  static setTacticalPause(on: boolean) {
+    this.tacticalPause = !!on;
+    if (!on) this.wheelHolds.clear();
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+  }
+
+  /** Host: a player opened or closed their power wheel. Under the tactical pause rule, an open wheel holds the world */
+  static holdForWheel(peerId: string, name: string, open: boolean) {
+    const had = this.wheelHolds.has(peerId);
+    if (open && this.tacticalPause) this.wheelHolds.set(peerId, { name, until: Date.now() + this.WHEEL_HOLD_SECONDS * 1000 });
+    else this.wheelHolds.delete(peerId);
+    if (had !== this.wheelHolds.has(peerId)) {
+      GMLog.info('host', open ? `${name} opened their power wheel: the world holds (tactical pause)` : `${name} closed their power wheel`);
+      GMNetworkManager.broadcastSessionRules(this.sessionRules());
+      this.notifyChange();
+    }
+  }
+
+  /**
+   * Whether the world holds still: the GM paused it, or (tactical pause) a player is choosing from their power wheel.
+   * On a player's machine, the host's word on wheels (the session rules).
+   */
+  static worldHeld(): boolean {
+    if (this.worldPaused) return true;
+    if (GMNetworkManager.role === 'client') return !!GMNetworkManager.sessionRules?.tacticalPause?.by?.length;
+    return this.wheelHolds.size > 0;
+  }
+
+  /** Host: let go of wheels held too long (or by players who left) */
+  static expireWheelHolds() {
+    if (!this.wheelHolds.size) return;
+    const now = Date.now();
+    let changed = false;
+    for (const [peerId, hold] of this.wheelHolds) {
+      if (hold.until <= now || !GMNetworkManager.peers.has(peerId)) {
+        this.wheelHolds.delete(peerId);
+        changed = true;
+      }
+    }
+    if (changed) {
+      GMNetworkManager.broadcastSessionRules(this.sessionRules());
+      this.notifyChange();
+    }
   }
 
   static setPlayersFrozen(on: boolean) {
@@ -1285,9 +1344,10 @@ export class GMManager {
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);
     GMCutscene.update(delta);
+    if (GMNetworkManager.role === 'host') this.expireWheelHolds();
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
-    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+    if (GMNetworkManager.role !== 'client' && !this.worldHeld() && !this.sceneLoading) {
       GMPlayers.downedTimer += delta;
       if (GMPlayers.downedTimer >= GMPlayers.DOWNED_CHECK_INTERVAL) {
         GMPlayers.updateDownedPlayers(GMPlayers.downedTimer);
@@ -1296,7 +1356,7 @@ export class GMManager {
     }
 
     // NPCs run on the GM's machine only; players see the result through the world updates
-    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+    if (GMNetworkManager.role !== 'client' && !this.worldHeld() && !this.sceneLoading) {
       this.npcAiTimer += delta;
       if (this.npcAiTimer >= this.NPC_AI_INTERVAL) {
         this.npcAiTimer = 0;
@@ -1377,7 +1437,8 @@ export class GMManager {
     routeContainerOpen: (container, user) => GMPlayers.routeContainerOpen(container, user),
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
-    isWorldPaused: () => !!GMManager.worldPaused,
+    isWorldPaused: () => GMManager.worldHeld(),
+    ownsCombatHud: () => GMPlayerHud.active(),
     cutsceneCamera: () => GMCutscene.renderCamera(),
     isPlayerFrozen: (creature) => GMManager.isPlayerFrozen(creature),
     isPlayerCharacter: (obj) => GMManager.isPlayerCharacter(obj),

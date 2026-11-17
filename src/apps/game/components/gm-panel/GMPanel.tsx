@@ -18,6 +18,7 @@ import { ContextMenu } from "@/apps/game/components/gm-panel/overlays/ContextMen
 import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
 import { CombatTracker, anyoneFighting } from "@/apps/game/components/gm-panel/overlays/CombatTracker";
 import { CutsceneOverlay } from "@/apps/game/components/gm-panel/overlays/CutsceneOverlay";
+import { PlayerHud } from "@/apps/game/components/gm-panel/overlays/PlayerHud";
 import { wireRecentPlacements } from "@/apps/game/components/gm-panel/controls/quickActions";
 import { installGameCursor } from "@/apps/game/components/gm-panel/gameCursor";
 import "@/apps/game/components/gm-panel/gm-cursor.scss";
@@ -263,7 +264,8 @@ export const GMPanel: React.FC = () => {
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
   if (isPlayerView) {
-    controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Tab', 'next target'], ['Esc', 'options']];
+    // The player's HUD labels its own keys; before it's up (no character yet), the basics
+    controlHints = KotOR.GMPlayerHud.active() ? [] : [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
   } else if (GMViewport.isPlacementTool(tool)) {
     statusChip = `Placing: ${placingName || 'object'} · ${GMViewport.placementYawOffset}°`;
     controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc / Right-click', 'done']];
@@ -308,7 +310,7 @@ export const GMPanel: React.FC = () => {
   const inConversation = KotOR.GameState.Mode === KotOR.EngineMode.DIALOG;
 
   return (
-    <div className={`gm-panel-root ${inConversation ? 'in-conversation' : ''}`}>
+    <div className={`gm-panel-root ${inConversation ? 'in-conversation' : ''} ${isPlayerView ? 'player-view' : ''}`}>
       {/* GM toolbar: status, drawer tabs, then viewport tools and mode controls */}
       <div className="gm-topbar">
         <div className="gm-topbar-group">
@@ -425,7 +427,7 @@ export const GMPanel: React.FC = () => {
               }}
               title="Freeze movement, combat and effects for everyone"
             >
-              {GMManager.worldPaused ? 'Paused' : 'Pause'}
+              {GMManager.worldPaused ? 'Paused' : GMManager.wheelHolds.size ? 'Held: power wheel' : 'Pause'}
             </button>
             <button
               className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
@@ -476,6 +478,9 @@ export const GMPanel: React.FC = () => {
       {/* A cutscene: widescreen bars and the caption (and, for the GM, the director's dock) */}
       <CutsceneOverlay />
 
+      {/* A player's combat HUD: target frame, power bar (1–8), power wheel (Q), and their own vitality and Force */}
+      {isPlayerView && <PlayerHud onOpenSheet={() => setSheet(sheet && !sheet.gmView ? null : { creature: null, section: 'overview', gmView: false })} />}
+
       {/* Our character is down: what happens next, by the session's rule */}
       {isPlayerView && <DownedBanner />}
 
@@ -494,7 +499,7 @@ export const GMPanel: React.FC = () => {
       {GMNetworkManager.role !== 'offline' && <RollFeed />}
 
       {/* Bottom controls strip: what the current mode/tool does and its keys (the cutscene's dock takes its place) */}
-      <div className="gm-controls-strip" style={KotOR.GMCutscene.active ? { display: 'none' } : undefined}>
+      <div className="gm-controls-strip" style={KotOR.GMCutscene.active || (!statusChip && !controlHints.length) ? { display: 'none' } : undefined}>
         {statusChip && <span className="gm-chip">{statusChip}</span>}
         {controlHints.map(([keys, label]) => (
           <span key={keys} className="gm-control-hint">

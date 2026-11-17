@@ -1,0 +1,177 @@
+import { beforeEach, describe, expect, jest, test } from "@jest/globals";
+
+jest.mock("@/GameState", () => ({ GameState: { gmMode: true } }));
+jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
+jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
+jest.mock("@/engine/rules/CharacterRules", () => ({ CharacterRules: { text: (_s: any, fallback = '') => fallback } }));
+
+import * as THREE from "three";
+import { GameState } from "@/GameState";
+import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
+import { GMNetworkManager } from "@/managers/GMNetworkManager";
+import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+
+const spell = (id: number, label: string, cols: Record<string, any>, cost = 10) => ({
+  id, label, name: -1, iconresref: `ip_${id}`, forcehostile: '****', forcefriendly: '****', range: 'M', ...cols,
+  getForcePointCost: () => cost,
+});
+const item = (resRef: string, use: 'self' | 'hostile', stack = 1) => ({
+  getUseTargeting: () => use, getItemResRef: () => resRef, getStackSize: () => stack, getName: () => resRef, getIcon: () => `i_${resRef}`,
+});
+
+function creature(name: string, x: number, o: Record<string, any> = {}): any {
+  return {
+    name, objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModuleCreature,
+    position: new THREE.Vector3(x, 0, 0), dead: false, hostile: false, friendly: false,
+    fp: 30, spells: [] as any[], feats: [] as any[], inventory: [] as any[], equipment: {}, weaponType: 1,
+    getName() { return this.name; }, isDead() { return this.dead; },
+    isHostile() { return this.hostile; }, isFriendly() { return this.friendly; },
+    getFP() { return this.fp; }, getSpells() { return this.spells; }, getFeats() { return this.feats; },
+    getInventory() { return this.inventory; }, getEquippedWeaponType() { return this.weaponType; },
+    ...o,
+  };
+}
+
+let pc: any;
+let creatures: any[];
+const runMenuItem = jest.fn();
+
+beforeEach(() => {
+  pc = creature('Hero', 0);
+  creatures = [pc];
+  runMenuItem.mockReset();
+  const G: any = GameState;
+  G.getCurrentPlayer = () => pc;
+  G.module = { area: { creatures } };
+  G.hooks = { isPlayerCharacter: (o: any) => !!o?.isPC };
+  G.CursorManager = {
+    selectedObject: undefined,
+    setReticleSelectedObject(o: any) { this.selectedObject = o; },
+    setReticleHoveredObject() { /* the hover reticle */ },
+  };
+  G.ActionMenuManager = { SetPC: jest.fn(), runMenuItem };
+  G.GameKey = 'kotor';
+  (GMNetworkManager as any).sessionRules = { deathRule: 'kotor' };
+});
+
+describe('what a player can use', () => {
+  test('attack, combat feats for the weapon in hand, hostile then friendly powers, then grenades and medpacs', () => {
+    pc.feats = [
+      { __index: 28, category: 0x1104, successor: 29, icon: 'ip_pa', label: 'Power Attack' },
+      { __index: 29, category: 0x1104, successor: '****', icon: 'ip_ipa', label: 'Improved Power Attack' },
+      { __index: 26, category: 0x1111, successor: '****', icon: 'ip_rf', label: 'Rapid Shot' },
+    ];
+    pc.spells = [spell(28, 'Heal', { forcefriendly: '0', range: 'T' }, 20), spell(35, 'Lightning', { forcehostile: '5' }, 40), spell(8, 'Speed', { forcefriendly: '2', range: 'P' }, 5)];
+    pc.inventory = [item('medpac', 'self', 3), item('frag', 'hostile', 2), item('frag', 'hostile', 1)];
+    const list = GMPlayerHud.abilities(pc);
+    expect(list.map((a) => a.key)).toEqual(['attack', 'feat:29', 'feat:26', 'power:35', 'power:28', 'power:8', 'item:frag', 'item:medpac']);
+    const by = new Map(list.map((a) => [a.key, a]));
+    expect(by.get('feat:26')!.usable).toBe(false);
+    expect(by.get('feat:26')!.why).toMatch(/ranged/);
+    expect(by.get('power:35')).toMatchObject({ aim: 'enemy', cost: 40, usable: false });
+    expect(by.get('power:28')).toMatchObject({ aim: 'ally', usable: true });
+    expect(by.get('power:8')).toMatchObject({ aim: 'self' });
+    expect(by.get('item:frag')).toMatchObject({ aim: 'enemy', count: 3 });
+    expect(by.get('item:medpac')).toMatchObject({ aim: 'self', count: 3 });
+  });
+
+  test("a power's empty hostile or friendly cell (-1 once loaded) doesn't count; a personal power is cast on you", () => {
+    pc.spells = [
+      spell(8, 'Speed', { forcehostile: -1, forcefriendly: 2, range: 'P' }),
+      spell(28, 'Heal', { forcehostile: -1, forcefriendly: 0, range: 'T' }),
+      spell(35, 'Lightning', { forcehostile: 5, forcefriendly: -1 }),
+      spell(138, 'Battle Meditation', { forcehostile: 1, forcefriendly: 1, range: 'P' }),
+    ];
+    const aims = Object.fromEntries(GMPlayerHud.abilities(pc).filter((a) => a.kind === 'power').map((a) => [a.name, a.aim]));
+    expect(aims).toEqual({ Lightning: 'enemy', 'Battle Meditation': 'self', Speed: 'self', Heal: 'ally' });
+  });
+
+  test('the default bar: offensive powers and grenades first, no plain attack, eight slots', () => {
+    pc.spells = [spell(28, 'Heal', { forcefriendly: '0' }), spell(35, 'Lightning', { forcehostile: '5' })];
+    pc.inventory = [item('medpac', 'self'), item('frag', 'hostile')];
+    const bar = GMPlayerHud.defaultLoadout(GMPlayerHud.abilities(pc));
+    expect(bar).toHaveLength(8);
+    expect(bar.slice(0, 4)).toEqual(['power:35', 'item:frag', 'power:28', 'item:medpac']);
+    expect(bar).not.toContain('attack');
+  });
+});
+
+describe('aiming', () => {
+  test('a hostile use goes to the enemy target, else the nearest enemy, which becomes the target', () => {
+    const far = creature('Far', 20, { hostile: true }), near = creature('Near', 5, { hostile: true }), dead = creature('Dead', 1, { hostile: true, dead: true });
+    creatures.push(far, near, dead);
+    expect(GMPlayerHud.targetFor('enemy')).toBe(near);
+    expect(GameState.CursorManager.selectedObject).toBe(near);
+    GameState.CursorManager.selectedObject = far;
+    expect(GMPlayerHud.targetFor('enemy')).toBe(far);
+  });
+
+  test('no enemy around: nothing to aim at, and nothing is sent', () => {
+    creatures.push(creature('Friend', 3, { friendly: true }));
+    expect(GMPlayerHud.targetFor('enemy')).toBeUndefined();
+    expect(GMPlayerHud.use({ key: 'attack', kind: 'attack', name: 'Attack', icon: '', aim: 'enemy', cost: 0, usable: true, entry: {} }))
+      .toMatchObject({ ok: false, message: 'No enemy in sight' });
+    expect(runMenuItem).not.toHaveBeenCalled();
+  });
+
+  test('a friendly power goes to the selected ally, else you; a personal one always to you', () => {
+    const ally = creature('Ally', 4, { isPC: true });
+    creatures.push(ally);
+    expect(GMPlayerHud.targetFor('ally')).toBe(pc);
+    GameState.CursorManager.selectedObject = ally;
+    expect(GMPlayerHud.targetFor('ally')).toBe(ally);
+    expect(GMPlayerHud.targetFor('self')).toBe(pc);
+  });
+
+  test('a use runs through the action menu with its target; one that cannot be used says why', () => {
+    const foe = creature('Foe', 3, { hostile: true });
+    creatures.push(foe);
+    const entry = { talent: {} };
+    expect(GMPlayerHud.use({ key: 'power:35', kind: 'power', name: 'Lightning', icon: '', aim: 'enemy', cost: 5, usable: true, entry }).ok).toBe(true);
+    expect(runMenuItem).toHaveBeenCalledWith(entry, foe);
+    expect(GMPlayerHud.use({ key: 'power:36', kind: 'power', name: 'Storm', icon: '', aim: 'enemy', cost: 50, usable: false, why: 'Needs 50 Force', entry }))
+      .toMatchObject({ ok: false, message: 'Needs 50 Force' });
+    expect(runMenuItem).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Tab targeting', () => {
+  test('Tab steps through living, visible enemies in reach, nearest first, and wraps; Shift+Tab through allies', () => {
+    const a = creature('A', 3, { hostile: true }), b = creature('B', 8, { hostile: true }), hidden = creature('Hidden', 2, { hostile: true, gmHidden: true });
+    const out = creature('Out', 80, { hostile: true }), ally = creature('Ally', 6, { friendly: true });
+    creatures.push(b, a, hidden, out, ally);
+    expect(GMPlayerHud.cycle('enemy')).toBe(a);
+    expect(GMPlayerHud.cycle('enemy')).toBe(b);
+    expect(GMPlayerHud.cycle('enemy')).toBe(a);
+    expect(GMPlayerHud.cycle('ally')).toBe(ally);
+  });
+
+  test('the target falls: the next nearest enemy is picked', () => {
+    const a = creature('A', 3, { hostile: true }), b = creature('B', 8, { hostile: true });
+    creatures.push(a, b);
+    GameState.CursorManager.selectedObject = a;
+    expect(GMPlayerHud.retargetAfterKill()).toBeUndefined();
+    a.dead = true;
+    expect(GMPlayerHud.retargetAfterKill()).toBe(b);
+    expect(GameState.CursorManager.selectedObject).toBe(b);
+  });
+});
+
+describe('the bar is saved per character', () => {
+  test('assigning moves an ability into a slot (out of any other) and is kept; reset brings back the default', () => {
+    const store: Record<string, string> = {};
+    (global as any).localStorage = {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; },
+    };
+    pc.spells = [spell(35, 'Lightning', { forcehostile: '5' }), spell(28, 'Heal', { forcefriendly: '0' })];
+    expect(GMPlayerHud.loadout(pc).slice(0, 2)).toEqual(['power:35', 'power:28']);
+    GMPlayerHud.assignSlot(5, 'power:35', pc);
+    const bar = GMPlayerHud.loadout(pc);
+    expect(bar[0]).toBeNull();
+    expect(bar[5]).toBe('power:35');
+    GMPlayerHud.resetLoadout(pc);
+    expect(GMPlayerHud.loadout(pc)[0]).toBe('power:35');
+  });
+});

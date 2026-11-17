@@ -163,6 +163,14 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </select>
           <div className="gm-hint">You can always revive them from the Players tab.</div>
         </div>
+        <div className="gm-section">
+          <div className="gm-section-title">Power wheel</div>
+          <label className="gm-checkbox" title={`Opening the wheel (Q) pauses everyone for up to ${GMManager.WHEEL_HOLD_SECONDS}s while that player picks`}>
+            <input type="checkbox" checked={GMManager.tacticalPause} onChange={(e) => GMManager.setTacticalPause(e.target.checked)} />
+            Tactical pause: the world waits while a player chooses
+          </label>
+          <div className="gm-hint">Good for one or two players or slow fights. Off: the wheel works in real time. Each pause lasts at most {GMManager.WHEEL_HOLD_SECONDS}s.</div>
+        </div>
         <CreationLimits />
         <details className="gm-section" open={GMSessions.getSavedSessions().length > 0}>
           <summary>Saved sessions <span className="gm-summary-note">{GMSessions.getSavedSessions().length} saved</span></summary>

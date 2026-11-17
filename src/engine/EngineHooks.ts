@@ -61,6 +61,8 @@ export interface EngineHooks {
   isLeaderLocked(): boolean;
   /** A camera to draw the world with instead of the game's own (a GM cutscene on a player's machine), or null */
   cutsceneCamera(): THREE.Camera | null;
+  /** The mode draws its own combat HUD (a GM session's player): KotOR's target, action, queue and party panels hide */
+  ownsCombatHud(): boolean;
   /** The area leaves out its own placeables, creatures or triggers */
   skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean;
 
@@ -120,6 +122,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   skillGatePasses: () => true,
   isLeaderLocked: () => false,
   cutsceneCamera: () => null,
+  ownsCombatHud: () => false,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
   onHostVisualEffectApplied: () => {},

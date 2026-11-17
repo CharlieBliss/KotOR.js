@@ -44,7 +44,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -135,6 +135,8 @@ export interface GMClientIntent {
   mine?: GMMineAction;
   /** roll: the skill or save (older players send abilityId, a skill) */
   check?: GMCheck;
+  /** wheel: the player opened (true) or closed their power wheel (the tactical pause rule holds the world meanwhile) */
+  open?: boolean;
 }
 
 export interface GMPeerInfo {
@@ -213,6 +215,8 @@ export interface GMSessionRules {
   creation?: ICharacterLimits;
   /** A cutscene is on: players watch the GM camera in widescreen (GMCutscene) */
   cutscene?: { active: boolean; caption?: string };
+  /** Tactical pause: a player's open power wheel holds the world; by names who is choosing now */
+  tacticalPause?: { enabled: boolean; by?: string[] };
 }
 
 export interface GMWorldSnapshot {
@@ -271,6 +275,7 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   stealth: { hostDriven: false, interrupts: false },
   levelup: { hostDriven: false, interrupts: false },
   roll: { hostDriven: false, interrupts: false },
+  wheel: { hostDriven: false, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */
@@ -775,7 +780,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {

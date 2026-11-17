@@ -1218,7 +1218,7 @@ describe("GM multiplayer host authority", () => {
       GMNetworkManager.role = "host";
       const broadcast = jest.spyOn(GMNetworkManager, "broadcastSessionRules");
       GMPlayers.setDeathRule("respawn");
-      expect(broadcast).toHaveBeenCalledWith({ deathRule: "respawn", frozen: false, creation: {} });
+      expect(broadcast).toHaveBeenCalledWith({ deathRule: "respawn", frozen: false, creation: {}, tacticalPause: { enabled: false, by: [] } });
 
       GMNetworkManager.role = "client";
       await GMNetworkManager.onPacketReceived({ type: "session.rules", senderId: "gm", timestamp: 0, payload: { deathRule: "gm" } });
