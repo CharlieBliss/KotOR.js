@@ -846,7 +846,9 @@ export class ModuleObject {
     const animations2DA = GameState.TwoDAManager.datatables.get('animations');
     if(animations2DA){
 
-      const debilitatedEffect = this.effects.find( e => e.type == GameEffectType.EffectSetState );
+      // Stunned, held, choking...: that pose, whatever it's doing. Not once dead: killed while held, it kept the
+      // stun pose for "die" and "dead" and never fell (on the GM's machine, where the stun is)
+      const debilitatedEffect = this.isDead() ? undefined : this.effects.find( e => e.type == GameEffectType.EffectSetState );
       if(debilitatedEffect){
         switch(debilitatedEffect.getInt(0)){
           case 1: //Confused

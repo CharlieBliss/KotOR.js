@@ -171,7 +171,10 @@ export class GMCombatAI {
     if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client') return false;
     if (!GMObjectKind.isCreature(npc) || !GM.isAutonomousNpc(npc as ModuleCreature)) return false;
     const cre = npc as ModuleCreature;
-    if (!GM.npcAiEnabled && !cre.gmOrder) return false;
+    // Under the GM's orders (a post, a patrol): the GM decides where it faces. Idle at its post, its scripts kept
+    // turning it to look about
+    if (cre.gmOrder) return true;
+    if (!GM.npcAiEnabled) return false;
     return !!cre.combatData?.combatState;
   }
 

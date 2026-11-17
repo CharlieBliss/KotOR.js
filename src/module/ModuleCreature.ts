@@ -437,7 +437,9 @@ export class ModuleCreature extends ModuleObject {
 
       this.updateLifeState(delta, netReplica);
 
-      if(this.isDebilitated()){
+      // Stunned, held or paralyzed: it stands there. Not once dead: killed while held, it was put back on its feet
+      // every frame and never fell (only where the stun is, the GM's machine; players' copies fell)
+      if(!this.isDead() && this.isDebilitated()){
         this.force = 0;
         this.speed = 0;
         this.setAnimationState(ModuleCreatureAnimState.IDLE);

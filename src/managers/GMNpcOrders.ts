@@ -190,6 +190,10 @@ export class GMNpcOrders {
         if (away && !this.isMoving(cre)) {
           this.stopFighting(cre);
           cre.gmOrderProgress = undefined;
+          // Its post crowded (posts taken up mid-melee end up a step apart): the nearest clear spot beside it is
+          // its post now. They jostled for the same few metres, turning on the spot, after every fight
+          const clear = this.clearSpotNear(cre, order.point, everyone);
+          if (clear) order.point = clear;
           this.moveTo(cre, this.vector(order.point), false);
         }
         return;
@@ -262,6 +266,34 @@ export class GMNpcOrders {
   /** Where it stands, as an order point */
   static here(cre: ModuleCreature): GMPoint {
     return { x: cre.position.x, y: cre.position.y, z: cre.position.z };
+  }
+
+  /** How far apart (m) two creatures' posts need to be to stand on them without jostling */
+  static POST_SPACING = 1.3;
+
+  /**
+   * A spot by point that no one else stands on or holds as their post: the point itself when it's clear, else the
+   * nearest clear one on rings around it (walkable). Null when the point is clear, or nothing nearby is
+   */
+  static clearSpotNear(cre: ModuleCreature, point: GMPoint, everyone: ModuleCreature[]): GMPoint | null {
+    const others = everyone.filter((c) => c && c !== cre && !c.isDead?.());
+    const clear = (p: GMPoint) => others.every((c) =>
+      this.distance2D(c.position, p) >= this.POST_SPACING &&
+      (!c.gmOrder || c.gmOrder.kind !== 'guard' || this.distance2D(c.gmOrder.point, p) >= this.POST_SPACING));
+    if (clear(point)) return null;
+    let best: GMPoint | null = null, bestDistance = Infinity;
+    for (const r of [this.POST_SPACING, this.POST_SPACING * 2, this.POST_SPACING * 3]) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const v = this.walkable(new THREE.Vector3(point.x + Math.cos(a) * r, point.y + Math.sin(a) * r, point.z));
+        const p = { x: v.x, y: v.y, z: v.z };
+        if (this.distance2D(p, point) > r + 0.5 || !clear(p)) continue;
+        const d = this.distance2D(cre.position, p);
+        if (d < bestDistance) { best = p; bestDistance = d; }
+      }
+      if (best) return best;
+    }
+    return null;
   }
 
   /** Someone else (alive) stands on this spot */
