@@ -1,0 +1,352 @@
+/**
+ * GM mode regression checks: the bugs found in play, each staged on purpose and checked on the GM's screen and a
+ * player's, so a fix stays fixed. One boot of a GM and a player in Onderon's throne room (scripts/fixtures/
+ * gm-throne-battle.json), the game running faster than real time, then short checks:
+ *
+ *   held and killed        a creature killed while stunned or held falls (it kept the stun pose on the GM's side)
+ *   shared effects         one beam and one impact a script applies to three creatures: each gets its own, and
+ *                          none is left behind on either screen once it's over (stretched beams, frozen particles)
+ *   passing                two walking head-on, one past someone standing, two together past someone: they step
+ *                          round by their body size and arrive (they went metres out of their way, or stuck)
+ *   crowded posts          guards sent back to the same post settle a step apart and stand still (they jostled
+ *                          and turned on the spot after every fight)
+ *   script facing          an NPC under a GM order isn't turned by its own AI script (k_ai_master spun them)
+ *   loot window            a player's loot window doesn't pause the shared world
+ *   player HUD             the player's own HUD is up and KotOR's combat panels are hidden
+ *   screens agree          GM and player agree on who is dead, and the dead lie down on both
+ *   page errors            no uncaught errors on either screen
+ *
+ * Usage:  npm run test:gm-regress [-- --show] [-- --speed 3] [-- --only passing,loot]
+ * Environment: GM_E2E_URL (default http://localhost:8080). Starts `npm run dev` when nothing is serving it.
+ * Exits non-zero when a check fails.
+ */
+const { app } = require('electron');
+const path = require('path');
+const fs = require('fs');
+const { configureApp, createGameWindow, evalIn, waitFor, bootToMenu, setGameSpeed, sleep } = require('./lib/game-window');
+const { createDevServer } = require('./lib/dev-server');
+const { startGMRelayServer } = require('./gm-server.js');
+
+const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/$/, '');
+const SHOW = process.argv.includes('--show');
+const arg = (name) => { const i = process.argv.indexOf(`--${name}`); return i >= 0 ? process.argv[i + 1] : undefined; };
+const SPEED = Math.max(1, Math.min(4, Number(arg('speed')) || 3));
+const ONLY = (arg('only') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const PORT = 7900 + Math.floor(Math.random() * 50);
+const WS_URL = `ws://localhost:${PORT}`;
+const PLAN = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'gm-throne-battle.json'), 'utf8'));
+
+configureApp(app, 'kotor-gm-regress');
+
+const t0 = Date.now();
+const log = (msg) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${msg}`);
+const results = [];
+class CheckFailed extends Error {}
+const expect = (cond, message) => { if (!cond) throw new CheckFailed(message); };
+
+async function check(id, name, fn) {
+  if (ONLY.length && !ONLY.includes(id)) return;
+  const start = Date.now();
+  try {
+    const details = await fn();
+    results.push({ id, name, ok: true });
+    log(`✔ ${name} (${((Date.now() - start) / 1000).toFixed(1)}s)${details ? ' — ' + details : ''}`);
+  } catch (e) {
+    results.push({ id, name, ok: false, error: e.message });
+    log(`✘ ${name} (${((Date.now() - start) / 1000).toFixed(1)}s) — ${e.message}`);
+  }
+}
+
+/** Helpers put in each page once: finding the cast, staging them, reading what the screen shows */
+function installHelpers(K) {
+  const THREE = window.THREE;
+  const R = window.__R = {};
+  R.creatures = () => [...K.GMManager.netIdMap.values()].filter((o) => o && K.GMObjectKind.isCreature(o));
+  R.named = (re) => R.creatures().filter((o) => new RegExp(re).test(o.getName()));
+  R.byNetId = (id) => K.GMManager.netIdMap.get(id);
+  R.anim = (o) => String(o?.model?.animationManager?.currentAnimation?.name || '').toLowerCase();
+  R.lyingDown = (o) => /^c?(die|dead)\d?$/.test(R.anim(o));
+  // Models of visual effects still hung on a creature (with something left in them to draw)
+  R.effectModels = (o) => {
+    const out = [];
+    o?.model?.traverse?.((n) => {
+      if (n === o.model || !/^v_|^fx_/i.test(n.name || '')) return;
+      if (n.parent && /^v_|^fx_/i.test(n.parent.name || '')) return;
+      let drawn = false;
+      n.traverse((c) => { if ((c.isMesh || c.type === 'Points') && c.visible) drawn = true; });
+      if (drawn) out.push(n.name);
+    });
+    return out;
+  };
+  R.visualEffects = (o) => (o?.effects || []).filter((e) => e && (e.type === K.GameEffectType.EffectBeam || e.type === K.GameEffectType.EffectVisualEffect));
+  if (K.GMManager.isGMUser()) {
+    // The stage: where Jedi Guardian 1 started, an open stretch of floor down the hall from it
+    const g = R.named('^Jedi Guardian 1$')[0];
+    R.anchor = g ? g.position.clone() : new THREE.Vector3();
+    R.at = (dx, dy) => new THREE.Vector3(R.anchor.x + dx, R.anchor.y + dy, R.anchor.z);
+    R.onlyThese = (keep) => { for (const o of R.creatures()) K.GMManager.setObjectHidden(o, !keep.includes(o)); };
+    R.put = (o, dx, dy, facing = 0) => { o.clearAllActions(); o.position.copy(R.at(dx, dy)); o.setFacing(facing, true); };
+    R.walk = (o, dx, dy, run = false) => {
+      const p = R.at(dx, dy);
+      const act = new K.GameState.ActionFactory.ActionMoveToPoint();
+      act.setParameter(0, 2, p.x); act.setParameter(1, 2, p.y); act.setParameter(2, 2, p.z);
+      act.setParameter(3, 3, K.GameState.module.area.id); act.setParameter(4, 3, 0xFFFFFFFF); act.setParameter(5, 1, run ? 1 : 0);
+      act.setParameter(6, 2, 0.5); act.setParameter(7, 1, 0); act.setParameter(8, 2, 30);
+      o.actionQueue.add(act);
+    };
+    R.track = (list, ms) => new Promise((resolve) => {
+      const tracks = list.map(() => []);
+      const id = setInterval(() => list.forEach((o, i) => tracks[i].push([o.position.x - R.anchor.x, o.position.y - R.anchor.y, o.rotation.z])), 100);
+      setTimeout(() => { clearInterval(id); resolve(tracks); }, ms);
+    });
+  }
+  return true;
+}
+
+async function run() {
+  const devServer = createDevServer({ baseUrl: BASE_URL, log });
+  await devServer.ensure();
+  startGMRelayServer({ port: PORT });
+  const gm = createGameWindow({ show: SHOW, title: 'GM regress — GM' });
+  const pl = createGameWindow({ show: SHOW, title: 'GM regress — player' });
+  const windows = [gm, pl];
+  try {
+    log('Booting a GM and a player (KotOR II)...');
+    const url = `${BASE_URL}/game/?key=tsl`;
+    await Promise.all(windows.map((w) => bootToMenu(w, url, { timeout: 300000 })));
+    await evalIn(gm, (K) => { K.GameState.EnterGMMode(); return true; });
+    await waitFor(gm, 'GM mode', (K) => !!(K.GameState.module && K.GameState.module.readyToProcessEvents && K.GMManager.active && !K.GameState.loadingTextures), 120000);
+    await evalIn(gm, (K, ws) => K.GMNetworkManager.hostSession(ws, 'regress'), WS_URL);
+    await waitFor(gm, 'hosting', (K) => K.GMNetworkManager.role === 'host' && K.GMNetworkManager.connected, 20000);
+    await evalIn(gm, async (K, plan) => { await K.GMScenePlan.import(plan); return true; }, PLAN);
+    await waitFor(gm, 'the throne room scene', (K) => !!(K.GameState.module && K.GameState.module.readyToProcessEvents && !K.GameState.loadingTextures && K.GMScenePlan.active), 150000);
+    await evalIn(gm, (K) => { K.GMManager.npcAiEnabled = false; return true; });
+    await evalIn(pl, (K, ws) => {
+      const G = K.GMManager, preset = G.PLAYER_PRESETS[0];
+      K.GameState.gmMode = true; G.active = true;
+      K.GMNetworkManager.joinSession(ws, 'Hero', { name: 'Hero', appearanceId: preset.appearanceId, classId: preset.classId, character: { ...K.GMCharacters.blank(preset), name: 'Hero' } });
+      return true;
+    }, WS_URL);
+    await waitFor(pl, 'the player to join', (K) => { const N = K.GMNetworkManager, me = K.GameState.getCurrentPlayer(); return !!(N.assignedActorNetId && me && me.gmNetId === N.assignedActorNetId && K.GameState.module && K.GameState.module.readyToProcessEvents); }, 150000);
+    await sleep(2000);
+    for (const w of windows) { await setGameSpeed(w, SPEED); await evalIn(w, installHelpers); }
+    log(`Ready (game at ${SPEED}x). Checks:`);
+    const pause = (gameSeconds) => sleep((gameSeconds * 1000) / SPEED);
+
+    await check('passing', 'Walkers step round each other by body size and arrive', async () => {
+      const cases = [
+        ['head-on', { headOn: true }],
+        ['past one standing', { standing: true }],
+        ['two together past one standing', { group: true }],
+      ];
+      const out = [];
+      for (const [label, setup] of cases) {
+        await evalIn(gm, (K, s) => {
+          const R = window.__R, [a, b, c] = R.named('^Telos Security');
+          R.onlyThese(s.group ? [a, b, c] : [a, b]);
+          R.put(a, 0, 4);
+          if (s.headOn) { R.put(b, 0.3, 18, Math.PI); R.walk(a, 0, 18); R.walk(b, 0.3, 4); }
+          else if (s.standing) { R.put(b, 0.6, 11); R.walk(a, 0, 18); }
+          else { R.put(b, 0.9, 4); R.put(c, 0.45, 11); R.walk(a, 0, 18); R.walk(b, 0.9, 18); }
+          window.__walkers = s.standing ? [a] : [a, b];
+          window.__tracking = R.track(window.__walkers, 12000 / s.speed);
+          return true;
+        }, { ...setup, speed: SPEED });
+        const r = await evalIn(gm, async () => {
+          const tracks = await window.__tracking;
+          return tracks.map((t) => {
+            let walked = 0, side = 0;
+            for (let i = 1; i < t.length; i++) walked += Math.hypot(t[i][0] - t[i - 1][0], t[i][1] - t[i - 1][1]);
+            for (const p of t) side = Math.max(side, Math.abs(p[0] - t[0][0]));
+            const straight = Math.hypot(t[t.length - 1][0] - t[0][0], t[t.length - 1][1] - t[0][1]);
+            return { walked: +walked.toFixed(1), straight: +straight.toFixed(1), side: +side.toFixed(2) };
+          });
+        });
+        for (const w of r) {
+          expect(w.straight >= 12.5, `${label}: didn't arrive (got ${w.straight} m of 14)`);
+          expect(w.side <= 1.2, `${label}: went ${w.side} m out of its way`);
+          expect(w.walked <= w.straight * 1.3, `${label}: walked ${w.walked} m to cover ${w.straight} m`);
+        }
+        out.push(`${label} ≤${Math.max(...r.map((w) => w.side))} m aside`);
+      }
+      return out.join(', ');
+    });
+
+    await check('posts', 'Guards sent back to one post settle a step apart and stand still', async () => {
+      await evalIn(gm, (K) => {
+        const R = window.__R, guards = R.named('^Telos Security');
+        R.onlyThese(guards);
+        const post = R.at(0, 10);
+        guards.forEach((g, i) => {
+          R.put(g, i - 1, 3);
+          g.gmOrder = { kind: 'guard', point: { x: post.x, y: post.y, z: post.z }, radius: 8 };
+          g.gmOrderProgress = undefined;
+        });
+        K.GMManager.npcAiEnabled = true;
+        return true;
+      });
+      await sleep(9000);
+      const r = await evalIn(gm, async (K) => {
+        const R = window.__R, guards = R.named('^Telos Security');
+        const tracks = await R.track(guards, 2000);
+        K.GMManager.npcAiEnabled = false;
+        const turn = tracks.map((t) => { let s = 0; for (let i = 1; i < t.length; i++) { let d = t[i][2] - t[i - 1][2]; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; s += Math.abs(d); } return +s.toFixed(2); });
+        const moved = tracks.map((t) => +Math.hypot(t[t.length - 1][0] - t[0][0], t[t.length - 1][1] - t[0][1]).toFixed(2));
+        let closest = Infinity;
+        for (let i = 0; i < guards.length; i++) for (let j = i + 1; j < guards.length; j++) closest = Math.min(closest, guards[i].position.distanceTo(guards[j].position));
+        const walking = guards.filter((g) => K.GMNpcOrders.isMoving(g)).map((g) => g.getName());
+        const fromPost = guards.map((g) => +Math.hypot(g.position.x - R.at(0, 10).x, g.position.y - R.at(0, 10).y).toFixed(1));
+        return { turn, moved, closest: +closest.toFixed(2), walking, fromPost };
+      });
+      expect(!r.walking.length, `still walking after 9 s: ${r.walking.join(', ')}`);
+      expect(r.closest >= 0.9, `two of them stand ${r.closest} m apart`);
+      expect(r.turn.every((t) => t < 0.5) && r.moved.every((m) => m < 0.3), `not standing still: turned ${r.turn} rad, moved ${r.moved} m in 2 s`);
+      expect(r.fromPost.every((d) => d < 4), `settled too far from the post: ${r.fromPost} m`);
+      return `closest ${r.closest} m apart, ${r.fromPost.join('/')} m from the post`;
+    });
+
+    await check('facing', "An NPC under a GM order isn't turned by its own AI script", async () => {
+      const r = await evalIn(gm, (K) => {
+        const R = window.__R, npc = R.named('^Telos Security 1$')[0];
+        npc.gmOrder = { kind: 'guard', point: { x: npc.position.x, y: npc.position.y, z: npc.position.z }, radius: 8 };
+        npc.setFacing(0, true);
+        const def = (K.NWScriptDefK2 && K.NWScriptDefK2.Actions[143] && typeof K.NWScriptDefK2.Actions[143].action === 'function') ? K.NWScriptDefK2.Actions[143] : K.NWScriptDefK1.Actions[143];
+        def.action.call({ caller: npc, name: 'k_ai_master' }, [new window.THREE.Vector3(npc.position.x - 5, npc.position.y, npc.position.z)]);
+        const held = Math.abs(npc.facing) < 0.01 && !npc.facingAnim;
+        npc.gmOrder = undefined;
+        def.action.call({ caller: npc, name: 'k_ai_master' }, [new window.THREE.Vector3(npc.position.x - 5, npc.position.y, npc.position.z)]);
+        const freed = Math.abs(npc.facing) > 1;
+        npc.setFacing(0, true);
+        return { held, freed };
+      });
+      expect(r.held, 'SetFacingPoint turned an NPC the GM has a post for');
+      expect(r.freed, "SetFacingPoint didn't turn an NPC without an order (scripts should still face idle NPCs)");
+    });
+
+    await check('effects', 'A shared beam and impact: each creature its own, nothing left on either screen', async () => {
+      const r = await evalIn(gm, (K) => {
+        const R = window.__R, caster = R.named('^Dark Jedi Master 1$')[0], targets = R.named('^Telos Security');
+        R.onlyThese([caster, ...targets]);
+        R.put(caster, 4, 8, Math.PI / 2);
+        targets.forEach((t, i) => R.put(t, -1 + i, 12));
+        const F = K.GameState.GameEffectFactory;
+        // As a power's script does: one effect value, applied to everyone it hits
+        const beam = new F.EffectBeam();
+        beam.setInt(0, 2038); beam.setInt(1, 0); beam.setInt(2, 0); beam.setObject(0, caster);
+        beam.setDurationType(1); beam.setDuration(1.5); beam.initialize();
+        const impact = new F.EffectVisualEffect();
+        impact.setInt(0, 1004); impact.setDurationType(0); impact.initialize();
+        for (const t of targets) { t.addEffect(beam); t.addEffect(impact); }
+        const beams = targets.map((t) => t.effects.find((e) => e.type === K.GameEffectType.EffectBeam));
+        return { targets: targets.map((t) => t.gmNetId), caster: caster.gmNetId, own: new Set(beams.filter(Boolean)).size };
+      });
+      expect(r.own === 3, `three targets hold ${r.own} distinct beam(s): one effect shared between them`);
+      await pause(10);
+      const left = async (w) => evalIn(w, (K, ids) => {
+        const R = window.__R;
+        return ids.map(R.byNetId).filter(Boolean).flatMap((o) => [
+          ...R.visualEffects(o).map((e) => `${o.getName()}: effect ${e.getInt(0)}`),
+          ...R.effectModels(o).map((n) => `${o.getName()}: model ${n}`),
+        ]);
+      }, [...r.targets, r.caster]);
+      const [g, p] = [await left(gm), await left(pl)];
+      expect(!g.length, `left on the GM's screen: ${g.join('; ')}`);
+      expect(!p.length, `left on the player's screen: ${p.join('; ')}`);
+    });
+
+    await check('falls', 'Creatures killed while stunned or held fall, on both screens', async () => {
+      const ids = await evalIn(gm, (K) => {
+        const R = window.__R, [a, b] = R.named('^Sith Assassin');
+        R.onlyThese([a, b]);
+        R.put(a, 3, 6); R.put(b, -3, 6);
+        [[a, 4], [b, 5]].forEach(([o, state]) => {
+          const e = new K.GameState.GameEffectFactory.EffectSetState();
+          e.setInt(0, state); e.setDurationType(1); e.setDuration(30); e.initialize();
+          o.addEffect(e);
+        });
+        return [a.gmNetId, b.gmNetId];
+      });
+      await pause(1.5);
+      await evalIn(gm, (K, list) => { for (const id of list) K.GMManager.killObject(window.__R.byNetId(id)); return true; }, ids);
+      await pause(4);
+      const read = (w) => evalIn(w, (K, list) => list.map((id) => { const o = window.__R.byNetId(id); return o ? `${o.getName()}: ${o.isDead() ? 'dead' : 'alive'}, ${window.__R.anim(o) || 'no animation'}` : `${id}: missing`; }), ids);
+      const [g, p] = [await read(gm), await read(pl)];
+      const down = (lines) => lines.every((l) => /dead, c?(die|dead)/.test(l));
+      expect(down(g), `GM's screen: ${g.join('; ')}`);
+      expect(down(p), `player's screen: ${p.join('; ')}`);
+    });
+
+    await check('loot', "A player's loot window doesn't pause the shared world", async () => {
+      const r = await evalIn(pl, async (K) => {
+        const m = K.GameState.module;
+        let ticks = 0, held = 0;
+        const tick = m.tick, tickPaused = m.tickPaused;
+        m.tick = function () { ticks++; return tick.apply(this, arguments); };
+        m.tickPaused = function () { held++; return tickPaused.apply(this, arguments); };
+        const menu = K.GameState.MenuManager.MenuContainer;
+        menu.open();
+        await new Promise((res) => setTimeout(res, 1500));
+        menu.close();
+        m.tick = tick; m.tickPaused = tickPaused;
+        const autoPaused = K.GameState.AutoPauseManager.SignalAutoPauseEvent(0);
+        return { ticks, held, autoPaused, state: K.GameState.State };
+      });
+      expect(r.ticks > 20 && r.held === 0, `with the loot window open the world ticked ${r.ticks} times and held ${r.held}`);
+      expect(!r.autoPaused && r.state !== 2, 'auto-pause still pauses a shared world');
+    });
+
+    await check('hud', "The player's HUD is up and KotOR's combat panels are hidden", async () => {
+      const r = await evalIn(pl, (K) => {
+        const o = K.GameState.MenuManager.InGameOverlay;
+        const shown = (n) => !!(o[n] && o[n].widget && o[n].widget.visible);
+        return {
+          hud: !!document.querySelector('.gm-player-hud'), slots: document.querySelectorAll('.gm-hud-bar-slots .gm-hud-slot').length,
+          kotor: ['BTN_ACTION0', 'BTN_TARGET0', 'LBL_QUEUE0', 'LBL_CHAR1'].filter(shown),
+        };
+      });
+      expect(r.hud && r.slots === 9, `HUD up: ${r.hud}, ${r.slots} slots`);
+      expect(!r.kotor.length, `KotOR's panels still showing: ${r.kotor.join(', ')}`);
+    });
+
+    await check('agree', 'GM and player agree on who is dead, and the dead lie down on both', async () => {
+      await evalIn(gm, (K) => { for (const o of window.__R.creatures()) K.GMManager.setObjectHidden(o, false); return true; });
+      await pause(2);
+      const read = (w) => evalIn(w, () => Object.fromEntries(window.__R.creatures().filter((o) => o.gmNetId).map((o) => [o.gmNetId, [o.getName(), o.isDead(), window.__R.lyingDown(o)]])));
+      const [g, p] = [await read(gm), await read(pl)];
+      const problems = [];
+      for (const [id, [name, dead, lying]] of Object.entries(g)) {
+        const other = p[id];
+        if (!other) { problems.push(`${name} missing on the player's screen`); continue; }
+        if (dead !== other[1]) problems.push(`${name}: ${dead ? 'dead' : 'alive'} for the GM, ${other[1] ? 'dead' : 'alive'} for the player`);
+        if (dead && !lying) problems.push(`${name} dead but standing on the GM's screen`);
+        if (other[1] && !other[2]) problems.push(`${name} dead but standing on the player's screen`);
+      }
+      expect(!problems.length, problems.join('; '));
+      return `${Object.keys(g).length} creatures`;
+    });
+
+    await check('errors', 'No uncaught errors on either screen', async () => {
+      const errors = windows.flatMap((w, i) => (w.pageErrors || []).map((e) => `${i ? 'player' : 'GM'}: ${e}`));
+      expect(!errors.length, [...new Set(errors)].slice(0, 5).join(' | '));
+    });
+  } finally {
+    if (!SHOW) windows.forEach((w) => { if (!w.isDestroyed()) w.destroy(); });
+    devServer.stop();
+  }
+}
+
+app.whenReady().then(async () => {
+  try {
+    await run();
+  } catch (e) {
+    log(`Run aborted: ${e.stack || e.message}`);
+    results.push({ id: 'setup', name: 'setup', ok: false, error: e.message });
+  }
+  const failed = results.filter((r) => !r.ok);
+  console.log('');
+  console.log(`GM regress: ${results.length - failed.length}/${results.length} checks passed in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+  for (const r of failed) console.log(`  ✘ ${r.name}: ${r.error}`);
+  app.exit(failed.length ? 1 : 0);
+});
+
+app.on('window-all-closed', () => {});

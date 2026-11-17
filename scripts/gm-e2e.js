@@ -29,8 +29,7 @@
  */
 const { app } = require('electron');
 const { configureApp, createGameWindow, evalIn, bootToMenu, setGameSpeed, sleep } = require('./lib/game-window');
-const { spawn, execSync } = require('child_process');
-const path = require('path');
+const { createDevServer } = require('./lib/dev-server');
 
 const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/$/, '');
 const WS_URL = process.env.GM_E2E_WS || 'ws://localhost:7878';
@@ -106,56 +105,9 @@ function expect(cond, message) {
 // Dev server
 // ---------------------------------------------------------------------------
 
-let devServer = null;
-
-async function isServing() {
-  try {
-    const res = await fetch(`${BASE_URL}/__dev-game/kotor/ls?path=`);
-    if (!res.ok) return false;
-    const entries = await res.json();
-    return Array.isArray(entries) && entries.some((e) => e.name.toLowerCase() === 'chitin.key');
-  } catch (e) {
-    return false;
-  }
-}
-
-async function ensureDevServer() {
-  if (await isServing()) {
-    log(`Using the dev server already running at ${BASE_URL}`);
-    return;
-  }
-  log(`Nothing serving ${BASE_URL} with game files; starting \`npm run dev\` for this run...`);
-  devServer = spawn('npm run dev', {
-    cwd: path.resolve(__dirname, '..'),
-    shell: true,
-    stdio: 'ignore',
-    detached: process.platform !== 'win32',
-  });
-  const deadline = Date.now() + DEV_SERVER_TIMEOUT;
-  while (Date.now() < deadline) {
-    if (await isServing()) {
-      // The game bundle is built alongside the engine library; wait until it is served too
-      try {
-        const res = await fetch(`${BASE_URL}/game/game.js`);
-        if (res.ok) return;
-      } catch (e) {}
-    }
-    await sleep(2000);
-  }
-  throw new Error(`Dev server did not start serving ${BASE_URL} with game files. Check KOTOR_GAME_DIR (see scripts/dev-game-files.js).`);
-}
-
-function stopDevServer() {
-  if (!devServer) return;
-  try {
-    if (process.platform === 'win32') {
-      execSync(`taskkill /pid ${devServer.pid} /T /F`, { stdio: 'ignore' });
-    } else {
-      process.kill(-devServer.pid, 'SIGTERM');
-    }
-  } catch (e) {}
-  devServer = null;
-}
+const devServer = createDevServer({ baseUrl: BASE_URL, timeout: DEV_SERVER_TIMEOUT, log });
+const ensureDevServer = () => devServer.ensure();
+const stopDevServer = () => devServer.stop();
 
 // ---------------------------------------------------------------------------
 // Game windows
