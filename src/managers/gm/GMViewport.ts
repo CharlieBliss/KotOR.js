@@ -11,6 +11,7 @@ import type { GMToolMode } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMMines } from "@/managers/gm/GMMines";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMHistory, GMHistoryChange } from "@/managers/gm/GMHistory";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
@@ -647,6 +648,10 @@ export class GMViewport {
       GMManager.setToolMode('select');
     } else if (GMManager.activeTool === 'place_mine') {
       GMMines.placeMine(GMMines.pendingMineType, spawnPos);
+    } else if (GMManager.activeTool === 'place_set') {
+      // The set's floor goes where clicked, turned by the placement rotation (R) from how it lies in its own area
+      await GMSetPieces.place(GMSetPieces.pending, spawnPos, -(this.placementYawOffset * Math.PI) / 180);
+      GMManager.setToolMode('select');
     } else if (GMManager.activeTool === 'teleport') {
       const target = this.getTeleportTarget();
       if (target) {
@@ -688,7 +693,7 @@ export class GMViewport {
   }
 
   static isPlacementTool(tool: GMToolMode): boolean {
-    return tool === 'place_creature' || tool === 'place_placeable' || tool === 'place_player' || tool === 'place_mine';
+    return tool === 'place_creature' || tool === 'place_placeable' || tool === 'place_player' || tool === 'place_mine' || tool === 'place_set';
   }
 
   static rotatePlacement(degrees: number) {

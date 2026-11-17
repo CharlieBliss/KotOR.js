@@ -1,0 +1,18 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Stowaway on the Hawk",
+  "summary": "The Ebon Hawk's interior built into Anchorhead's docking bay, with KotOR II's Ebon Hawk lounge raised beside the customs post. A test scene for set pieces.",
+  "gmNotes": "Walk the players around the ship, out across the docking bay floor where it joins, and up into the lounge. Right-click a set's floor to turn, raise, lower or remove it.",
+  "content": "kotor",
+  "area": { "game": "kotor", "module": "tat_m17ab", "reason": "Open docking bay floor for the ship to stand on." },
+  "sets": [
+    { "id": "hawk", "area": { "game": "kotor", "module": "ebo_m12aa" }, "at": { "spot": "entry" }, "turn": 90 },
+    { "id": "lounge", "area": { "game": "tsl", "module": "003ebo" }, "rooms": ["003ebof"], "at": { "spot": "waypoint:tat17_custompost" }, "raise": 3 }
+  ],
+  "players": { "at": { "spot": "room:m12aa_01f" } },
+  "actors": [
+    { "id": "thug", "template": "n_admrlsaulkar", "faction": "hostile", "at": { "spot": "set:hawk", "offset": [2, 0] } },
+    { "id": "guest", "template": "n_admrlsaulkar", "faction": "neutral", "at": { "spot": "set:lounge" } }
+  ]
+}

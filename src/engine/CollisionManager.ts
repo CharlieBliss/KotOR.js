@@ -555,6 +555,27 @@ export class CollisionManager {
     for (const collision of collisions) {
       this.collisionState.addCollision(CollisionType.ROOM, collision);
     }
+
+    // Set pieces' walls, for a creature outside them: from either side (their walkmesh only faces inward)
+    const sets = this.object.area?.setPieces;
+    if (!sets?.length) return;
+    const ownSet = this.object.room?.setPiece;
+    for (const set of sets) {
+      if (set === ownSet) continue;
+      for (const wall of set.wallsNear(this.object.position)) {
+        const collision = this.detectSingleEdgeCollision(this.facingSide(wall), CollisionType.ROOM);
+        if (collision) this.collisionState.addCollision(CollisionType.ROOM, collision);
+      }
+    }
+  }
+
+  /** A wall seen from the creature's side: the edge itself, or a copy facing the other way when it's behind it */
+  private tmpToActor = new THREE.Vector3();
+  private facingSide(edge: WalkmeshEdge): CollisionEdge {
+    if (!edge.normal) return edge;
+    const toActor = this.tmpToActor.copy(this.object.position).sub(edge.center_point);
+    if (toActor.dot(edge.normal) >= 0) return edge;
+    return { line: edge.line, normal: edge.normal.clone().negate(), center_point: edge.center_point, transition: -1 };
   }
 
   private validatePlaceablePenetration(): void {
@@ -617,7 +638,8 @@ export class CollisionManager {
     if (!edges || edges.length === 0) return collisions;
 
     for (const edge of edges) {
-      if (!edge || edge.transition >= 0) continue;
+      // Only walls: not transitions to another room, nor seams onto another floor
+      if (!edge || (edge.transition != null && edge.transition !== -1)) continue;
       const collision = this.detectSingleEdgeCollision(edge, collisionType);
       if (collision) {
         collisions.push(collision);
@@ -879,21 +901,43 @@ export class CollisionManager {
   private processRoomTransitions(): void {
     if (this.object.forceVector.length() === 0) return;
 
-    // Check for room transition edges
-    for (const [index, edge] of this.object.room.collisionManager.walkmesh.edges) {
-      if (!edge || edge.transition === -1) continue;
+    const crosses = (edge: WalkmeshEdge) => Utility.LineLineIntersection(
+      this.object.position.x,
+      this.object.position.y,
+      this.object.position.x + this.object.forceVector.x,
+      this.object.position.y + this.object.forceVector.y,
+      edge.line.start.x,
+      edge.line.start.y,
+      edge.line.end.x,
+      edge.line.end.y
+    );
 
-      if (Utility.LineLineIntersection(
-        this.object.position.x,
-        this.object.position.y,
-        this.object.position.x + this.object.forceVector.x,
-        this.object.position.y + this.object.forceVector.y,
-        edge.line.start.x,
-        edge.line.start.y,
-        edge.line.end.x,
-        edge.line.end.y
-      )) {
-        this.object.attachToRoom(this.object.area.rooms[edge.transition]);
+    // Check for room transition edges
+    const room = this.object.room;
+    let moved = false;
+    for (const [index, edge] of room.collisionManager.walkmesh.edges) {
+      if (!edge || edge.transition === -1) continue;
+      if (!crosses(edge)) continue;
+      if (edge.transition === WalkmeshEdge.SEAM) {
+        // Off a set piece: onto the floor past its edge that isn't the set's
+        const set = room.setPiece;
+        this.landBeyond(set ? (r) => r.setPiece !== set : (r) => r !== room);
+      } else {
+        const next = room.transitionRoom(edge.transition);
+        if (next) this.object.attachToRoom(next);
+      }
+      moved = true;
+      break;
+    }
+
+    // Onto a set piece across one of its seams
+    const sets = this.object.area?.setPieces;
+    if (!moved && sets?.length) {
+      for (const set of sets) {
+        if (set === room.setPiece || set.box.distanceToPoint(this.object.position) > 1) continue;
+        const seam = set.seams.find((s) => crosses(s.edge));
+        if (!seam) continue;
+        this.landBeyond((r) => r.setPiece === set);
         break;
       }
     }
@@ -936,35 +980,33 @@ export class CollisionManager {
     this.collisionState.clear();
   }
 
+  /**
+   * The floor under the object, in any room: where floors lie over each other (a set piece over the area's ground,
+   * a balcony), the one nearest its height
+   */
   findWalkableFace(object: ModuleObject = this.object){
     const objectPos = object.position;
-    let face;
-    let room;
     if(!object.area){
       return;
     }
-    for(let i = 0, il = object.area.rooms.length; i < il; i++){
-      room = object.area.rooms[i];
-      if(!room.collisionManager.walkmesh){
-        continue;
-      }
-
-      const walkableFaces = room.collisionManager.walkmesh.walkableFaces;
-
-      for(let j = 0, jl = walkableFaces.length; j < jl; j++){
-        face = walkableFaces[j];
-        if(!face.triangle.containsPoint(objectPos)){
-          continue;
-        }
-        this.groundFace = face;
-        this.lastGroundFace = this.groundFace;
-        this.surfaceId = this.groundFace.walkIndex;
-        object.attachToRoom(room);
-        face.triangle.closestPointToPoint(objectPos, this.wm_c_point);
-        objectPos.z = this.wm_c_point.z + .005;
-      }
+    const floor = object.area.floorAt(objectPos, objectPos.z);
+    if(!floor){
+      return undefined;
     }
-    return face;
+    this.groundFace = floor.face;
+    this.lastGroundFace = this.groundFace;
+    this.surfaceId = this.groundFace.walkIndex;
+    object.attachToRoom(floor.room);
+    objectPos.z = floor.z + .005;
+    return floor.face;
+  }
+
+  /** Across a seam: onto the floor where the object is going, among the rooms that pass the filter */
+  private landBeyond(filter: (room: ModuleRoom) => boolean): void {
+    const to = CollisionPool.getVector().copy(this.object.position).add(this.object.forceVector);
+    const floor = this.object.area?.floorAt(to, this.object.position.z, WalkmeshEdge.SEAM_STEP, filter);
+    CollisionPool.releaseVector(to);
+    if (floor) this.object.attachToRoom(floor.room);
   }
 
   // Room checking

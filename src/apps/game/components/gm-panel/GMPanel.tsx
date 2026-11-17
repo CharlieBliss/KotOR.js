@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import {
-  GMManager, GMNetworkManager, GMMines, GMSpawner, GMViewport, GMHistory, GMEditTools,
+  GMManager, GMNetworkManager, GMMines, GMSetPieces, GMSpawner, GMViewport, GMHistory, GMEditTools,
   useGMStore, possessCandidate as findPossessCandidate, setPanelPolling,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { editShortcut } from "@/apps/game/components/gm-panel/controls/editShortcuts";
@@ -252,13 +252,15 @@ export const GMPanel: React.FC = () => {
     tool === 'place_creature' ? GMManager.pendingCreatureConfig?.name :
     tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
     tool === 'place_player' ? GMManager.pendingPlayerConfig?.name :
-    tool === 'place_mine' ? `mine: ${GMMines.getMineTypes().find((m) => m.id === GMMines.pendingMineType)?.label || 'mine'}` : '';
+    tool === 'place_mine' ? `mine: ${GMMines.getMineTypes().find((m) => m.id === GMMines.pendingMineType)?.label || 'mine'}` :
+    tool === 'place_set' ? `set: ${GMSetPieces.describe(GMSetPieces.pending)}` : '';
   // What the toolbar's Place button puts down (the last kind of thing placed)
   const lastPlace = GMManager.lastPlacementTool;
   const placeButtonName =
     lastPlace === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name || 'object' :
     lastPlace === 'place_player' ? GMManager.pendingPlayerConfig?.name || 'player' :
     lastPlace === 'place_mine' ? 'mine' :
+    lastPlace === 'place_set' ? 'set' :
     GMManager.pendingCreatureConfig?.name || 'creature';
   const teleportTarget = GMViewport.getTeleportTarget();
   let statusChip: string | null = null;

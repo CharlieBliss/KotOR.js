@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import * as KotOR from "@/apps/game/KotOR";
-import { GMManager, GMViewport, GMHistory, GMEditTools, GMNpcOrders } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { GMManager, GMViewport, GMHistory, GMEditTools, GMNpcOrders, GMSetPieces } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { deleteSelection } from "@/apps/game/components/gm-panel/controls/editShortcuts";
 import { orderableSelection, placeNow, recentPlacements } from "@/apps/game/components/gm-panel/controls/quickActions";
 
@@ -140,6 +140,25 @@ function buildItems(req: MenuRequest, openPalette: (point: THREE.Vector3 | null)
     items.push({ kind: 'sep' });
   }
 
+  // A set piece here (rooms of another area), or the one picked in the Place tab's Sets
+  const host = KotOR.GMNetworkManager.role !== 'client';
+  const set = host ? GMSetPieces.setAt(point) : undefined;
+  if (set) {
+    items.push({ kind: 'heading', label: `Set: ${GMSetPieces.describe(set)}`, note: `${set.seams.length} joins with this area` });
+    items.push({ kind: 'row', items: [
+      { label: 'Turn 90°', title: 'Turn it clockwise about its middle', run: () => void GMSetPieces.move(set.id, { turnBy: -Math.PI / 2 }) },
+      { label: 'Up', title: 'Raise it 0.25 m', run: () => void GMSetPieces.move(set.id, { by: { z: 0.25 } }) },
+      { label: 'Down', title: 'Lower it 0.25 m', run: () => void GMSetPieces.move(set.id, { by: { z: -0.25 } }) },
+      { label: 'Pick', title: "Pick it in the Place tab's Sets, to move it", run: () => { GMSetPieces.selectedId = set.id; GMManager.notifyChange(); } },
+      { label: 'Remove', tone: 'danger', run: () => void GMSetPieces.remove(set.id) },
+    ] });
+    items.push({ kind: 'sep' });
+  }
+  const picked = host ? GMSetPieces.selected() : undefined;
+  if (picked && picked !== set) {
+    items.push({ label: `Move set ${GMSetPieces.describe(picked)} here`, title: 'The middle of its floor goes here', run: () => void GMSetPieces.move(picked.id, { to: { x: point.x, y: point.y, z: point.z } }) });
+  }
+
   items.push({ kind: 'heading', label: 'Place here' });
   const pending = GMManager.pendingCreatureConfig;
   const shown = new Set<string>();
@@ -156,6 +175,9 @@ function buildItems(req: MenuRequest, openPalette: (point: THREE.Vector3 | null)
     place.push({ label: r.label, title: `Placed lately (${r.kind === 'creature' ? 'creature' : 'object'})`, run: () => placeNow(r, point) });
   }
   for (const p of place) items.push(p);
+  if (host && GMManager.lastPlacementTool === 'place_set') {
+    items.push({ label: `Set: ${GMSetPieces.describe(GMSetPieces.pending)}`, title: "The Place tab's set: the middle of its floor goes here", run: () => void GMSetPieces.place(GMSetPieces.pending, point.clone(), -(GMViewport.placementYawOffset * Math.PI) / 180) });
+  }
   items.push({ label: 'Search…', title: 'Find any creature or object and put it here (/ opens this anywhere)', run: () => openPalette(point.clone()) });
   return items;
 }

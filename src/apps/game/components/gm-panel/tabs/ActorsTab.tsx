@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { ItemOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
+import { SetsSection } from "@/apps/game/components/gm-panel/tabs/SetsSection";
 // Types only: the game bundle must use the engine library's single GM managers via the KotOR external
 import type { GMCreatureSpawnConfig, GMCreatureTemplateInfo, GMPlaceableSpawnConfig, GMPlaceablePropCategory, GMSceneBlueprint } from "@/managers/GMManager";
 import {
@@ -20,7 +21,7 @@ export const ActorsTab: React.FC<{ active: boolean }> = React.memo(({ active }) 
   const [importBlueprintJson, setImportBlueprintJson] = useState<string>('');
   const [showJsonImportBox, setShowJsonImportBox] = useState<boolean>(false);
   // Actors & Placeables tab states
-  const [spawnSubTab, setSpawnSubTab] = useState<'creatures' | 'placeables' | 'kits'>('placeables');
+  const [spawnSubTab, setSpawnSubTab] = useState<'creatures' | 'placeables' | 'kits' | 'sets'>('placeables');
   const [propCategoryFilter, setPropCategoryFilter] = useState<'All' | GMPlaceablePropCategory>('All');
   // The creature preset or template the GM picked; creatureCfg is what gets placed (customized only on request)
   const [creaturePick, setCreaturePick] = useState<GMCreatureSpawnConfig>({ ...GMManager.pendingCreatureConfig });
@@ -140,7 +141,17 @@ export const ActorsTab: React.FC<{ active: boolean }> = React.memo(({ active }) 
         >
           Kits
         </button>
+        <button
+          className={`gm-btn ${spawnSubTab === 'sets' ? 'active' : ''}`}
+          style={{ flex: 1 }}
+          onClick={() => setSpawnSubTab('sets')}
+          title="Rooms of another area (either game) built into this scene: the Ebon Hawk on Tatooine, an Enclave room on Manaan..."
+        >
+          Sets
+        </button>
       </div>
+
+      {spawnSubTab === 'sets' && <SetsSection forceUpdate={forceUpdate} />}
 
       {/* Kits: whole sets of props (and NPCs) placed at once */}
       {spawnSubTab === 'kits' && (() => {
@@ -285,7 +296,7 @@ export const ActorsTab: React.FC<{ active: boolean }> = React.memo(({ active }) 
         );
       })()}
 
-      {spawnSubTab === 'kits' ? null : spawnSubTab === 'creatures' ? (
+      {spawnSubTab === 'kits' || spawnSubTab === 'sets' ? null : spawnSubTab === 'creatures' ? (
         <>
           <div className="gm-section">
             <div className="gm-section-title">Encounter</div>

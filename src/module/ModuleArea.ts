@@ -54,6 +54,7 @@ import { ModuleMiniGame } from "@/module/ModuleMiniGame";
 import { ModuleMGTrack } from "@/module/ModuleMGTrack";
 import { ModuleMGPlayer } from "@/module/ModuleMGPlayer";
 import type { Module } from "@/module/Module";
+import type { AreaSetPiece } from "@/module/AreaSetPiece";
 import { IVISRoom } from "@/interface/module/IVISRoom";
 import { BackgroundMusicMode } from "@/enums/audio/BackgroundMusicMode";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
@@ -332,6 +333,65 @@ export class ModuleArea extends ModuleObject {
 
   walkEdges: WalkmeshEdge[] = [];
   walkFaces: OdysseyFace3[] = [];
+
+  /** Rooms of other areas placed in this one (AreaSetPiece); their rooms are in rooms too */
+  setPieces: AreaSetPiece[] = [];
+
+  /** The walk edges and faces of every room (after rooms were added or moved) */
+  rebuildWalkData(){
+    const edges: WalkmeshEdge[] = [];
+    const faces: OdysseyFace3[] = [];
+    for(const room of this.rooms){
+      const wok = room?.collisionManager?.walkmesh;
+      if(!wok) continue;
+      for(const edge of wok.edges.values()) edges.push(edge);
+      for(const face of wok.walkableFaces) faces.push(face);
+    }
+    this.walkEdges = edges;
+    this.walkFaces = faces;
+    this.roomWalkmeshes = this.rooms.filter((r) => r?.collisionManager?.walkmesh).map((r) => r.collisionManager.walkmesh);
+  }
+
+  /**
+   * The walkable floor under a point (by x and y) nearest a height, within maxStep of it; only rooms that pass
+   * the filter. Null when there's none.
+   */
+  floorAt(point: THREE.Vector3, z: number = point.z, maxStep: number = Infinity, filter?: (room: ModuleRoom) => boolean): { room: ModuleRoom; face: OdysseyFace3; z: number } | null {
+    let best: { room: ModuleRoom; face: OdysseyFace3; z: number } | null = null;
+    // The nearest of the set pieces' floors on their own
+    let bestSet: { room: ModuleRoom; face: OdysseyFace3; z: number } | null = null;
+    for(const room of this.rooms){
+      const wok = room?.collisionManager?.walkmesh;
+      if(!wok || (filter && !filter(room))) continue;
+      for(const face of wok.walkableFaces){
+        if(!face.pointInFace2d(point)) continue;
+        const fz = ModuleArea.faceHeightAt(face, point.x, point.y);
+        const dz = Math.abs(fz - z);
+        if(dz > maxStep) continue;
+        if(room.setPiece && (!bestSet || dz < Math.abs(bestSet.z - z))) bestSet = { room, face, z: fz };
+        if(best && dz >= Math.abs(best.z - z)) continue;
+        best = { room, face, z: fz };
+      }
+    }
+    // A set piece's floor a little over the area's ground there is built on it: that's the floor stood on
+    if(best && bestSet && !best.room.setPiece && bestSet.z >= best.z - ModuleArea.FLOOR_TIE && bestSet.z - best.z <= ModuleArea.SET_FLOOR_OVER){
+      return bestSet;
+    }
+    return best;
+  }
+
+  /** Floors this close in height count as level with each other (metres) */
+  static FLOOR_TIE = 0.05;
+  /** How far above the area's ground a set piece's floor still counts as built on it (a step up onto a deck) */
+  static SET_FLOOR_OVER = 0.35;
+  static #facePlane = new THREE.Plane();
+  /** The height of a face's plane straight above or below x, y */
+  static faceHeightAt(face: OdysseyFace3, x: number, y: number): number {
+    const plane = face.triangle.getPlane(ModuleArea.#facePlane);
+    const n = plane.normal;
+    if(Math.abs(n.z) < 1e-6) return face.centroid.z;
+    return -(n.x * x + n.y * y + plane.constant) / n.z;
+  }
 
   constructor(resRef = '', are = new GFFObject(), git = new GFFObject()){
     super(are);
@@ -2134,7 +2194,8 @@ export class ModuleArea extends ModuleObject {
       }
 
       distance = point.distanceTo(tmpPoint);
-      if(distance >= nearest)
+      // A degenerate face (no area: its normal, and so the distance, is NaN) is never the nearest
+      if(!(distance < nearest))
         continue;
       
       nearest_point.copy(tmpPoint);//this.walkableFaces[i].centroid;

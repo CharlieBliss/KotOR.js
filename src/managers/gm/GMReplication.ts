@@ -25,6 +25,7 @@ import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 
 /** Keeping players' games in step with the GM's: serializing the world, applying it on clients, smoothing replica motion and mirroring the host's visuals. */
 export class GMReplication {
@@ -165,6 +166,7 @@ export class GMReplication {
       actors: this.serializeActorsForTick(),
       doors,
       mines: GMMines.getMines().map((m) => GMMines.serializeMine(m)),
+      sets: GMSetPieces.serialize(),
       atmosphere: Object.keys(GMAtmosphere.current).length ? GMAtmosphere.current : undefined,
       effects: this.lastingMirrors(),
     };
@@ -223,6 +225,8 @@ export class GMReplication {
         this.applyDoorStateOnClient(ds);
       }
     }
+    // Sets first: characters stand on their floors
+    if (Array.isArray(snapshot.sets)) await GMSetPieces.sync(snapshot.sets);
     if (Array.isArray(snapshot.actors)) {
       for (const actor of snapshot.actors) {
         await this.spawnOrUpdateFromSerialized(actor);

@@ -19,6 +19,7 @@ import { BitWise } from "@/utility/BitWise";
 import { VISObject } from "@/resource/VISObject";
 import { IVISRoom } from "@/interface";
 import { EngineMode } from "@/enums/engine/EngineMode";
+import type { AreaSetPiece } from "@/module/AreaSetPiece";
 
 /**
 * ModuleRoom class.
@@ -57,6 +58,14 @@ export class ModuleRoom extends ModuleObject {
   linkedRoomNames: string[] = [];
   linkedRooms: Map<string, ModuleRoom> = new Map<string, ModuleRoom>();
   linkedRoomsArray: ModuleRoom[] = [];
+
+  /** The set piece this room came with (rooms of another area placed in this one), if any */
+  setPiece?: AreaSetPiece;
+  /**
+   * The rooms its walkmesh's transitions lead to, by the transition's index into its layout: the area's own rooms,
+   * or for a set piece's room, the set's
+   */
+  layoutRooms?: (ModuleRoom | undefined)[];
 
   constructor( roomName: string, area: ModuleArea ){
     super();
@@ -161,6 +170,12 @@ export class ModuleRoom extends ModuleObject {
         this.sounds.splice(idx, 1);
       }
     }
+  }
+
+  /** The room a walkmesh transition of this room leads to */
+  transitionRoom(transition: number): ModuleRoom | undefined {
+    if(transition < 0) return undefined;
+    return (this.layoutRooms || this.area?.rooms || [])[transition];
   }
 
   setLinkedRooms(array: IVISRoom[] = []){

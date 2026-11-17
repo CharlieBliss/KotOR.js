@@ -1,5 +1,6 @@
 import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
+import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 import { GameState } from "@/GameState";
 
 export class GMEventEmitter {
@@ -246,6 +247,8 @@ export interface GMWorldSnapshot {
   actors: GMSerializedActor[];
   doors: GMSerializedDoorState[];
   mines?: GMSerializedMine[];
+  /** Rooms of other areas the GM placed in the scene (GMSetPieces); put in before the actors standing on them */
+  sets?: AreaSetPieceDef[];
   /** Lasting effects on the scene's objects that change how they look (an aura, a stun), for a player joining now */
   effects?: { netId: string; effect: GMEffectMirror }[];
   /** The music, sound and look the GM gave this scene */
@@ -319,6 +322,8 @@ export interface GMPacketMap {
   'player.notice': { text: string };
   'mine.state': GMSerializedMine;
   'mine.remove': { netId: string };
+  'set.state': AreaSetPieceDef;
+  'set.remove': { id: string };
   'fx.event': GMFxEvent;
   'container.open': { containerNetId: string; items: GMLootItem[] };
   'container.loot': { items: GMLootItem[]; [key: string]: any };

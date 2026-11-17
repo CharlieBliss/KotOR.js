@@ -80,6 +80,35 @@ describe("scene plans", () => {
     ]));
   });
 
+  test("sets: rooms of another area, placed before anyone, and spots others can stand on", () => {
+    const withSets = plan({
+      sets: [
+        { id: "hawk", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "entry" }, turn: 90 },
+        { id: "council", area: { game: "kotor", module: "danm13" }, rooms: ["m13aa_06a"], at: { spot: "set:hawk", offset: [30, 0] } },
+      ],
+      players: { at: { spot: "set:hawk" } },
+    });
+    expect(GMScenePlan.validate(withSets).filter((p) => p.level === "error")).toEqual([]);
+
+    const broken = plan({
+      sets: [
+        // A set goes in before the actors, so it can't stand on one; nor on a set placed after it
+        { id: "a", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "actor:jedi" } },
+        { id: "b", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "set:c" } },
+        { id: "c", area: { game: "wars" as any, module: "x" }, rooms: [], at: { spot: "entry" } },
+      ],
+      players: { at: { spot: "set:nowhere" } },
+    });
+    const errors = GMScenePlan.validate(broken).filter((p) => p.level === "error").map((p) => p.message);
+    expect(errors).toEqual(expect.arrayContaining([
+      'A set\'s spot is "entry", a waypoint, a room or an earlier set, not "actor:jedi".',
+      'A set\'s spot is "entry", a waypoint, a room or an earlier set, not "set:c".',
+      'The area\'s game is "kotor" or "tsl".',
+      '"rooms" is a list of room names (leave it out for all of them).',
+      'No set "nowhere".',
+    ]));
+  });
+
   test("customize.level restats an actor: a whole level 1 to 50, and a class by name or number", () => {
     const at = (customize: any) => GMScenePlan.validate(plan({ actors: [{ id: "a", template: "x", faction: "hostile", at: { spot: "entry" }, customize }], props: [], beats: [] }))
       .filter((p) => p.level === "error").map((p) => p.message);

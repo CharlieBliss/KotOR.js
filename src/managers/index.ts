@@ -48,6 +48,8 @@ export * from "@/managers/gm/GMSpawner";
 export * from "@/managers/gm/GMReplication";
 export * from "@/managers/gm/GMPlayers";
 export * from "@/managers/gm/GMMines";
+export * from "@/managers/gm/GMSetPieces";
+export * from "@/managers/gm/GMRoomNames";
 export * from "@/managers/gm/GMChecks";
 export * from "@/managers/gm/GMSessions";
 export * from "@/managers/gm/GMCharacters";

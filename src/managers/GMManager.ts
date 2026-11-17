@@ -50,6 +50,7 @@ import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
@@ -638,6 +639,7 @@ export class GMManager {
 
     // The scene's own music, sound and look, before the GM changes any
     GMAtmosphere.onSceneLoaded();
+    GMSetPieces.onSceneLoaded();
 
     // Show all rooms so GM free camera can see the entire area
     for (const room of mod.area.rooms) {

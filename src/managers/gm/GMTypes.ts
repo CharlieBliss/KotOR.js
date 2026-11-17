@@ -1,8 +1,9 @@
 import type { GMPlayerSheet, GMSessionRules } from "@/managers/GMNetworkManager";
 import type { ICharacterAttributes } from "@/engine/rules/CharacterBuilder";
+import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
-export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine'
+export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine' | 'place_set'
   // Ordering an NPC (GMNpcOrders): click the ground to move it, a creature to attack or follow, points to patrol
   | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol'
   // Turning the selection to face a clicked point or creature
@@ -287,6 +288,8 @@ export interface GMSessionSave {
   groups?: GMSavedGroup[];
   /** The music, sound and look the GM gave the scene */
   atmosphere?: GMAtmosphereSettings;
+  /** Rooms of other areas placed in the scene (GMSetPieces) */
+  sets?: AreaSetPieceDef[];
 }
 
 /**

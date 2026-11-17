@@ -18,6 +18,8 @@
  *   player HUD             the player's own HUD is up and KotOR's combat panels are hidden
  *   target actions         the HUD offers what the target allows (Attack an enemy, Search a body, which stays
  *                          picked), shows where each power lands, and has the quick actions
+ *   sets                   rooms of another area (KotOR II's Ebon Hawk) built into the scene: a creature walks
+ *                          through them on their floor, and the player's screen gets the set, turned and removed
  *   helping powers         a player's helping power goes off out of combat; one the GM's machine refuses says why
  *   combat powers          a power queued while attacking goes off, Disable Droid is refused on a person, the
  *                          cast is raised, held and lowered, Burst of Speed doubles speed, only top feat ranks show
@@ -410,6 +412,77 @@ async function run() {
       expect(body.target, 'picking a body moved the target off it (to the next enemy)');
       expect(/Search/.test(body.primary), `a body's main action: ${body.primary || 'none'}`);
       return `enemy: ${foe.primary.replace(/\s+/g, ' ')}, body: ${body.primary.replace(/\s+/g, ' ')}`;
+    });
+
+    await check('sets', "A room set from another area (the Ebon Hawk) is walked through, and players get it, moved and removed", async () => {
+      // KotOR II's Ebon Hawk, put down well away from the throne room (nothing of the hall under it)
+      const placed = await evalIn(gm, async (K) => {
+        const R = window.__R, at = R.at(400, 0);
+        const set = await K.GMSetPieces.place({ module: '003ebo' }, at, 0);
+        if (!set) return { error: 'the set did not load' };
+        const [walker] = R.named('^Telos Security');
+        R.onlyThese([walker]);
+        walker.clearAllActions();
+        walker.position.copy(set.position);
+        walker.collisionManager.findWalkableFace();
+        // One of the ship's own path points, in another of its rooms, 10-22 m away
+        let target = null, best = 0;
+        for (const p of set.pathPoints) {
+          const floor = set.floorOf(p.vector), d = p.vector.distanceTo(set.position);
+          if (floor && floor.room !== set.floorOf(set.position)?.room && d > best && d >= 10 && d <= 22) { best = d; target = p.vector.clone(); }
+        }
+        window.__set = { id: set.id, walker, target };
+        const p = target;
+        const act = new K.GameState.ActionFactory.ActionMoveToPoint();
+        act.setParameter(0, 2, p.x); act.setParameter(1, 2, p.y); act.setParameter(2, 2, p.z);
+        act.setParameter(3, 3, K.GameState.module.area.id); act.setParameter(4, 3, 0xFFFFFFFF); act.setParameter(5, 1, 1);
+        act.setParameter(6, 2, 0.5); act.setParameter(7, 1, 0); act.setParameter(8, 2, 30);
+        walker.clearAllActions(); walker.actionQueue.add(act);
+        window.__setFloors = [];
+        window.__setTrack = setInterval(() => window.__setFloors.push(walker.room?.setPiece === set ? walker.room.roomName : 'off'), 100);
+        return { id: set.id, rooms: set.rooms.length, points: set.pathPoints.length, startRoom: walker.room?.roomName, onSet: walker.room?.setPiece === set, distance: +best.toFixed(1) };
+      });
+      expect(!placed.error, placed.error);
+      expect(placed.onSet, `the walker put in the set stands on ${placed.startRoom || 'nothing'}, not the set's floor`);
+      // Until it arrives or gives up (its move ends)
+      await waitFor(gm, 'the walk through the set', () => { const { walker, target } = window.__set; return walker.position.distanceTo(target) <= 1.5 || !walker.actionQueue?.length; }, 30000).catch(() => undefined);
+      const walked = await evalIn(gm, (K) => {
+        clearInterval(window.__setTrack);
+        const { walker, target } = window.__set;
+        const floors = window.__setFloors;
+        return { left: +walker.position.distanceTo(target).toFixed(2), rooms: [...new Set(floors)], off: floors.filter((f) => f === 'off').length, saved: (K.GMSessions.buildSessionSave('regress').sets || []).length };
+      });
+      expect(walked.left <= 1.5, `the walker stopped ${walked.left} m short in the set (rooms: ${walked.rooms.join(', ')})`);
+      expect(!walked.off, `the walker left the set's floor ${walked.off} time(s) on the way`);
+      expect(walked.rooms.length >= 2, `the walker stayed in one room: ${walked.rooms.join(', ')}`);
+      expect(walked.saved === 1, `a session save holds ${walked.saved} sets`);
+
+      // The player's machine has it where the GM put it, and sees the walker on its floor
+      const walkerId = await evalIn(gm, () => window.__set.walker.gmNetId);
+      const readPlayer = () => evalIn(pl, (K, id, walkerId) => {
+        const set = K.GMSetPieces.get(id), walker = window.__R.byNetId(walkerId);
+        return set ? { rooms: set.rooms.length, x: set.position.x, y: set.position.y, yaw: set.yaw, walkerOnSet: walker?.room?.setPiece === set } : null;
+      }, placed.id, walkerId);
+      await waitFor(pl, "the set on the player's screen", (K, id) => !!K.GMSetPieces.get(id), 30000, placed.id);
+      await pause(1);
+      const seen = await readPlayer();
+      const gmSet = await evalIn(gm, (K, id) => { const s = K.GMSetPieces.get(id); return { x: s.position.x, y: s.position.y }; }, placed.id);
+      expect(seen.rooms === placed.rooms, `the player's set has ${seen.rooms} rooms, the GM's ${placed.rooms}`);
+      expect(Math.hypot(seen.x - gmSet.x, seen.y - gmSet.y) < 0.01, "the player's set isn't where the GM's is");
+      expect(seen.walkerOnSet, "on the player's screen the walker isn't on the set's floor");
+
+      // Turned, then removed: the player's follows
+      await evalIn(gm, async (K, id) => { await K.GMSetPieces.move(id, { turnBy: -Math.PI / 2 }); return true; }, placed.id);
+      await waitFor(pl, "the set turned on the player's screen", (K, id) => Math.abs((K.GMSetPieces.get(id)?.yaw ?? 0) + Math.PI / 2) < 1e-3, 15000, placed.id);
+      await evalIn(gm, async (K, id) => {
+        const R = window.__R, { walker } = window.__set;
+        await K.GMSetPieces.remove(id);
+        K.GMManager.teleportObject(walker, R.at(0, 4));
+        for (const o of R.creatures()) K.GMManager.setObjectHidden(o, false);
+        return true;
+      }, placed.id);
+      await waitFor(pl, "the set removed on the player's screen", (K, id) => !K.GMSetPieces.get(id), 15000, placed.id);
+      return `${placed.rooms} rooms, walked ${placed.distance} m through ${walked.rooms.length} rooms to ${walked.left} m; mirrored, turned and removed on the player's screen`;
     });
 
     await check('helping-powers', "A player's helping power goes off out of combat; one the GM's machine refuses says why", async () => {

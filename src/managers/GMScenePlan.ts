@@ -18,6 +18,7 @@ import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMSeats } from "@/managers/gm/GMSeats";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import { CharacterRules } from "@/engine/rules/CharacterRules";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 
 /*
  * A scene plan: a whole GM scene written as data, so it can be drafted outside the game (by Claude, from a
@@ -34,6 +35,7 @@ export type GMPlanGame = 'kotor' | 'tsl';
  * - "waypoint:<tag>": one of the area's waypoints
  * - "room:<name>": the middle of a room (layout room name, e.g. "m13aa_02a")
  * - "actor:<id>" / "prop:<id>": something this plan placed
+ * - "set:<id>": the middle of the floor of a set this plan placed (its rooms are "room:<name>" spots too)
  * - "players": where the plan puts the players
  */
 export type GMPlanSpot = string;
@@ -79,6 +81,30 @@ export interface GMPlanActor {
   order?: GMPlanOrder;
   customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string; level?: number; class?: string | number };
   loot?: string[];
+}
+
+/**
+ * A set: rooms of another area (either game) built into this one, to walk around in (GMSetPieces). Sets go in
+ * first, so the players, actors and props can stand in them.
+ * Not part of the kotor-gm-scenes skill's format on purpose: a set usually needs lining up by hand (raised or lowered
+ * until its floor joins the area's), which a plan written without seeing the area can't do. Plans the GM writes or
+ * saves may have them.
+ */
+export interface GMPlanSet {
+  id: string;
+  /** The area whose rooms these are */
+  area: { game: GMPlanGame; module: string };
+  /** Rooms of its layout (e.g. "m12aa_01a"); all of them when left out */
+  rooms?: string[];
+  /** Where the middle of its floor goes: a spot of this area, or of a set placed before it */
+  at: GMPlanPlacement;
+  /** Degrees it is turned clockwise from how it lies in its own area */
+  turn?: number;
+  /** Metres it is raised (or lowered, negative) from the floor at its spot */
+  raise?: number;
+  /** What the GM sees it called (otherwise its area's name), and names for its rooms (otherwise guessed) */
+  name?: string;
+  roomNames?: Record<string, string>;
 }
 
 export interface GMPlanProp {
@@ -134,6 +160,7 @@ export interface GMScenePlanData {
   players: { at: GMPlanPlacement; facing?: GMPlanFacing; frozen?: boolean; note?: string };
   actors?: GMPlanActor[];
   props?: GMPlanProp[];
+  sets?: GMPlanSet[];
   beats?: GMPlanBeat[];
 }
 
@@ -167,6 +194,8 @@ export class GMScenePlan {
   static active: GMScenePlan | null = null;
   plan: GMScenePlanData;
   objects: Map<string, ModuleObject[]> = new Map();
+  /** The sets this plan placed: plan id -> set id */
+  sets: Map<string, string> = new Map();
   /** Orders actors had when placed hidden, given when they're revealed */
   pendingOrders: Map<string, GMPlanOrder> = new Map();
 
@@ -271,9 +300,25 @@ export class GMScenePlan {
       });
     }
 
+    const setIds = new Set<string>();
+    (plan.sets || []).forEach((set: any, i: number) => {
+      const where = `sets[${i}]`;
+      if (!set?.id) { error(where, 'Needs an id.'); return; }
+      if (setIds.has(set.id)) error(where, `Duplicate set id "${set.id}".`);
+      if (!set.area?.module) error(where, 'Needs "area": { "game": ..., "module": ... }: whose rooms to bring.');
+      else if (!['kotor', 'tsl'].includes(set.area.game)) error(where, 'The area\'s game is "kotor" or "tsl".');
+      if (set.rooms !== undefined && !(Array.isArray(set.rooms) && set.rooms.length)) error(where, '"rooms" is a list of room names (leave it out for all of them).');
+      const [kind, name] = String(set.at?.spot || '').split(':');
+      if (!set.at?.spot) error(where, 'Needs "at": { "spot": ... }.');
+      // Sets go in before anyone: their spot is the area's, or an earlier set's
+      else if (!(set.at.spot === 'entry' || ['waypoint', 'room'].includes(kind) || (kind === 'set' && setIds.has(name)))) error(where, `A set's spot is "entry", a waypoint, a room or an earlier set, not "${set.at.spot}".`);
+      setIds.add(set.id);
+    });
+
     const spotOk = (spot: string, where: string) => {
       const [kind, name] = String(spot || '').split(':');
       if (['entry', 'players'].includes(spot)) return;
+      if (kind === 'set') { if (!setIds.has(name)) error(where, `No set "${name}".`); return; }
       if (kind === 'actor' && !actorIds.has(name)) error(where, `No actor "${name}".`);
       else if (kind === 'prop' && !propIds.has(name)) error(where, `No prop "${name}".`);
       else if (!['actor', 'prop', 'waypoint', 'room'].includes(kind) || !name) error(where, `Unknown spot "${spot}".`);
@@ -335,6 +380,10 @@ export class GMScenePlan {
     if (kind === 'room') {
       const room = area.rooms.find((r: any) => String(r.roomName || '').toLowerCase() === name);
       return room ? GMScenePlan.roomPoint(room) : null;
+    }
+    if (kind === 'set') {
+      const set = GMSetPieces.get(this.sets.get(rest.join(':')));
+      return set ? set.position.clone() : null;
     }
     if (kind === 'actor' || kind === 'prop') {
       const obj = this.objects.get(name)?.[0] || this.objects.get(rest.join(':'))?.[0];
@@ -408,7 +457,10 @@ export class GMScenePlan {
   walkable(p: THREE.Vector3): THREE.Vector3 {
     const area = GameState.module?.area;
     const snapped = area?.getNearestWalkablePoint ? area.getNearestWalkablePoint(p, 0.5).clone() : p.clone();
-    snapped.z = GMViewport.getGroundZAt(snapped.x, snapped.y, snapped.z);
+    // The floor there nearest the spot's height: where floors are stacked (a set over another, a gallery), the
+    // one the spot is on, not the topmost
+    const floor = area?.floorAt ? area.floorAt(snapped, snapped.z, 1.5) : null;
+    snapped.z = floor ? floor.z : GMViewport.getGroundZAt(snapped.x, snapped.y, snapped.z);
     return snapped;
   }
 
@@ -454,7 +506,10 @@ export class GMScenePlan {
     if (plan.settings?.deathRule) GMPlayers.setDeathRule(plan.settings.deathRule);
     if (typeof plan.settings?.npcAi === 'boolean') GMManager.npcAiEnabled = plan.settings.npcAi;
 
-    // Players first: other spots may be "players"
+    // Sets first: everyone else may stand in them
+    for (const set of plan.sets || []) await this.placeSet(set);
+
+    // Players next: other spots may be "players"
     const start = this.placementPoints({ ...plan.players.at, formation: undefined }, 1)?.[0];
     if (!start) this.note(`Players' spot "${plan.players.at.spot}" isn't in this area; they start at its entry.`);
     this.playerStart = start || GMPlayers.getRespawnPoint();
@@ -532,6 +587,18 @@ export class GMScenePlan {
       bestDistance = d;
     }
     return best ? { point: best, from: first.id } : null;
+  }
+
+  async placeSet(planSet: GMPlanSet) {
+    const point = this.placementPoints({ ...planSet.at, formation: undefined }, 1)?.[0];
+    if (!point) { this.note(`Set "${planSet.id}": spot "${planSet.at.spot}" isn't in this area.`); return; }
+    point.z += Number(planSet.raise) || 0;
+    const module = planSet.area.game !== GMScenePlan.runningGame() ? OtherGameManager.foreignModuleName(planSet.area.module) : String(planSet.area.module).toLowerCase();
+    const set = await GMSetPieces.place({ module, rooms: planSet.rooms, name: planSet.name, roomNames: planSet.roomNames }, point, -((Number(planSet.turn) || 0) * Math.PI) / 180);
+    if (!set) { this.note(`Set "${planSet.id}": couldn't build ${module}${planSet.rooms?.length ? ` (${planSet.rooms.join(', ')})` : ''}.`); return; }
+    const missing = (planSet.rooms || []).filter((r) => !set.rooms.some((room) => room.roomName === String(r).toLowerCase()));
+    if (missing.length) this.note(`Set "${planSet.id}": no room ${missing.join(', ')} in ${module}.`);
+    this.sets.set(planSet.id, set.id);
   }
 
   async placeActor(actor: GMPlanActor) {
