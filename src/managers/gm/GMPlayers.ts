@@ -1,4 +1,5 @@
 import { CharacterRules, ABILITIES } from "@/engine/rules/CharacterRules";
+import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMCharacters } from "@/managers/gm/GMCharacters";
 import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
@@ -406,14 +407,23 @@ export class GMPlayers {
     }
   }
 
+  /**
+   * Host: tell a player why something they asked for didn't happen. It was only written in the GM's chat, so to
+   * the player a power, item or action that the host refused simply never went off. Shown on their HUD
+   */
+  static tellPlayer(peerId: string | undefined, text: string) {
+    GMNetworkManager.appendChat('System', text);
+    if (peerId && GMNetworkManager.role === 'host') GMNetworkManager.send('player.notice', { text }, peerId);
+  }
+
   /** Host: put an item from the player's inventory into an equipment slot */
-  static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string) {
+  static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string, peerId?: string) {
     const slotName = ModuleCreatureArmorSlot[slot];
     if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName) || !resRef) return;
     if (!this.getPlayerInventory(actor).some((e) => e.resRef === resRef)) return;
     const wanted = await GMSpawner.createItemFromResRefAsync(resRef);
     if (wanted && actor.canUseItem?.(wanted) === false) {
-      GMNetworkManager.appendChat('System', `${actor.getName()} can't use that: it needs a feat they don't have.`);
+      this.tellPlayer(peerId, `${actor.getName()} can't use that: it needs a feat they don't have.`);
       return;
     }
     if (!this.removeFromPlayerInventory(actor, resRef)) return;
@@ -562,8 +572,8 @@ export class GMPlayers {
    */
   static INTENT_HANDLERS: Record<GMIntentKind, (actor: ModuleCreature, intent: GMClientIntent, peerId: string) => void | boolean | Promise<boolean>> = {
     loot: (actor, intent, peerId) => GMPlayers.grantLootOnHost(peerId, actor, intent.targetNetId),
-    equip: (actor, intent) => {
-      GMPlayers.equipOnHost(actor, intent.slot, intent.resRef).catch((e) => console.warn('[GMPlayers] equip failed', e));
+    equip: (actor, intent, peerId) => {
+      GMPlayers.equipOnHost(actor, intent.slot, intent.resRef, peerId).catch((e) => console.warn('[GMPlayers] equip failed', e));
     },
     unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
@@ -571,17 +581,17 @@ export class GMPlayers {
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
     cancel: () => false,
     wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
-    mine: (actor, intent) => {
+    mine: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMMines.useMineOnHost(actor, intent).then((ok) => {
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
+        if (!ok) GMPlayers.tellPlayer(peerId, `${actor.getName()} can't do that right now.`);
         return ok;
       });
     },
-    ability: (actor, intent) => {
+    ability: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMPlayers.useAbilityOnHost(actor, intent).then((ok) => {
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
+        if (!ok) GMPlayers.tellPlayer(peerId, GMPlayers.whyNot(actor, intent));
         return ok;
       });
     },
@@ -589,6 +599,25 @@ export class GMPlayers {
     attack: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
     use: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
   };
+
+  /** Host: why a power, feat, skill or item a player asked for couldn't be used, in words they can act on */
+  static whyNot(actor: ModuleCreature, intent: GMClientIntent): string {
+    const name = actor.getName() || 'You';
+    const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
+    if (actor.isDead?.()) return `${name} is down.`;
+    if (!target || target.gmHidden) return "That target isn't there any more.";
+    const id = Number(intent.abilityId);
+    if (intent.ability === 'spell') {
+      const spell = actor.getSpells().find((s: any) => s.id === id);
+      if (!spell) return `${name} doesn't know that power.`;
+      const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
+      if (cost > actor.getFP()) return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
+    }
+    if (intent.ability === 'feat' && !actor.getFeats().some((f: any) => f.id === id)) return `${name} doesn't have that feat.`;
+    if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
+    if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
+    return `${name} can't use that right now.`;
+  }
 
   /** Open a door, attack a creature or use an object: the host walks the character there and does it */
   static actOnTarget(actor: ModuleCreature, intent: GMClientIntent): boolean {
@@ -618,6 +647,7 @@ export class GMPlayers {
     // A watching player can't act (a late request from before the freeze is dropped too)
     if (GMManager.playersFrozen && intent.kind !== 'cancel') {
       GMLog.info('host', `${request}: ignored, players are watching (frozen)`);
+      if (intent.kind !== 'wheel') this.tellPlayer(peerId, 'The GM has everyone watching for now.');
       return;
     }
     const meta = GM_INTENTS[intent.kind];
@@ -638,7 +668,7 @@ export class GMPlayers {
     // the queue: it never filled, and a power waiting for its round was dropped by the next click)
     const queues = intent.kind === 'ability' && this.QUEUED_ABILITIES.includes(String(intent.ability));
     if (queues && (actor.combatRound?.scheduledActionList?.length || 0) >= this.QUEUE_LIMIT) {
-      GMNetworkManager.appendChat('System', `${actor.getName()}'s queue is full.`);
+      this.tellPlayer(peerId, `${actor.getName()}'s queue is full: wait for what's queued, or Stop.`);
       return;
     }
     if (meta.interrupts && !queues) actor.clearAllActions();
@@ -785,6 +815,7 @@ export class GMPlayers {
       return send('skill', SkillType.SECURITY, tool && typeof tool === 'object' ? tool.getItemResRef?.() : undefined);
     }
     GMNetworkManager.appendChat('System', "That can't be done in a GM session yet.");
+    GMPlayerHud.notice("That can't be done in a GM session yet.");
     return true;
   }
 
@@ -1004,3 +1035,11 @@ GMNetworkManager.on('player.sheet', 'client', async (packet) => {
 GMNetworkManager.on('container.loot', 'client', async (packet) => {
   if (packet.payload) await GMPlayers.receiveNetworkLoot(packet.payload.items || []);
 }, 'to-me');
+
+// A notice from the host about something this player asked for: their HUD shows it (and it goes in their chat)
+GMNetworkManager.on('player.notice', 'client', (packet) => {
+  const text = packet.payload?.text;
+  if (!text) return;
+  GMNetworkManager.appendChat('System', text);
+  GMPlayerHud.notice(text);
+}, 'to-me-or-all');

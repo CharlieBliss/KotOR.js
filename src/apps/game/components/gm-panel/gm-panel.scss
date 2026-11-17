@@ -368,6 +368,8 @@
   // Players' rolls, on everyone's screen for a few seconds
   .gm-roll-feed {
     position: fixed;
+    // Above the character sheet, which players roll from (it hid the result)
+    z-index: 3100;
     top: 52px;
     right: 12px;
     display: flex;

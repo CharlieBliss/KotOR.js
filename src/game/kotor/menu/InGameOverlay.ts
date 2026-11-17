@@ -563,6 +563,7 @@ export class InGameOverlay extends GameMenu {
       return;
     }
 
+    if (!guiControl) return;
     const action = GameState.ActionMenuManager.ActionPanels.targetPanels[index].getSelectedAction();
     if (!action) {
       guiControl.setMaterialTexture(guiControl.border.fill.material, undefined);
@@ -586,6 +587,7 @@ export class InGameOverlay extends GameMenu {
 
   UpdateSelfUIIcon(index = 0) {
     const guiControl = this.getControlByName('LBL_ACTION' + index);
+    if (!guiControl) return;
     if (GameState.ActionMenuManager.ActionPanels.selfPanels[index].actions.length) {
       const action = GameState.ActionMenuManager.ActionPanels.selfPanels[index].getSelectedAction();
       if (action && guiControl.getFillTextureName() != action.icon) {
@@ -968,7 +970,9 @@ export class InGameOverlay extends GameMenu {
     this.TogglePartyMember(1, false);
     this.TogglePartyMember(2, false);
     
-    for (let i = 0; i < GameState.PartyManager.party.length; i++) {
+    // The HUD has three portraits (LBL_CHAR1-3). A GM session's party can hold more: a fourth asked for LBL_CHAR4,
+    // which no game has, and the overlay threw every frame ("reading 'getFillTextureName'")
+    for (let i = 0; i < Math.min(3, GameState.PartyManager.party.length); i++) {
       let partyMember = GameState.PartyManager.party[i];
       let id = i;
       switch (i) {
@@ -981,6 +985,7 @@ export class InGameOverlay extends GameMenu {
       }
       this.TogglePartyMember(id, true);
       let pmBG = this.getControlByName('LBL_CHAR' + (id + 1));
+      if (!pmBG) continue;
       const portraitResRef = partyMember.getPortraitResRef();
       if (pmBG.getFillTextureName() != portraitResRef) {
         pmBG.setFillTextureName(portraitResRef);
@@ -988,8 +993,8 @@ export class InGameOverlay extends GameMenu {
           pmBG.setFillTexture(texture);
         });
       }
-      (this.getControlByName('PB_VIT' + (id + 1)) as GUIProgressBar).setProgress(Math.min(Math.max(partyMember.getHP() / partyMember.getMaxHP(), 0), 1) * 100);
-      (this.getControlByName('PB_FORCE' + (id + 1)) as GUIProgressBar).setProgress(Math.min(Math.max(partyMember.getFP() / partyMember.getMaxFP(), 0), 1) * 100);
+      (this.getControlByName('PB_VIT' + (id + 1)) as GUIProgressBar)?.setProgress(Math.min(Math.max(partyMember.getHP() / partyMember.getMaxHP(), 0), 1) * 100);
+      (this.getControlByName('PB_FORCE' + (id + 1)) as GUIProgressBar)?.setProgress(Math.min(Math.max(partyMember.getFP() / partyMember.getMaxFP(), 0), 1) * 100);
       if (partyMember.isDebilitated()) {
         this.getControlByName('LBL_DEBILATATED' + (id + 1))?.show();
       } else {
@@ -1001,6 +1006,7 @@ export class InGameOverlay extends GameMenu {
       this.showCombatUI();
       const labels = [this.LBL_QUEUE0, this.LBL_QUEUE1, this.LBL_QUEUE2, this.LBL_QUEUE3];
       labels.forEach((label, i) => {
+        if (!label) return;
         const icon = queue[i] || '';
         if (icon) {
           if (label.getFillTextureName() != icon) {

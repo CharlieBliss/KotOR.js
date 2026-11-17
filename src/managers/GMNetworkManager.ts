@@ -315,6 +315,8 @@ export interface GMPacketMap {
   'client.input': GMClientInput;
   'client.intent': GMClientIntent;
   'chat.message': { sender: string; text: string };
+  /** Host to one player: something about what they asked for (why a power didn't go off). Their HUD shows it */
+  'player.notice': { text: string };
   'mine.state': GMSerializedMine;
   'mine.remove': { netId: string };
   'fx.event': GMFxEvent;

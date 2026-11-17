@@ -18,11 +18,14 @@
  *   player HUD             the player's own HUD is up and KotOR's combat panels are hidden
  *   target actions         the HUD offers what the target allows (Attack an enemy, Search a body, which stays
  *                          picked), shows where each power lands, and has the quick actions
+ *   helping powers         a player's helping power goes off out of combat; one the GM's machine refuses says why
+ *   rolls                  a player rolling from their sheet sees the result, on it and above it
  *   screens agree          GM and player agree on who is dead, and the dead lie down on both
  *   page errors            no uncaught errors on either screen
  *
  * Usage:  npm run test:gm-regress [-- --show] [-- --speed 3] [-- --only passing,loot]
- * Environment: GM_E2E_URL (default http://localhost:8080). Starts `npm run dev` when nothing is serving it.
+ * Environment: GM_E2E_URL (default http://localhost:8080); GM_REGRESS_PROFILE, the browser profile (default
+ * kotor-gm-regress), for running two at once. Starts `npm run dev` when nothing is serving it.
  * Exits non-zero when a check fails.
  */
 const { app } = require('electron');
@@ -41,7 +44,8 @@ const PORT = 7900 + Math.floor(Math.random() * 50);
 const WS_URL = `ws://localhost:${PORT}`;
 const PLAN = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'gm-throne-battle.json'), 'utf8'));
 
-configureApp(app, 'kotor-gm-regress');
+// Its own browser profile; two runs at once (say, two sessions in one checkout) each need their own
+configureApp(app, process.env.GM_REGRESS_PROFILE || 'kotor-gm-regress');
 
 const t0 = Date.now();
 const log = (msg) => console.log(`${((Date.now() - t0) / 1000).toFixed(1).padStart(6)}s  ${msg}`);
@@ -401,6 +405,73 @@ async function run() {
       expect(body.target, 'picking a body moved the target off it (to the next enemy)');
       expect(/Search/.test(body.primary), `a body's main action: ${body.primary || 'none'}`);
       return `enemy: ${foe.primary.replace(/\s+/g, ' ')}, body: ${body.primary.replace(/\s+/g, ' ')}`;
+    });
+
+    await check('helping-powers', "A player's helping power goes off out of combat; one the GM's machine refuses says why", async () => {
+      // The GM gives the player's character Burst of Speed and the Force for it; their sheet brings it over
+      await evalIn(gm, (K) => {
+        const h = K.GMManager.getPlayerCharacters()[0];
+        // Up and alone, whatever earlier checks did to them (a trooper left beside them fights on its own scripts)
+        for (const o of window.__R.creatures()) if (o !== h) K.GMManager.setObjectHidden(o, true);
+        if (h.isDead()) K.GMPlayers.revivePlayer(h);
+        const rows = K.GameState.TwoDAManager.datatables.get('spells').rows;
+        const id = Number(Object.keys(rows).find((k) => rows[k].label === 'FORCE_POWER_SPEED_BURST'));
+        if (!h.getSpells().some((s) => s.id === id)) h.classes[0].addSpell(new K.TalentSpell(id));
+        h.maxForcePoints = Math.max(h.maxForcePoints || 0, 100); h.forcePoints = h.maxForcePoints; h.currentForce = h.maxForcePoints;
+        h.combatData.combatState = false; h.excitedDuration = 0;
+        return true;
+      });
+      await waitFor(pl, 'the helping power on the player\'s sheet', (K) => K.GMPlayerHud.abilities().some((x) => x.kind === 'power' && x.aim !== 'enemy' && x.usable), 15000);
+      const before = await evalIn(gm, (K) => { const h = K.GMManager.getPlayerCharacters()[0]; return { fp: h.getFP(), combat: !!h.combatData.combatState }; });
+      const sent = await evalIn(pl, (K) => {
+        const a = K.GMPlayerHud.abilities().find((x) => x.kind === 'power' && x.aim !== 'enemy' && x.usable);
+        if (!a) return null;
+        const r = K.GMPlayerHud.use(a);
+        return { name: a.name, ok: r.ok };
+      });
+      expect(sent && sent.ok, `the player has no helping power to use, or it wasn't sent: ${JSON.stringify(sent)}`);
+      await pause(4);
+      const after = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].getFP());
+      expect(!before.combat, 'the player was in combat: this checks out of combat');
+      if (!(after < before.fp)) {
+        // What the character was doing instead, to say why
+        const state = await evalIn(gm, (K) => {
+          const h = K.GMManager.getPlayerCharacters()[0], round = h.combatRound;
+          return {
+            queue: (h.actionQueue || []).map((a) => a.type), roundAction: round.action ? round.action.actionType : null,
+            scheduled: round.scheduledActionList.length, paused: !!round.roundPaused, started: !!round.roundStarted,
+            hostDriven: !!h.gmHostDriven, hidden: !!h.gmHidden, dead: h.isDead(), debilitated: h.isDebilitated(), held: K.GMManager.worldHeld(),
+            log: K.GMLog.recent ? K.GMLog.recent(6) : undefined,
+          };
+        });
+        const notice = await evalIn(pl, (K) => K.GMPlayerHud.lastNotice && K.GMPlayerHud.lastNotice.text);
+        throw new CheckFailed(`${sent.name} spent no Force on the GM's machine (${before.fp} → ${after}); the character: ${JSON.stringify(state)}; told the player: ${notice || 'nothing'}`);
+      }
+      // Asking for a power the character doesn't know: the GM's machine says so to the player
+      await evalIn(pl, (K) => { K.GMPlayerHud.lastNotice = null; K.GMNetworkManager.sendIntent('ability', undefined, { ability: 'spell', abilityId: 99999 }); return true; });
+      await sleep(1500);
+      const notice = await evalIn(pl, (K) => K.GMPlayerHud.lastNotice && K.GMPlayerHud.lastNotice.text);
+      expect(/know that power/.test(notice || ''), `the player wasn't told why a power was refused (notice: ${notice || 'none'})`);
+      return `${sent.name}: Force ${before.fp} → ${after}; refusal: "${notice}"`;
+    });
+
+    await check('rolls', 'A player rolling from their sheet sees the result, there and above it', async () => {
+      await evalIn(pl, () => { const b = [...document.querySelectorAll('.gm-hud-quick button')].find((x) => /Skills/.test(x.innerText)); if (b) b.click(); return true; });
+      await sleep(800);
+      const label = await evalIn(pl, () => { const b = [...document.querySelectorAll('button.sheet-roll')].find((x) => /^Roll /.test(x.title || '')); if (b) b.click(); return b ? (b.querySelector('.sheet-roll-name') || {}).innerText : null; });
+      expect(label, 'no roll button on the Skills sheet');
+      await sleep(1500);
+      const r = await evalIn(pl, () => {
+        const result = (document.querySelector('.sheet-roll.rolled .sheet-roll-result') || {}).innerText || '';
+        const feed = document.querySelector('.gm-roll-feed'), sheet = document.querySelector('.sheet-backdrop');
+        const z = (el) => (el ? Number(getComputedStyle(el).zIndex) || 0 : -1);
+        const closer = [...document.querySelectorAll('button')].find((x) => x.innerText.trim() === 'Close');
+        if (closer) closer.click();
+        return { result, feedAbove: !!feed && z(feed) > z(sheet), feed: !!feed };
+      });
+      expect(/→\s*-?\d+/.test(r.result), `the roll's result isn't on the sheet (${r.result || 'nothing'})`);
+      expect(r.feed && r.feedAbove, 'the roll feed is behind the character sheet');
+      return `${label}: ${r.result}`;
     });
 
     await check('agree', 'GM and player agree on who is dead, and the dead lie down on both', async () => {

@@ -2,6 +2,7 @@ import React from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { Panel } from "@/apps/game/components/gm-panel/creator/sections";
 import { GameImage } from "@/apps/game/components/gm-panel/creator/GameImage";
+import { useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { ABILITY_NAMES } from "@/apps/game/components/gm-panel/creator/creatorData";
 import type { GMCheck } from "@/managers/gm/GMTypes";
 
@@ -69,29 +70,46 @@ const SAVES: { save: 'fortitude' | 'reflex' | 'will'; name: string }[] = [
   { save: 'fortitude', name: 'Fortitude' }, { save: 'reflex', name: 'Reflex' }, { save: 'will', name: 'Will' },
 ];
 
-const RollButton: React.FC<{ name: string; bonus: number; detail?: string; onRoll: () => void; who: 'player' | 'gm' }> = ({ name, bonus, detail, onRoll, who }) => (
-  <button className="sheet-roll" onClick={onRoll} title={`Roll ${name}: d20 ${bonus >= 0 ? '+' : '-'} ${Math.abs(bonus)}${who === 'gm' ? ', for this player' : ''}. Everyone sees the result.`}>
+/**
+ * A skill or save that rolls when clicked. Its latest result shows on it for a few seconds: rolling from the sheet,
+ * the roll feed was behind the sheet, and players never saw what they rolled
+ */
+const RollButton: React.FC<{ name: string; bonus: number; detail?: string; onRoll: () => void; who: 'player' | 'gm'; last?: any }> = ({ name, bonus, detail, onRoll, who, last }) => (
+  <button className={`sheet-roll ${last ? 'rolled' : ''}`} onClick={onRoll} title={`Roll ${name}: d20 ${bonus >= 0 ? '+' : '-'} ${Math.abs(bonus)}${who === 'gm' ? ', for this player' : ''}. Everyone sees the result.`}>
     <span className="sheet-roll-name">{name}{detail ? <span className="cc-tag">{detail}</span> : null}</span>
-    <span className="sheet-roll-bonus">{signed(bonus)}</span>
+    {last ? (
+      <span
+        className={`sheet-roll-result ${last.roll === 20 ? 'natural-20' : last.roll === 1 ? 'natural-1' : ''}`}
+        title={`d20 ${last.roll} ${last.bonus >= 0 ? '+' : '-'} ${Math.abs(last.bonus)} = ${last.total}`}
+      >
+        → {last.total}{last.roll === 20 ? ' (20!)' : last.roll === 1 ? ' (1)' : ''}
+      </span>
+    ) : (
+      <span className="sheet-roll-bonus">{signed(bonus)}</span>
+    )}
   </button>
 );
 
 export const SkillsSection: React.FC<SheetSectionProps> = ({ creature: c, actions }) => {
+  useGMStore();
   const bonus = (check: GMCheck) => KotOR.GMChecks.checkBonus(c, check);
+  // This character's rolls still showing, by what was rolled
+  const shown = KotOR.GMChecks.shownRolls().filter((r: any) => r.netId === c.gmNetId);
+  const last = (check: GMCheck) => { const label = KotOR.GMChecks.checkLabel(check); return [...shown].reverse().find((r: any) => r.label === label); };
   return (
     <>
       <Panel title="Skills" extra={<span className="cc-hint">Click to roll · everyone sees it</span>}>
         <div className="sheet-rolls">
           {KotOR.GMChecks.SKILL_NAMES.map((name: string, skill: number) => {
             const ranks = Number(c.skills?.[skill]?.rank ?? c.getSkillRanks?.(skill) ?? 0);
-            return <RollButton key={name} name={name} bonus={bonus({ kind: 'skill', skill })} detail={`${ranks} rank${ranks === 1 ? '' : 's'}`} onRoll={() => actions.roll({ kind: 'skill', skill })} who={actions.who} />;
+            return <RollButton key={name} name={name} bonus={bonus({ kind: 'skill', skill })} detail={`${ranks} rank${ranks === 1 ? '' : 's'}`} onRoll={() => actions.roll({ kind: 'skill', skill })} who={actions.who} last={last({ kind: 'skill', skill })} />;
           })}
         </div>
       </Panel>
       <Panel title="Saving throws">
         <div className="sheet-rolls">
           {SAVES.map((s) => (
-            <RollButton key={s.save} name={s.name} bonus={bonus({ kind: 'save', save: s.save })} onRoll={() => actions.roll({ kind: 'save', save: s.save })} who={actions.who} />
+            <RollButton key={s.save} name={s.name} bonus={bonus({ kind: 'save', save: s.save })} onRoll={() => actions.roll({ kind: 'save', save: s.save })} who={actions.who} last={last({ kind: 'save', save: s.save })} />
           ))}
         </div>
       </Panel>

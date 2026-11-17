@@ -86,6 +86,14 @@ export class GMPlayerHud {
   /** Whether the wheel is open on this machine (told to the host once per open/close) */
   static wheelOpen: boolean = false;
 
+  /** The latest thing the host told this player about what they asked for (GMPlayers.tellPlayer), for the HUD */
+  static lastNotice: { text: string; at: number } | null = null;
+
+  static notice(text: string) {
+    this.lastNotice = { text, at: Date.now() };
+    GMManager.notifyChange();
+  }
+
   /** Our HUD replaces KotOR's: a player in a GM session, once they have their character */
   static active(): boolean {
     return !!(

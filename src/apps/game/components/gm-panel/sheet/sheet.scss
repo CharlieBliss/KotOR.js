@@ -55,6 +55,11 @@
   &:active { background: var(--cc-on); }
 }
 .sheet-roll-bonus { color: var(--cc-text-strong); font-size: 16px; font-variant: normal; font-variant-numeric: tabular-nums; }
+/* The latest result of this roll, for a few seconds */
+.sheet-roll.rolled { border-color: var(--cc-text-strong); }
+.sheet-roll-result { color: #ffe39a; font-size: 16px; font-weight: 700; font-variant: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sheet-roll-result.natural-20 { color: #7dffb0; }
+.sheet-roll-result.natural-1 { color: #ff8a8a; }
 
 .sheet-talents { display: flex; flex-direction: column; gap: 4px; }
 .sheet-talent {

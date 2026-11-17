@@ -311,8 +311,18 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
   const use = useCallback((ability: GMHudAbility | undefined) => {
     if (!ability) return;
     const result = GMPlayerHud.use(ability);
-    if (!result.ok && result.message) say(result.message);
+    if (!result.ok) {
+      if (result.message) say(result.message);
+      return;
+    }
+    // It was sent: say so, and to whom (a refusal from the GM's machine follows as its own notice)
+    const who = result.target === GMPlayerHud.player() ? 'you' : (result.target as any)?.getName?.() || 'target';
+    say(`${ability.name} → ${who}`);
   }, [say]);
+
+  // The GM's machine telling us why something we asked for didn't happen (GMPlayers.tellPlayer)
+  const notice = GMPlayerHud.lastNotice;
+  useEffect(() => { if (notice) say(notice.text); }, [notice?.at, say]);
 
   const act = useCallback((id: GMHudTargetAction['id']) => {
     const result = GMPlayerHud.runTargetAction(id);
