@@ -211,6 +211,8 @@ export interface GMSessionRules {
   frozen?: boolean;
   /** How far character creation may go beyond the game's rules (CharacterRules) */
   creation?: ICharacterLimits;
+  /** A cutscene is on: players watch the GM camera in widescreen (GMCutscene) */
+  cutscene?: { active: boolean; caption?: string };
 }
 
 export interface GMWorldSnapshot {
@@ -306,6 +308,8 @@ export interface GMPacketMap {
   'roll.result': { name: string; netId?: string; label: string; roll: number; bonus: number; total: number };
   'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
+  /** The GM camera during a cutscene (GMCutscene): cut jumps there instead of easing */
+  'cutscene.pose': { x: number; y: number; z: number; yaw: number; pitch: number; hfov: number; cut?: boolean };
   'scene.atmosphere': { atmosphere: GMAtmosphereSettings };
   'player.respawn': Record<string, never>;
 }

@@ -57,4 +57,5 @@ export * from "@/managers/gm/GMPlayerRequests";
 export * from "@/managers/gm/GMCombatAI";
 export * from "@/managers/gm/GMHistory";
 export * from "@/managers/gm/GMEditTools";
+export * from "@/managers/gm/GMCutscene";
 export * from "@/managers/gm/GMAtmosphere";

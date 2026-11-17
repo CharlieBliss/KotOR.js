@@ -1,3 +1,4 @@
+import type * as THREE from "three";
 import type { ModuleObject } from "@/module/ModuleObject";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleDoor } from "@/module/ModuleDoor";
@@ -58,6 +59,8 @@ export interface EngineHooks {
   skillGatePasses(obj: ModuleObject, user: ModuleObject): boolean;
   /** The player controls only their own character: the party leader can't be switched */
   isLeaderLocked(): boolean;
+  /** A camera to draw the world with instead of the game's own (a GM cutscene on a player's machine), or null */
+  cutsceneCamera(): THREE.Camera | null;
   /** The area leaves out its own placeables, creatures or triggers */
   skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean;
 
@@ -116,6 +119,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isNetworkContainer: () => false,
   skillGatePasses: () => true,
   isLeaderLocked: () => false,
+  cutsceneCamera: () => null,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
   onHostVisualEffectApplied: () => {},

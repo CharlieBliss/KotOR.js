@@ -49,6 +49,12 @@ function commands(onOpenTab: (tab: DrawerTab) => void, onToggleTracker: () => vo
     cmd('watch', GMManager.playersFrozen ? 'Let players act again' : 'Players watch', "Players can't move or act, and NPCs leave them alone", () => GMManager.setPlayersFrozen(!GMManager.playersFrozen), 'freeze cutscene'),
     cmd('hidden', GMEditTools.placeHidden ? 'Place visible' : 'Place hidden', 'Whether new creatures and objects arrive hidden from players', () => { GMEditTools.placeHidden = !GMEditTools.placeHidden; GMManager.notifyChange(); }, 'reveal'),
     cmd('tracker', 'Combat tracker', 'Show or hide the list of who is fighting (T)', onToggleTracker, 'initiative fight battle'),
+    cmd('cutscene', KotOR.GMCutscene.active ? 'End the cutscene' : 'Start a cutscene', 'Players watch your camera in widescreen', () => KotOR.GMCutscene.toggle(), 'cinematic camera movie widescreen letterbox'),
+    cmd('shot-save', `Save the view as shot ${KotOR.GMCutscene.nextFreeShot()}`, 'Ctrl+Shift+1–9 picks the number', () => KotOR.GMCutscene.saveShot(KotOR.GMCutscene.nextFreeShot()), 'camera angle cutscene'),
+    ...KotOR.GMCutscene.savedShots().flatMap(([n]) => [
+      cmd(`shot-cut:${n}`, `Cut to shot ${n}`, KotOR.GMCutscene.active ? `${n} in a cutscene` : 'Moves your camera there', () => KotOR.GMCutscene.goToShot(n, false), 'camera angle cutscene'),
+      cmd(`shot-pan:${n}`, `Pan to shot ${n}`, KotOR.GMCutscene.active ? `Shift+${n} in a cutscene` : 'Moves your camera there slowly', () => KotOR.GMCutscene.goToShot(n, true), 'camera angle cutscene'),
+    ]),
     cmd('undo', 'Undo', GMHistory.undoStack.length ? GMHistory.undoStack[GMHistory.undoStack.length - 1].label : 'Nothing to undo', () => void GMHistory.undo()),
     cmd('redo', 'Redo', GMHistory.redoStack.length ? GMHistory.redoStack[GMHistory.redoStack.length - 1].label : 'Nothing to redo', () => void GMHistory.redo()),
     cmd('sel-view', 'Select creatures on screen', 'Ctrl+A', () => GMManager.setSelection(GMEditTools.creaturesInView())),

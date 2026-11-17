@@ -35,6 +35,7 @@ import { PLACEABLE_PRESETS, CATEGORIZED_PROPS, PLACEABLE_KEYWORD_LABELS } from "
 import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
+import { GMCutscene } from "@/managers/gm/GMCutscene";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMHistory } from "@/managers/gm/GMHistory";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
@@ -122,7 +123,7 @@ export class GMManager {
   static sceneStartPoint: THREE.Vector3 | null = null;
 
   static sessionRules(): GMSessionRules {
-    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits };
+    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state() };
   }
 
   static setPlayersFrozen(on: boolean) {
@@ -1283,6 +1284,7 @@ export class GMManager {
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);
+    GMCutscene.update(delta);
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
     if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
@@ -1376,6 +1378,7 @@ export class GMManager {
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
     isWorldPaused: () => !!GMManager.worldPaused,
+    cutsceneCamera: () => GMCutscene.renderCamera(),
     isPlayerFrozen: (creature) => GMManager.isPlayerFrozen(creature),
     isPlayerCharacter: (obj) => GMManager.isPlayerCharacter(obj),
     isNetworkContainer: (container) => GMPlayers.isNetworkContainer(container),

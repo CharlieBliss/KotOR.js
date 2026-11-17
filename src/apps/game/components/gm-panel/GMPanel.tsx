@@ -17,6 +17,7 @@ import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
 import { ContextMenu } from "@/apps/game/components/gm-panel/overlays/ContextMenu";
 import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
 import { CombatTracker, anyoneFighting } from "@/apps/game/components/gm-panel/overlays/CombatTracker";
+import { CutsceneOverlay } from "@/apps/game/components/gm-panel/overlays/CutsceneOverlay";
 import { wireRecentPlacements } from "@/apps/game/components/gm-panel/controls/quickActions";
 import { installGameCursor } from "@/apps/game/components/gm-panel/gameCursor";
 import "@/apps/game/components/gm-panel/gm-cursor.scss";
@@ -109,6 +110,25 @@ export const GMPanel: React.FC = () => {
         e.stopPropagation();
         toggleTracker();
         return;
+      }
+      // Shots: Ctrl+Shift+1-9 saves the view as one; in a cutscene 1-9 cuts to it, Shift+1-9 pans there
+      const shotKey = /^Digit([1-9])$/.exec(e.code);
+      if (shotKey && !e.altKey) {
+        const n = Number(shotKey[1]);
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (ctrl && e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          KotOR.GMCutscene.saveShot(n);
+          KotOR.GameState.MenuManager.InGameBark?.barkFromString(`Shot ${n} saved: in a cutscene, ${n} cuts to it, Shift+${n} pans there`);
+          return;
+        }
+        if (!ctrl && KotOR.GMCutscene.active && KotOR.GMCutscene.getShot(n)) {
+          e.preventDefault();
+          e.stopPropagation();
+          KotOR.GMCutscene.goToShot(n, e.shiftKey);
+          return;
+        }
       }
       if (editShortcut(e)) {
         e.preventDefault();
@@ -424,6 +444,15 @@ export const GMPanel: React.FC = () => {
             >
               {GMManager.playersFrozen ? 'Players watching' : 'Watch'}
             </button>
+            <button
+              className={`gm-btn small ${KotOR.GMCutscene.active ? 'danger active' : ''}`}
+              onClick={() => KotOR.GMCutscene.toggle()}
+              title={KotOR.GMCutscene.active
+                ? 'End the cutscene: players get their own camera back'
+                : 'Cutscene: players watch your camera in widescreen. Ctrl+Shift+1–9 saves shots; in a cutscene 1–9 cuts to one, Shift pans'}
+            >
+              {KotOR.GMCutscene.active ? 'End cutscene' : 'Cutscene'}
+            </button>
           </div>
         )}
       </div>
@@ -444,6 +473,9 @@ export const GMPanel: React.FC = () => {
       )}
       {!isPlayerView && <CombatTracker shown={trackerShown} onShownChange={setTrackerShown} />}
 
+      {/* A cutscene: widescreen bars and the caption (and, for the GM, the director's dock) */}
+      <CutsceneOverlay />
+
       {/* Our character is down: what happens next, by the session's rule */}
       {isPlayerView && <DownedBanner />}
 
@@ -461,8 +493,8 @@ export const GMPanel: React.FC = () => {
       )}
       {GMNetworkManager.role !== 'offline' && <RollFeed />}
 
-      {/* Bottom controls strip: what the current mode/tool does and its keys */}
-      <div className="gm-controls-strip">
+      {/* Bottom controls strip: what the current mode/tool does and its keys (the cutscene's dock takes its place) */}
+      <div className="gm-controls-strip" style={KotOR.GMCutscene.active ? { display: 'none' } : undefined}>
         {statusChip && <span className="gm-chip">{statusChip}</span>}
         {controlHints.map(([keys, label]) => (
           <span key={keys} className="gm-control-hint">

@@ -286,3 +286,82 @@
     color: #ffe082;
   }
 }
+
+// --- Cutscene: widescreen bars, caption, and the GM's director dock
+.gm-panel-root {
+  .gm-cutscene {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9450;
+
+    // Players: KotOR's black bars, over the game's HUD and the panel's bars
+    &.watching {
+      z-index: 9900;
+      .gm-cutscene-bar { background: #000; }
+    }
+
+    // The GM: see-through bars, to frame the shot
+    &.directing .gm-cutscene-bar {
+      background: rgba(0, 0, 0, 0.55);
+      &.top { border-bottom: 1px dashed rgba(255, 209, 102, 0.6); }
+      &.bottom { border-top: 1px dashed rgba(255, 209, 102, 0.6); }
+    }
+  }
+
+  .gm-cutscene-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &.top { top: 0; }
+    &.bottom { bottom: 0; }
+  }
+
+  .gm-cutscene-caption {
+    max-width: min(900px, calc(100vw - 48px));
+    padding: 0 16px;
+    text-align: center;
+    font-size: 18px;
+    line-height: 1.35;
+    color: #f4f0e2;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  }
+
+  .gm-cutscene-dock {
+    position: fixed;
+    left: 50%;
+    bottom: 12px;
+    transform: translateX(-50%);
+    z-index: 9460;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100vw - 24px);
+    padding: 6px 8px;
+    background: rgba(9, 19, 32, 0.92);
+    border: 1px solid rgba(255, 209, 102, 0.55);
+    border-radius: 6px;
+    font-size: 12px;
+  }
+
+  .gm-cutscene-dock .gm-btn {
+    white-space: nowrap;
+  }
+
+  .gm-cutscene-live {
+    flex: 0 0 auto;
+    font-weight: 600;
+    color: #ff6b6b;
+    white-space: nowrap;
+  }
+
+  .gm-cutscene-input {
+    width: min(360px, 34vw);
+    user-select: text;
+  }
+}

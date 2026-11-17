@@ -1713,6 +1713,9 @@ export class GameState implements EngineContext {
   }
 
   static Render(delta: number = 0){
+    // A GM cutscene: players see through the GM's camera
+    const directed = GameState.hooks.cutsceneCamera?.();
+    if(directed) GameState.currentCamera = directed as THREE.PerspectiveCamera;
     GameState.renderPass.camera = GameState.currentCamera;
     GameState.renderPassAA.camera = GameState.currentCamera;
     GameState.bokehPass.camera = GameState.currentCamera;
