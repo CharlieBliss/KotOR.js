@@ -16,6 +16,8 @@
  *   rules                  a GM-run NPC's power still works: those scripts are rules, not behaviour
  *   loot window            a player's loot window doesn't pause the shared world
  *   player HUD             the player's own HUD is up and KotOR's combat panels are hidden
+ *   target actions         the HUD offers what the target allows (Attack an enemy, Search a body, which stays
+ *                          picked), shows where each power lands, and has the quick actions
  *   screens agree          GM and player agree on who is dead, and the dead lie down on both
  *   page errors            no uncaught errors on either screen
  *
@@ -368,6 +370,37 @@ async function run() {
       });
       expect(r.hud && r.slots === 9, `HUD up: ${r.hud}, ${r.slots} slots`);
       expect(!r.kotor.length, `KotOR's panels still showing: ${r.kotor.join(', ')}`);
+    });
+
+    await check('target-actions', 'The HUD offers what the target allows, shows where powers land, and has the quick actions', async () => {
+      // A living enemy and a body near the player, for the player to target
+      const ids = await evalIn(gm, (K) => {
+        const R = window.__R, [foe, body] = R.named('^Sith Trooper');
+        const hero = K.GMManager.getPlayerCharacters()[0];
+        R.onlyThese([foe, body, hero]);
+        for (const [o, dx] of [[foe, 3], [body, -3]]) { o.clearAllActions(); o.position.set(hero.position.x + dx, hero.position.y + 6, hero.position.z); }
+        if (!body.isDead()) K.GMManager.killObject(body);
+        return [foe.gmNetId, body.gmNetId];
+      });
+      await pause(2);
+      const read = (netId) => evalIn(pl, (K, id) => {
+        const o = window.__R.byNetId(id);
+        K.GMPlayerHud.select(o);
+        return new Promise((res) => setTimeout(() => res({
+          primary: (document.querySelector('.gm-hud-action.primary') || {}).innerText || '',
+          lands: [...document.querySelectorAll('.gm-hud-slot .gm-hud-lands')].map((c) => c.innerText),
+          target: K.GameState.CursorManager.selectedObject === o,
+          quick: [...document.querySelectorAll('.gm-hud-quick button')].map((b) => b.innerText.replace(/\s+/g, ' ')),
+        }), 600));
+      }, netId);
+      const foe = await read(ids[0]);
+      expect(/Attack/.test(foe.primary), `an enemy's main action: ${foe.primary || 'none'}`);
+      expect(!foe.lands.length || foe.lands.every((t) => /Target|You|Ally/.test(t)), `with an enemy targeted, slots land on: ${foe.lands.join(', ')}`);
+      expect(['Sheet', 'Skills', 'Items', 'Chat'].every((w) => foe.quick.some((q) => q.includes(w))), `quick actions: ${foe.quick.join(', ')}`);
+      const body = await read(ids[1]);
+      expect(body.target, 'picking a body moved the target off it (to the next enemy)');
+      expect(/Search/.test(body.primary), `a body's main action: ${body.primary || 'none'}`);
+      return `enemy: ${foe.primary.replace(/\s+/g, ' ')}, body: ${body.primary.replace(/\s+/g, ' ')}`;
     });
 
     await check('agree', 'GM and player agree on who is dead, and the dead lie down on both', async () => {

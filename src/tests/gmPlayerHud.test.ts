@@ -10,6 +10,7 @@ import { GameState } from "@/GameState";
 import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { SkillType } from "@/enums/nwscript/SkillType";
 
 const spell = (id: number, label: string, cols: Record<string, any>, cost = 10) => ({
   id, label, name: -1, iconresref: `ip_${id}`, forcehostile: '****', forcefriendly: '****', range: 'M', ...cols,
@@ -173,5 +174,118 @@ describe('the bar is saved per character', () => {
     expect(bar[5]).toBe('power:35');
     GMPlayerHud.resetLoadout(pc);
     expect(GMPlayerHud.loadout(pc)[0]).toBe('power:35');
+  });
+});
+
+describe('picking a body', () => {
+  test("a body the player picks on purpose (to search it) stays picked; only a kill while targeted moves on", () => {
+    const body = creature('Body', 3, { hostile: true, dead: true }), next = creature('Next', 6, { hostile: true });
+    creatures.push(body, next);
+    GameState.CursorManager.selectedObject = body;
+    expect(GMPlayerHud.retargetAfterKill()).toBeUndefined();
+    expect(GMPlayerHud.retargetAfterKill()).toBeUndefined();
+    expect(GameState.CursorManager.selectedObject).toBe(body);
+  });
+});
+
+describe('what the target allows', () => {
+  const T = ModuleObjectType;
+  const obj = (type: number, o: Record<string, any> = {}): any => ({
+    objectType: T.ModuleObject | type, position: new THREE.Vector3(2, 0, 0), getName: () => 'Thing', ...o,
+  });
+  beforeEach(() => {
+    (GameState as any).GMConversationManager = { canTalkTo: (o: any) => !!o.talks };
+    pc.getSkillRanks = (skill: number) => pc.skillRanks?.[skill] ?? 0;
+  });
+  const ids = (target: any) => GMPlayerHud.targetActions(target, pc).map((a) => `${a.id}${a.primary ? '*' : ''}${a.usable ? '' : '(no)'}`);
+
+  test('an enemy: attack; a friend you can talk to: talk; a body: search', () => {
+    expect(ids(creature('Foe', 3, { hostile: true }))).toEqual(['attack*']);
+    expect(ids(creature('Friend', 3, { friendly: true, talks: true }))).toEqual(['talk*']);
+    expect(ids(creature('Body', 3, { hostile: true, dead: true }))).toEqual(['search*']);
+    expect(ids(creature('Mute', 3, { friendly: true }))).toEqual([]);
+  });
+
+  test('a locked door: Open is out, Unlock is the main action with the Security skill; without it, why not', () => {
+    const door = obj(T.ModuleDoor, { isOpen: () => false, isLocked: () => true });
+    pc.skillRanks = { [SkillType.SECURITY]: 2 };
+    expect(ids(door)).toEqual(['open(no)', 'unlock*']);
+    pc.skillRanks = {};
+    expect(ids(door)).toEqual(['open(no)', 'unlock(no)']);
+    pc.inventory = [{ baseItemId: 59, getName: () => 'Security Tunneler' }];
+    expect(ids(door)).toEqual(['open(no)', 'tunneler*']);
+  });
+
+  test('an unlocked door opens; an open one offers nothing', () => {
+    expect(ids(obj(T.ModuleDoor, { isOpen: () => false, isLocked: () => false }))).toEqual(['open*']);
+    expect(ids(obj(T.ModuleDoor, { isOpen: () => true }))).toEqual([]);
+  });
+
+  test('a container is searched, a computer used', () => {
+    expect(ids(obj(T.ModulePlaceable, { hasInventory: true, isLocked: () => false }))).toEqual(['search*']);
+    expect(ids(obj(T.ModulePlaceable, { talks: true }))).toEqual(['use*']);
+  });
+
+  test('a mine: disarm and recover with Demolitions; without it, why not', () => {
+    const mine = obj(T.ModuleTrigger, { type: 2, trapDisarmable: true });
+    pc.skillRanks = { [SkillType.DEMOLITIONS]: 1 };
+    expect(ids(mine)).toEqual(['disarm*', 'recover']);
+    pc.skillRanks = {};
+    expect(ids(mine)).toEqual(['disarm(no)']);
+  });
+
+  test("a locked door's unlock goes to the host as KotOR's own menu sends it", () => {
+    const door = obj(T.ModuleDoor, { isOpen: () => false, isLocked: () => true });
+    pc.skillRanks = { [SkillType.SECURITY]: 2 };
+    (GameState as any).ActionFactory = { ActionUnlockObject: class { params: any[] = []; setOwner() {} setParameter(i: number, _t: number, v: any) { this.params[i] = v; } } };
+    GameState.CursorManager.selectedObject = door;
+    expect(GMPlayerHud.runTargetAction('unlock').ok).toBe(true);
+    const entry = runMenuItem.mock.calls[0][0] as any;
+    expect(entry.action.params[0]).toBe(door);
+    expect(runMenuItem.mock.calls[0][1]).toBe(door);
+    expect(GMPlayerHud.runTargetAction('open')).toMatchObject({ ok: false, message: 'Locked' });
+  });
+});
+
+describe('where an ability lands now', () => {
+  const ability = (aim: 'enemy' | 'ally' | 'self'): any => ({ key: aim, kind: 'power', name: aim, icon: '', aim, cost: 0, usable: true, entry: {} });
+
+  test('an attack: the enemy target, else the nearest enemy (without changing the target), else no one', () => {
+    expect(GMPlayerHud.landsOn(ability('enemy'), pc).how).toBe('none');
+    const near = creature('Near', 5, { hostile: true }), far = creature('Far', 15, { hostile: true });
+    creatures.push(far, near);
+    expect(GMPlayerHud.landsOn(ability('enemy'), pc)).toEqual({ how: 'nearest', who: near });
+    expect(GameState.CursorManager.selectedObject).toBeUndefined();
+    GameState.CursorManager.selectedObject = far;
+    expect(GMPlayerHud.landsOn(ability('enemy'), pc)).toEqual({ how: 'target', who: far });
+  });
+
+  test('a helping power: the friend targeted, else you; a personal one: you', () => {
+    const friend = creature('Friend', 4, { friendly: true });
+    creatures.push(friend);
+    expect(GMPlayerHud.landsOn(ability('ally'), pc).how).toBe('self');
+    GameState.CursorManager.selectedObject = friend;
+    expect(GMPlayerHud.landsOn(ability('ally'), pc)).toEqual({ how: 'target', who: friend });
+    expect(GMPlayerHud.landsOn(ability('self'), pc).how).toBe('self');
+  });
+
+  test("the wheel puts what fits the target first: helping powers when a friend's targeted", () => {
+    const list = [ability('enemy'), ability('ally'), ability('self')];
+    expect(GMPlayerHud.orderForTarget(list, pc).map((a) => a.aim)).toEqual(['enemy', 'ally', 'self']);
+    const friend = creature('Friend', 4, { friendly: true });
+    creatures.push(friend);
+    GameState.CursorManager.selectedObject = friend;
+    expect(GMPlayerHud.orderForTarget(list, pc).map((a) => a.aim)).toEqual(['ally', 'self', 'enemy']);
+  });
+});
+
+describe('the default bar', () => {
+  test('keeps up to three slots for what helps, even when attack powers alone would fill it', () => {
+    const attack = (id: number) => spell(id, `A${id}`, { forcehostile: '1' });
+    pc.spells = [101, 102, 103, 104, 105, 106, 107, 108, 109].map(attack).concat([spell(28, 'Heal', { forcefriendly: '0' }), spell(8, 'Speed', { forcefriendly: '2', range: 'P' })]);
+    pc.inventory = [item('medpac', 'self'), item('stim', 'self')];
+    const bar = GMPlayerHud.defaultLoadout(GMPlayerHud.abilities(pc));
+    expect(bar.slice(0, 5)).toEqual(['power:101', 'power:102', 'power:103', 'power:104', 'power:105']);
+    expect(bar.slice(5)).toEqual(['power:28', 'power:8', 'item:medpac']);
   });
 });

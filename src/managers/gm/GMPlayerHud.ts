@@ -4,6 +4,11 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
+import { GMSeats } from "@/managers/gm/GMSeats";
+import { SkillType } from "@/enums/nwscript/SkillType";
+import { ActionParameterType } from "@/enums/actions/ActionParameterType";
+import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
+import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
 import type { ModuleObject, ModuleCreature, ModuleItem } from "@/module";
 
 /** Who an ability goes to: the enemy target, an ally (or you), or only you */
@@ -31,6 +36,25 @@ export interface GMHudAbility {
   entry: any;
 }
 
+/** Something the player can do to the target besides fighting it (GMPlayerHud.targetActions) */
+export interface GMHudTargetAction {
+  id: 'attack' | 'talk' | 'search' | 'open' | 'use' | 'sit' | 'unlock' | 'tunneler' | 'disarm' | 'recover';
+  label: string;
+  /** What it does, for the tooltip */
+  title: string;
+  /** Can it be done now, and if not, why not */
+  usable: boolean;
+  why?: string;
+  /** The main one: R does it, as a click on the target does */
+  primary?: boolean;
+}
+
+/** Where an ability would land now (GMPlayerHud.landsOn) */
+export interface GMHudLanding {
+  how: 'target' | 'nearest' | 'self' | 'none';
+  who?: ModuleObject;
+}
+
 /** Combat feat categories (feat.2da): melee and ranged attacks */
 const MELEE_FEAT = 0x1104;
 const RANGED_FEAT = 0x1111;
@@ -49,6 +73,9 @@ const RANGED_WEAPON_TYPE = 4;
  */
 export class GMPlayerHud {
   static SLOTS: number = 8;
+
+  /** Bar slots the default keeps for helping powers and items, when the character has them */
+  static HELP_SLOTS: number = 3;
 
   /** How far (metres) Tab and the automatic enemy pick look */
   static TARGET_RANGE: number = 35;
@@ -155,7 +182,13 @@ export class GMPlayerHud {
       a.kind === 'item' && a.aim === 'enemy' ? 1 :
       a.kind === 'feat' ? (a.usable ? 2 : 6) :
       a.kind === 'power' ? 3 : 4;
-    const keys = abilities.filter((a) => a.kind !== 'attack').sort((a, b) => rank(a) - rank(b)).map((a) => a.key);
+    const sorted = abilities.filter((a) => a.kind !== 'attack').sort((a, b) => rank(a) - rank(b));
+    // Room kept for what helps (heals, medpacs, buffs): a Force user's attack powers filled the whole bar, and with
+    // a friend targeted nothing on it could help them
+    const helping = sorted.filter((a) => a.aim !== 'enemy');
+    const attacking = sorted.filter((a) => a.aim === 'enemy');
+    const keepForHelp = Math.min(this.HELP_SLOTS, helping.length);
+    const keys = [...attacking.slice(0, this.SLOTS - keepForHelp), ...helping].slice(0, this.SLOTS).map((a) => a.key);
     return Array.from({ length: this.SLOTS }, (_, i) => keys[i] || null);
   }
 
@@ -269,10 +302,183 @@ export class GMPlayerHud {
   static retargetAfterKill(): ModuleCreature | undefined {
     const pc = this.player();
     const current = this.selected();
-    if (!pc || !current || !GMObjectKind.isCreature(current) || !current.isDead?.() || !current.isHostile?.(pc)) return undefined;
+    const alive = !!current && GMObjectKind.isCreature(current) && !current.isDead?.();
+    // Only when it died while targeted: a body the player picks on purpose (to search it) stays picked
+    const fell = !!pc && !!current && this.watched.target === current && this.watched.alive && !alive &&
+      GMObjectKind.isCreature(current) && !!current.isHostile?.(pc);
+    this.watched = { target: current, alive };
+    if (!fell) return undefined;
     const next = this.creaturesNear('enemy', pc)[0];
-    if (next) this.select(next);
+    if (next) {
+      this.select(next);
+      this.watched = { target: next, alive: true };
+    }
     return next;
+  }
+
+  /** The target as last seen, and whether it was alive then (retargetAfterKill) */
+  static watched: { target?: ModuleObject; alive: boolean } = { alive: false };
+
+  // ---------------------------------------------------------------------------
+  // What the target allows
+  // ---------------------------------------------------------------------------
+
+  /**
+   * What the player can do to the target, in plain words, the main one first (R, or a click on the target does
+   * the same). Combat powers and items are on the bar and wheel; this is the rest: talk, search, open, unlock,
+   * sit, disarm. Each one sends the GM's machine the same request a click or KotOR's own target menu sends.
+   */
+  static targetActions(target: ModuleObject | undefined = this.selected(), pc: ModuleCreature | undefined = this.player()): GMHudTargetAction[] {
+    if (!pc || !target || target === pc || target.gmHidden) return [];
+    const out: GMHudTargetAction[] = [];
+    const ranks = (skill: SkillType) => Number(pc.getSkillRanks?.(skill) ?? 0);
+    const carried = (baseItemId: number) => (pc.getInventory?.() || []).find((i: any) => i?.baseItemId === baseItemId);
+    const unlock = () => {
+      if (!(target as any).isLocked?.()) return;
+      if (ranks(SkillType.SECURITY) >= 1) {
+        out.push({ id: 'unlock', label: 'Unlock', title: 'Pick the lock (Security skill)', usable: true });
+      }
+      const tunneler = carried(this.TUNNELER_BASE_ITEM);
+      if (tunneler) {
+        out.push({ id: 'tunneler', label: 'Unlock (tunneler)', title: `Open the lock with a ${tunneler.getName?.() || 'security tunneler'}`, usable: true });
+      }
+      if (!out.some((a) => a.id === 'unlock' || a.id === 'tunneler')) {
+        out.push({ id: 'unlock', label: 'Locked', title: 'Locked: you need the Security skill or a security tunneler', usable: false, why: 'Locked' });
+      }
+    };
+
+    if (GMObjectKind.isCreature(target)) {
+      const cre = target as ModuleCreature;
+      if (cre.isDead()) {
+        out.push({ id: 'search', label: 'Search', title: 'Search the body', usable: true, primary: true });
+      } else if (cre.isHostile(pc)) {
+        out.push({ id: 'attack', label: 'Attack', title: 'Attack it with what you have in hand', usable: true, primary: true });
+      } else if (GameState.GMConversationManager?.canTalkTo?.(cre, pc)) {
+        out.push({ id: 'talk', label: 'Talk', title: 'Walk over and talk (the GM speaks for them)', usable: true, primary: true });
+      }
+      return out;
+    }
+    if (GMObjectKind.isDoor(target)) {
+      const door = target as any;
+      if (!door.isOpen?.()) {
+        const locked = !!door.isLocked?.();
+        out.push({ id: 'open', label: 'Open', title: locked ? 'Try the door (it is locked)' : 'Open the door', usable: !locked, why: locked ? 'Locked' : undefined, primary: !locked });
+        unlock();
+      }
+      return this.markPrimary(out);
+    }
+    if (GMObjectKind.isPlaceable(target)) {
+      const plc = target as any;
+      if (GameState.GMConversationManager?.canTalkTo?.(plc, pc)) {
+        out.push({ id: 'use', label: 'Use', title: 'Use it (the GM speaks for it)', usable: true, primary: true });
+      } else if (GMSeats.seatsOf(plc).length) {
+        out.push({ id: 'sit', label: 'Sit', title: 'Sit down here', usable: true, primary: true });
+      } else if (plc.hasInventory) {
+        const locked = !!plc.isLocked?.();
+        out.push({ id: 'search', label: 'Search', title: locked ? 'It is locked' : 'Open it and take what you want', usable: !locked, why: locked ? 'Locked' : undefined, primary: !locked });
+        unlock();
+      } else if (plc.isUseable?.()) {
+        out.push({ id: 'use', label: 'Use', title: 'Use it', usable: true, primary: true });
+      }
+      return this.markPrimary(out);
+    }
+    if (GMObjectKind.isTrigger(target) && (target as any).type === ModuleTriggerType.TRAP) {
+      if (ranks(SkillType.DEMOLITIONS) >= 1) {
+        out.push({ id: 'disarm', label: 'Disarm', title: 'Disarm the mine (Demolitions skill)', usable: !!(target as any).trapDisarmable, primary: true });
+        out.push({ id: 'recover', label: 'Recover', title: 'Recover the mine to use yourself (Demolitions skill; harder)', usable: true });
+      } else {
+        out.push({ id: 'disarm', label: 'Mine', title: 'A mine: you need the Demolitions skill to disarm it', usable: false, why: 'Needs Demolitions' });
+      }
+    }
+    return out;
+  }
+
+  /** Security tunnelers (baseitems.2da row) */
+  static TUNNELER_BASE_ITEM = 59;
+
+  /** When the usual first action can't be done (a locked door), the first that can is the main one */
+  static markPrimary(list: GMHudTargetAction[]): GMHudTargetAction[] {
+    if (list.length && !list.some((a) => a.primary && a.usable)) {
+      list.forEach((a) => { a.primary = false; });
+      const first = list.find((a) => a.usable);
+      if (first) first.primary = true;
+    }
+    return list;
+  }
+
+  /** Do one of the target's actions (targetActions). Returns what to tell the player when it can't be done */
+  static runTargetAction(id: GMHudTargetAction['id'], target: ModuleObject | undefined = this.selected()): { ok: boolean; message?: string } {
+    const pc = this.player();
+    if (!pc || !target) return { ok: false, message: 'Nothing targeted' };
+    if (GMManager.isPlayerFrozen(pc)) return { ok: false, message: 'The GM has you watching' };
+    const action = this.targetActions(target, pc).find((a) => a.id === id);
+    if (!action) return { ok: false, message: "Can't do that to it" };
+    if (!action.usable) return { ok: false, message: action.why || action.title };
+    const menu = (entry: any) => {
+      GameState.ActionMenuManager.SetPC(pc);
+      GameState.ActionMenuManager.runMenuItem(entry, target);
+      return { ok: true };
+    };
+    const engineAction = (factory: string, params: [number, any][]) => {
+      const a = new (GameState.ActionFactory as any)[factory]();
+      a.setOwner?.(pc);
+      for (const [i, v] of params) a.setParameter(i, ActionParameterType.DWORD, v);
+      return a;
+    };
+    switch (id) {
+      case 'unlock':
+        return menu({ action: engineAction('ActionUnlockObject', [[0, target], [1, ModuleObjectConstant.OBJECT_INVALID]]) });
+      case 'tunneler': {
+        const tool = (pc.getInventory?.() || []).find((i: any) => i?.baseItemId === this.TUNNELER_BASE_ITEM);
+        return menu({ action: engineAction('ActionUnlockObject', [[0, target], [1, tool]]) });
+      }
+      case 'disarm':
+        return menu({ action: engineAction('ActionDisarmMine', [[0, target]]) });
+      case 'recover':
+        return menu({ action: engineAction('ActionRecoverMine', [[0, target]]) });
+      default:
+        // Attack, talk, search, open, use, sit: what clicking it does
+        return GameState.hooks.interceptInteraction(pc, target) ? { ok: true } : { ok: false, message: "Can't reach it from here" };
+    }
+  }
+
+  /**
+   * Where an ability would land now, without changing the target: the target, the nearest enemy (no enemy
+   * targeted), you, or nowhere (no enemy in reach). The bar and wheel show it on each slot.
+   */
+  static landsOn(ability: GMHudAbility, pc: ModuleCreature | undefined = this.player()): GMHudLanding {
+    if (!pc) return { how: 'none' };
+    if (ability.aim === 'self') return { how: 'self', who: pc };
+    const current = this.selected();
+    if (ability.aim === 'ally') {
+      return this.relation(current, pc) === 'ally' ? { how: 'target', who: current } : { how: 'self', who: pc };
+    }
+    if (this.relation(current, pc) === 'enemy') return { how: 'target', who: current };
+    const nearest = this.creaturesNear('enemy', pc)[0];
+    return nearest ? { how: 'nearest', who: nearest } : { how: 'none' };
+  }
+
+  /** The wheel's order for the target: helping powers first when a friend is targeted, attacks first otherwise */
+  static orderForTarget(abilities: GMHudAbility[], pc: ModuleCreature | undefined = this.player()): GMHudAbility[] {
+    const friendly = this.relation(this.selected(), pc) === 'ally';
+    const rank = (a: GMHudAbility) => friendly ? (a.aim === 'enemy' ? 1 : 0) : (a.aim === 'enemy' ? 0 : 1);
+    return abilities.map((a, i) => ({ a, i })).sort((x, y) => rank(x.a) - rank(y.a) || x.i - y.i).map((e) => e.a);
+  }
+
+  /** Stealth: whether the character can sneak, and whether it is */
+  static stealth(pc: ModuleCreature | undefined = this.player()): { can: boolean; on: boolean } {
+    const on = !!(pc as any)?.stealthMode;
+    return { can: on || !!(pc as any)?.canEnterStealth?.(), on };
+  }
+
+  static toggleStealth(): { ok: boolean; message?: string } {
+    const pc = this.player();
+    if (!pc) return { ok: false };
+    if (GMManager.isPlayerFrozen(pc)) return { ok: false, message: 'The GM has you watching' };
+    const s = this.stealth(pc);
+    if (!s.can) return { ok: false, message: "You can't sneak (no Stealth, or an enemy sees you)" };
+    GMNetworkManager.sendIntent('stealth');
+    return { ok: true };
   }
 
   // ---------------------------------------------------------------------------

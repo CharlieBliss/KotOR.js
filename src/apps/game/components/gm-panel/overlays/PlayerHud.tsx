@@ -4,16 +4,10 @@ import * as KotOR from "@/apps/game/KotOR";
 import { GMManager, GMNetworkManager, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { GameImage } from "@/apps/game/components/gm-panel/creator/GameImage";
 import { gameTextureUrl } from "@/apps/game/components/gm-panel/creator/gameTexture";
-import type { GMHudAbility, GMHudAim, GMHudRelation } from "@/managers/gm/GMPlayerHud";
+import type { GMHudAbility, GMHudRelation, GMHudTargetAction } from "@/managers/gm/GMPlayerHud";
 import "@/apps/game/components/gm-panel/gm-player-hud.scss";
 
 const { GMPlayerHud } = KotOR;
-
-const AIM_TEXT: Record<GMHudAim, string> = {
-  enemy: 'At your enemy target (the nearest enemy if you have none)',
-  ally: 'At your selected ally (Shift+Tab), or you',
-  self: 'On you',
-};
 
 const RELATION_TEXT: Record<GMHudRelation, string> = {
   enemy: 'Enemy', ally: 'Ally', neutral: 'Neutral', object: 'Object', self: 'You',
@@ -97,38 +91,95 @@ const TargetRings: React.FC = () => {
   );
 };
 
-/** Top centre: who the target is, which side they're on, their health, and what the keys do with them */
-const TargetFrame: React.FC = () => {
+/**
+ * Who an ability lands on right now, as a chip on its slot: Target (the enemy or ally you have targeted), Nearest
+ * (no enemy targeted: the nearest one), You, or No one. The name is in the tooltip; on the chip, names alike
+ * ("Sith Lord", "Sith Assassin") couldn't be told apart
+ */
+function landing(a: GMHudAbility): { text: string; side: string; title: string } {
+  const l = GMPlayerHud.landsOn(a);
+  const name = (l.who as any)?.getName?.() || '';
+  if (l.how === 'self') return { text: 'You', side: 'self', title: 'Lands on you' };
+  if (l.how === 'target') {
+    const side = GMPlayerHud.relation(l.who) || 'enemy';
+    return { text: side === 'ally' ? 'Ally' : 'Target', side, title: `Lands on ${name}, your target` };
+  }
+  if (l.how === 'nearest') return { text: 'Nearest', side: 'nearest', title: `No enemy targeted: lands on the nearest, ${name}` };
+  return { text: 'No one', side: 'none', title: 'No enemy in reach' };
+}
+
+/**
+ * Top centre: who the target is, which side they're on, their health, and what you can do to them: Attack, Talk,
+ * Search, Open, Unlock, Sit, Disarm, as labelled buttons (R does the main one, as a click on them does)
+ */
+const TargetFrame: React.FC<{ onAction: (id: GMHudTargetAction['id']) => void }> = ({ onAction }) => {
   const obj: any = GMPlayerHud.selected();
   const relation = GMPlayerHud.relation(obj);
   if (!obj || !relation || relation === 'self') {
     return (
       <div className="gm-hud-target empty">
         <span className="gm-hud-target-name">No target</span>
-        <span className="gm-hud-keys"><kbd>Tab</kbd> enemy <kbd>Shift+Tab</kbd> ally</span>
+        <span className="gm-hud-keys"><kbd>Tab</kbd> enemy <kbd>Shift+Tab</kbd> ally · or click something</span>
       </div>
     );
   }
   const creature = KotOR.GMObjectKind.isCreature(obj);
   const hp = creature ? Number(obj.getHP?.() ?? 0) : 0, maxHp = creature ? Number(obj.getMaxHP?.() ?? 0) : 0;
   const dead = creature && obj.isDead?.();
-  const hint =
-    relation === 'enemy' ? 'Click: attack · powers and grenades go here' :
-    relation === 'ally' ? 'Friendly powers go here' :
-    dead ? 'Down' : 'Click: use';
+  const actions = GMPlayerHud.targetActions(obj);
+  const powers =
+    relation === 'enemy' ? 'Attack powers and grenades go here' :
+    relation === 'ally' ? 'Helping powers go here' : '';
   return (
     <div className={`gm-hud-target ${relation}`} data-relation={relation}>
       <div className="gm-hud-target-head">
         <span className="gm-hud-target-side">{dead ? 'Down' : RELATION_TEXT[relation]}</span>
         <span className="gm-hud-target-name">{obj.getName?.() || 'Target'}</span>
       </div>
-      {creature && maxHp > 0 && (
+      {creature && !dead && maxHp > 0 && (
         <div className="gm-hud-bar hp" title={`${Math.max(0, Math.round(hp))} / ${maxHp} vitality`}>
           <span style={{ width: pct(hp, maxHp) }} />
           <em>{Math.max(0, Math.round(hp))} / {maxHp}</em>
         </div>
       )}
-      <div className="gm-hud-target-hint"><span>{hint}</span><span className="gm-hud-keys"><kbd>Tab</kbd> <kbd>Shift+Tab</kbd></span></div>
+      {actions.length > 0 && (
+        <div className="gm-hud-target-actions" role="group" aria-label="What you can do">
+          {actions.map((a) => (
+            <button
+              key={a.id}
+              className={`gm-hud-action ${a.primary ? 'primary' : ''}`}
+              disabled={!a.usable}
+              title={a.usable ? `${a.title}${a.primary ? ' (R, or click it)' : ''}` : `${a.title}`}
+              onClick={() => onAction(a.id)}
+            >
+              {a.primary && <kbd>R</kbd>}{a.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="gm-hud-target-hint">
+        <span>{powers}</span>
+        <span className="gm-hud-keys"><kbd>Tab</kbd> <kbd>Shift+Tab</kbd></span>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * The things players do most in a session besides fighting, labelled with their keys: their sheet, their skills
+ * (rolls the GM asks for), inventory, chat with the GM and table, and sneaking when they can
+ */
+const QuickActions: React.FC<{ onOpenSheet: (section: 'overview' | 'skills') => void; onOpenChat: () => void; onStealth: () => void }> = ({ onOpenSheet, onOpenChat, onStealth }) => {
+  const stealth = GMPlayerHud.stealth();
+  return (
+    <div className="gm-hud-quick" role="toolbar" aria-label="Quick actions">
+      <button onClick={() => onOpenSheet('overview')} title="Your character sheet: stats, feats, powers, effects (P)"><kbd>P</kbd>Sheet</button>
+      <button onClick={() => onOpenSheet('skills')} title="Your skills: roll one when the GM asks (K)"><kbd>K</kbd>Skills</button>
+      <button onClick={() => KotOR.GameState.MenuManager.MenuInventory?.open?.()} title="Inventory and equipment (I)"><kbd>I</kbd>Items</button>
+      <button onClick={onOpenChat} title="Talk to the GM and the table (Enter)"><kbd>↵</kbd>Chat</button>
+      {stealth.can && (
+        <button className={stealth.on ? 'on' : ''} onClick={onStealth} title={stealth.on ? 'Stop sneaking (G)' : 'Sneak (G)'}><kbd>G</kbd>{stealth.on ? 'Sneaking' : 'Sneak'}</button>
+      )}
     </div>
   );
 };
@@ -208,7 +259,7 @@ const PowerWheel: React.FC<{
           {focus ? (
             <>
               <strong>{focus.name}</strong>
-              <span>{AIM_TEXT[focus.aim]}</span>
+              <span className={`gm-hud-wheel-lands side-${landing(focus).side}`}>→ {landing(focus).title.replace(/^Lands on /, '')}</span>
               {focus.cost > 0 && <span>{focus.cost} Force</span>}
               {focus.count != null && <span>{focus.count} left</span>}
               {!focus.usable && <span className="warn">{focus.why}</span>}
@@ -231,7 +282,7 @@ const PowerWheel: React.FC<{
  * A GM session player's combat HUD, in place of KotOR's (GMPlayerHud hides that): the target frame and rings,
  * a power bar on 1–8, the power wheel on Q, a readable self frame, and the combat queue.
  */
-export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
+export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills') => void; onOpenChat: () => void }> = ({ onOpenSheet, onOpenChat }) => {
   useGMStore();
   useTicker(200);
   const [wheel, setWheel] = useState<{ open: boolean; sticky: boolean }>({ open: false, sticky: false });
@@ -241,12 +292,14 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
   const visible = GMPlayerHud.active() && KotOR.GameState.Mode === KotOR.EngineMode.INGAME && !KotOR.GMCutscene.active;
   const pc: any = GMPlayerHud.player();
   const abilities: GMHudAbility[] = visible ? GMPlayerHud.abilities(pc) : [];
+  // The wheel: what fits the target first (helping powers with a friend targeted, attacks otherwise)
+  const wheelAbilities: GMHudAbility[] = visible ? GMPlayerHud.orderForTarget(abilities, pc) : [];
   const bar = visible ? GMPlayerHud.loadout(pc, abilities) : [];
   const byKey = new Map(abilities.map((a) => [a.key, a]));
 
   // The latest of everything for the key and mouse handlers, which are attached once
-  const live = useRef({ visible, abilities, bar, byKey, wheel, hovered });
-  live.current = { visible, abilities, bar, byKey, wheel, hovered };
+  const live = useRef({ visible, abilities: wheelAbilities, bar, byKey, wheel, hovered });
+  live.current = { visible, abilities: wheelAbilities, bar, byKey, wheel, hovered };
 
   const say = useCallback((text: string) => setToast({ text, at: Date.now() }), []);
   useEffect(() => {
@@ -258,6 +311,16 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
   const use = useCallback((ability: GMHudAbility | undefined) => {
     if (!ability) return;
     const result = GMPlayerHud.use(ability);
+    if (!result.ok && result.message) say(result.message);
+  }, [say]);
+
+  const act = useCallback((id: GMHudTargetAction['id']) => {
+    const result = GMPlayerHud.runTargetAction(id);
+    if (!result.ok && result.message) say(result.message);
+  }, [say]);
+
+  const sneak = useCallback(() => {
+    const result = GMPlayerHud.toggleStealth();
     if (!result.ok && result.message) say(result.message);
   }, [say]);
 
@@ -292,8 +355,11 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
   // The enemy we were on fell: on to the next
   useEffect(() => { if (visible) GMPlayerHud.retargetAfterKill(); });
 
-  // Keys: 1–8 the bar, Q the wheel, Tab / Shift+Tab targets. Caught before the game's own handlers, which would
-  // otherwise run KotOR's hidden action slots on the same keys
+  const onOpenChatRef = useRef(onOpenChat);
+  onOpenChatRef.current = onOpenChat;
+
+  // Keys: 1–8 the bar, Q the wheel, Tab / Shift+Tab targets, R the target's main action, G sneak, Enter chat.
+  // Caught before the game's own handlers, which would otherwise run KotOR's hidden action slots on the same keys
   useEffect(() => {
     const stop = (e: KeyboardEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
     const onDown = (e: KeyboardEvent) => {
@@ -331,6 +397,26 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
       if (e.code === 'Escape' && s.wheel.open) {
         stop(e);
         closeWheel();
+        return;
+      }
+      if (s.wheel.open) return;
+      // R: the target's main action (Attack, Talk, Search, Open...), as a click on it does
+      if (e.code === 'KeyR') {
+        stop(e);
+        if (e.repeat) return;
+        const main = GMPlayerHud.targetActions().find((a) => a.primary);
+        if (main) act(main.id);
+        else say(GMPlayerHud.selected() ? 'Nothing to do with it' : 'No target: Tab picks an enemy');
+        return;
+      }
+      if (e.code === 'KeyG') {
+        stop(e);
+        if (!e.repeat) sneak();
+        return;
+      }
+      if (e.code === 'Enter') {
+        stop(e);
+        onOpenChatRef.current();
       }
     };
     const onUp = (e: KeyboardEvent) => {
@@ -352,7 +438,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
       window.removeEventListener('keydown', onDown, true);
       window.removeEventListener('keyup', onUp, true);
     };
-  }, [openWheel, closeWheel, pick, use, say]);
+  }, [openWheel, closeWheel, pick, use, act, sneak, say]);
 
   if (!visible || !pc) return null;
 
@@ -363,13 +449,14 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
   return (
     <div className="gm-player-hud">
       <TargetRings />
-      <TargetFrame />
+      <TargetFrame onAction={act} />
 
       {held.length > 0 && (
         <div className="gm-hud-paused">Paused: {held.join(', ')} {held.length === 1 ? 'is' : 'are'} choosing a power</div>
       )}
 
-      <SelfFrame onOpenSheet={onOpenSheet} />
+      <QuickActions onOpenSheet={(section) => onOpenSheet(section)} onOpenChat={onOpenChat} onStealth={sneak} />
+      <SelfFrame onOpenSheet={() => onOpenSheet('overview')} />
 
       <div className="gm-hud-dock">
         {toast && <div className="gm-hud-toast" key={toast.at}>{toast.text}</div>}
@@ -387,13 +474,14 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
         <div className={`gm-hud-bar-slots ${frozen ? 'frozen' : ''}`} role="toolbar" aria-label="Power bar">
           {bar.map((key, i) => {
             const a = key ? byKey.get(key) : undefined;
+            const lands = a ? landing(a) : undefined;
             const title = a
-              ? `${i + 1}: ${a.name}\n${AIM_TEXT[a.aim]}${a.cost ? `\n${a.cost} Force` : ''}${a.count != null ? `\n${a.count} left` : ''}${a.usable ? '' : `\n${a.why}`}\nRight-click to empty`
+              ? `${i + 1}: ${a.name}\n${lands!.title}${a.cost ? `\n${a.cost} Force` : ''}${a.count != null ? `\n${a.count} left` : ''}${a.usable ? '' : `\n${a.why}`}\nRight-click to empty`
               : key ? `${i + 1}: none left (right-click to empty)` : `${i + 1}: empty. Hold Q, point at a power and press ${i + 1}`;
             return (
               <button
                 key={i}
-                className={`gm-hud-slot ${a ? `aim-${a.aim}` : 'empty'} ${a && !a.usable ? 'unusable' : ''}`}
+                className={`gm-hud-slot ${a ? `aim-${a.aim}` : 'empty'} ${a && !a.usable ? 'unusable' : ''} ${lands?.side === 'none' ? 'no-one' : ''}`}
                 title={title}
                 onClick={() => (a ? use(a) : openWheel(true))}
                 onContextMenu={(e) => { e.preventDefault(); if (key) GMPlayerHud.assignSlot(i, null); }}
@@ -403,6 +491,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
                 {a && a.cost > 0 && <span className="gm-hud-cost">{a.cost}</span>}
                 {a && a.count != null && <span className="gm-hud-count">{a.count}</span>}
                 {a && <span className="gm-hud-slot-name">{a.name}</span>}
+                {lands && <span className={`gm-hud-lands side-${lands.side}`}>{lands.text}</span>}
               </button>
             );
           })}
@@ -415,7 +504,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }
       </div>
 
       {wheel.open && (
-        <PowerWheel abilities={abilities} hovered={hovered} onHover={setHovered} onPick={pick} onClose={closeWheel} held={held} />
+        <PowerWheel abilities={wheelAbilities} hovered={hovered} onHover={setHovered} onPick={pick} onClose={closeWheel} held={held} />
       )}
     </div>
   );

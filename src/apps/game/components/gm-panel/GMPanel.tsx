@@ -479,7 +479,16 @@ export const GMPanel: React.FC = () => {
       <CutsceneOverlay />
 
       {/* A player's combat HUD: target frame, power bar (1–8), power wheel (Q), and their own vitality and Force */}
-      {isPlayerView && <PlayerHud onOpenSheet={() => setSheet(sheet && !sheet.gmView ? null : { creature: null, section: 'overview', gmView: false })} />}
+      {isPlayerView && (
+        <PlayerHud
+          onOpenSheet={(section = 'overview') => setSheet(sheet && !sheet.gmView && sheet.section === section ? null : { creature: null, section, gmView: false })}
+          onOpenChat={() => {
+            setDrawerTab('multiplayer');
+            // The Session tab's chat box, once it's drawn
+            setTimeout(() => (document.querySelector('.gm-drawer input[placeholder="Say something to everyone"]') as HTMLInputElement | null)?.focus(), 50);
+          }}
+        />
+      )}
 
       {/* Our character is down: what happens next, by the session's rule */}
       {isPlayerView && <DownedBanner />}
@@ -490,6 +499,7 @@ export const GMPanel: React.FC = () => {
       {/* The character sheet; and everyone's rolls, for a few seconds */}
       {sheet && (sheet.gmView ? sheet.creature : currentLeader) && (
         <CharacterSheet
+          key={`${sheet.gmView ? "gm" : "me"}-${sheet.section}`}
           creature={sheet.gmView ? sheet.creature : currentLeader}
           initialSection={sheet.section}
           gmView={sheet.gmView}
