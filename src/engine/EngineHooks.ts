@@ -99,8 +99,11 @@ export interface EngineHooks {
   onCombatRoundEnd(creature: ModuleCreature): void;
   /** A creature's own script asks it to attack: true when the mode has it busy with something else */
   holdsScriptAttack(creature: ModuleCreature): boolean;
-  /** A creature's own script turns it (SetFacing, SetFacingPoint): true when the mode decides where it faces now */
-  holdsScriptFacing(creature: ModuleObject): boolean;
+  /**
+   * Whether a creature's own behaviour scripts run (ScriptControl: heartbeat, perception, combat rounds, being hit).
+   * False while the mode runs its behaviour (a GM session's AI); its story and rules scripts run regardless
+   */
+  runsBehaviourScripts(creature: ModuleCreature): boolean;
   /** Creatures walk through this one rather than around it (it isn't there for them, e.g. hidden by the GM) */
   walksThrough(creature: ModuleObject): boolean;
   /** A creature uses something it can sit on: sit in it. True when that's what happened (no other use) */
@@ -149,7 +152,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   openCharacterSheet: () => false,
   onCombatRoundEnd: () => {},
   holdsScriptAttack: () => false,
-  holdsScriptFacing: () => false,
+  runsBehaviourScripts: () => true,
   walksThrough: () => false,
   useSeat: () => false,
   isSeat: () => false,

@@ -186,6 +186,28 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   </div>
                 )}
 
+                {!selectedObj.gmOwnerPeerId && !selectedObj.gmPlayerConfig && (
+                  <div className="gm-row" title="Who decides what it does moment to moment. Its death, conversations and powers always run its own scripts">
+                    <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Behaviour</span>
+                    <div className="gm-segmented" role="group" aria-label="Behaviour">
+                      <button
+                        className={`gm-btn small ${selectedObj.gmScripted ? '' : 'active'}`}
+                        title="The GM AI and your orders run it (its own AI scripts stay quiet, so they can't pull it another way)"
+                        onClick={() => edit('setScripted', () => KotOR.GMCombatAI.setScripted(selectedObj as KotOR.ModuleCreature, false))}
+                      >
+                        GM AI
+                      </button>
+                      <button
+                        className={`gm-btn small ${selectedObj.gmScripted ? 'active' : ''}`}
+                        title="Its own scripts run it, as in the game: for a boss with its own tactics, or a plot NPC"
+                        onClick={() => edit('setScripted', () => KotOR.GMCombatAI.setScripted(selectedObj as KotOR.ModuleCreature, true))}
+                      >
+                        Its own scripts
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {!selectedObj.gmOwnerPeerId && (() => {
                   const cre = selectedObj as KotOR.ModuleCreature;
                   const stances = GMManager.availableAnimations(cre, 'stance');

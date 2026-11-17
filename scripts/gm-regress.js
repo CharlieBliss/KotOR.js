@@ -11,7 +11,9 @@
  *                          round by their body size and arrive (they went metres out of their way, or stuck)
  *   crowded posts          guards sent back to the same post settle a step apart and stand still (they jostled
  *                          and turned on the spot after every fight)
- *   script facing          an NPC under a GM order isn't turned by its own AI script (k_ai_master spun them)
+ *   behaviour              the GM's AI runs its NPCs' behaviour (their own AI scripts stay quiet), and their
+ *                          scripts run it again when the GM leaves an NPC to them
+ *   rules                  a GM-run NPC's power still works: those scripts are rules, not behaviour
  *   loot window            a player's loot window doesn't pause the shared world
  *   player HUD             the player's own HUD is up and KotOR's combat panels are hidden
  *   screens agree          GM and player agree on who is dead, and the dead lie down on both
@@ -207,22 +209,58 @@ async function run() {
       return `closest ${r.closest} m apart, ${r.fromPost.join('/')} m from the post`;
     });
 
-    await check('facing', "An NPC under a GM order isn't turned by its own AI script", async () => {
+    await check('behaviour', "The GM's AI runs its NPCs' behaviour; their own scripts only when the GM leaves them to it", async () => {
+      // Count the heartbeat script's runs (every 6 s of game time) for an NPC under the GM's AI, then left to its scripts
+      const count = async (scripted) => {
+        await evalIn(gm, (K, s) => {
+          const R = window.__R, npc = R.named('^Telos Security 1$')[0];
+          R.onlyThese([npc]);
+          K.GMManager.npcAiEnabled = true;
+          K.GMCombatAI.setScripted(npc, s);
+          const script = npc.scripts[K.ModuleObjectScript.CreatureOnHeartbeat];
+          window.__beats = 0;
+          if (script && !script.__counted) {
+            const run = script.run;
+            script.run = function () { window.__beats++; return run.apply(this, arguments); };
+            script.__counted = true;
+          }
+          return !!script;
+        }, scripted);
+        await pause(13);
+        return evalIn(gm, () => window.__beats);
+      };
+      const hasScript = await evalIn(gm, (K) => !!window.__R.named('^Telos Security 1$')[0].scripts[K.ModuleObjectScript.CreatureOnHeartbeat]);
+      expect(hasScript, 'Telos Security 1 has no heartbeat script to count');
+      const underAi = await count(false);
+      const ownScripts = await count(true);
+      await evalIn(gm, (K) => { K.GMManager.npcAiEnabled = false; K.GMCombatAI.setScripted(window.__R.named('^Telos Security 1$')[0], false); return true; });
+      expect(underAi === 0, `its heartbeat script ran ${underAi} times under the GM's AI`);
+      expect(ownScripts >= 1, `left to its own scripts, its heartbeat script didn't run (${ownScripts})`);
+      return `heartbeats under the GM AI: ${underAi}, on its own scripts: ${ownScripts}`;
+    });
+
+    await check('rules', "A GM-run NPC's powers still work (their scripts are the rules, not behaviour)", async () => {
       const r = await evalIn(gm, (K) => {
-        const R = window.__R, npc = R.named('^Telos Security 1$')[0];
-        npc.gmOrder = { kind: 'guard', point: { x: npc.position.x, y: npc.position.y, z: npc.position.z }, radius: 8 };
-        npc.setFacing(0, true);
-        const def = (K.NWScriptDefK2 && K.NWScriptDefK2.Actions[143] && typeof K.NWScriptDefK2.Actions[143].action === 'function') ? K.NWScriptDefK2.Actions[143] : K.NWScriptDefK1.Actions[143];
-        def.action.call({ caller: npc, name: 'k_ai_master' }, [new window.THREE.Vector3(npc.position.x - 5, npc.position.y, npc.position.z)]);
-        const held = Math.abs(npc.facing) < 0.01 && !npc.facingAnim;
-        npc.gmOrder = undefined;
-        def.action.call({ caller: npc, name: 'k_ai_master' }, [new window.THREE.Vector3(npc.position.x - 5, npc.position.y, npc.position.z)]);
-        const freed = Math.abs(npc.facing) > 1;
-        npc.setFacing(0, true);
-        return { held, freed };
+        const R = window.__R, caster = R.named('^Dark Jedi Master 1$')[0], target = R.named('^Telos Security 2$')[0];
+        R.onlyThese([caster, target]);
+        R.put(caster, 0, 6, 0); R.put(target, 0, 10, Math.PI);
+        K.GMManager.npcAiEnabled = true;
+        const rows = K.GameState.TwoDAManager.datatables.get('spells').rows;
+        const id = Number(Object.keys(rows).find((k) => rows[k].label === 'FORCE_POWER_STUN'));
+        window.__ruleTarget = target;
+        window.__ruleBefore = target.effects.length;
+        new K.TalentSpell(id).useTalentOnObject(target, caster);
+        return { id };
       });
-      expect(r.held, 'SetFacingPoint turned an NPC the GM has a post for');
-      expect(r.freed, "SetFacingPoint didn't turn an NPC without an order (scripts should still face idle NPCs)");
+      expect(r.id >= 0, 'no Stun power in spells.2da');
+      await pause(6);
+      const after = await evalIn(gm, (K) => {
+        const t = window.__ruleTarget;
+        K.GMManager.npcAiEnabled = false;
+        return { effects: t.effects.map((e) => e.type), stunned: !!(t.isStunned() || t.isParalyzed() || t.isDebilitated()) };
+      });
+      expect(after.stunned || after.effects.length > 0, `the power's script did nothing to its target (effects: ${after.effects.join(',') || 'none'})`);
+      return after.stunned ? 'Stun held its target' : `target got effects ${after.effects.join(',')} (it may have resisted)`;
     });
 
     await check('effects', 'A shared beam and impact: each creature its own, nothing left on either screen', async () => {

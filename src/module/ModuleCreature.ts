@@ -2145,7 +2145,7 @@ export class ModuleCreature extends ModuleObject {
     GameState.hooks.onCombatRoundEnd(this);
 
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnEndRound];
-    if(!nwscript){ return true; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnEndRound)){ return true; }
     const instance = nwscript.newInstance();
     instance.run(this);
   }
@@ -2171,7 +2171,7 @@ export class ModuleCreature extends ModuleObject {
 
   onAttacked(attackType: CombatActionType){
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnAttacked];
-    if(!nwscript){ return; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnAttacked)){ return; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2005 : 1005;
     instance.run(this, script_num);
@@ -2184,7 +2184,7 @@ export class ModuleCreature extends ModuleObject {
     this.resetExcitedDuration();
     
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnDamaged];
-    if(!nwscript){ return true; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnDamaged)){ return true; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2006 : 1006;
     instance.run(this, script_num);
@@ -2195,7 +2195,7 @@ export class ModuleCreature extends ModuleObject {
       return;
 
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnBlocked];
-    if(!nwscript){ return; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnBlocked)){ return; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2009 : 1009;
     instance.run(this, script_num);

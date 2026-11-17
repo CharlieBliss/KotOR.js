@@ -1,4 +1,5 @@
 import type { GMObjectState } from "@/managers/gm/GMObjectState";
+import { isBehaviourScript } from "@/module/creature/ScriptControl";
 import * as THREE from "three";
 import type { Action } from "@/actions/Action";
 import { ActionQueue } from "@/actions/ActionQueue";
@@ -1089,11 +1090,20 @@ export class ModuleObject {
   }
 
   /**
-   * Trigger the user defined event
-   * @param event 
+   * Whether this object's script for slot runs now. A creature's behaviour scripts (ScriptControl) don't when
+   * something else runs its behaviour (EngineHooks.runsBehaviourScripts: a GM session's AI); its story and rules
+   * scripts always do
    */
+  runsScript(slot: string, userEvent?: number): boolean {
+    if(!BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)) return true;
+    if(!isBehaviourScript(slot, userEvent)) return true;
+    return GameState.hooks.runsBehaviourScripts(this as any);
+  }
+
+  /** Trigger the user defined event */
   triggerUserDefinedEvent( event: NWScriptEvent ){
     if(!(event instanceof NWScriptEvent)){ return; }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnUserDefined, parseInt(event.getInt(0)))){ return; }
 
     let onUserDefined: NWScriptInstance;
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)){
@@ -1116,6 +1126,7 @@ export class ModuleObject {
    */
   triggerSpellCastAtEvent( event: NWScriptEvent ){
     if(!(event instanceof NWScriptEvent)){ return; }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnSpellAt)){ return; }
 
     let onSpellAt: NWScriptInstance;
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)){
@@ -1161,6 +1172,9 @@ export class ModuleObject {
   triggerHeartbeat(){
     //Only allow the heartbeat script to run after the onspawn is called
     if(!(this.spawned === true && GameState.module.readyToProcessEvents)){
+      return;
+    }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnHeartbeat)){
       return;
     }
 
@@ -1600,7 +1614,7 @@ export class ModuleObject {
       onDamaged = this.scripts[ModuleObjectScript.DoorOnDamaged];
     }
 
-    if(onDamaged){
+    if(onDamaged && this.runsScript(ModuleObjectScript.CreatureOnDamaged)){
       onDamaged.run(this);
     }
   }
@@ -2802,7 +2816,7 @@ export class ModuleObject {
       onNotice = this.scripts[ModuleObjectScript.CreatureOnNotice];
     }
 
-    if(triggerOnNotice && onNotice){
+    if(triggerOnNotice && onNotice && this.runsScript(ModuleObjectScript.CreatureOnNotice)){
       const instance = onNotice.nwscript.newInstance();
       (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
@@ -2851,7 +2865,7 @@ export class ModuleObject {
       onNotice = this.scripts[ModuleObjectScript.CreatureOnNotice];
     }
 
-    if(triggerOnNotice && onNotice){
+    if(triggerOnNotice && onNotice && this.runsScript(ModuleObjectScript.CreatureOnNotice)){
       const instance = onNotice.nwscript.newInstance();
       (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);

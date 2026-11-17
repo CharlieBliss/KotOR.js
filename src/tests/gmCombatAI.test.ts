@@ -182,6 +182,27 @@ describe("choosing what to do", () => {
     expect(close.npc.equipItem).toHaveBeenCalledWith(ModuleCreatureArmorSlot.RIGHTHAND, sword);
   });
 
+  test("it takes out the weapon in its pack, not a stale copy, and swaps one at a time (a body dropped two rifles and no sword)", async () => {
+    const staleRifle = weapon('g_w_blstrrfl001', true);
+    const packRifle = weapon('g_w_blstrrfl001', true);
+    const sword = weapon('g_w_vbroswrd01', false);
+    const { npc } = fight({ equipment: { RIGHTHAND: sword }, inventory: [packRifle] }, {}, 12);
+    const first = GMCombatAI.equipWeapon(npc, staleRifle as any);
+    const second = GMCombatAI.equipWeapon(npc, sword as any);
+    expect(second).toBe(first);
+    await first;
+    expect(npc.equipItem).toHaveBeenCalledTimes(1);
+    expect(npc.equipItem).toHaveBeenCalledWith(ModuleCreatureArmorSlot.RIGHTHAND, packRifle);
+    expect(npc.inventory).not.toContain(packRifle);
+  });
+
+  test("a weapon it no longer carries isn't taken out", async () => {
+    const gone = weapon('g_w_blstrrfl001', true);
+    const { npc } = fight({ inventory: [] }, {}, 12);
+    await GMCombatAI.equipWeapon(npc, gone as any);
+    expect(npc.equipItem).not.toHaveBeenCalled();
+  });
+
   test("the GM's styles limit what it uses", () => {
     const lightning = power(35);
     const medpac = usable(64, 'g_i_medeqpmnt01');
@@ -214,30 +235,42 @@ describe("deciding every round", () => {
   });
 });
 
-describe("a GM NPC's own scripts turning it", () => {
-  const npc = (o: Record<string, any> = {}): any => ({
-    objectType: 0xFFFF, combatData: { combatState: true }, isDead: () => false, ...o,
-  });
-  const withGM = (o: Record<string, any>) => { (GameState as any).GMManager = { isAutonomousNpc: () => true, npcAiEnabled: true, ...o }; };
+describe("who runs a GM NPC's behaviour: the GM's AI or its own scripts", () => {
+  const npc = (o: Record<string, any> = {}): any => ({ ...o });
+  const withGM = (o: Record<string, any>, net: Record<string, any> = {}) => {
+    (GameState as any).gmMode = true;
+    (GameState as any).GMManager = { isAutonomousNpc: () => true, npcAiEnabled: true, ...o };
+    (GameState as any).GMNetworkManager = { role: 'host', ...net };
+    (GameState as any).hooks = { isNetReplica: () => false };
+  };
 
-  test("the GM's AI holds it in a fight (k_ai_master spun NPCs on the spot after every fight)", () => {
+  test("with the NPC AI on, the GM's AI does (its scripts kept pulling it another way)", () => {
     withGM({});
-    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(true);
+    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(false);
   });
 
-  test('out of combat, its scripts face it where they like', () => {
-    withGM({});
-    expect(GMCombatAI.holdsScriptFacing(npc({ combatData: { combatState: false } }))).toBe(false);
-  });
-
-  test("with the NPC AI off and no order, its scripts run its fights and face it", () => {
+  test('the NPC AI off: its own scripts, unless the GM gave it an order', () => {
     withGM({ npcAiEnabled: false });
-    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(false);
-    expect(GMCombatAI.holdsScriptFacing(npc({ gmOrder: { kind: 'guard' } }))).toBe(true);
+    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
+    expect(GMCombatAI.runsBehaviourScripts(npc({ gmOrder: { kind: 'guard' } }))).toBe(false);
   });
 
-  test("players' characters aren't held", () => {
+  test('the GM can leave one to its own scripts (a boss, a plot NPC)', () => {
+    withGM({});
+    expect(GMCombatAI.runsBehaviourScripts(npc({ gmScripted: true }))).toBe(true);
+  });
+
+  test("players' characters keep their scripts; outside GM mode nothing changes", () => {
     withGM({ isAutonomousNpc: () => false });
-    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(false);
+    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
+    withGM({});
+    (GameState as any).gmMode = false;
+    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
+  });
+
+  test("on a player's machine, copies of the GM's creatures run no behaviour scripts (the GM's machine does)", () => {
+    withGM({}, { role: 'client' });
+    (GameState as any).hooks = { isNetReplica: () => true };
+    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(false);
   });
 });

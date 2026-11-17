@@ -53,6 +53,10 @@ export interface GMObjectState {
   gmLastRollAt?: number;
   /** NPC: what it fights with (GMCombatAI): everything it has (default), weapons only, or plain attacks */
   gmCombatStyle?: GMCombatStyle;
+  /** NPC: the GM left its behaviour to its own scripts, not the GM's AI (GMCombatAI.runsBehaviourScripts) */
+  gmScripted?: boolean;
+  /** NPC: a weapon swap the GM AI started, still loading items (GMCombatAI.equipWeapon) */
+  gmWeaponSwap?: Promise<void>;
   /** NPC: when each combat tactic can next be used (performance clock, ms) */
   gmCombatCooldowns?: Record<string, number>;
   /** NPC: busy with a power, item or weapon swap it chose until then (performance clock, ms) */

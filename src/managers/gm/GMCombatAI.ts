@@ -161,21 +161,26 @@ export class GMCombatAI {
   }
 
   /**
-   * Host: a GM NPC's own AI script (k_ai_master) turning it while it's in a fight, or keyed up just after one, with
-   * the GM's AI or an order in charge. It looked about for more enemies, turning on the spot several times a
-   * second for ten seconds after every fight (and against its own attacks during it). Out of combat, or with the
-   * NPC AI off and no order, its scripts face it where they like
+   * Who runs a creature's behaviour: the GM's AI, or its own scripts (ScriptControl). The GM's AI does for an NPC
+   * while the NPC AI is on or it has a GM order, unless the GM left it to its own scripts (a boss or plot NPC);
+   * its story and rules scripts run either way. The two used to run side by side and pull it different ways
+   * (k_ai_master turning it about after every fight, attacking someone else mid-power). On a player's machine
+   * the GM's machine runs every copied creature, scripts and all
    */
-  static holdsScriptFacing(npc: ModuleObject): boolean {
+  static runsBehaviourScripts(npc: ModuleCreature): boolean {
     const GM = GameState.GMManager;
-    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client') return false;
-    if (!GMObjectKind.isCreature(npc) || !GM.isAutonomousNpc(npc as ModuleCreature)) return false;
-    const cre = npc as ModuleCreature;
-    // Under the GM's orders (a post, a patrol): the GM decides where it faces. Idle at its post, its scripts kept
-    // turning it to look about
-    if (cre.gmOrder) return true;
-    if (!GM.npcAiEnabled) return false;
-    return !!cre.combatData?.combatState;
+    if (!GameState.gmMode || !GM) return true;
+    if (GameState.hooks.isNetReplica(npc)) return false;
+    if (GameState.GMNetworkManager?.role === 'client') return true;
+    if (!GM.isAutonomousNpc(npc) || npc.gmScripted) return true;
+    return !(GM.npcAiEnabled || npc.gmOrder);
+  }
+
+  /** The GM leaves an NPC's behaviour to its own scripts (true), or to the GM's AI (the default) */
+  static setScripted(npc: ModuleCreature, scripted: boolean) {
+    if (!npc) return;
+    npc.gmScripted = scripted ? true : undefined;
+    GameState.GMManager?.notifyChange?.();
   }
 
   /** Seconds walking towards a target without getting closer before an NPC gives up on reaching it */
@@ -475,13 +480,31 @@ export class GMCombatAI {
     return `casts ${t.label} on ${on === s.npc ? 'itself' : on.getName()}`;
   }
 
-  /** Swap the weapon in its hand for one it carries (the one it puts away goes back in its pack) */
-  static async equipWeapon(npc: ModuleCreature, weapon: ModuleItem): Promise<void> {
+  /**
+   * Swap the weapon in its hand for one it carries (the one it puts away goes back in its pack). One swap at a time:
+   * a second one decided while the first was still loading items worked from the wrong weapon in hand, and lost
+   * or doubled weapons (a body dropped two rifles and no sword)
+   */
+  static equipWeapon(npc: ModuleCreature, weapon: ModuleItem): Promise<void> {
+    if (npc.gmWeaponSwap) return npc.gmWeaponSwap;
+    npc.gmWeaponSwap = this.swapWeapon(npc, weapon).finally(() => { npc.gmWeaponSwap = undefined; });
+    return npc.gmWeaponSwap;
+  }
+
+  private static async swapWeapon(npc: ModuleCreature, wanted: ModuleItem): Promise<void> {
     const old = npc.equipment?.RIGHTHAND;
     const oldResRef = old ? gmItemResRef(old) : '';
     const list = npc.inventory || [];
-    const i = list.indexOf(weapon);
-    if (i >= 0) list.splice(i, 1);
+    // The one in its pack now: the kit may hold an item that was put away and came back as a fresh one. Equipping
+    // the old object left the fresh one in the pack too
+    let i = list.indexOf(wanted);
+    if (i < 0) {
+      const resRef = gmItemResRef(wanted);
+      i = list.findIndex((item) => gmItemResRef(item) === resRef);
+      if (i < 0) return;
+    }
+    const weapon = list[i];
+    list.splice(i, 1);
     // A two-handed or paired setup: the left hand's weapon goes away too when switching to ranged
     if (weapon.isRangedWeapon() && npc.equipment?.LEFTHAND?.getWeaponType?.()) {
       const leftResRef = gmItemResRef(npc.equipment.LEFTHAND);

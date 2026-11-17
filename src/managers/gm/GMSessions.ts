@@ -166,6 +166,7 @@ export class GMSessions {
         barkText: cre.gmBarkText || '',
         stance: cre.heldStance || undefined,
         combatStyle: cre.gmCombatStyle && cre.gmCombatStyle !== 'all' ? cre.gmCombatStyle : undefined,
+        scripted: cre.gmScripted || undefined,
         pinned: cre.gmPinned || undefined,
       });
     }
@@ -332,6 +333,7 @@ export class GMSessions {
         );
         if (cre && typeof saved.hp === 'number') GMManager.setCreatureHP(cre, saved.hp, saved.maxHp);
         if (cre && saved.combatStyle) cre.gmCombatStyle = saved.combatStyle;
+        if (cre && saved.scripted) cre.gmScripted = true;
         obj = cre;
       } else {
         const cfg = saved.config as GMPlaceableSpawnConfig;

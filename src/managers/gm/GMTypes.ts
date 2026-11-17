@@ -219,6 +219,8 @@ export interface GMSavedObject {
   stance?: string;
   /** What it fights with (GMCombatAI), when not everything */
   combatStyle?: 'weapons' | 'attack';
+  /** Its behaviour left to its own scripts (GMCombatAI.runsBehaviourScripts) */
+  scripted?: boolean;
   /** Pinned: can't be clicked or dragged in the scene */
   pinned?: boolean;
 }

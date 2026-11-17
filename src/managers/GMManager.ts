@@ -1471,7 +1471,7 @@ export class GMManager {
     requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
     onCombatRoundEnd: (creature) => GMCombatAI.onRoundEnd(creature),
     holdsScriptAttack: (creature) => GMCombatAI.holdsScriptAttack(creature),
-    holdsScriptFacing: (creature) => GMCombatAI.holdsScriptFacing(creature),
+    runsBehaviourScripts: (creature) => GMCombatAI.runsBehaviourScripts(creature),
     walksThrough: (creature) => !!creature.gmHidden,
     useSeat: (creature, target) => GameState.gmMode && GMObjectKind.isCreature(creature) && GMSeats.sitIn(creature as ModuleCreature, target),
     isSeat: (object) => GameState.gmMode && GMSeats.seatsOf(object).length > 0,
