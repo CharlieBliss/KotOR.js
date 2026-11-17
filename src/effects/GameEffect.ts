@@ -74,8 +74,55 @@ export class GameEffect {
     return;
   }
 
+  /** Taken off its object (retire): its models are gone, and one that finishes loading later is dropped */
+  removed: boolean = false;
+
+  /**
+   * Shown on a player's machine for one on the GM's (GMReplication mirrors what changes how a creature looks):
+   * drawn only. Its gameplay (pushing a creature along, say) happens on the GM's machine
+   */
+  mirrored: boolean = false;
+
+  /** The models it draws: taken away with it */
+  models: any[] = [];
+
+  /**
+   * Take on a model the effect draws, hung on parent (or hung later by the effect). Taken away with the effect;
+   * already removed (a model still loading when it ended), the model is thrown away. False then
+   */
+  adoptModel(model: any, parent?: any): boolean {
+    if(!model) return false;
+    if(this.removed){
+      model.dispose?.();
+      return false;
+    }
+    this.models.push(model);
+    parent?.add?.(model);
+    return true;
+  }
+
+  /** Take its models off whatever they hang on, and free them */
+  releaseModels(){
+    for(const model of this.models.splice(0)){
+      model.removeFromParent?.();
+      model.dispose?.();
+    }
+  }
+
+  /**
+   * It's over: its own clean-up (onRemove), then its models. Once only; false when it already was. Every way an
+   * effect ends goes through here (ModuleObject.detachEffect, Module.removeEffect)
+   */
+  retire(): boolean {
+    if(this.removed) return false;
+    this.removed = true;
+    this.onRemove();
+    this.releaseModels();
+    return true;
+  }
+
   /** Runtime state a copy starts without: it's applied, timed and drawn on its own */
-  static UNCOPIED = new Set(['applied', 'initialized', 'durationEnded', 'removed', 'object', 'age', 'model',
+  static UNCOPIED = new Set(['applied', 'initialized', 'durationEnded', 'removed', 'object', 'age', 'model', 'models', 'gmFxId',
     'impact_model', 'impact_root_model', 'impact_head_model', 'impactTimer', 'impactRootTimer', 'impactHeadTimer']);
 
   /**
@@ -266,9 +313,9 @@ export class GameEffect {
     this.durationEnded = true;
     if(this.object && typeof this.object.removeEffect === 'function'){
       this.object.removeEffect(this);
-    }else{
-      this.onRemove();
     }
+    // Not on the object's list (never was, or already taken off): over all the same
+    this.retire();
   }
 
   getSaveType(){

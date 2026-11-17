@@ -2227,12 +2227,24 @@ export class ModuleObject {
     effect.setAttachedObject(this);
     effect.loadModel();
     effect.onApply(this);
+    GameState.hooks.onEffectApplied(this, effect);
     // A heal, hit or resurrection has done its work once applied: kept, it sat on the creature for good, listed
     // as a "Heal" or "Damage" with no source
     if(ModuleObject.ONE_SHOT_EFFECTS.has(effect.type) && effect.getDurationType() == GameEffectDurationType.INSTANT){
       return;
     }
     this.effects.push(effect);
+  }
+
+  /**
+   * Take an effect off: off the list, its clean-up and models (GameEffect.retire), and the mode told (a GM
+   * session's players take it off too). Every way an effect comes off goes through here
+   */
+  detachEffect(effect: GameEffect){
+    const index = this.effects.indexOf(effect);
+    if(index < 0) return;
+    this.effects.splice(index, 1);
+    if(effect.retire()) GameState.hooks.onEffectRemoved(this, effect);
   }
 
   /** Effects that act once, when applied instantly (other types default to instant and still last) */
@@ -2272,16 +2284,8 @@ export class ModuleObject {
     if(!(oCreator instanceof ModuleObject)){
       return;
     }
-    let eIndex = this.effects.length - 1;
-    let effect = this.effects[eIndex];
-    while(effect){
-      if(effect.getCreator() == oCreator){
-        let index = this.effects.indexOf(effect);
-        if(index >= 0){
-          this.effects.splice(index, 1)[0].onRemove();
-        }
-      }
-      effect = this.effects[--eIndex];
+    for(const effect of this.effects.filter((e) => e.getCreator() == oCreator)){
+      this.detachEffect(effect);
     }
   }
 
@@ -2290,13 +2294,8 @@ export class ModuleObject {
    * @param type 
    */
   removeEffectsByType(type: number = -1){
-    let effect = this.getEffect(type);
-    while(effect){
-      let index = this.effects.indexOf(effect);
-      if(index >= 0){
-        this.effects.splice(index, 1)[0].onRemove();
-      }
-      effect = this.getEffect(type);
+    for(const effect of this.effects.filter((e) => e.type == type)){
+      this.detachEffect(effect);
     }
   }
 
@@ -2306,9 +2305,7 @@ export class ModuleObject {
    */
   removeEffect(effect: GameEffect){
     if(!effect){ return; }
-    const arrIdx = this.effects.indexOf(effect);
-    if(arrIdx == -1){ return; }
-    this.effects.splice(arrIdx, 1)[0].onRemove();
+    this.detachEffect(effect);
   }
 
   /**
@@ -3353,10 +3350,9 @@ export class ModuleObject {
 
       // Dispose all game effects
       if(this.effects && this.effects.length > 0){
+        // The object is going: its effects' models go with it (nobody needs telling, the object itself goes)
         for(let i = this.effects.length - 1; i >= 0; i--){
-          if(this.effects[i]){
-            this.effects[i].onRemove();
-          }
+          this.effects[i]?.retire();
         }
         this.effects.length = 0;
       }

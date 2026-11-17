@@ -68,16 +68,34 @@ export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item';
  * A visual the host just showed on a networked object, replayed on clients
  * - anim: a 2DA animation (attack swings, hit/dodge/parry reactions, casting)
  * - text: floating combat text (damage numbers, miss, deflected)
- * - vfx.add / vfx.remove: a visualeffects.2da effect (Force power impacts, auras, shields)
+ * - effect.add / effect.remove: an effect that changes how something looks (GMReplication.MIRRORED_EFFECTS:
+ *   visuals and auras, beams, stun and hold poses), made on the copy and drawn only
+ * - vfx.at: a visual effect at a spot
  * - projectile: a blaster bolt (ammunitiontypes.2da row) from netId to targetNetId
  */
+/**
+ * An effect on the GM's machine as players get it (GMReplication.MIRRORED_EFFECTS): enough to make the same effect
+ * there, drawn only (GameEffect.mirrored)
+ */
+export interface GMEffectMirror {
+  fxId: string;
+  /** GameEffectType */
+  type: number;
+  ints: number[];
+  floats: number[];
+  durationType: number;
+  duration: number;
+  /** A beam's caster (its objectList[0]): the beam is drawn from them */
+  casterNetId?: string;
+}
+
 export type GMFxEvent =
   | { kind: 'anim'; netId: string; anim: string; index: number }
   | { kind: 'text'; netId: string; text: string; style: number; timer: number }
-  | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number;
-      /** A beam (Force Lightning, Drain Life): from the caster's model to this object's */
-      beam?: { casterNetId: string; bodyPart: number } }
-  | { kind: 'vfx.remove'; netId: string; fxId: string }
+  /** An effect that changes how something looks (a visual, a beam, a stun or hold pose), shown on players' copies */
+  | { kind: 'effect.add'; netId: string; effect: GMEffectMirror }
+  /** It came off (on an object; at: on a spot, a 'vfx.at' effect) */
+  | { kind: 'effect.remove'; netId?: string; fxId: string; at?: boolean }
   /** A visual effect at a spot (an area power's burst, a grenade blast, a beam aimed at a spot) */
   | { kind: 'vfx.at'; fxId: string; vfx: number; miss: number; durationType: number; duration: number; x: number; y: number; z: number;
       beam?: { casterNetId: string; bodyPart: number } }
@@ -228,6 +246,8 @@ export interface GMWorldSnapshot {
   actors: GMSerializedActor[];
   doors: GMSerializedDoorState[];
   mines?: GMSerializedMine[];
+  /** Lasting effects on the scene's objects that change how they look (an aura, a stun), for a player joining now */
+  effects?: { netId: string; effect: GMEffectMirror }[];
   /** The music, sound and look the GM gave this scene */
   atmosphere?: GMAtmosphereSettings;
 }

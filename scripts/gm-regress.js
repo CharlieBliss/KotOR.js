@@ -3,6 +3,7 @@
  * player's, so a fix stays fixed. One boot of a GM and a player in Onderon's throne room (scripts/fixtures/
  * gm-throne-battle.json), the game running faster than real time, then short checks:
  *
+ *   held pose              a creature the GM stuns looks held on the player's screen, and is let go with it
  *   held and killed        a creature killed while stunned or held falls (it kept the stun pose on the GM's side)
  *   shared effects         one beam and one impact a script applies to three creatures: each gets its own, and
  *                          none is left behind on either screen once it's over (stretched beams, frozen particles)
@@ -199,7 +200,8 @@ async function run() {
         return { turn, moved, closest: +closest.toFixed(2), walking, fromPost };
       });
       expect(!r.walking.length, `still walking after 9 s: ${r.walking.join(', ')}`);
-      expect(r.closest >= 0.9, `two of them stand ${r.closest} m apart`);
+      // Bodies are about 0.4 m across: closer than 0.7 m they're standing in each other
+      expect(r.closest >= 0.7, `two of them stand on each other, ${r.closest} m apart`);
       expect(r.turn.every((t) => t < 0.5) && r.moved.every((m) => m < 0.3), `not standing still: turned ${r.turn} rad, moved ${r.moved} m in 2 s`);
       expect(r.fromPost.every((d) => d < 4), `settled too far from the post: ${r.fromPost} m`);
       return `closest ${r.closest} m apart, ${r.fromPost.join('/')} m from the post`;
@@ -252,6 +254,28 @@ async function run() {
       const [g, p] = [await left(gm), await left(pl)];
       expect(!g.length, `left on the GM's screen: ${g.join('; ')}`);
       expect(!p.length, `left on the player's screen: ${p.join('; ')}`);
+    });
+
+    await check('held', 'A creature the GM stuns looks held on the player\'s screen, and is let go with it', async () => {
+      const id = await evalIn(gm, (K) => {
+        const R = window.__R, [o] = R.named('^Dark Jedi Master 2$');
+        R.onlyThese([o]);
+        R.put(o, 0, 8);
+        const e = new K.GameState.GameEffectFactory.EffectSetState();
+        e.setInt(0, 5); e.setDurationType(1); e.setDuration(60); e.initialize();
+        o.addEffect(e);
+        window.__heldEffect = e;
+        return o.gmNetId;
+      });
+      await pause(2);
+      const read = (w) => evalIn(w, (K, netId) => { const o = window.__R.byNetId(netId); return { held: !!o?.isParalyzed?.(), anim: window.__R.anim(o) }; }, id);
+      const during = await read(pl);
+      expect(during.held && /paraly/.test(during.anim), `while held, the player's copy is held: ${during.held}, showing ${during.anim || 'nothing'}`);
+      await evalIn(gm, (K, netId) => { window.__R.byNetId(netId).removeEffect(window.__heldEffect); return true; }, id);
+      await pause(2);
+      const after = await read(pl);
+      expect(!after.held && !/paraly/.test(after.anim), `let go, the player's copy is still held: ${after.held}, showing ${after.anim}`);
+      return `held: ${during.anim}; let go: ${after.anim}`;
     });
 
     await check('falls', 'Creatures killed while stunned or held fall, on both screens', async () => {

@@ -104,6 +104,8 @@ export class EffectBeam extends GameEffect {
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
           onComplete: (model: OdysseyModel3D) => {
+            // Taken away with the effect (thrown away if the beam ended while it loaded)
+            if(!this.adoptModel(model)) return resolve();
             this.model = model;
             // Applied while the model was loading (addEffect applies at once): attach it now
             if(this.applied) this.attachBeam();
@@ -122,7 +124,6 @@ export class EffectBeam extends GameEffect {
       
     super.onApply();
     this.attachBeam();
-    GameState.hooks.onHostVisualEffectApplied(this);
   }
 
   /** Hang the beam on its caster's model, its emitters aimed at the target (once both models are there) */
@@ -139,14 +140,9 @@ export class EffectBeam extends GameEffect {
     }
   }
 
-  /** The beam goes with the effect: off the caster's model (it stayed there after the power ended) */
+  /** The beam's model is the base effect's to take away (GameEffect.retire): off the caster's model with it */
   onRemove(){
-    GameState.hooks.onHostVisualEffectRemoved(this);
-    if(this.model instanceof OdysseyModel3D){
-      this.model.removeFromParent();
-      this.model.dispose();
-      this.model = undefined;
-    }
+    this.model = undefined;
     super.onRemove();
   }
 

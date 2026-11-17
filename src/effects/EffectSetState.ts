@@ -85,7 +85,8 @@ export class EffectSetState extends GameEffect {
 
     if(this.elapsed < anim_push_length){
       const f_push_move_delta = (this.elapsed / anim_push_length);
-      this.object.position.copy(v1.lerp(v2, f_push_move_delta));
+      // Shown for one on the GM's machine: the creature's position comes from there
+      if(!this.mirrored) this.object.position.copy(v1.lerp(v2, f_push_move_delta));
       this.object.box.setFromObject(this.object.model);
     }else if(this.elapsed < anim_push_length + anim_land_length){
       this.object.position.set(

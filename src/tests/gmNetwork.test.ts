@@ -11,6 +11,7 @@ import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import { GMNetworkManager, GMPacket } from "@/managers/GMNetworkManager";
 import { GMTemplates } from "@/managers/gm/GMTemplates";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { GameEffectType } from "@/enums/effects/GameEffectType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { OdysseyModelAnimation } from "@/odyssey";
 import { GameState } from "@/GameState";
@@ -355,27 +356,58 @@ describe("GM multiplayer host authority", () => {
       expect(fxSent()).toEqual([]);
     });
 
-    test("sends combat text and visual effects, but no removal for instant effects", () => {
+    test("sends combat text and look-changing effects, but no removal for instant effects", () => {
       GMNetworkManager.role = "host";
       const cre = mockCreature("cre_0");
-      const effect = (durationType: number): any => ({
-        object: cre,
-        getInt: (i: number) => (i === 0 ? 1007 : 0),
+      const effect = (type: number, durationType: number, ints: number[] = [1007]): any => ({
+        type, object: cre, intList: ints, floatList: [], mirrored: false,
+        getInt: (i: number) => ints[i] ?? 0,
+        getObject: (): undefined => undefined,
         getDurationType: () => durationType,
         getDuration: () => 6000,
       });
 
       GMReplication.onHostTextSprite(cre, "miss", 0, 1500);
-      const aura = effect(2);
-      GMReplication.onHostVisualEffectApplied(aura);
-      GMReplication.onHostVisualEffectRemoved(aura);
-      const impact = effect(0);
-      GMReplication.onHostVisualEffectApplied(impact);
-      GMReplication.onHostVisualEffectRemoved(impact);
+      const aura = effect(GameEffectType.EffectVisualEffect, 2);
+      GMReplication.onEffectApplied(cre, aura);
+      GMReplication.onEffectRemoved(cre, aura);
+      const impact = effect(GameEffectType.EffectVisualEffect, 0);
+      GMReplication.onEffectApplied(cre, impact);
+      GMReplication.onEffectRemoved(cre, impact);
 
-      expect(fxSent().map((e: any) => e.kind)).toEqual(["text", "vfx.add", "vfx.remove", "vfx.add"]);
-      expect(fxSent()[1]).toEqual(expect.objectContaining({ netId: "cre_0", vfx: 1007, durationType: 2, duration: 6000 }));
+      expect(fxSent().map((e: any) => e.kind)).toEqual(["text", "effect.add", "effect.remove", "effect.add"]);
+      expect(fxSent()[1]).toEqual(expect.objectContaining({
+        netId: "cre_0",
+        effect: expect.objectContaining({ type: GameEffectType.EffectVisualEffect, ints: [1007], durationType: 2, duration: 6000 }),
+      }));
       expect(fxSent()[2].fxId).toBe(aura.gmFxId);
+    });
+
+    test("a stun or hold pose reaches players; gameplay effects and ones already mirrored don't", () => {
+      GMNetworkManager.role = "host";
+      const cre = mockCreature("cre_0");
+      const effect = (type: number, ints: number[], mirrored = false): any => ({
+        type, object: cre, intList: ints, floatList: [], mirrored,
+        getInt: (i: number) => ints[i] ?? 0, getObject: (): undefined => undefined,
+        getDurationType: () => 1, getDuration: () => 6,
+      });
+      GMReplication.onEffectApplied(cre, effect(GameEffectType.EffectSetState, [5]));
+      GMReplication.onEffectApplied(cre, effect(GameEffectType.EffectHeal, [20]));
+      GMReplication.onEffectApplied(cre, effect(GameEffectType.EffectAbilityIncrease, [0, 2]));
+      GMReplication.onEffectApplied(cre, effect(GameEffectType.EffectVisualEffect, [1007], true));
+      expect(fxSent().map((e: any) => [e.kind, e.effect?.type, e.effect?.ints])).toEqual([["effect.add", GameEffectType.EffectSetState, [5]]]);
+    });
+
+    test("a player joining gets the lasting look-changing effects already on, not instant ones", () => {
+      GMNetworkManager.role = "host";
+      const cre: any = mockCreature("cre_0");
+      const effect = (type: number, durationType: number): any => ({
+        type, intList: [4], floatList: [], mirrored: false,
+        getInt: () => 4, getObject: (): undefined => undefined, getDurationType: () => durationType, getDuration: () => 6,
+      });
+      cre.effects = [effect(GameEffectType.EffectSetState, 1), effect(GameEffectType.EffectVisualEffect, 0), effect(GameEffectType.EffectHeal, 1)];
+      const lasting = GMReplication.lastingMirrors().filter((e) => e.netId === "cre_0");
+      expect(lasting.map((e) => e.effect.type)).toEqual([GameEffectType.EffectSetState]);
     });
 
     test("players replay the animation and keep the host's state index", () => {

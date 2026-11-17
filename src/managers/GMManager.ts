@@ -1452,8 +1452,8 @@ export class GMManager {
       return !GMManager.keepDefaultTriggers;
     },
     onHostTwoDAAnimation: (creature, animation) => GMReplication.onHostTwoDAAnimation(creature, animation),
-    onHostVisualEffectApplied: (effect) => GMReplication.onHostVisualEffectApplied(effect),
-    onHostVisualEffectRemoved: (effect) => GMReplication.onHostVisualEffectRemoved(effect),
+    onEffectApplied: (owner, effect) => GMReplication.onEffectApplied(owner, effect),
+    onEffectRemoved: (owner, effect) => GMReplication.onEffectRemoved(owner, effect),
     onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),
     onDoorOpened: (door, by) => {
       // Tell everyone, once this frame's state has settled, when a door opened for someone in a session

@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from "@jest/globals";
 
-jest.mock("@/GameState", () => ({ GameState: { hooks: { onHostVisualEffectRemoved: () => {}, onHostVisualEffectApplied: () => {} } } }));
+jest.mock("@/GameState", () => ({ GameState: { hooks: { onEffectRemoved: () => {}, onEffectApplied: () => {} } } }));
 jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
 jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 
@@ -12,6 +12,7 @@ import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 const holder = (name: string): any => ({
   name, effects: [] as GameEffect[], isImmuneToEffect: () => false,
   removeEffect(effect: GameEffect) { return ModuleObject.prototype.removeEffect.call(this, effect); },
+  detachEffect(effect: GameEffect) { return ModuleObject.prototype.detachEffect.call(this, effect); },
 });
 const addEffect = (obj: any, effect: GameEffect) => ModuleObject.prototype.addEffect.call(obj, effect, effect.getDurationType(), effect.getDuration());
 const removeEffect = (obj: any, effect: GameEffect) => ModuleObject.prototype.removeEffect.call(obj, effect);

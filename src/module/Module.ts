@@ -376,6 +376,7 @@ export class Module {
     effect.setAttachedObject(this);
     effect.onApply(object);
     this.effects.push(effect);
+    GameState.hooks.onEffectApplied(this, effect);
 
     GameState.group.effects.add(object.model);
   }
@@ -383,7 +384,9 @@ export class Module {
   removeEffect(effect: GameEffect){
     if(!effect) return;
     const idx = this.effects.indexOf(effect);
-    if(idx >= 0) this.effects.splice(idx, 1)[0]?.onRemove();
+    if(idx < 0) return;
+    this.effects.splice(idx, 1);
+    if(effect.retire()) GameState.hooks.onEffectRemoved(this, effect);
   }
 
   addEvent(event: GameEvent){

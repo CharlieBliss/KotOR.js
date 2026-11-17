@@ -136,7 +136,7 @@ export class EffectVisualEffect extends GameEffect {
     if(this.object && this.object.effects?.includes(this)){
       this.object.removeEffect(this);
     }else{
-      this.onRemove();
+      this.retire();
     }
   }
 
@@ -145,7 +145,6 @@ export class EffectVisualEffect extends GameEffect {
       return;
 
     super.onApply();
-    GameState.hooks.onHostVisualEffectApplied(this);
 
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
 
@@ -204,20 +203,11 @@ export class EffectVisualEffect extends GameEffect {
             context: this.object.context
           }).then(
             (model: OdysseyModel3D) => {
-              // Loaded after the effect was taken away: nothing would ever remove it
-              if(this.removed){ model.dispose(); return; }
+              // Hung on the object's impact node; the effect takes it away (thrown away if it's already over)
+              if(!this.object.model){ model.dispose(); return; }
+              if(!this.adoptModel(model, this.object.model.impact || this.object.model)) return;
               this.impact_model = model;
-              if(this.object.model){
-                if(this.object.model.impact){
-                  this.object.model.impact.add(this.impact_model);
-                  TextureLoader.LoadQueue();
-                }else{
-                  this.object.model.add(this.impact_model);
-                  TextureLoader.LoadQueue();
-                }
-              }else{
-                this.impact_model.dispose();
-              }
+              TextureLoader.LoadQueue();
             }
           )
         }
@@ -241,15 +231,10 @@ export class EffectVisualEffect extends GameEffect {
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
         }).then((model: OdysseyModel3D) => {
-          // Loaded after the effect was taken away: nothing would ever remove it
-          if(this.removed){ model.dispose(); return; }
+          if(!this.object.model){ model.dispose(); return; }
+          if(!this.adoptModel(model, this.object.model)) return;
           this.impact_root_model = model;
-          if(this.object.model){
-            this.object.model.add(this.impact_root_model);
-            TextureLoader.LoadQueue();
-          }else{
-            this.impact_root_model.dispose();
-          }
+          TextureLoader.LoadQueue();
         });
       });
     }
@@ -262,20 +247,12 @@ export class EffectVisualEffect extends GameEffect {
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context,
           }).then((model: OdysseyModel3D) => {
-            // Loaded after the effect was taken away: nothing would ever remove it
-            if(this.removed){ model.dispose(); return; }
+            // No head to attach it to (droids and some creatures): not shown
+            const head = this.object?.model?.headconjure || this.object?.model?.headhook;
+            if(!head){ model.dispose(); return; }
+            if(!this.adoptModel(model, head)) return;
             this.impact_head_model = model;
-            if(this.object?.model?.headconjure){
-              this.object.model.headconjure.add(this.impact_head_model);
-              TextureLoader.LoadQueue();
-            }else if(this.object?.model?.headhook){
-              this.object.model.headhook.add(this.impact_head_model);
-              TextureLoader.LoadQueue();
-            }else{
-              // No head to attach it to (droids and some creatures)
-              this.impact_head_model.dispose();
-              this.impact_head_model = undefined;
-            }
+            TextureLoader.LoadQueue();
           })
         }
       );
@@ -315,9 +292,8 @@ export class EffectVisualEffect extends GameEffect {
               isForceShield: true,
               context: this.object.context
             }).then((model: OdysseyModel3D) => {
-              if(this.removed){ model.dispose(); return; }
+              if(!this.adoptModel(model, GameState.scene)) return;
               this.model = model;
-              GameState.scene.add(model);
               model.position.copy(this.object.position);
               model.rotation.copy(this.object.rotation);
               model.quaternion.copy(this.object.quaternion);
@@ -364,8 +340,8 @@ export class EffectVisualEffect extends GameEffect {
             isForceShield: true,
             context: this.object.context,
             onComplete: (model: OdysseyModel3D) => {
+              if(!this.adoptModel(model, GameState.scene)) return;
               this.model = model;
-              GameState.scene.add(model);
               model.position.copy(this.object.position);
               model.rotation.copy(this.object.rotation);
               model.quaternion.copy(this.object.quaternion);
@@ -398,21 +374,10 @@ export class EffectVisualEffect extends GameEffect {
     }
   }
 
+  /** Its models are the base effect's to take away (GameEffect.retire); it only lets go of them */
   onRemove(){
-    if(this.removed) return;
-    this.removed = true;
-    GameState.hooks.onHostVisualEffectRemoved(this);
-    for(const key of ['model', 'impact_model', 'impact_root_model', 'impact_head_model'] as const){
-      const model = this[key];
-      if(model instanceof OdysseyModel3D){
-        model.removeFromParent();
-        model.dispose();
-      }
-      this[key] = undefined;
-    }
+    super.onRemove();
+    this.model = this.impact_model = this.impact_root_model = this.impact_head_model = undefined;
   }
-
-  /** onRemove has run: its models are gone */
-  removed: boolean = false;
 
 }

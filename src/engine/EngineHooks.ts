@@ -74,8 +74,10 @@ export interface EngineHooks {
   // --- Things that happened on this machine
   /** A creature played an animations.2da animation */
   onHostTwoDAAnimation(creature: ModuleCreature, animation: ITwoDAAnimation): void;
-  onHostVisualEffectApplied(effect: GameEffect): void;
-  onHostVisualEffectRemoved(effect: GameEffect): void;
+  /** An effect went on an object (or on a spot: owner is the module). Every effect, whatever its type */
+  onEffectApplied(owner: any, effect: GameEffect): void;
+  /** An effect came off an object, or a spot (GameEffect.retire has run) */
+  onEffectRemoved(owner: any, effect: GameEffect): void;
   onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number): void;
   /** by opened door (by is the door itself when it opened on its own) */
   onDoorOpened(door: ModuleDoor, by: ModuleObject): void;
@@ -133,8 +135,8 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   sharedWorld: () => false,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
-  onHostVisualEffectApplied: () => {},
-  onHostVisualEffectRemoved: () => {},
+  onEffectApplied: () => {},
+  onEffectRemoved: () => {},
   onHostProjectile: () => {},
   onDoorOpened: () => {},
   onMineChanged: () => {},

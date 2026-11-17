@@ -18,6 +18,7 @@ import {
   GMSerializedDoorState,
   GMWorldSnapshot,
   GMFxEvent,
+  GMEffectMirror,
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -165,6 +166,7 @@ export class GMReplication {
       doors,
       mines: GMMines.getMines().map((m) => GMMines.serializeMine(m)),
       atmosphere: Object.keys(GMAtmosphere.current).length ? GMAtmosphere.current : undefined,
+      effects: this.lastingMirrors(),
     };
   }
 
@@ -226,6 +228,8 @@ export class GMReplication {
         await this.spawnOrUpdateFromSerialized(actor);
       }
     }
+    // Auras, stuns and holds already on when we joined
+    for (const entry of snapshot.effects || []) this.applyEffectMirrorOnClient(entry.netId, entry.effect);
   }
 
   static applyWorldTickOnClient(actors: GMSerializedActor[]) {
@@ -520,53 +524,115 @@ export class GMReplication {
     GMNetworkManager.broadcastFx({ kind: 'projectile', netId, targetNetId, ammunition, hit, delay });
   }
 
-  static onHostVisualEffectApplied(effect: GameEffect) {
+  /**
+   * Effects players see: those that change how something looks. Applied on players' copies too, drawn only
+   * (GameEffect.mirrored): a visual or aura, a beam, a stun / hold / sleep / choke / push pose. Gameplay (damage,
+   * healing, stats) stays on the GM's machine. A new effect type that changes how creatures look goes here, and
+   * players see it with nothing else to write
+   */
+  static MIRRORED_EFFECTS: ReadonlySet<number> = new Set([
+    GameEffectType.EffectVisualEffect, GameEffectType.EffectBeam, GameEffectType.EffectSetState,
+  ]);
+
+  /** Host: an effect as players get it, or null when they don't need it (or can't be told who it's from) */
+  static mirrorOf(effect: GameEffect): GMEffectMirror | null {
+    if (!this.MIRRORED_EFFECTS.has(effect.type) || effect.mirrored) return null;
+    let casterNetId: string | undefined;
+    if (effect.type === GameEffectType.EffectBeam) {
+      casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
+      if (!casterNetId) return null;
+    }
+    const fxId = (effect as any).gmFxId || ((effect as any).gmFxId = GMManager.getNextNetId('fx'));
+    return {
+      fxId, type: effect.type, ints: [...(effect.intList || [])], floats: [...(effect.floatList || [])],
+      durationType: effect.getDurationType(), duration: effect.getDuration(), ...(casterNetId ? { casterNetId } : {}),
+    };
+  }
+
+  /** Host: an effect went on an object or a spot; players get the ones that change how things look */
+  static onEffectApplied(owner: any, effect: GameEffect) {
+    if (GMNetworkManager.role !== 'host' || !this.MIRRORED_EFFECTS.has(effect.type) || effect.mirrored) return;
     // At a spot: scripts apply area bursts, grenade blasts and some beams at a location (Module.addEffect), on a
     // marker with no network id. Players replay them at the same spot
-    const marker = (effect as any).creator;
-    if ((effect.object as any) === GameState.module && GMNetworkManager.role === 'host' && marker?.position) {
-      let beam: { casterNetId: string; bodyPart: number } | undefined;
-      if (effect.type === GameEffectType.EffectBeam) {
-        const casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
-        if (!casterNetId) return;
-        beam = { casterNetId, bodyPart: effect.getInt(1) };
-      }
+    if (owner === GameState.module) {
+      const marker = (effect as any).creator;
+      if (!marker?.position || effect.type === GameEffectType.EffectSetState) return;
+      const mirror = this.mirrorOf(effect);
+      if (!mirror) return;
+      const beam = mirror.casterNetId ? { casterNetId: mirror.casterNetId, bodyPart: effect.getInt(1) } : undefined;
       GMNetworkManager.broadcastFx({
-        kind: 'vfx.at', fxId: GMManager.getNextNetId('fx'), vfx: effect.getInt(0), miss: effect.getInt(2),
+        kind: 'vfx.at', fxId: mirror.fxId, vfx: effect.getInt(0), miss: effect.getInt(2),
         durationType: effect.getDurationType(), duration: effect.getDuration(),
         x: marker.position.x, y: marker.position.y, z: marker.position.z, ...(beam ? { beam } : {}),
       });
       return;
     }
-    const netId = this.getHostFxNetId(effect.object);
-    if (!netId) return;
-    // A beam is drawn from its caster: players need to know who that is
-    let beam: { casterNetId: string; bodyPart: number } | undefined;
-    if (effect.type === GameEffectType.EffectBeam) {
-      const casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
-      if (!casterNetId) return;
-      beam = { casterNetId, bodyPart: effect.getInt(1) };
-    }
-    const fxId = GMManager.getNextNetId('fx');
-    (effect as any).gmFxId = fxId;
-    GMNetworkManager.broadcastFx({
-      kind: 'vfx.add',
-      netId,
-      fxId,
-      vfx: effect.getInt(0),
-      miss: effect.getInt(2),
-      durationType: effect.getDurationType(),
-      duration: effect.getDuration(),
-      ...(beam ? { beam } : {}),
-    });
+    const netId = this.getHostFxNetId(owner);
+    const mirror = netId ? this.mirrorOf(effect) : null;
+    if (!netId || !mirror) return;
+    GMNetworkManager.broadcastFx({ kind: 'effect.add', netId, effect: mirror });
   }
 
-  static onHostVisualEffectRemoved(effect: GameEffect) {
+  /** Host: an effect came off; players take theirs off too (instant ones finish on their own everywhere) */
+  static onEffectRemoved(owner: any, effect: GameEffect) {
+    if (GMNetworkManager.role !== 'host') return;
     const fxId = (effect as any).gmFxId;
-    const netId = this.getHostFxNetId(effect.object);
-    // Instant effects finish on their own on every machine
-    if (!fxId || !netId || effect.getDurationType() === GameEffectDurationType.INSTANT) return;
-    GMNetworkManager.broadcastFx({ kind: 'vfx.remove', netId, fxId });
+    if (!fxId || effect.getDurationType() === GameEffectDurationType.INSTANT) return;
+    if (owner === GameState.module) {
+      GMNetworkManager.broadcastFx({ kind: 'effect.remove', fxId, at: true });
+      return;
+    }
+    const netId = this.getHostFxNetId(owner);
+    if (netId) GMNetworkManager.broadcastFx({ kind: 'effect.remove', netId, fxId });
+  }
+
+  /** Host: the lasting mirrored effects on the scene's objects now, for a player joining */
+  static lastingMirrors(): { netId: string; effect: GMEffectMirror }[] {
+    const out: { netId: string; effect: GMEffectMirror }[] = [];
+    for (const obj of GMManager.netIdMap.values()) {
+      const netId = (obj as any)?.gmNetId;
+      if (!netId || !Array.isArray((obj as any).effects) || (obj as any).gmHidden) continue;
+      for (const effect of (obj as any).effects as GameEffect[]) {
+        if (!effect || effect.getDurationType() === GameEffectDurationType.INSTANT) continue;
+        const mirror = this.mirrorOf(effect);
+        if (mirror) out.push({ netId, effect: mirror });
+      }
+    }
+    return out;
+  }
+
+  /** Client: make the effect the host has, drawn only */
+  static effectFromMirror(mirror: GMEffectMirror): GameEffect | null {
+    const F: any = GameState.GameEffectFactory;
+    const make: Record<number, () => GameEffect> = {
+      [GameEffectType.EffectVisualEffect]: () => new F.EffectVisualEffect(),
+      [GameEffectType.EffectBeam]: () => new F.EffectBeam(),
+      [GameEffectType.EffectSetState]: () => new F.EffectSetState(),
+    };
+    const effect = make[mirror.type]?.();
+    if (!effect) return null;
+    if (mirror.casterNetId) {
+      const caster = GMManager.netIdMap.get(mirror.casterNetId);
+      if (!caster) return null;
+      effect.setObject(0, caster);
+    }
+    (mirror.ints || []).forEach((v, i) => effect.setInt(i, v));
+    (mirror.floats || []).forEach((v, i) => effect.setFloat(i, v));
+    effect.setDurationType(mirror.durationType);
+    effect.setDuration(mirror.duration);
+    effect.mirrored = true;
+    (effect as any).gmFxId = mirror.fxId;
+    effect.initialize();
+    return effect;
+  }
+
+  /** Client: put a host effect on our copy of the object (once: a snapshot and an event may both bring it) */
+  static applyEffectMirrorOnClient(netId: string, mirror: GMEffectMirror) {
+    const obj = GMManager.netIdMap.get(netId);
+    if (!obj || !mirror) return;
+    if ((obj.effects || []).some((e) => (e as any).gmFxId === mirror.fxId)) return;
+    const effect = this.effectFromMirror(mirror);
+    if (effect) obj.addEffect(effect);
   }
 
   /** Client: a visual effect the host put at a spot (an area burst, a grenade blast, a beam at a spot) */
@@ -586,6 +652,8 @@ export class GMReplication {
     effect.setInt(2, event.miss);
     effect.setDurationType(event.durationType);
     effect.setDuration(event.duration);
+    effect.mirrored = true;
+    (effect as any).gmFxId = event.fxId;
     effect.initialize();
     GameState.module.addEffect(effect, { position: new THREE.Vector3(event.x, event.y, event.z) } as any);
   }
@@ -595,6 +663,11 @@ export class GMReplication {
    */
   static applyFxEventOnClient(event: GMFxEvent) {
     if (event?.kind === 'vfx.at') { this.applyFxAtOnClient(event); return; }
+    if (event?.kind === 'effect.remove' && event.at) {
+      const effect = (GameState.module?.effects || []).find((e: any) => e.gmFxId === event.fxId);
+      if (effect) GameState.module.removeEffect(effect);
+      return;
+    }
     const obj = GMManager.netIdMap.get(event?.netId);
     if (!obj) return;
     switch (event.kind) {
@@ -617,27 +690,10 @@ export class GMReplication {
       case 'text':
         TextSprite3D.CreateOnObject(obj, event.text, event.style, event.timer);
         break;
-      case 'vfx.add': {
-        let effect: GameEffect;
-        if (event.beam) {
-          const caster = GMManager.netIdMap.get(event.beam.casterNetId);
-          if (!caster) return;
-          effect = new GameState.GameEffectFactory.EffectBeam();
-          effect.setInt(1, event.beam.bodyPart);
-          effect.setObject(0, caster);
-        } else {
-          effect = new GameState.GameEffectFactory.EffectVisualEffect();
-        }
-        effect.setInt(0, event.vfx);
-        effect.setInt(2, event.miss);
-        effect.setDurationType(event.durationType);
-        effect.setDuration(event.duration);
-        effect.initialize();
-        (effect as any).gmFxId = event.fxId;
-        obj.addEffect(effect);
+      case 'effect.add':
+        this.applyEffectMirrorOnClient(event.netId, event.effect);
         break;
-      }
-      case 'vfx.remove': {
+      case 'effect.remove': {
         const effect = obj.effects.find((e) => (e as any).gmFxId === event.fxId);
         if (effect) obj.removeEffect(effect);
         break;
