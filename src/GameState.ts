@@ -1563,9 +1563,9 @@ export class GameState implements EngineContext {
       GameState.updateTime(delta);
     }
 
-    //Handle Module Tick
+    //Handle Module Tick: a menu over the game (a loot window) holds it, unless the world is shared with others
     if(
-      GameState.State == EngineState.PAUSED || GameState.MenuManager.activeModals.length
+      (GameState.State == EngineState.PAUSED || GameState.MenuManager.activeModals.length) && !GameState.hooks.sharedWorld()
     ){
       GameState.module.tickPaused(delta);
     }else{

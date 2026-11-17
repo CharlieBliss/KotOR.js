@@ -61,6 +61,11 @@ export interface EngineHooks {
   isLeaderLocked(): boolean;
   /** A camera to draw the world with instead of the game's own (a GM cutscene on a player's machine), or null */
   cutsceneCamera(): THREE.Camera | null;
+  /**
+   * The world is shared with other machines (a GM session): one player's menu (a loot window), auto-pause or
+   * Space doesn't stop it. Only the mode pauses it (isWorldPaused)
+   */
+  sharedWorld(): boolean;
   /** The mode draws its own combat HUD (a GM session's player): KotOR's target, action, queue and party panels hide */
   ownsCombatHud(): boolean;
   /** The area leaves out its own placeables, creatures or triggers */
@@ -92,6 +97,8 @@ export interface EngineHooks {
   onCombatRoundEnd(creature: ModuleCreature): void;
   /** A creature's own script asks it to attack: true when the mode has it busy with something else */
   holdsScriptAttack(creature: ModuleCreature): boolean;
+  /** A creature's own script turns it (SetFacing, SetFacingPoint): true when the mode decides where it faces now */
+  holdsScriptFacing(creature: ModuleObject): boolean;
   /** Creatures walk through this one rather than around it (it isn't there for them, e.g. hidden by the GM) */
   walksThrough(creature: ModuleObject): boolean;
   /** A creature uses something it can sit on: sit in it. True when that's what happened (no other use) */
@@ -123,6 +130,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isLeaderLocked: () => false,
   cutsceneCamera: () => null,
   ownsCombatHud: () => false,
+  sharedWorld: () => false,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
   onHostVisualEffectApplied: () => {},
@@ -139,6 +147,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   openCharacterSheet: () => false,
   onCombatRoundEnd: () => {},
   holdsScriptAttack: () => false,
+  holdsScriptFacing: () => false,
   walksThrough: () => false,
   useSeat: () => false,
   isSeat: () => false,

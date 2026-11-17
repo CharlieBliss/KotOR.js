@@ -180,6 +180,13 @@ export class GMNpcOrders {
           cre.clearAllActions();
           return;
         }
+        // Nearly back but held off its spot (a neighbour stands on it): this is its post now. Walking on, it
+        // turned on the spot trying to reach it after every fight
+        if (!away && this.isMoving(cre) && this.distance2D(cre.position, order.point) > 0.3 && this.arrived(cre, order.point, everyone)) {
+          order.point = this.here(cre);
+          cre.clearAllActions();
+          return;
+        }
         if (away && !this.isMoving(cre)) {
           this.stopFighting(cre);
           cre.gmOrderProgress = undefined;

@@ -7,6 +7,8 @@ import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot"
 import { ActionType } from "@/enums/actions/ActionType";
 import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import type { ModuleCreature } from "@/module/ModuleCreature";
+import type { ModuleObject } from "@/module/ModuleObject";
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import type { TalentSpell } from "@/talents/TalentSpell";
 import type { TalentFeat } from "@/talents/TalentFeat";
 
@@ -156,6 +158,21 @@ export class GMCombatAI {
     if (order === 'standDown' || order === 'flee') return true;
     if ((npc.gmCombatHoldUntil || 0) > performance.now()) return true;
     return this.isActing(npc);
+  }
+
+  /**
+   * Host: a GM NPC's own AI script (k_ai_master) turning it while it's in a fight, or keyed up just after one, with
+   * the GM's AI or an order in charge. It looked about for more enemies, turning on the spot several times a
+   * second for ten seconds after every fight (and against its own attacks during it). Out of combat, or with the
+   * NPC AI off and no order, its scripts face it where they like
+   */
+  static holdsScriptFacing(npc: ModuleObject): boolean {
+    const GM = GameState.GMManager;
+    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client') return false;
+    if (!GMObjectKind.isCreature(npc) || !GM.isAutonomousNpc(npc as ModuleCreature)) return false;
+    const cre = npc as ModuleCreature;
+    if (!GM.npcAiEnabled && !cre.gmOrder) return false;
+    return !!cre.combatData?.combatState;
   }
 
   /** Seconds walking towards a target without getting closer before an NPC gives up on reaching it */

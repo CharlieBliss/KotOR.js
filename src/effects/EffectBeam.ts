@@ -141,6 +141,7 @@ export class EffectBeam extends GameEffect {
 
   /** The beam goes with the effect: off the caster's model (it stayed there after the power ended) */
   onRemove(){
+    GameState.hooks.onHostVisualEffectRemoved(this);
     if(this.model instanceof OdysseyModel3D){
       this.model.removeFromParent();
       this.model.dispose();

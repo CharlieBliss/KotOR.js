@@ -2216,6 +2216,12 @@ export class ModuleObject {
 
     if(this.isImmuneToEffect(effect)) return;
 
+    // Already on another object (one effect a script applies to several): this one gets its own
+    if(effect.applied && effect.object && effect.object !== this){
+      effect = effect.clone();
+      effect.initialize();
+    }
+
     effect.setAttachedObject(this);
     effect.loadModel();
     effect.onApply(this);

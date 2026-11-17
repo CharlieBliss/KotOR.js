@@ -249,7 +249,8 @@ export class SpellCastInstance {
 
               const anim = this.casthandmodel.playAnimation('cast01', false);
               setTimeout(() => {
-                //Clean up the impact effect
+                //Clean up the impact effect (off the hand too: emptied, it stayed there)
+                this.casthandmodel.removeFromParent();
                 this.casthandmodel.dispose();
               }, (anim ? anim.length * 1000 : 1500) )
             }else{
@@ -271,7 +272,7 @@ export class SpellCastInstance {
 
   dispose(){
 
-    if(this.casthandmodel) this.casthandmodel.dispose();
+    if(this.casthandmodel){ this.casthandmodel.removeFromParent(); this.casthandmodel.dispose(); }
     if(this.projectile) this.projectile.dispose();
     if(this.container) this.container.removeFromParent();
   }

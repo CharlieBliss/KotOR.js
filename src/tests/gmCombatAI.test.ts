@@ -213,3 +213,31 @@ describe("deciding every round", () => {
     expect(lightning.useTalentOnObject).toHaveBeenCalledWith(foe, npc);
   });
 });
+
+describe("a GM NPC's own scripts turning it", () => {
+  const npc = (o: Record<string, any> = {}): any => ({
+    objectType: 0xFFFF, combatData: { combatState: true }, isDead: () => false, ...o,
+  });
+  const withGM = (o: Record<string, any>) => { (GameState as any).GMManager = { isAutonomousNpc: () => true, npcAiEnabled: true, ...o }; };
+
+  test("the GM's AI holds it in a fight (k_ai_master spun NPCs on the spot after every fight)", () => {
+    withGM({});
+    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(true);
+  });
+
+  test('out of combat, its scripts face it where they like', () => {
+    withGM({});
+    expect(GMCombatAI.holdsScriptFacing(npc({ combatData: { combatState: false } }))).toBe(false);
+  });
+
+  test("with the NPC AI off and no order, its scripts run its fights and face it", () => {
+    withGM({ npcAiEnabled: false });
+    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(false);
+    expect(GMCombatAI.holdsScriptFacing(npc({ gmOrder: { kind: 'guard' } }))).toBe(true);
+  });
+
+  test("players' characters aren't held", () => {
+    withGM({ isAutonomousNpc: () => false });
+    expect(GMCombatAI.holdsScriptFacing(npc())).toBe(false);
+  });
+});

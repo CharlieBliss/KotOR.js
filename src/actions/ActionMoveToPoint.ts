@@ -36,6 +36,12 @@ export class ActionMoveToPoint extends Action {
   static STUCK_SECONDS = 1.2;
   /** Metres it must cover to count as getting somewhere */
   static PROGRESS_DISTANCE = 0.4;
+
+  /**
+   * Stuck this close to where it's going (someone stands on the spot, or right next to it): it's there. It
+   * sidestepped and turned on the spot until the move timed out and it was teleported onto the spot
+   */
+  static CLOSE_ENOUGH_WHEN_STUCK = 1.1;
   /** How far it steps aside when stuck */
   static SIDESTEP_DISTANCE = 1.5;
 
@@ -130,7 +136,13 @@ export class ActionMoveToPoint extends Action {
           this.owner.force = 1;//Math.min( 1, Math.max( 0.5, ( ( distanceToTarget - arrivalDistance ) / 1 ) ) );
           // this.owner.walk = !run;
           this.owner.setAnimationState(run ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);
-          this.watchProgress(delta);
+          if(this.watchProgress(delta)){
+            this.owner.force = 0;
+            this.owner.speed = 0;
+            this.setComputedPath(undefined);
+            this.owner.setAnimationState(ModuleCreatureAnimState.IDLE);
+            return ActionStatus.COMPLETE;
+          }
         }else{
           this.computedPath.pop();
         }
@@ -211,22 +223,25 @@ export class ActionMoveToPoint extends Action {
    * Walking into something the path didn't know about (a prop, a crowd) and getting nowhere: step aside,
    * alternating sides, and find the way from there
    */
-  watchProgress(delta: number){
+  /** Notices a walk getting nowhere: sidesteps, or (true) gives up as arrived when it's nearly there */
+  watchProgress(delta: number): boolean {
     if(!this.progressFrom){
       this.progressFrom = this.owner.position.clone();
       this.stuckTime = 0;
-      return;
+      return false;
     }
     if(Utility.Distance2D(this.owner.position, this.progressFrom) >= ActionMoveToPoint.PROGRESS_DISTANCE){
       this.progressFrom.copy(this.owner.position);
       this.stuckTime = 0;
-      return;
+      return false;
     }
     this.stuckTime += delta;
-    if(this.stuckTime < ActionMoveToPoint.STUCK_SECONDS) return;
+    if(this.stuckTime < ActionMoveToPoint.STUCK_SECONDS) return false;
     this.stuckTime = 0;
     this.progressFrom.copy(this.owner.position);
+    if(Utility.Distance2D(this.owner.position, this.real_target_position || this.target_position) <= ActionMoveToPoint.CLOSE_ENOUGH_WHEN_STUCK) return true;
     this.sidestep();
+    return false;
   }
 
   sidestep(){

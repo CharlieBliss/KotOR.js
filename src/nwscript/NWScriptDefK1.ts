@@ -189,6 +189,7 @@ NWScriptDefK1.Actions = {
     type: NWScriptDataType.VOID,
     args: [NWScriptDataType.FLOAT],
     action: function(this: NWScriptInstance, args: [number]){
+      if(GameState.hooks.holdsScriptFacing(this.caller as any)) return;
       this.caller.setFacing(args[0]);   
     }
   },
@@ -1947,6 +1948,7 @@ NWScriptDefK1.Actions = {
     args: [NWScriptDataType.VECTOR],
     action: function(this: NWScriptInstance, args: [THREE.Vector3]){
       if(BitWise.InstanceOfObject(this.caller, ModuleObjectType.ModuleObject)){
+        if(GameState.hooks.holdsScriptFacing(this.caller as any)) return;
         this.caller.FacePoint(args[0]);
       }
     }

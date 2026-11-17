@@ -187,7 +187,7 @@ export class Action {
     // Constants for avoidance behavior
     const AVOIDANCE_DISTANCE = 1.0; // Distance ahead to check for obstacles
     const AVOIDANCE_DISTANCE_SHORT = 0.5; // Shorter distance for closer detection
-    const SAFETY_BUFFER = 1.1; // Multiplier for hit distance safety
+    const PASSING_ROOM = 0.25; // Clearance (m) between two bodies walking past each other
     const BLOCKING_DECAY_RATE = 0.5; // Rate at which blocking timer decreases
 
     // Calculate look-ahead points (fixed direction - was backwards)
@@ -207,8 +207,9 @@ export class Action {
       if (GameState.hooks.walksThrough(creature)) return;
 
       // Walking the same way: it's moving out of the way too (a group setting off together). Detouring around
-      // it would only send both in circles
-      if ((creature.force > 0 || creature.speed > 0.5) && Math.abs(Utility.NormalizeRadian(creature.getFacing() - owner.getFacing())) < Math.PI / 3) return;
+      // it would only send both in circles. Judged by where each is going: their facings swing as they step
+      // round others, and two walking back to their posts together zigzagged round each other for metres
+      if ((creature.force > 0 || creature.speed > 0.5) && Action.headingSameWay(owner, creature, finalTarget)) return;
 
       // Skip the target object if it's specified
       if (excludeTarget && creature === excludeTarget) {
@@ -223,8 +224,8 @@ export class Action {
       // NPCs avoid party members too (in GM mode, the players' characters): they skipped them, and walked
       // into a player standing in their way and stuck there
 
-      // Close enough to bump: its size and the mover's own (collision stops them that far apart)
-      const hitDistance = (creature.getHitDistance() + (owner.getHitDistance?.() || 0)) * SAFETY_BUFFER;
+      // Close enough to bump: both bodies and a little room (collision stops them that far apart)
+      const hitDistance = Action.bodyRadius(creature) + Action.bodyRadius(owner) + PASSING_ROOM;
       const creaturePos = creature.position;
 
       // Check both look-ahead points
@@ -313,13 +314,32 @@ export class Action {
     }
   }
 
+  /** Two walkers heading the same way (within 60°): toward where each is walking to, else the way each faces */
+  static headingSameWay(owner: ModuleCreature, other: ModuleCreature, ownerTarget: THREE.Vector3): boolean {
+    const theirs = other.action?.type === ActionType.ActionMoveToPoint
+      ? new THREE.Vector3(other.action.getParameter<number>(0) - other.position.x, other.action.getParameter<number>(1) - other.position.y, 0)
+      : undefined;
+    const ours = ownerTarget ? new THREE.Vector3(ownerTarget.x - owner.position.x, ownerTarget.y - owner.position.y, 0) : undefined;
+    if (theirs && ours && theirs.lengthSq() > 0.25 && ours.lengthSq() > 0.25) {
+      return theirs.normalize().dot(ours.normalize()) > Math.cos(Math.PI / 3);
+    }
+    return Math.abs(Utility.NormalizeRadian(other.getFacing() - owner.getFacing())) < Math.PI / 3;
+  }
+
+  /** A creature's body radius (ModuleCreature.getBodyRadius), for anything that might not have one */
+  static bodyRadius(creature: any): number {
+    return typeof creature?.getBodyRadius === 'function' ? creature.getBodyRadius() : 0.4;
+  }
+
+  /** Room left between two bodies when one steps round the other (m) */
+  static DETOUR_ROOM = 0.45;
+
   /**
    * Calculates the avoidance path around an obstacle
    */
   private calculateAvoidancePath(owner: ModuleCreature, obstacle: ModuleCreature, finalTarget: THREE.Vector3, obstacleDistance: number) {
-    const SAFETY_BUFFER = 1.5;
-    // Room for both of them to pass
-    const safeRadius = (obstacle.getHitDistance() + owner.getHitDistance()) * SAFETY_BUFFER;
+    // Just room for both bodies to pass (it was 3 m to the side of a person: NPCs went far out of their way)
+    const safeRadius = Action.bodyRadius(obstacle) + Action.bodyRadius(owner) + Action.DETOUR_ROOM;
 
     // Calculate perpendicular direction for detour
     const direction = owner.forceVector.clone().normalize();
@@ -328,11 +348,11 @@ export class Action {
     // Calculate two possible detour points
     const detourPoint1 = owner.area.getNearestWalkablePoint(
       obstacle.position.clone().add(perpendicular.clone().multiplyScalar(safeRadius)),
-      owner.getHitDistance()
+      Action.bodyRadius(owner)
     );
     const detourPoint2 = owner.area.getNearestWalkablePoint(
       obstacle.position.clone().sub(perpendicular.clone().multiplyScalar(safeRadius)),
-      owner.getHitDistance()
+      Action.bodyRadius(owner)
     );
 
     // The side that keeps it heading where it's going (a detour backwards is how NPCs end up circling); when
@@ -386,11 +406,11 @@ export class Action {
       // Calculate alternate detour (opposite of what we chose)
       const direction = obstacle.forceVector.clone().normalize();
       const perpendicular = new THREE.Vector3(-direction.y, direction.x, 0).normalize();
-      const safeRadius = obstacle.getHitDistance() * 1.5;
-      
+      const safeRadius = Action.bodyRadius(obstacle) + Action.bodyRadius(owner) + Action.DETOUR_ROOM;
+
       const alternateDetour = owner.area.getNearestWalkablePoint(
         obstacle.position.clone().sub(perpendicular.clone().multiplyScalar(safeRadius)),
-        obstacle.getHitDistance()
+        Action.bodyRadius(obstacle)
       );
 
       const path = ComputedPath.FromVector3List([obstacle.position, alternateDetour]);

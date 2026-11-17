@@ -74,6 +74,25 @@ export class GameEffect {
     return;
   }
 
+  /** Runtime state a copy starts without: it's applied, timed and drawn on its own */
+  static UNCOPIED = new Set(['applied', 'initialized', 'durationEnded', 'removed', 'object', 'age', 'model',
+    'impact_model', 'impact_root_model', 'impact_head_model', 'impactTimer', 'impactRootTimer', 'impactHeadTimer']);
+
+  /**
+   * A fresh, unapplied copy. A script's effect is a value: applying it to several objects (a power hitting
+   * everyone around) gives each its own. Shared, the one effect ended on the last object only, and stayed on the
+   * rest for good, its beam or particles with it
+   */
+  clone(): this {
+    const copy = new (this.constructor as any)();
+    for(const key of Object.keys(this)){
+      if(GameEffect.UNCOPIED.has(key)) continue;
+      const value = (this as any)[key];
+      copy[key] = Array.isArray(value) ? value.slice() : value;
+    }
+    return copy;
+  }
+
   setCreator(oCreator: ModuleObject){
     this.creator = oCreator;
   }

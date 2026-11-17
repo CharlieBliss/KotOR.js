@@ -2744,6 +2744,15 @@ export class ModuleCreature extends ModuleObject {
   }
 
   /**
+   * Its body's radius: what collision keeps clear around it (appearance.2da creperspace), for walking past
+   * people. getHitDistance (1 m for a person) is twice that, and stepping round others by it sent NPCs metres
+   * out of their way
+   */
+  getBodyRadius(): number {
+    return Math.max(0.3, Number(this.creatureAppearance?.creperspace) || 0.4);
+  }
+
+  /**
    * How close it has to be to hit something in melee: 2 m between two people, more when bodies are big enough
    * that collision keeps them further apart than that (a rancor can't get within 3.5 m of anyone)
    */
