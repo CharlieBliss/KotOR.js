@@ -381,7 +381,7 @@ describe("GM multiplayer host authority", () => {
     test("players replay the animation and keep the host's state index", () => {
       GMNetworkManager.role = "client";
       const cre = mockCreature("cre_0", {
-        playTwoDAAnimation(anim: any) { this.animationState = { index: ModuleCreatureAnimState.PAUSE, animation: anim }; },
+        playTwoDAAnimation(anim: any, index = ModuleCreatureAnimState.PAUSE) { this.animationState = { index, animation: anim }; return true; },
       });
       const animation = { name: "g8a1" };
       jest.spyOn(OdysseyModelAnimation, "GetAnimation2DA").mockReturnValue(animation as any);
@@ -395,7 +395,7 @@ describe("GM multiplayer host authority", () => {
       GMNetworkManager.role = "client";
       const animation = { name: "g8d1" };
       const cre = mockCreature("cre_0", {
-        playTwoDAAnimation(anim: any) { this.animationState = { index: ModuleCreatureAnimState.PAUSE, animation: anim }; },
+        playTwoDAAnimation(anim: any, index = ModuleCreatureAnimState.PAUSE) { this.animationState = { index, animation: anim }; return true; },
       });
       jest.spyOn(OdysseyModelAnimation, "GetAnimation2DA").mockReturnValue(animation as any);
       GMReplication.applyFxEventOnClient({ kind: "anim", netId: "cre_0", anim: "g8d1", index: ModuleCreatureAnimState.DAMAGE });

@@ -1,4 +1,5 @@
 import type { GMCreatureSpawnConfig } from "@/managers/gm/GMTypes";
+import { bodyOwner, resolveStateRequest, allowsOneOffAnimation } from "@/module/creature/AnimationPriority";
 import { GFFObject } from "@/resource/GFFObject";
 import * as THREE from "three";
 import { ModuleObject } from "@/module/ModuleObject";
@@ -1481,16 +1482,13 @@ export class ModuleCreature extends ModuleObject {
    * stood still while their powers went off.
    */
   playCastAnimation(names: string[] = []): boolean {
-    if(this.isDead()) return false;
     for(const name of names){
       if(!name || !this.hasModelAnimation(name)) continue;
       const anim = OdysseyModelAnimation.GetAnimation2DA(name);
       if(!anim) continue;
-      this.playTwoDAAnimation(anim);
       // Its own state, as a swing's is ATTACK: left at PAUSE, the combat stance (and the turn to face the
       // target) took over before the cast was drawn
-      this.animationState.index = /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1;
-      return true;
+      return this.playTwoDAAnimation(anim, /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1);
     }
     return false;
   }
@@ -1501,9 +1499,11 @@ export class ModuleCreature extends ModuleObject {
     return !!model?.odysseyAnimationMap?.has?.(String(name).toLowerCase().trim());
   }
 
+  /** Set its animation state, as far as whoever owns its body allows (AnimationPriority) */
   setAnimationState(animState: ModuleCreatureAnimState){
     if(!animState){ return; }
-    
+    animState = resolveStateRequest(bodyOwner(this), animState);
+
     this.animationState.index = animState;
     this.animationState.animation = this.animationConstantToAnimation(animState);
     this.animationState.started = false;
@@ -1518,17 +1518,23 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
-  playTwoDAAnimation(animation: ITwoDAAnimation){
-    if(animation){
-      this.resetAnimationState();
-      this.animationState = {
-        index: ModuleCreatureAnimState.PAUSE,
-        animation: animation,
-        started: false,
-        speed: 1,
-      }
-      GameState.hooks.onHostTwoDAAnimation(this, animation);
+  /**
+   * Play a one-off animation (a swing, a flinch, a cast, a gesture), under the state it counts as (a swing is
+   * ATTACK, so the combat stance doesn't take over before it's drawn). Refused while something owns the body:
+   * dying, getting up, held (AnimationPriority). Returns whether it plays.
+   */
+  playTwoDAAnimation(animation: ITwoDAAnimation, index: ModuleCreatureAnimState = ModuleCreatureAnimState.PAUSE): boolean {
+    if(!animation) return false;
+    if(!allowsOneOffAnimation(bodyOwner(this))) return false;
+    this.resetAnimationState();
+    this.animationState = {
+      index,
+      animation: animation,
+      started: false,
+      speed: 1,
     }
+    GameState.hooks.onHostTwoDAAnimation(this, animation);
+    return true;
   }
 
   playOverlayAnimation(NWScriptAnimId = -1){

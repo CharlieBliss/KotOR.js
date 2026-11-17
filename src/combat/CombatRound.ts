@@ -907,8 +907,7 @@ export class CombatRound {
     if(combatAction.isCutsceneAttack){
 
       if(creature){
-        creature.playTwoDAAnimation(combatAction.twoDAAnimation);
-        creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+        creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
       }
 
       if(combatAction.target){
@@ -917,16 +916,13 @@ export class CombatRound {
           case AttackResult.HIT_SUCCESSFUL:
           case AttackResult.CRITICAL_HIT:
           case AttackResult.AUTOMATIC_HIT:
-            target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+            target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
           break;
           case AttackResult.PARRIED:
-            target.playTwoDAAnimation( target.getParryAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.PARRY;
+            target.playTwoDAAnimation(target.getParryAnimation( combatAction.animationName ), ModuleCreatureAnimState.PARRY);
           break;
           default:
-            target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+            target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
           break;
         }
       }
@@ -939,8 +935,7 @@ export class CombatRound {
       ){
 
         if(creature){
-          creature.playTwoDAAnimation( combatAction.twoDAAnimation );
-          creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+          creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
         }
 
         if(combatAction.target && BitWise.InstanceOfObject(combatAction.target, ModuleObjectType.ModuleCreature)){
@@ -951,8 +946,7 @@ export class CombatRound {
           ){
             if(target.combatData.lastAttackTarget == creature){
               if(!this.attacksIncludeKillingBlow()){
-                target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-                target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+                target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
               }
             }
           }
@@ -961,8 +955,7 @@ export class CombatRound {
       }else{
 
         if(creature){
-          creature.playTwoDAAnimation( combatAction.twoDAAnimation );
-          creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+          creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
         }
 
         if(combatAction.target && BitWise.InstanceOfObject(combatAction.target, ModuleObjectType.ModuleCreature)){
@@ -973,8 +966,7 @@ export class CombatRound {
           ){
             if(combatAction.target.combatData.lastAttackTarget == creature){
               if(!this.attacksIncludeKillingBlow()){
-                target.playTwoDAAnimation( target.getDodgeAnimation( combatAction.animationName ) );
-                target.animationState.index = ModuleCreatureAnimState.DODGE;
+                target.playTwoDAAnimation(target.getDodgeAnimation( combatAction.animationName ), ModuleCreatureAnimState.DODGE);
               }
             }
           }

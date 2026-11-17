@@ -602,9 +602,7 @@ export class GMReplication {
         if (!GMObjectKind.isCreature(obj)) return;
         const cre = obj as ModuleCreature;
         const animation = OdysseyModelAnimation.GetAnimation2DA(event.anim);
-        if (!animation || cre.isDead()) return;
-        cre.playTwoDAAnimation(animation);
-        cre.animationState.index = event.index;
+        if (!animation || !cre.playTwoDAAnimation(animation, event.index)) return;
         cre.gmFxAnimation = cre.animationState.animation;
         cre.gmFxUntil = performance.now() + this.FX_HOLD_MS;
         // The same swing or shot again: the model still has the last one as its animation (a replica isn't put
