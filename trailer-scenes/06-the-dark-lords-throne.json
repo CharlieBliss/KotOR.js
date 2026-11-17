@@ -1,0 +1,348 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "The Dark Lord's Throne",
+  "summary": "On the Star Forge's viewing platform, Darth Malak waits among Jedi held in stasis, his fallen apprentice Bastila at his side. He makes her fight the Jedi; the Jedi reaches her; she turns on her master.",
+  "gmNotes": "The finale. Players are frozen through beat 1 (the throne-room standoff), then duel Bastila in beat 2 while Malak watches. Beat 3 is Malak feeding on the captive Jedi. Beat 4 is the turn: Bastila changes sides and the last fight with Malak and his guards begins. Film the open platform against the stars; the frozen Jedi make a strong background.",
+  "content": "tsl",
+  "area": {
+    "game": "kotor",
+    "module": "sta_m45ad",
+    "reason": "KotOR's Star Forge viewing platform: a vast open deck in space where Malak kept captive Jedi in stasis for the final duel. It is the games' Death Star throne room, made for a Return of the Jedi finale."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "waypoint:sta_pc_start"
+    },
+    "facing": 180,
+    "frozen": true,
+    "note": "On the platform's north side, facing Malak across the deck. Frozen until beat 2."
+  },
+  "actors": [
+    {
+      "id": "malak",
+      "name": "Darth Malak",
+      "template": "n_darthmalak",
+      "faction": "hostile",
+      "at": {
+        "spot": "waypoint:sta_malak_dead"
+      },
+      "facing": 0,
+      "order": {
+        "kind": "standDown"
+      },
+      "customize": {
+        "level": 16,
+        "hp": 240
+      }
+    },
+    {
+      "id": "bastila",
+      "name": "Bastila",
+      "template": "g_dark_jed01f",
+      "faction": "hostile",
+      "at": {
+        "spot": "waypoint:sta_malak_dead",
+        "offset": [
+          -4,
+          4
+        ]
+      },
+      "facing": 0,
+      "order": {
+        "kind": "standDown"
+      },
+      "customize": {
+        "level": 13,
+        "class": "Jedi Sentinel",
+        "rightHand": "g_w_dblsbr002",
+        "hp": 170
+      }
+    },
+    {
+      "id": "guards",
+      "name": "Sith Honour Guard",
+      "template": "g_sithtroop07",
+      "faction": "hostile",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:sta_malak_dead",
+        "offset": [
+          -1,
+          -4
+        ],
+        "formation": "line",
+        "spacing": 7
+      },
+      "facing": 0,
+      "stance": "attention",
+      "order": {
+        "kind": "standDown"
+      },
+      "customize": {
+        "level": 9
+      }
+    },
+    {
+      "id": "captive1",
+      "name": "Captive Jedi",
+      "template": "n_jedicounm",
+      "faction": "neutral",
+      "at": {
+        "spot": "waypoint:sta_way_captive1"
+      },
+      "facing": "toward:waypoint:sta_malak_dead",
+      "stance": "paralyzed",
+      "order": {
+        "kind": "standDown"
+      }
+    },
+    {
+      "id": "captive2",
+      "name": "Captive Jedi",
+      "template": "n_jedicounf",
+      "faction": "neutral",
+      "at": {
+        "spot": "waypoint:sta_way_captive7"
+      },
+      "facing": "toward:waypoint:sta_malak_dead",
+      "stance": "paralyzed",
+      "order": {
+        "kind": "standDown"
+      }
+    },
+    {
+      "id": "captive3",
+      "name": "Captive Jedi",
+      "template": "n_jedimemm",
+      "faction": "neutral",
+      "at": {
+        "spot": "waypoint:sta_way_captive2"
+      },
+      "facing": "toward:waypoint:sta_malak_dead",
+      "stance": "paralyzed",
+      "order": {
+        "kind": "standDown"
+      }
+    },
+    {
+      "id": "captive4",
+      "name": "Captive Jedi",
+      "template": "n_jedimemf",
+      "faction": "neutral",
+      "at": {
+        "spot": "waypoint:sta_way_captive6"
+      },
+      "facing": "toward:waypoint:sta_malak_dead",
+      "stance": "paralyzed",
+      "order": {
+        "kind": "standDown"
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "banners",
+      "template": "plc_sithban01",
+      "name": "Sith banner",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:sta_malak_dead",
+        "offset": [
+          -1,
+          -8
+        ],
+        "formation": "line",
+        "spacing": 12
+      },
+      "facing": 0
+    },
+    {
+      "id": "braziers",
+      "template": "plc_brazier01",
+      "name": "Brazier",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:sta_malak_dead",
+        "offset": [
+          -1,
+          2
+        ],
+        "formation": "line",
+        "spacing": 12
+      }
+    },
+    {
+      "id": "dead_jedi",
+      "template": "plc_endcorps",
+      "name": "Drained Jedi",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:sta_malak_dead",
+        "offset": [
+          8,
+          8
+        ],
+        "formation": "line",
+        "spacing": 3
+      }
+    }
+  ],
+  "beats": [
+    {
+      "title": "The throne room",
+      "narration": "Stars wheel past the open deck of the Star Forge. Jedi hang frozen in stasis around the platform. At its heart, Darth Malak waits, and Bastila stands at his side in dark robes.",
+      "notes": "Standoff. Slow push in on Malak and Bastila.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "malak",
+          "text": "Welcome. I have been expecting you. Your friends are here too; they will not be leaving."
+        },
+        {
+          "do": "say",
+          "id": "bastila",
+          "text": "You should not have come. There is nothing left here for you to save."
+        }
+      ]
+    },
+    {
+      "title": "Apprentice against Jedi",
+      "narration": "Malak gestures. Bastila's double blade ignites.",
+      "notes": "Frees the players. Bastila fights them; Malak and his guards only watch.",
+      "actions": [
+        {
+          "do": "freezePlayers",
+          "on": false
+        },
+        {
+          "do": "say",
+          "id": "malak",
+          "text": "Destroy this Jedi, apprentice, and take your place at my side."
+        },
+        {
+          "do": "order",
+          "ids": [
+            "bastila"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "malak"
+          ],
+          "gesture": "point"
+        }
+      ]
+    },
+    {
+      "title": "The feast",
+      "narration": "Malak turns to the frozen Jedi and opens his hand. One after another, they convulse and fall.",
+      "notes": "Malak drains the captives; set piece while the duel goes on.",
+      "actions": [
+        {
+          "do": "animate",
+          "ids": [
+            "malak"
+          ],
+          "gesture": "power"
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "captive1",
+            "captive2",
+            "captive3",
+            "captive4"
+          ],
+          "stance": "spasm"
+        },
+        {
+          "do": "say",
+          "id": "malak",
+          "text": "Their strength becomes mine. As yours will."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "captive1",
+            "captive2",
+            "captive3",
+            "captive4"
+          ],
+          "stance": "dead_face"
+        }
+      ]
+    },
+    {
+      "title": "Redemption",
+      "narration": "Bastila lowers her blade. She looks from the dead Jedi to her master, and turns.",
+      "notes": "Bastila changes sides. Malak and his guards attack.",
+      "actions": [
+        {
+          "do": "faction",
+          "ids": [
+            "bastila"
+          ],
+          "faction": "friendly"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "bastila"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "guards"
+          }
+        },
+        {
+          "do": "say",
+          "id": "bastila",
+          "text": "No. Never again. I am a Jedi, Malak, like the ones you murdered."
+        },
+        {
+          "do": "order",
+          "ids": [
+            "guards"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "bastila"
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "malak"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "say",
+          "id": "malak",
+          "text": "Then you will both die here."
+        }
+      ]
+    }
+  ]
+}
