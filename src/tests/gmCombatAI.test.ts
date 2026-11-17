@@ -160,6 +160,28 @@ describe("choosing what to do", () => {
     expect(GMCombatAI.engage(droid.npc, droid.foe, [droid.npc, droid.foe])).toBe('power');
   });
 
+  test("one rule says who a power works on, for NPCs, players' HUDs and the GM's machine alike", () => {
+    expect(GMCombatAI.powerTargetRule('1')).toBe('droids');
+    expect(GMCombatAI.powerTargetRule(1)).toBe('droids');
+    expect(GMCombatAI.powerTargetRule('8')).toBe('forceUsers');
+    expect(GMCombatAI.powerTargetRule('****')).toBeUndefined();
+    expect(GMCombatAI.powerTargetRule(-1)).toBeUndefined();
+    const person = creature('Trooper', 0), droid = creature('HK', 0, { race: 5 });
+    const kinds = (o: any) => o === person || o === droid;
+    jest.spyOn(require('@/managers/gm/GMObjectKind').GMObjectKind, 'isCreature').mockImplementation(kinds as any);
+    expect(GMCombatAI.worksOn('droids', person)).toBe(false);
+    expect(GMCombatAI.worksOn('droids', droid)).toBe(true);
+    expect(GMCombatAI.worksOn(undefined, person)).toBe(true);
+    expect(GMCombatAI.worksOn('droids', undefined)).toBe(false);
+  });
+
+  test("only the best rank of a feat chain counts (Master Flurry, not the Flurry it needed)", () => {
+    const flurry = { id: 11, successor: 91 }, improved = { id: 91, successor: 92 }, master = { id: 92, successor: -1 }, other = { id: 30, successor: -1 };
+    expect(GMCombatAI.bestRanks([flurry, improved, other])).toEqual([improved, other]);
+    expect(GMCombatAI.bestRanks([flurry, improved, master])).toEqual([master]);
+    expect(GMCombatAI.bestRanks([flurry])).toEqual([flurry]);
+  });
+
   test("out of Force points, it falls back to its weapons", () => {
     const lightning = power(35, 20);
     const { npc, foe } = fight({ fp: 5, spells: [lightning] });
@@ -260,8 +282,9 @@ describe("who runs a GM NPC's behaviour: the GM's AI or its own scripts", () => 
     expect(GMCombatAI.runsBehaviourScripts(npc({ gmScripted: true }))).toBe(true);
   });
 
-  test("players' characters keep their scripts; outside GM mode nothing changes", () => {
+  test("a player's character runs on its player, not KotOR's AI (it cleared their queued powers); outside GM mode nothing changes", () => {
     withGM({ isAutonomousNpc: () => false });
+    expect(GMCombatAI.runsBehaviourScripts(npc({ gmOwnerPeerId: 'peer_1' }))).toBe(false);
     expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
     withGM({});
     (GameState as any).gmMode = false;

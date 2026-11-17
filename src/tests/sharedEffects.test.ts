@@ -13,6 +13,7 @@ const holder = (name: string): any => ({
   name, effects: [] as GameEffect[], isImmuneToEffect: () => false,
   removeEffect(effect: GameEffect) { return ModuleObject.prototype.removeEffect.call(this, effect); },
   detachEffect(effect: GameEffect) { return ModuleObject.prototype.detachEffect.call(this, effect); },
+  effectsChanged() {},
 });
 const addEffect = (obj: any, effect: GameEffect) => ModuleObject.prototype.addEffect.call(obj, effect, effect.getDurationType(), effect.getDuration());
 const removeEffect = (obj: any, effect: GameEffect) => ModuleObject.prototype.removeEffect.call(obj, effect);

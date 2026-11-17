@@ -16,4 +16,12 @@ export interface ICreatureAnimationState {
   animation: ITwoDAAnimation;
   started: boolean;
   speed: number;
+  /**
+   * A cast held for its whole length (ModuleCreature.playCastAnimation): the raise, then its loop for hold seconds,
+   * then the raise backwards. Only castoutN has these (ModuleCreature.CAST_HOLDS)
+   */
+  hold?: number;
+  phase?: 'in' | 'hold' | 'out';
+  /** Played backwards (the hands coming down) */
+  reverse?: boolean;
 }

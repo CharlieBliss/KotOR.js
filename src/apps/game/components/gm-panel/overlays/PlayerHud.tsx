@@ -105,6 +105,10 @@ function landing(a: GMHudAbility): { text: string; side: string; title: string }
     return { text: side === 'ally' ? 'Ally' : 'Target', side, title: `Lands on ${name}, your target` };
   }
   if (l.how === 'nearest') return { text: 'Nearest', side: 'nearest', title: `No enemy targeted: lands on the nearest, ${name}` };
+  if (l.wrongKind && a.onlyOn) {
+    const who = a.onlyOn === 'droids' ? 'droids' : 'Force users';
+    return { text: a.onlyOn === 'droids' ? 'Droids only' : 'Jedi only', side: 'none', title: `Only works on ${who}: none targeted or in reach` };
+  }
   return { text: 'No one', side: 'none', title: 'No enemy in reach' };
 }
 

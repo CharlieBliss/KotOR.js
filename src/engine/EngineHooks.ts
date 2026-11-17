@@ -73,7 +73,8 @@ export interface EngineHooks {
 
   // --- Things that happened on this machine
   /** A creature played an animations.2da animation */
-  onHostTwoDAAnimation(creature: ModuleCreature, animation: ITwoDAAnimation): void;
+  /** hold: a cast held this many seconds (ModuleCreature.playCastAnimation), so players' copies hold it too */
+  onHostTwoDAAnimation(creature: ModuleCreature, animation: ITwoDAAnimation, hold?: number): void;
   /** An effect went on an object (or on a spot: owner is the module). Every effect, whatever its type */
   onEffectApplied(owner: any, effect: GameEffect): void;
   /** An effect came off an object, or a spot (GameEffect.retire has run) */

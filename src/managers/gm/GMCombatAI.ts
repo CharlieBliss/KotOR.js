@@ -1,4 +1,5 @@
 import { GameState } from "@/GameState";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { gmItemResRef } from "@/managers/gm/GMVocab";
@@ -13,6 +14,9 @@ import type { TalentSpell } from "@/talents/TalentSpell";
 import type { TalentFeat } from "@/talents/TalentFeat";
 
 /** How an NPC may fight (GM's choice per NPC, in the Inspector) */
+/** Who a power works on at all (GMCombatAI.powerTargetRule) */
+export type GMPowerTargetRule = 'droids' | 'forceUsers';
+
 export type GMCombatStyle = 'all' | 'weapons' | 'attack';
 
 /** A power, combat feat or usable item, sorted by what it's for */
@@ -128,6 +132,11 @@ export class GMCombatAI {
     if (npc.gmCombatClosingRound) return;
     const GM = GameState.GMManager;
     if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldHeld()) return;
+    // A player's character: back to the enemy its player chose, once what they queued has gone off
+    if (GM.isPlayerCharacter?.(npc)) {
+      GMPlayers.keepFighting(npc);
+      return;
+    }
     if (!GM.isAutonomousNpc(npc)) return;
     // With the GM's NPC AI off, only NPCs under an order fight on
     if (!GM.npcAiEnabled && !GMNpcOrders.getOrder(npc)) return;
@@ -172,6 +181,10 @@ export class GMCombatAI {
     if (!GameState.gmMode || !GM) return true;
     if (GameState.hooks.isNetReplica(npc)) return false;
     if (GameState.GMNetworkManager?.role === 'client') return true;
+    // A player's character is theirs to run. On the GM's machine it isn't the party leader, so KotOR's AI scripts
+    // (which leave the leader alone) ran it like an NPC: at the end of every combat round k_ai_master cleared the
+    // player's queued powers and picked its own attack
+    if (npc.gmOwnerPeerId || npc.gmPlayerConfig || GM.isPlayerCharacter?.(npc)) return false;
     if (!GM.isAutonomousNpc(npc) || npc.gmScripted) return true;
     return !(GM.npcAiEnabled || npc.gmOrder);
   }
@@ -369,10 +382,7 @@ export class GMCombatAI {
     }
 
     // Combat feats: the highest of each chain (Power Attack -> Improved -> Master)
-    const feats = (npc.getFeats?.() || []) as TalentFeat[];
-    const ids = new Set(feats.map((f) => f.id));
-    for (const feat of feats) {
-      if (feat.successor >= 0 && ids.has(feat.successor)) continue;
+    for (const feat of this.bestRanks((npc.getFeats?.() || []) as TalentFeat[])) {
       if (feat.category === 0x1104) kit.meleeFeats.push(feat);
       else if (feat.category === 0x1111) kit.rangedFeats.push(feat);
     }
@@ -411,8 +421,8 @@ export class GMCombatAI {
       // Grenades hit everyone; area Force powers in KotOR pick out the caster's enemies
       discriminate: !grenade,
       // Droid powers, and ion grenades (GRENADE_ION, not every name with ION in it, like FRAGMENTATION)
-      droidsOnly: String(row.forcehostile) === '1' || /(^|_)ION($|_)/.test(label),
-      forceUsersOnly: String(row.forcehostile) === '8',
+      droidsOnly: this.powerTargetRule(row.forcehostile) === 'droids' || /(^|_)ION($|_)/.test(label),
+      forceUsersOnly: this.powerTargetRule(row.forcehostile) === 'forceUsers',
     };
   }
 
@@ -436,6 +446,39 @@ export class GMCombatAI {
 
   static hasEffectFrom(cre: ModuleCreature, spellId: number): boolean {
     return (cre?.effects || []).some((e: any) => e && e.spellId === spellId);
+  }
+
+  /**
+   * Who a power works on at all, from spells.2da's forcehostile: 1 droids only (Disable Droid, Destroy Droid), 8
+   * Force users only. NPCs aim by it, players' HUDs offer by it, and the GM's machine refuses anything else
+   */
+  static powerTargetRule(forcehostile: any): GMPowerTargetRule | undefined {
+    const v = String(forcehostile ?? '').trim();
+    return v === '1' ? 'droids' : v === '8' ? 'forceUsers' : undefined;
+  }
+
+  /** Whether a power with this rule works on cre (no rule: anyone) */
+  static worksOn(rule: GMPowerTargetRule | undefined, cre: ModuleObject | undefined): boolean {
+    if (!rule) return true;
+    if (!cre || !GMObjectKind.isCreature(cre)) return false;
+    return rule === 'droids' ? this.isDroid(cre as ModuleCreature) : this.isForceUser(cre as ModuleCreature);
+  }
+
+  /** The rule in words, for a player */
+  static ruleText(rule: GMPowerTargetRule | undefined): string {
+    return rule === 'droids' ? 'droids' : rule === 'forceUsers' ? 'Force users' : 'anyone';
+  }
+
+  /**
+   * Of a character's feats, the best rank of each chain: Master Flurry, not also Flurry and Improved Flurry, which
+   * it has as prerequisites (feat.2da's successor column names the next rank; blank is -1)
+   */
+  static bestRanks<T extends { id?: any; successor?: any }>(feats: T[]): T[] {
+    const ids = new Set(feats.map((f) => Number(f?.id)));
+    return feats.filter((f) => {
+      const next = Number(f?.successor);
+      return !(Number.isFinite(next) && next >= 0 && ids.has(next));
+    });
   }
 
   static isDroid(cre: ModuleCreature): boolean {

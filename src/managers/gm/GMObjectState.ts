@@ -39,6 +39,8 @@ export interface GMObjectState {
   // ---- Replication
   /** Host: it is carrying out a player's request (the host owns its position until it finishes) */
   gmHostDriven?: boolean;
+  /** Player's character: the enemy its player chose to fight (GMPlayers.keepFighting goes back to it) */
+  gmFightTarget?: any;
   /** Host: the last request its player sent */
   gmIntentSeq?: number;
   /** Host: the last teleport the GM gave it (older player positions are dropped) */

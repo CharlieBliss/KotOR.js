@@ -1451,7 +1451,7 @@ export class GMManager {
       if(kind === 'creatures') return !GMManager.keepDefaultCreatures;
       return !GMManager.keepDefaultTriggers;
     },
-    onHostTwoDAAnimation: (creature, animation) => GMReplication.onHostTwoDAAnimation(creature, animation),
+    onHostTwoDAAnimation: (creature, animation, hold) => GMReplication.onHostTwoDAAnimation(creature, animation, hold),
     onEffectApplied: (owner, effect) => GMReplication.onEffectApplied(owner, effect),
     onEffectRemoved: (owner, effect) => GMReplication.onEffectRemoved(owner, effect),
     onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),

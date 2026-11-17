@@ -17,4 +17,6 @@ export interface OdysseyModelAnimationManagerState {
   lastEvent: number;
   events: boolean[];
   animation?: any;
+  /** Played backwards: a cast's raise played again lowers the hands (KotOR has no separate animation for it) */
+  reverse?: boolean;
 }

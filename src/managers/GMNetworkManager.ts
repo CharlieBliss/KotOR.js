@@ -90,7 +90,7 @@ export interface GMEffectMirror {
 }
 
 export type GMFxEvent =
-  | { kind: 'anim'; netId: string; anim: string; index: number }
+  | { kind: 'anim'; netId: string; anim: string; index: number; hold?: number }
   | { kind: 'text'; netId: string; text: string; style: number; timer: number }
   /** An effect that changes how something looks (a visual, a beam, a stun or hold pose), shown on players' copies */
   | { kind: 'effect.add'; netId: string; effect: GMEffectMirror }

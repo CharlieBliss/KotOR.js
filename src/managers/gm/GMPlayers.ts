@@ -1,4 +1,5 @@
 import { CharacterRules, ABILITIES } from "@/engine/rules/CharacterRules";
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMCharacters } from "@/managers/gm/GMCharacters";
 import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
@@ -579,7 +580,7 @@ export class GMPlayers {
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
     levelup: (actor) => GMPlayers.levelUpOnHost(actor),
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
-    cancel: () => false,
+    cancel: (actor) => { actor.gmFightTarget = undefined; return false; },
     wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
     mine: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
@@ -610,6 +611,8 @@ export class GMPlayers {
     if (intent.ability === 'spell') {
       const spell = actor.getSpells().find((s: any) => s.id === id);
       if (!spell) return `${name} doesn't know that power.`;
+      const rule = GMCombatAI.powerTargetRule(spell.forcehostile);
+      if (target !== actor && !GMCombatAI.worksOn(rule, target)) return `That power only works on ${GMCombatAI.ruleText(rule)}.`;
       const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
       if (cost > actor.getFP()) return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
     }
@@ -617,6 +620,23 @@ export class GMPlayers {
     if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
     if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
     return `${name} can't use that right now.`;
+  }
+
+  /**
+   * Host: a player's character finished a combat round with nothing more queued: it goes on attacking the enemy its
+   * player chose, as the character you control does in KotOR, until that enemy is down or the player moves away
+   * (a cancel). KotOR's AI scripts used to do this for it, and picked their own attacks over the player's powers
+   */
+  static keepFighting(actor: ModuleCreature) {
+    const round = actor.combatRound;
+    if (!round || round.action || round.scheduledActionList.length || actor.isDead()) return;
+    const target = actor.gmFightTarget as ModuleCreature | undefined;
+    if (!target || target.isDead?.() || target.gmHidden || !GMObjectKind.isCreature(target) || !target.isHostile?.(actor)) {
+      actor.gmFightTarget = undefined;
+      return;
+    }
+    if (GMManager.isPlayerFrozen(actor) || actor.isDebilitated?.()) return;
+    actor.attackCreature(target, undefined);
   }
 
   /** Open a door, attack a creature or use an object: the host walks the character there and does it */
@@ -628,7 +648,10 @@ export class GMPlayers {
     if (intent.kind === 'open' && !GMObjectKind.isDoor(target)) return false;
     if (intent.kind === 'attack' && !GMObjectKind.isCreature(target)) return false;
     if (intent.kind === 'open') actor.actionOpenDoor(target);
-    else if (intent.kind === 'attack') actor.attackCreature(target, undefined);
+    else if (intent.kind === 'attack') {
+      actor.attackCreature(target, undefined);
+      actor.gmFightTarget = target;
+    }
     else actor.actionUseObject(target);
     return true;
   }
@@ -710,12 +733,16 @@ export class GMPlayers {
     if (!actor || actor.isDead()) return false;
     const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
     if (!target || target.gmHidden) return false;
+    // Aimed at an enemy: that's who they're fighting now (they go back to attacking it after)
+    if (target !== actor && GMObjectKind.isCreature(target) && (target as ModuleCreature).isHostile?.(actor)) actor.gmFightTarget = target;
     const id = Number(intent.abilityId);
 
     switch (intent.ability) {
       case 'spell': {
         const spell = actor.getSpells().find((s: any) => s.id === id);
         if (!spell) return false;
+        // Disable Droid on a person, and the like: it does nothing, so it isn't cast
+        if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }

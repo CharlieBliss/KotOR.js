@@ -97,7 +97,7 @@ export class ActionItemCastSpell extends Action {
             const conjure = spellTalent?.getConjureAnimation?.() || '';
             const names = /^throw/.test(conjure) ? [conjure, 'throwgren']
               : spellTarget == this.owner ? ['castout2'] : [conjure, 'castout1'];
-            (this.owner as any).playCastAnimation?.(names);
+            (this.owner as any).playCastAnimation?.(names, spellTalent?.getCastSeconds?.() || 0);
           }
           const spellCastInstance = new SpellCastInstance(this.owner, spellTarget, spellTalent);
           spellCastInstance.item = item;

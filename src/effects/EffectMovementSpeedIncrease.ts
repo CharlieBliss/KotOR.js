@@ -25,19 +25,12 @@ export class EffectMovementSpeedIncrease extends GameEffect {
       
     super.onApply();
     
-    if(!this.object) return;
-    if(this.getInt(0) < 100){
-      this.setInt(0, this.getInt(0) + 100);
-    }
-
-    this.object.updateMovementSpeed();
+    // The object works its speed out once this is on its list (ModuleObject.effectsChanged): under 100 is read
+    // as 100 more (99 is 199%), so it isn't changed here, where applying it again added another 100
   }
 
   onRemove(){
     super.onRemove();
-
-    if(!this.object) return;
-    this.object.updateMovementSpeed();
   }
 
 }

@@ -4,6 +4,8 @@ import { ActionType } from "@/enums/actions/ActionType";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
+import type { GMPowerTargetRule } from "@/managers/gm/GMCombatAI";
 import { GMSeats } from "@/managers/gm/GMSeats";
 import { SkillType } from "@/enums/nwscript/SkillType";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
@@ -34,6 +36,8 @@ export interface GMHudAbility {
   why?: string;
   /** The action-menu entry it runs (ActionMenuManager.runMenuItem sends it to the host) */
   entry: any;
+  /** Works only on droids, or only on Force users (Disable Droid): GMCombatAI.powerTargetRule */
+  onlyOn?: GMPowerTargetRule;
 }
 
 /** Something the player can do to the target besides fighting it (GMPlayerHud.targetActions) */
@@ -53,6 +57,8 @@ export interface GMHudTargetAction {
 export interface GMHudLanding {
   how: 'target' | 'nearest' | 'self' | 'none';
   who?: ModuleObject;
+  /** Nothing to land on because it only works on droids or Force users, and the target (or everyone near) isn't */
+  wrongKind?: boolean;
 }
 
 /** Combat feat categories (feat.2da): melee and ranged attacks */
@@ -123,14 +129,12 @@ export class GMPlayerHud {
     });
 
     // Combat feats: the best rank of each chain (Power Attack, not also its lesser ranks)
-    const feats: any[] = pc.getFeats?.() || [];
-    for (const feat of feats) {
+    for (const feat of GMCombatAI.bestRanks<any>(pc.getFeats?.() || [])) {
       if (feat?.category != MELEE_FEAT && feat?.category != RANGED_FEAT) continue;
-      if (feat.successor != null && String(feat.successor) !== '****' && feats.some((f) => f?.__index == feat.successor)) continue;
       const forRanged = feat.category == RANGED_FEAT;
       const usable = forRanged === ranged;
       out.push({
-        key: `feat:${feat.__index ?? feat.id}`, kind: 'feat', name: CharacterRules.text(feat.name, feat.label || 'Combat feat'),
+        key: `feat:${feat.id}`, kind: 'feat', name: CharacterRules.text(feat.name, feat.label || 'Combat feat'),
         icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0, usable,
         why: usable ? undefined : (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand'),
         entry: { talent: feat },
@@ -151,6 +155,7 @@ export class GMPlayerHud {
       const usable = cost <= fp;
       const personal = String(spell.range || '').toUpperCase() === 'P';
       out.push({
+        onlyOn: GMCombatAI.powerTargetRule(spell.forcehostile),
         key: `power:${spell.id}`, kind: 'power', name: CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`),
         icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : isHostile(spell) ? 'enemy' : 'ally',
         cost, usable, why: usable ? undefined : `Needs ${cost} Force (you have ${Math.floor(fp)})`,
@@ -279,13 +284,13 @@ export class GMPlayerHud {
    * Who a use goes to: an enemy (the target, else the nearest, which becomes the target), an ally (the selected
    * ally, else yourself) or yourself. Undefined when there's no enemy to aim at.
    */
-  static targetFor(aim: GMHudAim, pc: ModuleCreature | undefined = this.player()): ModuleObject | undefined {
+  static targetFor(aim: GMHudAim, pc: ModuleCreature | undefined = this.player(), onlyOn?: GMPowerTargetRule): ModuleObject | undefined {
     if (!pc) return undefined;
     if (aim === 'self') return pc;
     const current = this.selected();
     if (aim === 'ally') return this.relation(current, pc) === 'ally' ? current : pc;
-    if (this.relation(current, pc) === 'enemy') return current;
-    const nearest = this.creaturesNear('enemy', pc)[0];
+    if (this.relation(current, pc) === 'enemy') return GMCombatAI.worksOn(onlyOn, current) ? current : undefined;
+    const nearest = this.creaturesNear('enemy', pc).find((c) => GMCombatAI.worksOn(onlyOn, c));
     if (nearest) this.select(nearest);
     return nearest;
   }
@@ -296,8 +301,13 @@ export class GMPlayerHud {
     if (!pc || !ability) return { ok: false };
     if (GMManager.isPlayerFrozen(pc)) return { ok: false, message: 'The GM has you watching' };
     if (!ability.usable) return { ok: false, message: ability.why || "Can't use that now" };
-    const target = this.targetFor(ability.aim, pc);
-    if (!target) return { ok: false, message: 'No enemy in sight' };
+    const target = this.targetFor(ability.aim, pc, ability.onlyOn);
+    if (!target) {
+      if (!ability.onlyOn) return { ok: false, message: 'No enemy in sight' };
+      const current = this.selected();
+      const who = GMCombatAI.ruleText(ability.onlyOn);
+      return { ok: false, message: this.relation(current, pc) === 'enemy' ? `${ability.name} only works on ${who}` : `No ${who === 'droids' ? 'droid' : 'Force user'} in sight` };
+    }
     GameState.ActionMenuManager.SetPC(pc);
     GameState.ActionMenuManager.runMenuItem(ability.entry, target);
     return { ok: true, target };
@@ -461,9 +471,11 @@ export class GMPlayerHud {
     if (ability.aim === 'ally') {
       return this.relation(current, pc) === 'ally' ? { how: 'target', who: current } : { how: 'self', who: pc };
     }
-    if (this.relation(current, pc) === 'enemy') return { how: 'target', who: current };
-    const nearest = this.creaturesNear('enemy', pc)[0];
-    return nearest ? { how: 'nearest', who: nearest } : { how: 'none' };
+    if (this.relation(current, pc) === 'enemy') {
+      return GMCombatAI.worksOn(ability.onlyOn, current) ? { how: 'target', who: current } : { how: 'none', wrongKind: true };
+    }
+    const nearest = this.creaturesNear('enemy', pc).find((c) => GMCombatAI.worksOn(ability.onlyOn, c));
+    return nearest ? { how: 'nearest', who: nearest } : { how: 'none', wrongKind: !!ability.onlyOn };
   }
 
   /** The wheel's order for the target: helping powers first when a friend is targeted, attacks first otherwise */

@@ -490,23 +490,28 @@ export class ModuleObject {
   }
 
   /**
-   * Update the movement speed
+   * The movement speed multiplier from its effects. An increase holds the new speed in percent (EffectMovementSpeedIncrease
+   * turns 99 into 199: Burst of Speed doubles it); a decrease holds the percent taken off. Like effects don't
+   * stack, as in the Aurora rules: the biggest increase and the biggest decrease count. It added the new speed on
+   * top of the old one, and nothing called it once the effect was on the creature, so Force Speed did nothing
    */
   updateMovementSpeed(){
-    let movementSpeed = 1.0;
-
-    for(let i = 0, len = this.effects.length; i < len; i++){
-      const effect = this.effects[i];
-      if(!effect) continue; let rate = 0;
+    let faster = 1, slower = 0;
+    for(const effect of this.effects){
+      if(!effect) continue;
       if(effect.type == GameEffectType.EffectMovementSpeedIncrease){
-        rate = (effect.getInt(0) / 100);
+        const percent = effect.getInt(0);
+        faster = Math.max(faster, (percent < 100 ? percent + 100 : percent) / 100);
       }else if(effect.type == GameEffectType.EffectMovementSpeedDecrease){
-        rate = (effect.getInt(0) / -100);
+        slower = Math.max(slower, Math.min(99, Math.max(0, effect.getInt(0))) / 100);
       }
-      movementSpeed += rate;
     }
+    this.movementSpeed = faster * (1 - slower);
+  }
 
-    this.movementSpeed = movementSpeed;
+  /** What its effects decide, worked out again whenever one goes on or comes off */
+  effectsChanged(){
+    this.updateMovementSpeed();
   }
 
   /**
@@ -2197,6 +2202,7 @@ export class ModuleObject {
       effect.setAttachedObject(this);
       effect.onApply(this);
     }
+    this.effectsChanged();
   }
 
   /**
@@ -2248,6 +2254,7 @@ export class ModuleObject {
       return;
     }
     this.effects.push(effect);
+    this.effectsChanged();
   }
 
   /**
@@ -2259,6 +2266,7 @@ export class ModuleObject {
     if(index < 0) return;
     this.effects.splice(index, 1);
     if(effect.retire()) GameState.hooks.onEffectRemoved(this, effect);
+    this.effectsChanged();
   }
 
   /** Effects that act once, when applied instantly (other types default to instant and still last) */

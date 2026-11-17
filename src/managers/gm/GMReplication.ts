@@ -501,12 +501,12 @@ export class GMReplication {
    * Host: a creature started a 2DA animation. Callers set the animation state index right after
    * (ATTACK, DAMAGE, DODGE...), so read it once the current call stack has finished.
    */
-  static onHostTwoDAAnimation(cre: ModuleCreature, animation: ITwoDAAnimation) {
+  static onHostTwoDAAnimation(cre: ModuleCreature, animation: ITwoDAAnimation, hold: number = 0) {
     const netId = this.getHostFxNetId(cre);
     if (!netId || !animation?.name) return;
     queueMicrotask(() => {
       if (cre.animationState?.animation !== animation) return;
-      GMNetworkManager.broadcastFx({ kind: 'anim', netId, anim: animation.name, index: cre.animationState.index });
+      GMNetworkManager.broadcastFx({ kind: 'anim', netId, anim: animation.name, index: cre.animationState.index, ...(hold > 0 ? { hold } : {}) });
     });
   }
 
@@ -675,7 +675,7 @@ export class GMReplication {
         if (!GMObjectKind.isCreature(obj)) return;
         const cre = obj as ModuleCreature;
         const animation = OdysseyModelAnimation.GetAnimation2DA(event.anim);
-        if (!animation || !cre.playTwoDAAnimation(animation, event.index)) return;
+        if (!animation || !cre.playTwoDAAnimation(animation, event.index, event.hold || 0)) return;
         cre.gmFxAnimation = cre.animationState.animation;
         cre.gmFxUntil = performance.now() + this.FX_HOLD_MS;
         // The same swing or shot again: the model still has the last one as its animation (a replica isn't put

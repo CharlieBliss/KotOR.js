@@ -19,6 +19,8 @@
  *   target actions         the HUD offers what the target allows (Attack an enemy, Search a body, which stays
  *                          picked), shows where each power lands, and has the quick actions
  *   helping powers         a player's helping power goes off out of combat; one the GM's machine refuses says why
+ *   combat powers          a power queued while attacking goes off, Disable Droid is refused on a person, the
+ *                          cast is raised, held and lowered, Burst of Speed doubles speed, only top feat ranks show
  *   rolls                  a player rolling from their sheet sees the result, on it and above it
  *   screens agree          GM and player agree on who is dead, and the dead lie down on both
  *   page errors            no uncaught errors on either screen
@@ -273,6 +275,8 @@ async function run() {
       const r = await evalIn(gm, (K) => {
         const R = window.__R, caster = R.named('^Dark Jedi Master 1$')[0], targets = R.named('^Telos Security');
         R.onlyThese([caster, ...targets]);
+        // Its own fight held off: the Dark Jedi healing itself left a cure visual this check took for a stuck one
+        window.__aiWas = K.GMManager.npcAiEnabled; K.GMManager.npcAiEnabled = false;
         R.put(caster, 4, 8, Math.PI / 2);
         targets.forEach((t, i) => R.put(t, -1 + i, 12));
         const F = K.GameState.GameEffectFactory;
@@ -296,6 +300,7 @@ async function run() {
         ]);
       }, [...r.targets, r.caster]);
       const [g, p] = [await left(gm), await left(pl)];
+      await evalIn(gm, (K) => { K.GMManager.npcAiEnabled = window.__aiWas; return true; });
       expect(!g.length, `left on the GM's screen: ${g.join('; ')}`);
       expect(!p.length, `left on the player's screen: ${p.join('; ')}`);
     });
@@ -399,7 +404,7 @@ async function run() {
       }, netId);
       const foe = await read(ids[0]);
       expect(/Attack/.test(foe.primary), `an enemy's main action: ${foe.primary || 'none'}`);
-      expect(!foe.lands.length || foe.lands.every((t) => /Target|You|Ally/.test(t)), `with an enemy targeted, slots land on: ${foe.lands.join(', ')}`);
+      expect(!foe.lands.length || foe.lands.every((t) => /Target|You|Ally|Droids only|Jedi only/.test(t)), `with an enemy targeted, slots land on: ${foe.lands.join(', ')}`);
       expect(['Sheet', 'Skills', 'Items', 'Chat'].every((w) => foe.quick.some((q) => q.includes(w))), `quick actions: ${foe.quick.join(', ')}`);
       const body = await read(ids[1]);
       expect(body.target, 'picking a body moved the target off it (to the next enemy)');
@@ -453,6 +458,84 @@ async function run() {
       const notice = await evalIn(pl, (K) => K.GMPlayerHud.lastNotice && K.GMPlayerHud.lastNotice.text);
       expect(/know that power/.test(notice || ''), `the player wasn't told why a power was refused (notice: ${notice || 'none'})`);
       return `${sent.name}: Force ${before.fp} → ${after}; refusal: "${notice}"`;
+    });
+
+    await check('combat-powers', "A player's power survives their attack, waits for a valid target, is cast in full, and does what it says", async () => {
+      // One trooper beside the player; the player has Stun, Disable Droid, Burst of Speed, Flurry and Improved Flurry
+      const foeId = await evalIn(gm, (K) => {
+        const G = K.GMManager, h = G.getPlayerCharacters()[0], R = window.__R;
+        if (h.isDead()) K.GMPlayers.revivePlayer(h);
+        const foe = R.named('Sith Trooper').find((o) => !o.isDead()) || R.named('Sith Trooper')[0];
+        for (const o of R.creatures()) if (o !== h) G.setObjectHidden(o, o !== foe);
+        if (foe.isDead()) K.GMPlayers.revivePlayer?.(foe);
+        G.teleportObject(foe, new window.THREE.Vector3(h.position.x + 1.5, h.position.y + 1.5, h.position.z));
+        G.setCreatureHP(foe, 400, 400);
+        const spells = K.GameState.TwoDAManager.datatables.get('spells').rows;
+        for (const label of ['FORCE_POWER_STUN', 'FORCE_POWER_DROID_DISABLE', 'FORCE_POWER_SPEED_BURST']) {
+          const id = Number(Object.keys(spells).find((k) => spells[k].label === label));
+          if (id >= 0 && !h.getSpells().some((s) => s.id === id)) h.classes[0].addSpell(new K.TalentSpell(id));
+        }
+        const feats = K.GameState.TwoDAManager.datatables.get('feat').rows;
+        // Flurry and Improved Flurry (CombatFeatType)
+        for (const id of [11, 91].filter((i) => feats[i])) {
+          if (id >= 0) { if (!h.getHasFeat(id)) h.addFeat(id); window.__flurry = (window.__flurry || 0) + 1; }
+        }
+        window.__flurry = window.__flurry || 0;
+        h.maxForcePoints = 300; h.forcePoints = 300; h.currentForce = 300;
+        G.npcAiEnabled = false;
+        return foe.gmNetId;
+      });
+      await waitFor(pl, "the powers on the player's sheet", (K) => ['Stun', 'Disable Droid'].every((n) => K.GMPlayerHud.abilities().some((a) => a.name === n)), 15000);
+
+      // Only the best rank of a feat chain
+      expect(await evalIn(gm, () => window.__flurry) === 2, 'feat.2da has no FEAT_FLURRY / FEAT_IMPROVED_FLURRY to test with');
+      const feats = await evalIn(pl, (K) => K.GMPlayerHud.abilities().filter((a) => a.kind === 'feat').map((a) => a.name));
+      expect(!feats.includes('Flurry'), `the bar offers Flurry beside its better rank: ${feats.join(', ')}`);
+
+      // Disable Droid on a person: not offered, and the GM's machine refuses it if sent anyway
+      const droid = await evalIn(pl, (K, id) => {
+        const foe = K.GMManager.netIdMap.get(id); K.GMPlayerHud.select(foe);
+        const a = K.GMPlayerHud.abilities().find((x) => x.name === 'Disable Droid');
+        const landing = K.GMPlayerHud.landsOn(a);
+        const r = K.GMPlayerHud.use(a);
+        return { onlyOn: a.onlyOn, wrongKind: !!landing.wrongKind, ok: r.ok, message: r.message };
+      }, foeId);
+      expect(droid.onlyOn === 'droids' && droid.wrongKind && !droid.ok, `Disable Droid was offered on a trooper: ${JSON.stringify(droid)}`);
+      const fp0 = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].getFP());
+      await evalIn(pl, (K, id) => { K.GMPlayerHud.lastNotice = null; K.GMNetworkManager.sendIntent('ability', id, { ability: 'spell', abilityId: K.GMPlayerHud.abilities().find((x) => x.name === 'Disable Droid').entry.talent.id }); return true; }, foeId);
+      await waitFor(pl, 'the refusal', (K) => /only works on droids/.test(K.GMPlayerHud.lastNotice?.text || ''), 10000).catch(async () => {
+        const said = await evalIn(pl, (K) => K.GMPlayerHud.lastNotice);
+        const fp = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].getFP());
+        throw new CheckFailed(`Disable Droid sent at a trooper anyway: the player was told ${JSON.stringify(said)} (Force ${fp0} → ${fp})`);
+      });
+
+      // Attacking, then a power: the power goes off (the attack used to replace it), and the cast is held
+      await evalIn(gm, (K) => {
+        const h = K.GMManager.getPlayerCharacters()[0]; window.__cast = [];
+        clearInterval(window.__castTimer);
+        window.__castTimer = setInterval(() => { const st = h.model?.animationManager?.currentAnimationState, n = (h.model?.animationManager?.currentAnimation?.name || '-') + (st?.reverse ? '<' : ''); if (window.__cast[window.__cast.length - 1] !== n) window.__cast.push(n); }, 15);
+        return true;
+      });
+      await evalIn(pl, (K, id) => K.GMPlayers.interceptInteraction(K.GameState.getCurrentPlayer(), K.GMManager.netIdMap.get(id)), foeId);
+      await pause(2);
+      const stun = await evalIn(pl, (K) => { const a = K.GMPlayerHud.abilities().find((x) => x.name === 'Stun'); return K.GMPlayerHud.use(a).ok; });
+      expect(stun, 'Stun was not sent');
+      await evalIn(pl, (K, id) => K.GMPlayers.interceptInteraction(K.GameState.getCurrentPlayer(), K.GMManager.netIdMap.get(id)), foeId);
+      await waitFor(gm, 'the Stun going off', (K) => K.GMManager.getPlayerCharacters()[0].getFP() < 300, 20000).catch(() => undefined);
+      await pause(2.5);
+      const after = await evalIn(gm, (K, id) => { clearInterval(window.__castTimer); const h = K.GMManager.getPlayerCharacters()[0], f = K.GMManager.netIdMap.get(id); return { fp: h.getFP(), cast: window.__cast.join(' '), fx: f.effects.filter((e) => e.spellId >= 0).map((e) => e.type) }; }, foeId);
+      expect(after.fp < fp0, `the queued Stun never went off (Force ${fp0} → ${after.fp})`);
+      expect(/castout1 .*castoutlp1 .*castout1</.test(after.cast), `the cast wasn't raised, held and lowered: ${after.cast}`);
+      expect(after.fx.length, 'Stun left nothing on the trooper (neither the stun nor its resisted effects)');
+
+      // Burst of Speed doubles their speed
+      await evalIn(gm, (K, id) => { const h = K.GMManager.getPlayerCharacters()[0]; K.GMManager.setObjectHidden(K.GMManager.netIdMap.get(id), true); h.gmFightTarget = undefined; h.combatData.combatState = false; h.forcePoints = 300; return true; }, foeId);
+      const before = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].movementSpeed);
+      await evalIn(pl, (K) => { const me = K.GameState.getCurrentPlayer(); K.GMPlayerHud.select(me); const a = K.GMPlayerHud.abilities().find((x) => x.name === 'Burst of Speed'); return K.GMPlayerHud.use(a).ok; });
+      await waitFor(gm, 'Burst of Speed', (K) => K.GMManager.getPlayerCharacters()[0].movementSpeed > 1.5, 20000).catch(() => undefined);
+      const fast = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].movementSpeed);
+      expect(fast >= 1.9, `Burst of Speed took their speed from ×${before} to ×${fast.toFixed(2)}`);
+      return `best feat ranks only; Disable Droid refused on a trooper; Stun went off after an attack (Force ${fp0} → ${after.fp}), cast ${after.cast.split(' ').length} parts; speed ×${fast.toFixed(2)}`;
     });
 
     await check('rolls', 'A player rolling from their sheet sees the result, there and above it', async () => {

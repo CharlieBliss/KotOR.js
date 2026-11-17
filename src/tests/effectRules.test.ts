@@ -95,6 +95,25 @@ describe("passive effects reach the rules", () => {
     expect(droid.isImmuneToEffect(effect(GameEffectType.EffectDamage, 10))).toBe(false);
   });
 
+  test("movement speed: an increase is the new speed in percent (99 is 199%), the biggest of each kind counts", () => {
+    const speedOf = (...effects: any[]) => { const cre = creature({ effects }); cre.updateMovementSpeed(); return +cre.movementSpeed.toFixed(2); };
+    expect(speedOf()).toBe(1);
+    expect(speedOf(effect(GameEffectType.EffectMovementSpeedIncrease, 99))).toBe(1.99);
+    expect(speedOf(effect(GameEffectType.EffectMovementSpeedIncrease, 200))).toBe(2);
+    expect(speedOf(effect(GameEffectType.EffectMovementSpeedIncrease, 50), effect(GameEffectType.EffectMovementSpeedIncrease, 99))).toBe(1.99);
+    expect(speedOf(effect(GameEffectType.EffectMovementSpeedDecrease, 50))).toBe(0.5);
+    expect(speedOf(effect(GameEffectType.EffectMovementSpeedIncrease, 200), effect(GameEffectType.EffectMovementSpeedDecrease, 50))).toBe(1);
+  });
+
+  test("its speed is worked out again as an effect goes on and comes off (Force Speed did nothing)", () => {
+    const cre = creature({ movementSpeed: 1 });
+    const burst: any = { ...effect(GameEffectType.EffectMovementSpeedIncrease, 99), getDurationType: () => 1, initialize() { return this; }, setAttachedObject() {}, loadModel() {}, onApply() {}, retire: () => true, applied: false };
+    cre.addEffect(burst);
+    expect(+cre.movementSpeed.toFixed(2)).toBe(1.99);
+    cre.detachEffect(burst);
+    expect(cre.movementSpeed).toBe(1);
+  });
+
   test("blaster deflection bonus from effects", () => {
     const cre = creature();
     cre.effects.push(effect(GameEffectType.EffectBlasterDeflectionIncrease, 4), effect(GameEffectType.EffectBlasterDeflectionDecrease, 1));

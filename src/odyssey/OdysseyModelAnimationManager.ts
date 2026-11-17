@@ -373,6 +373,8 @@ export class OdysseyModelAnimationManager {
     
     //Loop through and animate all the controllers for the current node
     let controller: OdysseyController;
+    // Where in the animation it is: from the end, played backwards
+    const elapsed = state.reverse ? Math.max(0, anim.length - state.elapsed) : state.elapsed;
     for(let c of node.controllers){
       controller = c[1];
 
@@ -388,7 +390,7 @@ export class OdysseyModelAnimationManager {
 
       lastFrame = 0;
       for(let f = 0, fc = controller.frameCount; f < fc; f++){
-        if(controller.data[f].time <= state.elapsed){
+        if(controller.data[f].time <= elapsed){
           lastFrame = f;
           continue;
         }
@@ -408,7 +410,7 @@ export class OdysseyModelAnimationManager {
       fl = 0;
 
       if (next) { 
-        fl = Math.abs( (state.elapsed - last.time) / (next.time - last.time) ) % 1;
+        fl = Math.abs( (elapsed - last.time) / (next.time - last.time) ) % 1;
       }else{
         fl = 1;
         next = controller.data[lastFrame];
@@ -416,7 +418,7 @@ export class OdysseyModelAnimationManager {
       }
 
       //Make sure the last frame has already begun.
-      if(state.elapsed < last.time){
+      if(elapsed < last.time){
         fl = 0;
       }
       

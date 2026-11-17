@@ -155,6 +155,8 @@ export class ModuleCreature extends ModuleObject {
   // appearance: any;
 
   animationState: ICreatureAnimationState;
+  /** Stunned, held or paralyzed last frame (let go, it goes back to its stance) */
+  wasHeld: boolean = false;
   overlayAnimationState: IOverlayAnimationState;
   
   equipment: CreatureEquipment;
@@ -440,11 +442,17 @@ export class ModuleCreature extends ModuleObject {
 
       // Stunned, held or paralyzed: it stands there. Not once dead: killed while held, it was put back on its feet
       // every frame and never fell (only where the stun is, the GM's machine; players' copies fell)
-      if(!this.isDead() && this.isDebilitated()){
+      const held = !this.isDead() && this.isDebilitated();
+      if(held){
         this.force = 0;
         this.speed = 0;
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
+      }else if(this.wasHeld && !this.isDead()){
+        // Let go: back to its stance. Its idle had become the looping stun or hold pose, which nothing replaced
+        // until something else happened to play (a held creature stayed frozen on players' screens)
+        this.setAnimationState(ModuleCreatureAnimState.PAUSE);
       }
+      this.wasHeld = held;
 
       this.updateMoveForce(delta, netMotion);
 
@@ -461,7 +469,7 @@ export class ModuleCreature extends ModuleObject {
         this.updateCombat(delta);
         this.updateCasting(delta);
       }
-      this.updateAnimationState();
+      this.updateAnimationState(delta);
       this.updateItems(delta);
       
       this.updateModelAnimation(delta);
@@ -1075,7 +1083,7 @@ export class ModuleCreature extends ModuleObject {
     return {x: 0, y: 0, z: 0};
   }
 
-  updateAnimationState(){
+  updateAnimationState(delta: number = 0){
 
     if(!(this.model instanceof OdysseyModel3D))
       return;
@@ -1108,12 +1116,17 @@ export class ModuleCreature extends ModuleObject {
     this.refreshIdleStance();
 
     if(this.animationState.animation){
+      // A held cast: the hands stay up its whole length, then come down
+      if(this.animationState.phase === 'hold' && this.animationState.started){
+        this.animationState.hold = (this.animationState.hold || 0) - delta;
+        if(this.animationState.hold <= 0) this.nextCastPhase();
+      }
       if(currentAnimation != this.animationState.animation.name?.toLowerCase()){
         if(!this.animationState.started){
           this.animationState.started = true;
           let aLooping = (!parseInt(this.animationState.animation.fireforget) && parseInt(this.animationState.animation.looping) == 1);
-          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping);
-        }else{
+          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping, !!this.animationState.reverse);
+        }else if(!this.nextCastPhase()){
           this.setAnimationState(ModuleCreatureAnimState.PAUSE);
         }
       }
@@ -1481,16 +1494,52 @@ export class ModuleCreature extends ModuleObject {
    * playTwoDAAnimation, so in GM sessions players see it too. Nothing played a cast animation before: casters
    * stood still while their powers went off.
    */
-  playCastAnimation(names: string[] = []): boolean {
+  playCastAnimation(names: string[] = [], seconds: number = 0): boolean {
     for(const name of names){
       if(!name || !this.hasModelAnimation(name)) continue;
       const anim = OdysseyModelAnimation.GetAnimation2DA(name);
       if(!anim) continue;
       // Its own state, as a swing's is ATTACK: left at PAUSE, the combat stance (and the turn to face the
       // target) took over before the cast was drawn
-      return this.playTwoDAAnimation(anim, /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1);
+      return this.playTwoDAAnimation(anim, /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1, this.castHoldFor(name, seconds));
     }
     return false;
+  }
+
+  /**
+   * A cast's raise and the loop that holds it. KotOR plays the raise, holds the loop for the rest of the power's
+   * conjure and cast time (spells.2da, 1.5 s for most), then plays the raise backwards to lower the hands: there
+   * is no animation for that. Played alone, the 0.33 s raise ended a fifth of the way into the cast
+   */
+  static CAST_HOLDS: Record<string, string> = { castout1: 'castoutlp1', castout2: 'castoutlp2', castout3: 'castoutlp3' };
+
+  /** How long a cast of this length holds its loop: what's left once the raise and the lowering are played */
+  castHoldFor(name: string, seconds: number): number {
+    const loop = ModuleCreature.CAST_HOLDS[String(name).toLowerCase()];
+    if(!loop || !(seconds > 0) || !this.hasModelAnimation(loop)) return 0;
+    const raise = (this.model as any)?.odysseyAnimationMap?.get(String(name).toLowerCase())?.length || 0;
+    return Math.max(0, seconds - 2 * raise);
+  }
+
+  /** A held cast's next part: the raise to its loop, the loop to the lowering. False once it's over */
+  private nextCastPhase(): boolean {
+    const state = this.animationState;
+    if(!state.phase || state.phase === 'out') return false;
+    const name = String(state.animation?.name || '').toLowerCase();
+    if(state.phase === 'in'){
+      const loop = OdysseyModelAnimation.GetAnimation2DA(ModuleCreature.CAST_HOLDS[name]);
+      if(!loop || !((state.hold || 0) > 0)) return this.lowerCast(state.animation);
+      this.animationState = { ...state, animation: loop, started: false, phase: 'hold' };
+      return true;
+    }
+    const raise = Object.keys(ModuleCreature.CAST_HOLDS).find((k) => ModuleCreature.CAST_HOLDS[k] === name);
+    return this.lowerCast(raise ? OdysseyModelAnimation.GetAnimation2DA(raise) : undefined);
+  }
+
+  private lowerCast(raise: ITwoDAAnimation | undefined): boolean {
+    if(!raise) return false;
+    this.animationState = { ...this.animationState, animation: raise, started: false, phase: 'out', reverse: true, hold: 0 };
+    return true;
   }
 
   /** Whether the creature's loaded model has an animation of this name */
@@ -1507,6 +1556,10 @@ export class ModuleCreature extends ModuleObject {
     this.animationState.index = animState;
     this.animationState.animation = this.animationConstantToAnimation(animState);
     this.animationState.started = false;
+    // A held cast is over once anything else plays: its phase, hold and backwards playing don't carry over
+    this.animationState.phase = undefined;
+    this.animationState.hold = 0;
+    this.animationState.reverse = false;
   }
   
   resetAnimationState(){
@@ -1523,7 +1576,7 @@ export class ModuleCreature extends ModuleObject {
    * ATTACK, so the combat stance doesn't take over before it's drawn). Refused while something owns the body:
    * dying, getting up, held (AnimationPriority). Returns whether it plays.
    */
-  playTwoDAAnimation(animation: ITwoDAAnimation, index: ModuleCreatureAnimState = ModuleCreatureAnimState.PAUSE): boolean {
+  playTwoDAAnimation(animation: ITwoDAAnimation, index: ModuleCreatureAnimState = ModuleCreatureAnimState.PAUSE, hold: number = 0): boolean {
     if(!animation) return false;
     if(!allowsOneOffAnimation(bodyOwner(this))) return false;
     this.resetAnimationState();
@@ -1533,7 +1586,12 @@ export class ModuleCreature extends ModuleObject {
       started: false,
       speed: 1,
     }
-    GameState.hooks.onHostTwoDAAnimation(this, animation);
+    // A cast held for its length (playCastAnimation): its raise, loop and lowering
+    if(hold > 0 && ModuleCreature.CAST_HOLDS[String(animation.name || '').toLowerCase()]){
+      this.animationState.phase = 'in';
+      this.animationState.hold = hold;
+    }
+    GameState.hooks.onHostTwoDAAnimation(this, animation, hold);
     return true;
   }
 

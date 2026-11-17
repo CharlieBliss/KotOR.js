@@ -58,9 +58,9 @@ beforeEach(() => {
 describe('what a player can use', () => {
   test('attack, combat feats for the weapon in hand, hostile then friendly powers, then grenades and medpacs', () => {
     pc.feats = [
-      { __index: 28, category: 0x1104, successor: 29, icon: 'ip_pa', label: 'Power Attack' },
-      { __index: 29, category: 0x1104, successor: '****', icon: 'ip_ipa', label: 'Improved Power Attack' },
-      { __index: 26, category: 0x1111, successor: '****', icon: 'ip_rf', label: 'Rapid Shot' },
+      { id: 28, category: 0x1104, successor: 29, icon: 'ip_pa', label: 'Power Attack' },
+      { id: 29, category: 0x1104, successor: -1, icon: 'ip_ipa', label: 'Improved Power Attack' },
+      { id: 26, category: 0x1111, successor: -1, icon: 'ip_rf', label: 'Rapid Shot' },
     ];
     pc.spells = [spell(28, 'Heal', { forcefriendly: '0', range: 'T' }, 20), spell(35, 'Lightning', { forcehostile: '5' }, 40), spell(8, 'Speed', { forcefriendly: '2', range: 'P' }, 5)];
     pc.inventory = [item('medpac', 'self', 3), item('frag', 'hostile', 2), item('frag', 'hostile', 1)];

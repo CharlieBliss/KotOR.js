@@ -642,9 +642,10 @@ export class OdysseyModel3D extends OdysseyObject3D {
     }
   };
 
-  playAnimation(anim: OdysseyModelAnimation|string|number, loop: boolean = false){
+  playAnimation(anim: OdysseyModelAnimation|string|number, loop: boolean = false, reverse: boolean = false){
     const state: any = {
       loop: loop,
+      reverse: reverse,
       blend: true,
       cFrame: 0,
       elapsed: 0,

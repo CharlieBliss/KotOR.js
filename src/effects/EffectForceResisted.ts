@@ -1,5 +1,7 @@
 import { GameEffect } from "@/effects/GameEffect";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { TextSprite3D } from "@/engine/TextSprite3D";
+import { TextSprite3DType } from "@/enums/engine/TextSprite3DType";
 
 /**
  * EffectForceResisted class.
@@ -24,6 +26,9 @@ export class EffectForceResisted extends GameEffect {
       return;
       
     super.onApply();
+    // Said over the target, as a miss is: a power it shrugged off (a save made, or its Force resistance) looked
+    // like one that did nothing at all. Players see it too (TextSprite3D.onCreateOnObject)
+    if(this.object && !this.mirrored) TextSprite3D.CreateOnObject(this.object, 'resisted', TextSprite3DType.NEUTRAL, 1500);
   }
 
 }
