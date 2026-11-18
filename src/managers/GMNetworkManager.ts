@@ -101,7 +101,7 @@ export type GMFxEvent =
   /** A visual effect at a spot (an area power's burst, a grenade blast, a beam aimed at a spot) */
   | { kind: 'vfx.at'; fxId: string; vfx: number; miss: number; durationType: number; duration: number; x: number; y: number; z: number;
       beam?: { casterNetId: string; bodyPart: number } }
-  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number }
+  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number; deflected?: boolean; powerShot?: boolean }
   | { kind: 'cast.fx'; netId: string; targetNetId?: string; spellId: number; casthandvisual?: string; projmodel?: string; castTime: number; conjureTime: number; range?: string };
 
 /** A question the GM asks players, as an NPC or as the GM, with replies to pick from */
@@ -133,6 +133,8 @@ export interface GMPlayerSheet {
   maxForcePoints: number;
   currentForce: number;
   xp: number;
+  /** Alignment value (0 = Dark, 50 = Neutral, 100 = Light); older hosts don't send it */
+  goodEvil?: number;
   /** Natural armour (part of defense); older hosts don't send it */
   naturalAC?: number;
   /** equipment slot name (RIGHTHAND, ARMOR...) -> item resref */
@@ -344,6 +346,7 @@ export interface GMPacketMap {
   'talk.line': any;
   'talk.end': { convId?: string; [key: string]: any };
   'roll.result': { name: string; netId?: string; label: string; roll: number; bonus: number; total: number };
+  'alignment.shift': { targetName: string; targetNetId?: string; alignment: 'light' | 'dark'; points: number; total: number; soundResRef: string; text: string };
   'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
   /** The GM camera during a cutscene (GMCutscene): cut jumps there instead of easing */

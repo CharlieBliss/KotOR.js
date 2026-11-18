@@ -42,6 +42,19 @@ import { GMLog } from "@/managers/gm/GMLog";
 import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayerRequests } from "@/managers/gm/GMPlayerRequests";
+import { UINotificationManager } from "@/managers/UINotificationManager";
+import { UIIconTimerType } from "@/enums/engine/UIIconTimerType";
+
+export interface GMAlignmentAlert {
+  id: string;
+  targetName: string;
+  targetNetId?: string;
+  alignment: 'light' | 'dark';
+  points: number;
+  total: number;
+  text: string;
+  at: number;
+}
 
 /** Players in a GM session: their characters' sheets and inventories (kept by the host), what they ask the host to do, looting, rewards, questions from the GM, and what happens when they fall. */
 export class GMPlayers {
@@ -320,6 +333,104 @@ export class GMPlayers {
     GMManager.notifyChange();
   }
 
+  /** Recent Light/Dark alignment shift banners shown to all connected players */
+  static alignmentAlerts: GMAlignmentAlert[] = [];
+  static ALIGNMENT_ALERT_MS = 6500;
+
+  static activeAlignmentAlerts(now: number = Date.now()): GMAlignmentAlert[] {
+    this.alignmentAlerts = this.alignmentAlerts.filter((a) => now - a.at < this.ALIGNMENT_ALERT_MS);
+    return this.alignmentAlerts;
+  }
+
+  /** Play Light/Dark Side shift stinger + record visible alert banner */
+  static notifyAlignmentShift(payload: GMPacketMap['alignment.shift']) {
+    if (!payload) return;
+    UINotificationManager.PlayAlignmentShiftSound?.(payload.alignment, payload.soundResRef);
+    const localPlayer = GameState.getCurrentPlayer?.();
+    if (!payload.targetNetId || (localPlayer as any)?.gmNetId === payload.targetNetId || GMManager.isGMUser?.()) {
+      if (payload.alignment === 'light') UINotificationManager.LightShiftTimer = 10;
+      else UINotificationManager.DarkShiftTimer = 10;
+    }
+    this.alignmentAlerts.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      targetName: payload.targetName,
+      targetNetId: payload.targetNetId,
+      alignment: payload.alignment,
+      points: payload.points,
+      total: payload.total,
+      text: payload.text,
+      at: Date.now(),
+    });
+    if (this.alignmentAlerts.length > 4) this.alignmentAlerts.shift();
+    GMManager.notifyChange();
+  }
+
+  /** Host: award Light Side or Dark Side points to one player (`peerId` or `netId` or creature), or `'all'`, and alert everyone */
+  static giveAlignment(target: string | ModuleCreature, alignment: 'light' | 'dark', amount: number = 5): boolean {
+    const points = Math.round(Number(amount));
+    if (!(points > 0)) return false;
+
+    const recipients: ModuleCreature[] = [];
+    const pushUnique = (cre: ModuleCreature | null | undefined) => {
+      if (cre && !recipients.includes(cre)) recipients.push(cre);
+    };
+
+    if (typeof target === 'string') {
+      if (target === 'all') {
+        for (const peer of GMNetworkManager.peers.values()) pushUnique(this.getPeerActor(peer.peerId));
+        for (const pc of GMManager.getPlayerCharacters()) pushUnique(pc);
+      } else {
+        pushUnique(this.getPeerActor(target) || (GMManager.netIdMap.get(target) as ModuleCreature | undefined));
+      }
+    } else if (target) {
+      pushUnique(target);
+    }
+
+    if (!recipients.length) return false;
+
+    const label = alignment === 'light' ? 'Light Side' : 'Dark Side';
+    const soundResRef = UINotificationManager.GetAlignmentShiftSound?.(alignment) || (alignment === 'light' ? 'mus_s_lightshort' : 'mus_s_darkshort');
+
+    for (const actor of recipients) {
+      const before = Number(actor.getGoodEvil?.() ?? actor.goodEvil ?? 50);
+      if (typeof actor.adjustAlignment === 'function') {
+        // 2 = ALIGNMENT_LIGHT, 3 = ALIGNMENT_DARK
+        actor.adjustAlignment(points, alignment === 'light' ? 2 : 3);
+      } else {
+        const delta = alignment === 'light' ? points : -points;
+        actor.goodEvil = Math.max(0, Math.min(100, before + delta));
+      }
+    }
+
+    const primary = recipients[0];
+    const total = Math.round(Number(primary.getGoodEvil?.() ?? primary.goodEvil ?? 50));
+    const targetName = recipients.length > 1
+      ? `All players (${recipients.length})`
+      : (primary.getName?.() || 'Player');
+    const text = recipients.length > 1
+      ? `The GM awarded ${targetName} ${points} ${label} point${points === 1 ? '' : 's'}!`
+      : `${targetName} gained ${points} ${label} point${points === 1 ? '' : 's'}! (${total}/100)`;
+
+    const payload: GMPacketMap['alignment.shift'] = {
+      targetName,
+      targetNetId: recipients.length === 1 ? primary.gmNetId : undefined,
+      alignment,
+      points,
+      total,
+      soundResRef,
+      text,
+    };
+
+    GMNetworkManager.appendChat('GM', text);
+    if (GMNetworkManager.role === 'host') {
+      GMNetworkManager.send('alignment.shift', payload);
+      this.updatePlayerSheets();
+    }
+    this.notifyAlignmentShift(payload);
+    GMManager.notifyChange();
+    return true;
+  }
+
   /** Host: award XP to one connected player; it reaches them with their next character sheet */
   static giveXP(peerId: string, amount: number): boolean {
     const actor = this.getPeerActor(peerId);
@@ -386,6 +497,7 @@ export class GMPlayers {
       maxForcePoints: cre.maxForcePoints || 0,
       currentForce: cre.currentForce || 0,
       xp: cre.experience || 0,
+      goodEvil: cre.getGoodEvil?.() ?? cre.goodEvil ?? 50,
       naturalAC: cre.naturalAC || 0,
       equipment,
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
@@ -510,6 +622,9 @@ export class GMPlayers {
     cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
     sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
     cre.experience = sheet.xp;
+    // Set, not setGoodEvil: that queues KotOR's own shift icon and stinger, and the GM's alignment.shift has
+    // already played it (it played twice for the player who got the points)
+    if (typeof sheet.goodEvil === 'number') cre.goodEvil = Math.max(0, Math.min(100, sheet.goodEvil));
     if (typeof sheet.naturalAC === "number") cre.naturalAC = sheet.naturalAC;
     cre.forcePoints = sheet.forcePoints;
     cre.maxForcePoints = sheet.maxForcePoints;
@@ -1071,3 +1186,14 @@ GMNetworkManager.on('player.notice', 'client', (packet) => {
   GMNetworkManager.appendChat('System', text);
   GMPlayerHud.notice(text);
 }, 'to-me-or-all');
+
+
+// Broadcast to all connected players when the GM awards Light Side or Dark Side points
+GMNetworkManager.on('alignment.shift', 'client', (packet) => {
+  const payload = packet.payload;
+  if (!payload) return;
+  GMNetworkManager.appendChat('GM', payload.text);
+  GMPlayers.notifyAlignmentShift(payload);
+  const characterMenu = GameState.MenuManager?.MenuCharacter;
+  if (characterMenu?.bVisible) characterMenu.updateCharacterStats?.(GameState.getCurrentPlayer());
+});

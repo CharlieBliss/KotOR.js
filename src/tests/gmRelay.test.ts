@@ -198,4 +198,23 @@ describe("GM relay server", () => {
     await settle();
     expect(host.received).toContainEqual(expect.objectContaining({ type: "peer.leave", senderId: "alice" }));
   });
+
+  test("alignment.shift is host-only and broadcasts to all players", async () => {
+    const host = await connect();
+    const alice = await connect();
+    const bob = await connect();
+    host.send({ type: "host.register", senderId: "gm" });
+    alice.send({ type: "peer.join", senderId: "alice" });
+    bob.send({ type: "peer.join", senderId: "bob" });
+    await settle();
+
+    alice.send({ type: "alignment.shift", senderId: "alice", payload: { alignment: "dark", points: 50, text: "spoofed" } });
+    await settle();
+    expect(types(bob)).not.toContain("alignment.shift");
+
+    host.send({ type: "alignment.shift", senderId: "gm", payload: { alignment: "light", points: 10, text: "Alice gained 10 Light Side points!" } });
+    await settle();
+    expect(types(alice)).toContain("alignment.shift");
+    expect(types(bob)).toContain("alignment.shift");
+  });
 });

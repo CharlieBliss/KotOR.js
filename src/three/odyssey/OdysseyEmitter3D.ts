@@ -172,7 +172,6 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
     switch(this.node.renderMode){
       case 'Normal':
-      case 'Motion_Blur':
       case 'Linked':
         this.geometry = new THREE.BufferGeometry();
       break;
@@ -434,7 +433,7 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
         break;
         case 'Lighten':
           this.material.blending = THREE.AdditiveBlending;
-          this.material.transparent = false;
+          this.material.transparent = true;
           this.material.depthWrite = false;
           this.material.needsUpdate = true;
         break;
@@ -467,13 +466,12 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
       switch(this.node.renderMode){
         case 'Normal':
-        case 'Motion_Blur':
           this.material.defines.POINTS = '';
 
           this.offsets = new THREE.BufferAttribute( new Float32Array( offsets ), 3 ).setUsage( THREE.DynamicDrawUsage );
           this.velocities = new THREE.BufferAttribute( new Float32Array( velocities ), 4 ).setUsage( THREE.DynamicDrawUsage );
           this.props = new THREE.BufferAttribute( new Float32Array( props ), 4 ).setUsage( THREE.DynamicDrawUsage );
-          this.ids = new THREE.InstancedBufferAttribute( new Float32Array( ids ), 1 ).setUsage( THREE.DynamicDrawUsage );
+          this.ids = new THREE.BufferAttribute( new Float32Array( ids ), 1 ).setUsage( THREE.DynamicDrawUsage );
           this.geometry.setAttribute( 'position', this.offsets );
           this.geometry.setAttribute( 'velocity', this.velocities );
           this.geometry.setAttribute( 'props', this.props );
@@ -733,11 +731,10 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
       switch(this.node.renderMode){
         case 'Normal':
-        case 'Motion_Blur':
           this.offsets = new THREE.BufferAttribute( offsets, 3 ).setUsage( THREE.DynamicDrawUsage );
           this.velocities = new THREE.BufferAttribute( velocities, 4 ).setUsage( THREE.DynamicDrawUsage );
           this.props = new THREE.BufferAttribute( props, 4 ).setUsage( THREE.DynamicDrawUsage );
-          this.ids = new THREE.InstancedBufferAttribute( ids, 1 ).setUsage( THREE.DynamicDrawUsage );
+          this.ids = new THREE.BufferAttribute( ids, 1 ).setUsage( THREE.DynamicDrawUsage );
           this.geometry.setAttribute( 'position', this.offsets );
           this.geometry.setAttribute( 'velocity', this.velocities );
           this.geometry.setAttribute( 'props', this.props );
@@ -789,7 +786,7 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     // P2P: attractor / Bezier paths (per-particle indices). Linked ribbons use main tick below
     // (trail + ring + strip); P2PGravity indexes every *vertex* and moves offsets — wrong for L/R pairs.
     // KotOR MDL can set P2P flags on Linked trail emitters (e.g. v_heal_imp); those must not early-return here.
-    if(this.node.flags.isP2P && this.node.renderMode !== 'Linked' && this.node.renderMode !== 'Fountain'){
+    if((this.node.flags.isP2PSel || (this.node.flags.isP2P && this.gravity !== 0)) && this.updateType !== 'Explosion' && this.updateType !== 'Fountain' && this.node.renderMode !== 'Linked'){
       this.emitterLog('tick:earlyReturn', { reason: this.node.flags.isP2PSel ? 'P2PBezier' : 'P2PGravity', delta });
       // Inherit moves live particles with the emitter, here as on the main path: a blaster bolt is a P2P emitter
       // in flight, and without it its particles stayed where they were born, by the gun, until they died
@@ -1014,8 +1011,8 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
     }
 
-    // Inherit: move POINTS-mode particles with emitter
-    if(this.node.renderMode === 'Normal' && this.node.flags.canInherit && this._hasLastWorldPos){
+    // Inherit: move POINTS / Motion_Blur world-space particles with emitter
+    if((this.node.renderMode === 'Normal' || this.node.renderMode === 'Motion_Blur') && this.node.flags.canInherit && this._hasLastWorldPos){
       for(let i = 0; i < spawnableParticleCount; i++){
         if(this.props.getZ(i) === 1){
           this.offsets.setX(i, this.offsets.getX(i) + this._worldPosDelta.x);

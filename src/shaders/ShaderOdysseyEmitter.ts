@@ -282,6 +282,17 @@ export class ShaderOdysseyEmitter extends Shader {
           #endif
         #else
           //Render particles as plane geometry so we can control it's rotation
+          #ifdef Motion_Blur
+            vec4 mvCenter = viewMatrix * vec4(offset + force, 1.0);
+            vec3 instVel = velocity.xyz + mass * 5.0;
+            vec3 mvVel = (viewMatrix * vec4(instVel, 0.0)).xyz;
+            vec2 vel2 = length(mvVel.xy) > 0.0001 ? normalize(mvVel.xy) : vec2(0.0, 1.0);
+            vec2 perp2 = vec2(-vel2.y, vel2.x);
+            float width = max(scaleF, 0.012);
+            float streakLen = max(scaleFY, width) + length(mvVel.xy) * max(blurLength, 0.08);
+            mvCenter.xy += perp2 * (position.x * width) + vel2 * (position.y * streakLen);
+            gl_Position = projectionMatrix * mvCenter;
+          #else
           #ifdef Aligned_to_Particle_Dir
             vec4 vertex = vec4( position, 1.0 ) * matrix;
             vec3 newPos = offset + (vertex.xyz * scaleF);
@@ -290,13 +301,6 @@ export class ShaderOdysseyEmitter extends Shader {
             // Apply non-square scaling to quad vertices
             vec3 scaledPos = vec3(position.x * scaleF, position.y * scaleFY, position.z);
             vec3 newPos = (offset) + scaledPos + force;
-
-            #ifdef Motion_Blur
-              // Stretch quad along velocity direction
-              vec3 velDir = normalize(velocity.xyz + vec3(0.0001));
-              float stretch = length(velocity.xyz) * blurLength;
-              newPos += velDir * (dot(scaledPos, velDir) * stretch);
-            #endif
 
             #ifdef Billboard_to_World_Z
               //Override the modelViewMatrix so we can ignore preset rotation's (That way the plane will lay flat on the ground)
@@ -322,6 +326,7 @@ export class ShaderOdysseyEmitter extends Shader {
                 gl_Position = projectionMatrix * modelViewMatrix * ( vec4(newPos, 1.0) * rotationZ(rotate * age) );
               #endif
             #endif
+          #endif
           #endif
         #endif
       #endif

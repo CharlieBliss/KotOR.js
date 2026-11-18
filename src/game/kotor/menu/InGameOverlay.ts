@@ -837,7 +837,8 @@ export class InGameOverlay extends GameMenu {
   UpdateHUDNotificationIcons(delta = 0){
     if(GameState.UINotificationManager.bNotificationSoundQueued){
       GameState.UINotificationManager.bNotificationSoundQueued = false;
-      GameState.guiAudioEmitter.playSoundFireAndForget('gui_quest');
+      const sound = GameState.UINotificationManager.pendingNotificationSound || 'gui_quest';
+      GameState.guiAudioEmitter.playSoundFireAndForget(sound);
     }
     /**
      * Item Lost

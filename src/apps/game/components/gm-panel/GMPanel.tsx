@@ -14,6 +14,7 @@ import { PromptCard } from "@/apps/game/components/gm-panel/overlays/PromptCard"
 import { CharacterSheet } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
+import { AlignmentFeed } from "@/apps/game/components/gm-panel/overlays/AlignmentFeed";
 import { ContextMenu } from "@/apps/game/components/gm-panel/overlays/ContextMenu";
 import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
 import { CombatTracker, anyoneFighting } from "@/apps/game/components/gm-panel/overlays/CombatTracker";
@@ -523,6 +524,7 @@ export const GMPanel: React.FC = () => {
         />
       )}
       {GMNetworkManager.role !== 'offline' && <RollFeed />}
+      <AlignmentFeed />
 
       {/* Bottom controls strip: what the current mode/tool does and its keys (the cutscene's dock takes its place) */}
       <div className="gm-controls-strip" style={KotOR.GMCutscene.active || (!statusChip && !controlHints.length) ? { display: 'none' } : undefined}>

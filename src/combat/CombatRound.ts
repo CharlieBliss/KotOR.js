@@ -19,6 +19,7 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import { BitWise } from "@/utility/BitWise";
 import { CombatAttackData } from "@/combat/CombatAttackData";
 import { CombatRoundAction } from "@/combat/CombatRoundAction";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 import type { TalentFeat } from "@/talents/TalentFeat";
 import { GameState } from "@/GameState";
 import { FeedbackMessageEntry } from "@/engine/FeedbackMessageEntry";
@@ -508,23 +509,35 @@ export class CombatRound {
           attack.attackResult == AttackResult.AUTOMATIC_HIT;
 
         // Ranged weapons show their shot: a blaster bolt that reaches the target, or flies past on a miss
+        const isDeflected = attack.attackResult == AttackResult.DEFLECTED;
+        const isRangedShot = !!attack.attackWeapon?.isRangedWeapon?.();
         if(targetCreature){
-          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || attack.attackResult == AttackResult.DEFLECTED, attackDamageDelay);
+          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || isDeflected, attackDamageDelay, {
+            deflected: isDeflected,
+            powerShot: CombatRoundAction.isPowerBlastFeat(combatAction.featId),
+          });
         }
 
         if(landed){
           attack.applyDamageEffectToCreature(creature, targetCreature);
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, attack.getTotalDamage().toString(), TextSprite3DType.HOSTILE, 1500);
+            if(!isRangedShot){
+              const sparkLabel = CombatVisualEffects.getMeleeSparkLabel('hit', attack.attackWeapon, (targetCreature as any).equipment?.RIGHTHAND);
+              if(sparkLabel) CombatVisualEffects.applyFirstVisualEffect(targetCreature, [sparkLabel], creature);
+            }
           }
         }else if(attack.attackResult == AttackResult.MISS){
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, 'miss', TextSprite3DType.NEUTRAL, 1500);
           }
-        }else if(attack.attackResult == AttackResult.DEFLECTED){
+        }else if(isDeflected){
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, 'deflected', TextSprite3DType.NEUTRAL, 1500);
           }
+        }else if(attack.attackResult == AttackResult.PARRIED && targetCreature && !isRangedShot){
+          const sparkLabel = CombatVisualEffects.getMeleeSparkLabel('parry', attack.attackWeapon, (targetCreature as any).equipment?.RIGHTHAND);
+          if(sparkLabel) CombatVisualEffects.applyFirstVisualEffect(targetCreature, [sparkLabel], creature);
         }
       }
     }
@@ -780,9 +793,10 @@ export class CombatRound {
       targetCreature.combatRound.deflectArrow = false;
     }
 
-    // An opposed roll with the lightsaber against the attack roll
+    // An opposed roll with the lightsaber against the attack roll (Precise Shot penalizes deflection)
+    const precisePenalty = CombatAttackData.GetPreciseShotRank(this.owner as ModuleCreature) * 2;
     const deflectRoll = Dice.roll(1, DiceType.d20,
-      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus);
+      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus) - precisePenalty;
     if(deflectRoll < attackRoll) return false;
     // "If the attack is beaten by 10 or more, the bolt is deflected back at the enemy"
     if(deflectRoll >= attackRoll + 10) this.reflectBolt(targetCreature, weapon);
@@ -881,6 +895,10 @@ export class CombatRound {
 
     if(combatAction.actionType === CombatActionType.ATTACK_USE_FEAT){
       combatAction.calculateAttackAnimation();
+      const featVfx = CombatVisualEffects.getFeatVisualEffectLabels(combatAction.featId, creature.getWeapon?.());
+      if(featVfx.length){
+        CombatVisualEffects.applyFirstVisualEffect(creature, featVfx, creature);
+      }
     }
 
     if(!combatAction.animationName){

@@ -1465,7 +1465,7 @@ export class GMManager {
     onHostTwoDAAnimation: (creature, animation, hold) => GMReplication.onHostTwoDAAnimation(creature, animation, hold),
     onEffectApplied: (owner, effect) => GMReplication.onEffectApplied(owner, effect),
     onEffectRemoved: (owner, effect) => GMReplication.onEffectRemoved(owner, effect),
-    onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),
+    onHostProjectile: (caster, target, ammunition, hit, delay, options) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay, options),
     onHostSpellCast: (caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range) => GMReplication.onHostSpellCast(caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range),
     onDoorOpened: (door, by) => {
       // Tell everyone, once this frame's state has settled, when a door opened for someone in a session

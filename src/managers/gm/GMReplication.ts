@@ -546,11 +546,15 @@ export class GMReplication {
   }
 
   /** Host: a ranged attack fired a bolt; players draw it too */
-  static onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number) {
+  static onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number, options?: { deflected?: boolean; powerShot?: boolean }) {
     const netId = this.getHostFxNetId(caster);
     const targetNetId = this.getHostFxNetId(target);
     if (!netId || !targetNetId) return;
-    GMNetworkManager.broadcastFx({ kind: 'projectile', netId, targetNetId, ammunition, hit, delay });
+    GMNetworkManager.broadcastFx({
+      kind: 'projectile', netId, targetNetId, ammunition, hit, delay,
+      ...(options?.deflected ? { deflected: true } : {}),
+      ...(options?.powerShot ? { powerShot: true } : {}),
+    });
   }
 
   /** Host: a spell/power started casting; players replay its cast hand visual & projectile */
@@ -772,7 +776,13 @@ export class GMReplication {
       }
       case 'projectile': {
         const target = GMManager.netIdMap.get(event.targetNetId);
-        if (target) GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay);
+        if (target) {
+          const opts = (event.deflected || event.powerShot)
+            ? { ...(event.deflected ? { deflected: true } : {}), ...(event.powerShot ? { powerShot: true } : {}) }
+            : undefined;
+          if (opts) GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay, opts);
+          else GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay);
+        }
         break;
       }
       case 'cast.fx': {

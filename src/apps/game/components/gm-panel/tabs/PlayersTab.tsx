@@ -25,6 +25,7 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
   // DM tools
   const [rewardXp, setRewardXp] = useState<number>(250);
   const [rewardItem, setRewardItem] = useState<string>('g_i_medeqpmnt01');
+  const [rewardAlign, setRewardAlign] = useState<number>(5);
   const updatePlayerCfg = (patch: Partial<GMPlayerSpawnConfig>) => {
     const next = { ...playerCfg, ...patch };
     setPlayerCfg(next);
@@ -133,6 +134,26 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
         )}
       </div>
 
+      {GMManager.getPlayerCharacters().length > 0 && (
+        <div className="gm-section">
+          <div className="gm-section-title">Alignment award</div>
+          <div className="gm-row" style={{ alignItems: 'flex-end', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
+            <div className="gm-field" style={{ flex: '1 1 110px' }}>
+              <label>Points</label>
+              <input className="gm-input" type="number" min={1} max={100} value={rewardAlign} onChange={e => setRewardAlign(Number(e.target.value))} />
+            </div>
+            <div className="gm-row">
+              <button className="gm-btn small" onClick={() => GMPlayers.giveAlignment('all', 'light', rewardAlign)} title={`Award all players ${rewardAlign} Light Side points (plays sound & alerts everyone)`}>
+                + Light Side (All)
+              </button>
+              <button className="gm-btn small danger" onClick={() => GMPlayers.giveAlignment('all', 'dark', rewardAlign)} title={`Award all players ${rewardAlign} Dark Side points (plays sound & alerts everyone)`}>
+                + Dark Side (All)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {GMNetworkManager.role === 'host' && (
         <div className="gm-section">
           <div className="gm-section-title">Connected players ({connectedPeers.length})</div>
@@ -153,20 +174,27 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
               <div className="gm-list">
                 {connectedPeers.map(peer => {
                   const pc = GMPlayers.getPeerActor(peer.peerId);
+                  const alignVal = pc ? Math.round(Number(pc.getGoodEvil?.() ?? pc.goodEvil ?? 50)) : 50;
                   return (
                     <div key={peer.peerId} className="gm-card">
                       <div className="gm-card-info">
                         <div className="gm-card-title">{peer.name}</div>
                         <div className="gm-card-sub">
-                          {pc ? `${pc.getName()} • Level ${pc.classes?.[0]?.level ?? '?'} • HP ${pc.getHP()}/${pc.getMaxHP()} • XP ${pc.experience || 0}` : 'No character yet'}
+                          {pc ? `${pc.getName()} • Lv ${pc.classes?.[0]?.level ?? '?'} • HP ${pc.getHP()}/${pc.getMaxHP()} • XP ${pc.experience || 0} • Align ${alignVal}` : 'No character yet'}
                         </div>
                       </div>
-                      <div className="gm-row">
+                      <div className="gm-row" style={{ flexWrap: 'wrap' }}>
                         <button className="gm-btn small" disabled={!pc} onClick={() => GMPlayers.giveXP(peer.peerId, rewardXp)} title={`Give ${peer.name} ${rewardXp} XP`}>
                           + XP
                         </button>
                         <button className="gm-btn small" disabled={!pc || !rewardItem.trim()} onClick={() => GMPlayers.giveItem(peer.peerId, rewardItem)} title={`Give ${peer.name} ${rewardItem}`}>
                           + Item
+                        </button>
+                        <button className="gm-btn small" disabled={!pc} onClick={() => GMPlayers.giveAlignment(peer.peerId, 'light', rewardAlign)} title={`Give ${peer.name} ${rewardAlign} Light Side points (alerts all players)`}>
+                          + Light
+                        </button>
+                        <button className="gm-btn small danger" disabled={!pc} onClick={() => GMPlayers.giveAlignment(peer.peerId, 'dark', rewardAlign)} title={`Give ${peer.name} ${rewardAlign} Dark Side points (alerts all players)`}>
+                          + Dark
                         </button>
                         <button className="gm-btn small" disabled={!pc} onClick={() => { if (pc) GMManager.events.dispatchEvent('open-player-sheet', pc); }} title={`${peer.name}'s character sheet: what they see, and roll or level up for them`}>
                           Sheet

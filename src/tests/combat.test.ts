@@ -2,13 +2,16 @@ import { afterEach, describe, expect, jest, test } from "@jest/globals";
 
 // The real GameState pulls in the whole browser engine (WebGL, window, File System Access);
 // these tests only need it as a bag for the few managers they stub per-test.
-jest.mock("@/GameState", () => ({ GameState: {} }));
+// The engine's default hooks (no game mode stepping in): a spell cast tells them, and threw without them
+jest.mock("@/GameState", () => ({ GameState: { hooks: jest.requireActual<typeof import("@/engine/EngineHooks")>("@/engine/EngineHooks").DEFAULT_ENGINE_HOOKS } }));
 jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
 
 import { CombatAttackData } from "@/combat/CombatAttackData";
 import { CombatRound } from "@/combat/CombatRound";
 import { CombatRoundAction } from "@/combat/CombatRoundAction";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 import { SpellCastInstance } from "@/combat/SpellCastInstance";
+import { OdysseyModelAnimation } from "@/odyssey/OdysseyModelAnimation";
 import { EffectDamage } from "@/effects/EffectDamage";
 import { EffectDamageImmunityDecrease } from "@/effects/EffectDamageImmunityDecrease";
 import { EffectDamageImmunityIncrease } from "@/effects/EffectDamageImmunityIncrease";
@@ -74,6 +77,8 @@ function createMockCreature(overrides: Record<string, any> = {}): any {
     getGoodEvil: () => overrides.goodEvil ?? 50,
     getTotalClassLevel: () => overrides.level ?? 8,
     getBaseAttackBonus: () => overrides.bab ?? 6,
+    // As ModuleCreature's: Dexterity for a ranged weapon, Strength otherwise
+    getAttackAbilityModifier: (weapon?: any) => Math.floor(((weapon?.isRangedWeapon?.() ? (overrides.dex ?? 14) : (overrides.str ?? 14)) - 10) / 2),
     getAC: () => overrides.ac ?? 15,
     getHP: () => hp,
     subtractHP: (amount: number) => {
@@ -508,6 +513,121 @@ describe("Combat, Feats, and Force Powers", () => {
       expect(target.combatData.lastSpellAttacker).toBe(caster);
       expect(GameState.NWScript.Load).toHaveBeenCalledWith("k_sp1_generic");
       expect(mockScriptInstance.run).toHaveBeenCalledWith(caster, 0);
+    });
+  });
+
+  describe("combat feat animations, Precise Shot, and spark VFX", () => {
+    test("melee, unarmed, and ranged feats pick actual model animations with rank variants and fallbacks", () => {
+      const modelAnims = new Set([
+        "m2a1", "f2a1a", "f2a1b", "f2a1c", "f2a2a", "f2a2b", "f2a3a", "f2a4",
+        "g8a1", "f10a2a", "f10a3a",
+        "b5a1", "b5a2", "b5a3", "b5a4",
+        "b7a3", "b9a1", "b9a2", "b9a4",
+      ]);
+      jest.spyOn(OdysseyModelAnimation, "GetAnimation2DA").mockImplementation((name: string) => (
+        modelAnims.has(name) ? ({ name } as any) : undefined
+      ));
+
+      const meleeOwner = createMockCreature();
+      meleeOwner.getCombatAnimationAttackType = () => "m";
+      meleeOwner.getCombatAnimationWeaponType = () => 2;
+      meleeOwner.model = {};
+      meleeOwner.hasModelAnimation = (name: string) => modelAnims.has(name);
+
+      const pick = (owner: any, featId: CombatFeatType) => {
+        const ca = new CombatRoundAction();
+        ca.owner = owner;
+        ca.actionType = CombatActionType.ATTACK_USE_FEAT;
+        ca.setFeat(new TalentFeat(featId));
+        ca.calculateAttackAnimation();
+        return ca.animationName;
+      };
+
+      expect(pick(meleeOwner, CombatFeatType.CRITICAL_STRIKE)).toBe("f2a1a");
+      expect(pick(meleeOwner, CombatFeatType.IMPROVED_CRITICAL_STRIKE)).toBe("f2a1b");
+      expect(pick(meleeOwner, CombatFeatType.MASTER_CRITICAL_STRIKE)).toBe("f2a1c");
+      expect(pick(meleeOwner, CombatFeatType.FLURRY)).toBe("f2a2a");
+      expect(pick(meleeOwner, CombatFeatType.IMPROVED_FLURRY)).toBe("f2a2b");
+      expect(pick(meleeOwner, CombatFeatType.MASTER_FLURRY)).toBe("f2a4");
+      expect(pick(meleeOwner, CombatFeatType.POWER_ATTACK)).toBe("f2a3a");
+
+      const unarmedOwner = createMockCreature();
+      unarmedOwner.getCombatAnimationAttackType = () => "g";
+      unarmedOwner.getCombatAnimationWeaponType = () => 8;
+      unarmedOwner.model = {};
+      unarmedOwner.hasModelAnimation = (name: string) => modelAnims.has(name);
+      expect(pick(unarmedOwner, CombatFeatType.POWER_ATTACK)).toBe("f10a3a");
+      expect(pick(unarmedOwner, CombatFeatType.FLURRY)).toBe("f10a2a");
+
+      const pistolOwner = createMockCreature();
+      pistolOwner.getCombatAnimationAttackType = () => "b";
+      pistolOwner.getCombatAnimationWeaponType = () => 5;
+      pistolOwner.model = {};
+      pistolOwner.hasModelAnimation = (name: string) => modelAnims.has(name);
+      expect(pick(pistolOwner, CombatFeatType.RAPID_SHOT)).toBe("b5a2");
+      expect(pick(pistolOwner, CombatFeatType.SNIPER_SHOT)).toBe("b5a3");
+      expect(pick(pistolOwner, CombatFeatType.POWER_BLAST)).toBe("b5a4");
+      expect(pick(pistolOwner, CombatFeatType.PRECISE_SHOT_I)).toBe("b5a3");
+
+      const heavyOwner = createMockCreature();
+      heavyOwner.getCombatAnimationAttackType = () => "b";
+      heavyOwner.getCombatAnimationWeaponType = () => 9;
+      heavyOwner.model = {};
+      heavyOwner.hasModelAnimation = (name: string) => modelAnims.has(name);
+      expect(pick(heavyOwner, CombatFeatType.SNIPER_SHOT)).toBe("b7a3");
+    });
+
+    test("Precise Shot I-V adds passive ranged damage (+1..+8) and penalizes Jedi deflection (-2..-10)", () => {
+      const blaster: any = {
+        baseItemId: 13,
+        baseItem: { weaponWield: WeaponWield.BLASTER_PISTOL, criticalHitMultiplier: 2 },
+        isRangedWeapon: () => true,
+        getBaseDamageType: () => DamageType.ENERGY,
+        getBaseDamage: () => 4,
+        hasDamageBonus: () => false,
+        getWeaponWield: () => WeaponWield.BLASTER_PISTOL,
+      };
+      const shooter = createMockCreature({ feats: [CombatFeatType.PRECISE_SHOT_III] });
+      const atkData = new CombatAttackData();
+      atkData.attackWeapon = blaster;
+      atkData.calculateDamage(shooter, false, undefined, false);
+      expect(atkData.getTotalDamage()).toBe(8); // 4 base + 4 Precise Shot III
+
+      // Deflection penalty: shooter with Precise Shot V (-10) lowers target deflect roll
+      jest.spyOn(Dice, "roll").mockImplementation((_c, _d, mod = 0) => 12 + mod);
+      const jedi = createMockCreature({
+        feats: [CombatFeatType.JEDI_DEFENSE],
+        equipment: { RIGHTHAND: { baseItemId: 8 } },
+        combatRound: { deflectArrow: true },
+        classes: [{ getBaseAttackBonus: () => 0 }],
+      });
+      jedi.getAttackAbilityModifier = () => 0;
+      const shooterV = createMockCreature({ feats: [CombatFeatType.PRECISE_SHOT_V] });
+      const round = new CombatRound(shooterV);
+      // 12 - 10 (Precise Shot V) = 2 < attackRoll 10 => fails to deflect
+      expect(round.checkBlasterDeflection(jedi, blaster, 10)).toBe(false);
+    });
+
+    test("CombatVisualEffects resolves TSL rowlabels/indices and weapon spark/feat VFX labels", () => {
+      (GameState as any).TwoDAManager = {
+        datatables: new Map([
+          ["visualeffects", {
+            rows: {
+              107: { __index: 107, __rowlabel: "4004", label: "VFX_COM_SPARKS_LIGHTSABER", imp_impact_node: "v_spkb_imp" },
+              108: { __index: 108, __rowlabel: "4011", label: "VFX_COM_SPARKS_PARRY_METAL", imp_impact_node: "v_parrspr_imp" },
+            },
+          }],
+        ]),
+      };
+      expect(CombatVisualEffects.lookupVisualEffectId("VFX_COM_SPARKS_LIGHTSABER")).toBe(4004);
+      expect(CombatVisualEffects.lookupImpactModel("VFX_COM_SPARKS_PARRY_METAL")).toBe("v_parrspr_imp");
+
+      const saber: any = { baseItemId: 8, isRangedWeapon: () => false };
+      const vibroblade: any = { baseItemId: 2, isRangedWeapon: () => false };
+      expect(CombatVisualEffects.getMeleeSparkLabel("parry", saber, vibroblade)).toBe("VFX_COM_SPARKS_LIGHTSABER");
+      expect(CombatVisualEffects.getMeleeSparkLabel("clash", vibroblade, vibroblade)).toBe("VFX_COM_SPARKS_PARRY_METAL");
+      expect(CombatVisualEffects.getFeatVisualEffectLabels(CombatFeatType.POWER_ATTACK, saber)).toEqual(["VFX_COM_POWER_ATTACK_IMPROVED_SABER"]);
+      expect(CombatVisualEffects.getFeatVisualEffectLabels(CombatFeatType.SNIPER_SHOT, undefined)).toEqual(["VFX_COM_SNIPER_SHOT", "VFX_COM_SNIPER_SHOT_IMPROVED"]);
     });
   });
 });

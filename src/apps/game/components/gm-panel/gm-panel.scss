@@ -829,3 +829,108 @@
     }
   }
 }
+
+
+.gm-align-feed {
+  position: fixed;
+  top: 108px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9650;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: min(480px, 92vw);
+}
+
+.gm-align-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.7);
+  animation: gm-align-pop 0.22s ease-out;
+
+  &.light {
+    background: linear-gradient(135deg, rgba(16, 46, 82, 0.94), rgba(10, 28, 54, 0.94));
+    border: 1px solid rgba(118, 206, 255, 0.72);
+    color: #e9f6ff;
+
+    .gm-align-badge {
+      color: #8ee1ff;
+      border-color: rgba(142, 225, 255, 0.5);
+      background: rgba(54, 152, 232, 0.25);
+      text-shadow: 0 0 10px rgba(142, 225, 255, 0.8);
+    }
+
+    .gm-align-title span {
+      background: rgba(94, 194, 255, 0.22);
+      color: #aee4ff;
+    }
+  }
+
+  &.dark {
+    background: linear-gradient(135deg, rgba(64, 14, 20, 0.94), rgba(34, 8, 12, 0.94));
+    border: 1px solid rgba(255, 92, 92, 0.72);
+    color: #ffecee;
+
+    .gm-align-badge {
+      color: #ff7a7a;
+      border-color: rgba(255, 110, 110, 0.5);
+      background: rgba(220, 48, 56, 0.28);
+      text-shadow: 0 0 10px rgba(255, 90, 90, 0.8);
+    }
+
+    .gm-align-title span {
+      background: rgba(255, 90, 90, 0.22);
+      color: #ffb0b0;
+    }
+  }
+}
+
+.gm-align-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.gm-align-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.gm-align-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+
+  span {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+}
+
+.gm-align-text {
+  font-size: 12.5px;
+  opacity: 0.94;
+}
+
+@keyframes gm-align-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}

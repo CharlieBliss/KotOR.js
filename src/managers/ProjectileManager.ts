@@ -5,12 +5,19 @@ import { OdysseyModel3D } from "@/three/odyssey";
 import type { OdysseyModel } from "@/odyssey";
 import type { ModuleObject } from "@/module/ModuleObject";
 import type { ModuleItem } from "@/module/ModuleItem";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 
 /** A row of ammunitiontypes.2da: what a ranged weapon shoots */
 interface IAmmunitionType {
   model: string;
   shotSound: string;
   impactSound: string;
+  muzzleFlash: string;
+}
+
+export interface IProjectileOptions {
+  deflected?: boolean;
+  powerShot?: boolean;
 }
 
 interface IProjectile {
@@ -18,6 +25,7 @@ interface IProjectile {
   target: ModuleObject;
   ammunition: IAmmunitionType;
   hit: boolean;
+  deflected: boolean;
   /** Seconds until it leaves the weapon */
   delay: number;
   fired: boolean;
@@ -27,6 +35,13 @@ interface IProjectile {
   duration: number;
   model?: OdysseyModel3D;
   done: boolean;
+}
+
+interface ITransientFx {
+  model: OdysseyModel3D;
+  remaining: number;
+  follow?: ModuleObject;
+  followOffset?: THREE.Vector3;
 }
 
 const valid = (value: any): string => {
@@ -58,6 +73,7 @@ export class ProjectileManager {
   static TRAVEL_ANIMATION = 'travel01';
 
   static projectiles: IProjectile[] = [];
+  static transientFx: ITransientFx[] = [];
   static models: Map<string, Promise<OdysseyModel | undefined>> = new Map();
 
   static tmpVec = new THREE.Vector3();
@@ -68,16 +84,17 @@ export class ProjectileManager {
   /**
    * The ammunition a weapon fires, or undefined for melee weapons and unarmed attacks
    */
-  static GetAmmunitionType(index: number): IAmmunitionType | undefined {
+  static GetAmmunitionType(index: number, powerShot: boolean = false): IAmmunitionType | undefined {
     if(!(index >= 1)) return undefined;
     const row = GameState.TwoDAManager?.datatables.get('ammunitiontypes')?.rows[index];
     if(!row) return undefined;
-    const model = valid(row.model0) || valid(row.model);
+    const model = (powerShot && valid(row.model1)) || valid(row.model0) || valid(row.model);
     if(!model) return undefined;
     return {
       model,
-      shotSound: valid(row.shotsound0),
-      impactSound: valid(row.impactsound0),
+      shotSound: (powerShot && valid(row.shotsound1)) || valid(row.shotsound0),
+      impactSound: (powerShot && valid(row.impactsound1)) || valid(row.impactsound0),
+      muzzleFlash: valid(row.muzzleflash),
     };
   }
 
@@ -90,20 +107,20 @@ export class ProjectileManager {
    * A ranged attack: fire its bolt. Called by the combat round for each attack it resolves.
    * @param delay seconds until the shot leaves the weapon (the attack animation's damage delay)
    */
-  static FireWeapon(caster: ModuleObject, target: ModuleObject, weapon: ModuleItem | undefined, hit: boolean, delay: number = 0): boolean {
+  static FireWeapon(caster: ModuleObject, target: ModuleObject, weapon: ModuleItem | undefined, hit: boolean, delay: number = 0, options?: IProjectileOptions): boolean {
     const ammunitionIndex = this.GetWeaponAmmunitionIndex(weapon);
     if(ammunitionIndex < 1 || !caster || !target) return false;
-    if(!this.Launch(caster, target, ammunitionIndex, hit, delay)) return false;
+    if(!this.Launch(caster, target, ammunitionIndex, hit, delay, options)) return false;
     // GM sessions: players draw the same bolt
-    GameState.hooks.onHostProjectile(caster, target, ammunitionIndex, hit, delay);
+    GameState.hooks.onHostProjectile(caster, target, ammunitionIndex, hit, delay, options);
     return true;
   }
 
   /**
    * Show a bolt of the given ammunitiontypes.2da row from caster to target
    */
-  static Launch(caster: ModuleObject, target: ModuleObject, ammunitionIndex: number, hit: boolean, delay: number = 0): boolean {
-    const ammunition = this.GetAmmunitionType(ammunitionIndex);
+  static Launch(caster: ModuleObject, target: ModuleObject, ammunitionIndex: number, hit: boolean, delay: number = 0, options?: IProjectileOptions): boolean {
+    const ammunition = this.GetAmmunitionType(ammunitionIndex, !!options?.powerShot);
     if(!ammunition || !caster || !target) return false;
 
     // Shots in the same round leave one after another
@@ -113,6 +130,7 @@ export class ProjectileManager {
       target,
       ammunition,
       hit,
+      deflected: !!options?.deflected,
       delay: Math.max(0, delay) + queued * this.SHOT_SPACING,
       fired: false,
       from: new THREE.Vector3(),
@@ -138,6 +156,34 @@ export class ProjectileManager {
       TextureLoader.LoadQueue();
     });
     return true;
+  }
+
+  /** Spawn a short-lived spark/muzzle-flash OdysseyModel3D at a world position (optionally following an object) */
+  static SpawnBurst(resRef: string, position: THREE.Vector3, context: any, ttl: number = 1.6, follow?: ModuleObject): void {
+    if(!resRef || !GameState.scene) return;
+    const pos = position.clone();
+    const followOffset = follow?.position ? pos.clone().sub(follow.position) : undefined;
+    MDLLoader.loader.load(resRef).then((mdl) => {
+      if(!mdl) return undefined;
+      return OdysseyModel3D.FromMDL(mdl, { context });
+    }).then((model) => {
+      if(!model || !GameState.scene) return;
+      model.position.copy(follow?.position ? follow.position.clone().add(followOffset!) : pos);
+      if(follow?.model) model.quaternion.copy(follow.model.quaternion);
+      model.updateMatrixWorld(true);
+      GameState.scene.add(model);
+      if(model.odysseyAnimations?.some((a) => a.name === 'impact')){
+        model.playAnimation('impact', false);
+      }
+      for(const em of model.emitters || []){
+        if(em.updateType === 'Explosion' && !em.isDetonated){
+          em.detonate();
+        }
+      }
+      model.update(0.016);
+      this.transientFx.push({ model, remaining: ttl, follow, followOffset });
+      TextureLoader.LoadQueue();
+    }).catch(() => {});
   }
 
   static async LoadModel(resRef: string, caster: ModuleObject): Promise<OdysseyModel3D | undefined> {
@@ -188,6 +234,9 @@ export class ProjectileManager {
       projectile.to.add(side).add(dir.normalize().multiplyScalar(this.MISS_OVERSHOOT));
     }
     projectile.duration = Math.max(0.05, projectile.from.distanceTo(projectile.to) / this.SPEED);
+    if(projectile.ammunition.muzzleFlash){
+      this.SpawnBurst(projectile.ammunition.muzzleFlash, projectile.from, projectile.caster.context, 0.5);
+    }
     if(projectile.ammunition.shotSound){
       projectile.caster.audioEmitter?.playSoundFireAndForget(projectile.ammunition.shotSound);
     }
@@ -195,8 +244,25 @@ export class ProjectileManager {
 
   static Finish(projectile: IProjectile){
     projectile.done = true;
-    if(projectile.fired && projectile.hit && projectile.ammunition.impactSound){
-      projectile.target.audioEmitter?.playSoundFireAndForget(projectile.ammunition.impactSound);
+    if(projectile.fired){
+      if(projectile.deflected){
+        const resRef = CombatVisualEffects.lookupImpactModel('VFX_COM_BLASTER_DEFLECTION', 'v_blastdef_imp');
+        const deflectPos = projectile.target.model?.deflecthook
+          ? projectile.target.model.deflecthook.getWorldPosition(this.tmpVec)
+          : projectile.to;
+        this.SpawnBurst(resRef, deflectPos, projectile.target.context, 1.5);
+        const clashSound = (projectile.target as any).equipment?.RIGHTHAND?.weaponSound?.getClashResRef?.() || 'cb_ls_clash1';
+        projectile.target.audioEmitter?.playSoundFireAndForget(clashSound);
+      }else if(projectile.hit){
+        const resRef = CombatVisualEffects.lookupImpactModel('VFX_COM_BLASTER_IMPACT', 'v_blaster_imp');
+        this.SpawnBurst(resRef, projectile.to, projectile.target.context, 1.5);
+        if(projectile.ammunition.impactSound){
+          projectile.target.audioEmitter?.playSoundFireAndForget(projectile.ammunition.impactSound);
+        }
+      }else{
+        const resRef = CombatVisualEffects.lookupImpactModel('VFX_COM_BLASTER_IMPACT_GROUND', 'v_spksplat_imp');
+        this.SpawnBurst(resRef, projectile.to, projectile.caster.context, 1.5);
+      }
     }
     if(projectile.model){
       projectile.model.removeFromParent();
@@ -206,6 +272,24 @@ export class ProjectileManager {
   }
 
   static Update(delta: number = 0){
+    if(this.transientFx.length){
+      for(const fx of this.transientFx){
+        fx.remaining -= delta;
+        if(fx.remaining <= 0){
+          fx.model.removeFromParent();
+          fx.model.dispose();
+        }else{
+          if(fx.follow?.position && !(fx.follow as any).destroyed){
+            fx.model.position.copy(fx.follow.position);
+            if(fx.followOffset) fx.model.position.add(fx.followOffset);
+            if(fx.follow.model) fx.model.quaternion.copy(fx.follow.model.quaternion);
+            fx.model.updateMatrixWorld(true);
+          }
+          fx.model.update(delta);
+        }
+      }
+      this.transientFx = this.transientFx.filter((fx) => fx.remaining > 0);
+    }
     if(!this.projectiles.length) return;
     for(const projectile of this.projectiles){
       if(projectile.done) continue;
@@ -248,6 +332,11 @@ export class ProjectileManager {
       this.Finish(projectile);
     }
     this.projectiles = [];
+    for(const fx of this.transientFx){
+      fx.model.removeFromParent();
+      fx.model.dispose();
+    }
+    this.transientFx = [];
   }
 
 }

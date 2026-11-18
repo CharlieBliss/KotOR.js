@@ -722,6 +722,7 @@ describe("GM multiplayer host authority", () => {
         hp: 150, maxHp: 150,
         forcePoints: 40, maxForcePoints: 40, currentForce: 0,
         xp: 1200,
+        goodEvil: 50,
         naturalAC: 0,
         equipment: { RIGHTHAND: "g_w_lghtsbr01" },
         inventory: [{ resRef: "g_i_medeqpmnt02", stack: 1 }],
@@ -1453,6 +1454,56 @@ describe("GM multiplayer host authority", () => {
       (GameState as any).ProjectileManager = { Launch: launch };
       GMReplication.applyFxEventOnClient({ kind: "projectile", netId: "pc_1", targetNetId: "cre_0", ammunition: 1, hit: false, delay: 0.2 });
       expect(launch).toHaveBeenCalledWith(shooter, target, 1, false, 0.2);
+
+      GMReplication.applyFxEventOnClient({ kind: "projectile", netId: "pc_1", targetNetId: "cre_0", ammunition: 1, hit: true, delay: 0.1, deflected: true, powerShot: true });
+      expect(launch).toHaveBeenLastCalledWith(shooter, target, 1, true, 0.1, { deflected: true, powerShot: true });
+    });
+
+    test("GM awards Light and Dark Side points, syncing goodEvil and broadcasting alignment.shift music/alerts to everyone", async () => {
+      const playSoundFireAndForget = jest.fn();
+      (GameState as any).guiAudioEmitter = { playSoundFireAndForget };
+      (GameState as any).TwoDAManager = {
+        datatables: new Map([["guisounds", { rows: { 17: { label: "DarkSide", soundresref: "mus_s_darkshort" }, 18: { label: "LightSide", soundresref: "mus_s_lightshort" } } }]]),
+      };
+
+      GMNetworkManager.role = "host";
+      GMPlayers.alignmentAlerts = [];
+      const pcA = mockCreature("pc_1", {
+        gmOwnerPeerId: "peer_a", goodEvil: 50,
+        getName: () => "Bastila", getGoodEvil() { return this.goodEvil; },
+        setGoodEvil(v: number) { this.goodEvil = Math.max(0, Math.min(100, v)); },
+        adjustAlignment(val: number, align: number) { this.setGoodEvil(this.goodEvil + (align === 2 ? val : -val)); },
+      });
+      const pcB = mockCreature("pc_2", {
+        gmOwnerPeerId: "peer_b", goodEvil: 50,
+        getName: () => "Canderous", getGoodEvil() { return this.goodEvil; },
+        setGoodEvil(v: number) { this.goodEvil = Math.max(0, Math.min(100, v)); },
+        adjustAlignment(val: number, align: number) { this.setGoodEvil(this.goodEvil + (align === 2 ? val : -val)); },
+      });
+      GMNetworkManager.peers.set("peer_a", { peerId: "peer_a", name: "A", role: "client", joinedAt: 1, controlledNetId: "pc_1" });
+      GMNetworkManager.peers.set("peer_b", { peerId: "peer_b", name: "B", role: "client", joinedAt: 2, controlledNetId: "pc_2" });
+
+      expect(GMPlayers.giveAlignment("peer_a", "light", 15)).toBe(true);
+      expect(pcA.goodEvil).toBe(65);
+      expect(playSoundFireAndForget).toHaveBeenCalledWith("mus_s_lightshort");
+      const shiftPackets = sent.filter((p) => p.type === "alignment.shift");
+      expect(shiftPackets).toHaveLength(1);
+      expect(shiftPackets[0].targetPeerId).toBeUndefined();
+      expect(shiftPackets[0].payload).toMatchObject({ alignment: "light", points: 15, total: 65, soundResRef: "mus_s_lightshort" });
+
+      // Client receives broadcast alignment.shift and hears Dark Side music
+      GMNetworkManager.role = "client";
+      GMPlayers.alignmentAlerts = [];
+      playSoundFireAndForget.mockClear();
+      expect(GMPlayers.giveAlignment("all", "dark", 10)).toBe(true);
+      expect(pcA.goodEvil).toBe(55);
+      expect(pcB.goodEvil).toBe(40);
+      await GMNetworkManager.onPacketReceived({
+        type: "alignment.shift", senderId: "gm", timestamp: 0,
+        payload: { targetName: "All players (2)", alignment: "dark", points: 10, total: 55, soundResRef: "mus_s_darkshort", text: "The GM awarded All players (2) 10 Dark Side points!" },
+      });
+      expect(playSoundFireAndForget).toHaveBeenCalledWith("mus_s_darkshort");
+      expect(GMPlayers.activeAlignmentAlerts()).toHaveLength(2);
     });
   });
 

@@ -56,6 +56,7 @@ import { AudioEmitterType } from "@/enums/audio/AudioEmitterType";
 import { AudioPriorityGroup } from "@/enums/audio/AudioPriorityGroup";
 import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { CombatRoundAction } from "@/combat";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import type { Action } from "@/actions/Action";
 import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
@@ -1772,13 +1773,7 @@ export class ModuleCreature extends ModuleObject {
       return 'g';
     }
 
-    /*if(weaponWield == 0)//this.isSimpleCreature())
-      return 'm';
-
-    if(weaponWield == 5 || weaponWield == 6 || weaponWield == 7 || weaponWield == 8 || weaponWield == 9){
-      return 'b';
-    }
-    return 'c';*/
+    return weaponType === 4 ? 'b' : 'm';
   }
 
   //Return the WeaponType ID for the current equipped items
@@ -1914,12 +1909,15 @@ export class ModuleCreature extends ModuleObject {
       break;
       case 'HitParry':
         rhWeaponSoundResRef = rhSounds?.getHitParryResRef() || '';
+        this.spawnCombatEventSparks('parry');
       break;
       case 'Contact':
         rhWeaponSoundResRef = rhSounds?.getClashResRef() || '';
+        this.spawnCombatEventSparks('clash');
       break;
       case 'Clash':
         rhWeaponSoundResRef = rhSounds?.getClashResRef() || '';
+        this.spawnCombatEventSparks('clash');
       break;
       case 'Hit':
         if(this.combatData.combatAction && this.combatData.combatAction.hits && this.combatData.combatAction.damage){
@@ -1941,6 +1939,38 @@ export class ModuleCreature extends ModuleObject {
       this.audioEmitter.setPriorityGroupId(AudioPriorityGroup.COMBAT);
       this.audioEmitter.playSoundFireAndForget(rhWeaponSoundResRef);
     }
+  }
+
+  /** Spawn visible clash / parry spark bursts at weapon contact during melee animations */
+  spawnCombatEventSparks(kind: 'clash' | 'parry'): void {
+    const target = this.combatData?.combatAction?.target || this.combatData?.lastAttackTarget || this.combatRound?.action?.target;
+    const defenderWeapon = (target as any)?.equipment?.RIGHTHAND;
+    const label = CombatVisualEffects.getMeleeSparkLabel(kind, this.equipment?.RIGHTHAND, defenderWeapon);
+    if(!label) return;
+    const resRef = CombatVisualEffects.lookupImpactModel(
+      label,
+      label === 'VFX_COM_SPARKS_LIGHTSABER' ? 'v_spkb_imp' : 'v_parrspr_imp'
+    );
+    if(!resRef) return;
+
+    const pos = new THREE.Vector3();
+    if(this.model?.impact){
+      this.model.impact.updateWorldMatrix(true, false);
+      this.model.impact.getWorldPosition(pos);
+    }else{
+      pos.copy(this.position).setZ(this.position.z + 1.15);
+    }
+    if(target?.position){
+      const tPos = new THREE.Vector3();
+      if(target.model?.impact){
+        target.model.impact.updateWorldMatrix(true, false);
+        target.model.impact.getWorldPosition(tPos);
+      }else{
+        tPos.copy(target.position).setZ(target.position.z + 1.15);
+      }
+      pos.lerp(tPos, 0.5);
+    }
+    GameState.ProjectileManager?.SpawnBurst?.(resRef, pos, this.context, 1.5);
   }
 
   /** The weapon in use: in the right hand, else the left, else a natural weapon (undefined when unarmed) */

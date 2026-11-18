@@ -85,7 +85,7 @@ export interface EngineHooks {
   onEffectApplied(owner: any, effect: GameEffect): void;
   /** An effect came off an object, or a spot (GameEffect.retire has run) */
   onEffectRemoved(owner: any, effect: GameEffect): void;
-  onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number): void;
+  onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number, options?: { deflected?: boolean; powerShot?: boolean }): void;
   onHostSpellCast(caster: ModuleObject, target: ModuleObject | undefined, spellId: number, casthandvisual: string, projmodel: string, castTime: number, conjureTime: number, range?: string): void;
   /** by opened door (by is the door itself when it opened on its own) */
   onDoorOpened(door: ModuleDoor, by: ModuleObject): void;

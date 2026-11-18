@@ -23,6 +23,8 @@
  *   helping powers         a player's helping power goes off out of combat; one the GM's machine refuses says why
  *   combat powers          a power queued while attacking goes off, Disable Droid is refused on a person, the
  *                          cast is raised, held and lowered, Burst of Speed doubles speed, only top feat ranks show
+ *   combat visuals         a feat plays its own animation and effect; blaster shots flash and hit on both screens
+ *   alignment              the GM's Light Side award: one stinger, a banner that goes, the points on the sheet
  *   rolls                  a player rolling from their sheet sees the result, on it and above it
  *   screens agree          GM and player agree on who is dead, and the dead lie down on both
  *   page errors            no uncaught errors on either screen
@@ -305,7 +307,8 @@ async function run() {
       const r = await evalIn(gm, (K) => {
         const R = window.__R, caster = R.named('^Dark Jedi Master 1$')[0], targets = R.named('^Telos Security');
         R.onlyThese([caster, ...targets]);
-        for (const o of [caster, ...targets]) R.fresh(o);
+        // Fresh, and kept from fighting each other on their own scripts: their new hit sparks were counted as left over
+        for (const o of [caster, ...targets]) { R.fresh(o); K.GMNpcOrders.setOrder(o, { kind: 'standDown' }); }
         // Its own fight held off: the Dark Jedi healing itself left a cure visual this check took for a stuck one
         window.__aiWas = K.GMManager.npcAiEnabled; K.GMManager.npcAiEnabled = false;
         R.put(caster, 4, 8, Math.PI / 2);
@@ -643,6 +646,92 @@ async function run() {
       const fast = await evalIn(gm, (K) => K.GMManager.getPlayerCharacters()[0].movementSpeed);
       expect(fast >= 1.9, `Burst of Speed took their speed from ×${before} to ×${fast.toFixed(2)}`);
       return `best feat ranks only; Disable Droid refused on a trooper; Stun went off after an attack (Force ${fp0} → ${after.fp}), cast ${after.cast.split(' ').length} parts; speed ×${fast.toFixed(2)}`;
+    });
+
+    await check('combat-visuals', "Combat looks as KotOR's: a feat's own animation and effect, saber sparks, and blaster flashes and impacts on both screens", async () => {
+      // A Jedi Guardian against a Dark Jedi Master, sabers out; a Sith Trooper shooting at the Guardian
+      const ids = await evalIn(gm, (K) => {
+        const R = window.__R, G = K.GMManager;
+        const [jedi] = R.named('^Jedi Guardian 1$'), [dark] = R.named('^Dark Jedi Master 1$'), [trooper] = R.named('^Sith Trooper');
+        R.onlyThese([jedi, dark, trooper]);
+        for (const o of [jedi, dark, trooper]) R.fresh(o);
+        G.npcAiEnabled = false;
+        R.put(jedi, 0, 6, 0); R.put(dark, 0, 7.4, Math.PI); R.put(trooper, 5, 6, Math.PI / 2);
+        for (const o of [jedi, dark]) G.setCreatureHP(o, 500, 500);
+        // What gets drawn: sparks and flashes (bursts), effects put on the Jedi, the Jedi's animations
+        window.__vis = { bursts: [], fx: [], anims: [] };
+        const PM = K.GameState.ProjectileManager;
+        if (!PM.__origBurst) PM.__origBurst = PM.SpawnBurst;
+        PM.SpawnBurst = function (resRef, ...rest) { window.__vis.bursts.push(resRef); return PM.__origBurst.call(this, resRef, ...rest); };
+        const add = jedi.addEffect.bind(jedi);
+        jedi.addEffect = (e, ...rest) => { if (e?.type === K.GameEffectType.EffectVisualEffect) window.__vis.fx.push(e.getInt(0)); return add(e, ...rest); };
+        clearInterval(window.__visTimer);
+        window.__visTimer = setInterval(() => { const n = jedi.model?.animationManager?.currentAnimation?.name || '-'; if (window.__vis.anims[window.__vis.anims.length - 1] !== n) window.__vis.anims.push(n); }, 15);
+        // Flurry, at the Dark Jedi
+        if (!jedi.getHasFeat(11)) jedi.addFeat(11);
+        const flurry = jedi.getFeats().find((f) => f.id === 11);
+        flurry.useTalentOnObject(dark, jedi);
+        trooper.attackCreature(jedi, undefined);
+        return { jedi: jedi.gmNetId, flurryFx: K.CombatVisualEffects.lookupVisualEffectId('VFX_COM_FLURRY_IMPROVED_SABER') };
+      });
+      // The player's screen: the bursts it draws
+      await evalIn(pl, (K) => {
+        window.__plBursts = [];
+        const PM = K.GameState.ProjectileManager;
+        if (!PM.__origBurst) PM.__origBurst = PM.SpawnBurst;
+        PM.SpawnBurst = function (resRef, ...rest) { window.__plBursts.push(resRef); return PM.__origBurst.call(this, resRef, ...rest); };
+        return true;
+      });
+      await pause(9);
+      const seen = await evalIn(gm, (K) => {
+        clearInterval(window.__visTimer);
+        const v = window.__vis;
+        K.GameState.ProjectileManager.SpawnBurst = K.GameState.ProjectileManager.__origBurst;
+        return { bursts: [...new Set(v.bursts)], fx: [...new Set(v.fx)], anims: v.anims.join(' ') };
+      });
+      const plBursts = await evalIn(pl, (K) => { K.GameState.ProjectileManager.SpawnBurst = K.GameState.ProjectileManager.__origBurst; return [...new Set(window.__plBursts)]; });
+      await evalIn(gm, (K) => { K.GMManager.npcAiEnabled = true; return true; });
+      expect(/(^| )f\d+a2/.test(seen.anims), `Flurry didn't play a flurry animation (f…a2…): ${seen.anims}`);
+      expect(seen.fx.includes(ids.flurryFx), `Flurry's effect (${ids.flurryFx}) wasn't put on the Jedi: ${seen.fx.join(', ') || 'none'}`);
+      const impacts = ['v_blaster_imp', 'v_blastdef_imp', 'v_spksplat_imp'];
+      expect(seen.bursts.includes('v_muzflash_01'), `no muzzle flash on the GM's screen: ${seen.bursts.join(', ') || 'none'}`);
+      expect(seen.bursts.some((b) => impacts.includes(b)), `no bolt impact, deflection or splash on the GM's screen: ${seen.bursts.join(', ')}`);
+      expect(plBursts.includes('v_muzflash_01') && plBursts.some((b) => impacts.includes(b)), `the player's screen didn't draw the shots' flashes and impacts: ${plBursts.join(', ') || 'none'}`);
+      return `animations ${seen.anims.split(' ').filter((n) => /^f/.test(n)).join('/')}, effects ${seen.fx.join(',')}, GM bursts ${seen.bursts.join(',')}, player bursts ${plBursts.join(',')}`;
+    });
+
+    await check('alignment', 'The GM awards Light Side points: the player hears the stinger once, sees the banner (and it goes), and their sheet has them', async () => {
+      const before = await evalIn(gm, (K) => {
+        const peer = [...K.GMNetworkManager.peers.values()][0];
+        const pc = K.GMPlayers.getPeerActor(peer.peerId);
+        pc.goodEvil = 50;
+        K.GMPlayers.updatePlayerSheets();
+        return { peerId: peer.peerId, value: pc.goodEvil };
+      });
+      await pause(1);
+      await evalIn(pl, (K) => {
+        window.__sounds = [];
+        const emitter = K.GameState.guiAudioEmitter;
+        if (!emitter.__origPlay) emitter.__origPlay = emitter.playSoundFireAndForget;
+        emitter.playSoundFireAndForget = function (resRef, ...rest) { window.__sounds.push(String(resRef).toLowerCase()); return emitter.__origPlay.call(this, resRef, ...rest); };
+        return true;
+      });
+      const given = await evalIn(gm, (K, peerId) => K.GMPlayers.giveAlignment(peerId, 'light', 5), before.peerId);
+      expect(given, 'the GM could not award the points');
+      await waitFor(pl, 'the banner on the player\'s screen', () => !!document.querySelector('.gm-align-alert.light'), 15000);
+      await pause(3);
+      const heard = await evalIn(pl, (K) => ({
+        sounds: window.__sounds.slice(),
+        text: document.querySelector('.gm-align-alert.light .gm-align-text')?.innerText || '',
+        value: K.GameState.getCurrentPlayer()?.goodEvil,
+      }));
+      const stingers = heard.sounds.filter((s) => s === 'mus_s_lightshort').length;
+      expect(stingers === 1, `the player heard the Light Side stinger ${stingers} times (sounds: ${heard.sounds.join(', ') || 'none'})`);
+      expect(heard.value === 55, `the player's sheet has ${heard.value} (was 50, +5)`);
+      expect(/5 Light Side point/.test(heard.text), `the banner says: ${heard.text}`);
+      await waitFor(pl, 'the banner to go', () => !document.querySelector('.gm-align-alert'), 15000);
+      await evalIn(pl, (K) => { K.GameState.guiAudioEmitter.playSoundFireAndForget = K.GameState.guiAudioEmitter.__origPlay; return true; });
+      return `"${heard.text}", stinger once, sheet ${before.value} → ${heard.value}, banner gone`;
     });
 
     await check('rolls', 'A player rolling from their sheet sees the result, there and above it', async () => {

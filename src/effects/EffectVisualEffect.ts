@@ -44,7 +44,8 @@ export class EffectVisualEffect extends GameEffect {
 
     const visualeffects2DA = GameState.TwoDAManager.datatables.get('visualeffects');
     if(visualeffects2DA){
-      this.visualEffect = visualeffects2DA.getByID(this.getInt(0));
+      const id = this.getInt(0);
+      this.visualEffect = visualeffects2DA.getByID(id) || visualeffects2DA.rows?.[id];
     }
 
     return this;
@@ -145,6 +146,11 @@ export class EffectVisualEffect extends GameEffect {
       return;
 
     super.onApply();
+
+    if(!this.visualEffect){
+      this.applied = true;
+      return;
+    }
 
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
 
