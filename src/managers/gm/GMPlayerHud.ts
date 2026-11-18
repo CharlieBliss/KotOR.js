@@ -455,9 +455,31 @@ export class GMPlayerHud {
       case 'recover':
         return menu({ action: engineAction('ActionRecoverMine', [[0, target]]) });
       default:
-        // Attack, talk, search, open, use, sit: what clicking it does
-        return GameState.hooks.interceptInteraction(pc, target) ? { ok: true } : { ok: false, message: "Can't reach it from here" };
+        // Attack, talk, search, open, use, sit: clients ask the host; in Host POSSESS or Offline GM, act locally
+        if (GameState.hooks.interceptInteraction(pc, target)) return { ok: true };
+        if (GMNetworkManager.role !== 'client') {
+          pc.clearAllActions();
+          if (id === 'attack') pc.attackCreature(target, undefined);
+          else if (typeof (target as any).onClick === 'function') (target as any).onClick(pc);
+          else pc.actionUseObject(target);
+          return { ok: true };
+        }
+        return { ok: false, message: "Can't reach it from here" };
     }
+  }
+
+  /** Cancel queued actions for the active player (client sends cancel intent; host/offline clears locally) */
+  static stop() {
+    if (GMNetworkManager.role === 'client') {
+      GMNetworkManager.sendIntent('cancel');
+      return;
+    }
+    const pc = this.player();
+    if (!pc) return;
+    pc.cancelCombat?.();
+    pc.clearAllActions?.();
+    pc.combatRound?.clearActions?.();
+    pc.gmFightTarget = undefined;
   }
 
   /**

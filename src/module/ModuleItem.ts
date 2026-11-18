@@ -360,11 +360,11 @@ export class ModuleItem extends ModuleObject {
   }
 
   getDamageFlags(): number {
-    return this.baseItem.damageFlags;
+    return this.baseItem?.damageFlags || 0;
   }
 
   getCriticalThreatRangeMin(){
-    return 20 - this.baseItem.criticalThreat;
+    return 20 - (this.baseItem?.criticalThreat || 0);
   }
 
   getCriticalThreatRangeMax(){
@@ -622,7 +622,7 @@ export class ModuleItem extends ModuleObject {
       break;
       default:
         if(wasPowered && !current) model.playAnimation('powerdown');
-        else model.playAnimation('off', true);
+        else if(current !== 'off') model.playAnimation('off', true);
       break;
     }
   }

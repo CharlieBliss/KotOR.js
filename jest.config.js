@@ -3,6 +3,7 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   moduleNameMapper: {
+    '\\.(css|scss|sass)$': '<rootDir>/src/tests/__mocks__/styleMock.js',
     '^@/(.*)$': '<rootDir>/src/$1',
   },
   transform: {

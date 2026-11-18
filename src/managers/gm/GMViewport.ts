@@ -791,42 +791,47 @@ export class GMViewport {
       return { position: pos, facing: Utility.NormalizeRadian(angle + Math.PI) };
     }
 
+    const area = GameState.module?.area;
+    const snap = (p: THREE.Vector3) => (area?.getNearestWalkablePoint ? area.getNearestWalkablePoint(p, 0.5).clone() : p);
     const cam = this.getActiveThreeCamera();
     if (!cam) {
-      const area = GameState.module?.area;
       return {
-        position: new THREE.Vector3(area?.module?.entryX || 0, area?.module?.entryY || 0, area?.module?.entryZ || 0),
+        position: snap(new THREE.Vector3(area?.module?.entryX || 0, area?.module?.entryY || 0, area?.module?.entryZ || 0)),
         facing: 0
       };
     }
 
     const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const ray = new THREE.Raycaster(cam.position.clone(), forward.clone().normalize());
-    const targets: THREE.Object3D[] = [];
-    if (GameState.walkmeshList?.length) targets.push(...GameState.walkmeshList);
-    if (GameState.group?.rooms) targets.push(GameState.group.rooms);
+    const walkTargets: THREE.Object3D[] = GameState.walkmeshList?.length ? [...GameState.walkmeshList] : [];
+    const roomTargets: THREE.Object3D[] = GameState.group?.rooms ? [GameState.group.rooms] : [];
 
-    const hits = ray.intersectObjects(targets, true);
+    const walkHits = walkTargets.length ? ray.intersectObjects(walkTargets, true) : [];
+    const hits = walkHits.length > 0 && walkHits[0].distance < 35
+      ? walkHits
+      : (roomTargets.length ? ray.intersectObjects(roomTargets, true) : []);
     if (hits.length > 0 && hits[0].distance < 35) {
-      const pt = hits[0].point.clone();
+      const pt = snap(hits[0].point.clone());
       const facing = Math.atan2(cam.position.x - pt.x, cam.position.y - pt.y);
       return { position: pt, facing };
     }
 
     // Fallback: project forward and snap Z down onto walkmesh
     const fallbackPos = cam.position.clone().addScaledVector(forward, distance);
+    const allTargets = [...walkTargets, ...roomTargets];
     const downRay = new THREE.Raycaster(
       new THREE.Vector3(fallbackPos.x, fallbackPos.y, fallbackPos.z + 10),
       new THREE.Vector3(0, 0, -1)
     );
-    const downHits = downRay.intersectObjects(targets, true);
+    const downHits = allTargets.length ? downRay.intersectObjects(allTargets, true) : [];
     if (downHits.length > 0) {
       fallbackPos.z = downHits[0].point.z;
     } else if (GameState.module) {
       fallbackPos.z = GameState.module.entryZ || 0;
     }
-    const facing = Math.atan2(cam.position.x - fallbackPos.x, cam.position.y - fallbackPos.y);
-    return { position: fallbackPos, facing };
+    const snapped = snap(fallbackPos);
+    const facing = Math.atan2(cam.position.x - snapped.x, cam.position.y - snapped.y);
+    return { position: snapped, facing };
   }
 
   /**

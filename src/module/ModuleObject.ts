@@ -393,7 +393,7 @@ export class ModuleObject {
     if(!resRef){ return true; }
     const buffer = ResourceLoader.loadCachedResource(resType, resRef);
     if(!buffer){
-      console.error(`Failed to load ${this.constructor.name} template ${resRef}`);
+      console.warn(`Failed to load ${this.constructor.name} template ${resRef}`);
       return false;
     }
     this.template.merge(new GFFObject(buffer));
@@ -2603,7 +2603,7 @@ export class ModuleObject {
       this.model.updateMatrix();
     }
     
-    if(this.model instanceof THREE.Object3D)
+    if(this.box && this.model instanceof THREE.Object3D)
       this.box.setFromObject(this.model);
   }
 

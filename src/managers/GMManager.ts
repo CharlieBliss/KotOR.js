@@ -1218,7 +1218,7 @@ export class GMManager {
 
     const everyone: ModuleCreature[] = [...area.creatures, ...GameState.PartyManager.party];
     for (const cre of area.creatures) {
-      if (!this.isAutonomousNpc(cre)) continue;
+      if (!this.isAutonomousNpc(cre) || cre.gmHidden) continue;
       // Walking on the spot towards someone it can't reach: think again (GMCombatAI)
       GMCombatAI.checkStuck(cre, everyone);
       if (GMNpcOrders.getOrder(cre)) {
@@ -1385,6 +1385,14 @@ export class GMManager {
     // A connected player's character can't be hidden: it would vanish from their own game
     if (!obj || obj.gmOwnerPeerId) return false;
     obj.gmHidden = !!hidden;
+    // Off the stage: it stops what it was doing. Hidden mid-fight, it went on fighting where players couldn't
+    // see it (a stun from nowhere); the GM's AI and its behaviour scripts leave it be until it's shown again
+    if (hidden && GMObjectKind.isCreature(obj)) {
+      const cre = obj as ModuleCreature;
+      cre.clearAllActions?.();
+      cre.combatRound?.clearActions?.();
+      cre.cancelCombat?.();
+    }
     const netId = obj.gmNetId;
     if (netId && GMNetworkManager.role === 'host') {
       if (hidden) {
@@ -1442,6 +1450,7 @@ export class GMManager {
     isWorldPaused: () => GMManager.worldHeld(),
     ownsCombatHud: () => GMPlayerHud.active(),
     sharedWorld: () => GMNetworkManager.role !== 'offline',
+    keepsModuleState: () => false,
     cutsceneCamera: () => GMCutscene.renderCamera(),
     isPlayerFrozen: (creature) => GMManager.isPlayerFrozen(creature),
     isPlayerCharacter: (obj) => GMManager.isPlayerCharacter(obj),
@@ -1457,6 +1466,7 @@ export class GMManager {
     onEffectApplied: (owner, effect) => GMReplication.onEffectApplied(owner, effect),
     onEffectRemoved: (owner, effect) => GMReplication.onEffectRemoved(owner, effect),
     onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),
+    onHostSpellCast: (caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range) => GMReplication.onHostSpellCast(caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range),
     onDoorOpened: (door, by) => {
       // Tell everyone, once this frame's state has settled, when a door opened for someone in a session
       if(by === door || GMNetworkManager.role === 'offline') return;

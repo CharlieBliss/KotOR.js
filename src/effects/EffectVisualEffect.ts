@@ -209,17 +209,17 @@ export class EffectVisualEffect extends GameEffect {
               this.impact_model = model;
               TextureLoader.LoadQueue();
             }
-          )
+          ).catch(() => {});
         }
-      );
+      ).catch(() => {});
     }
 
     this.impactRoot();
     this.impactHead();
 
-    if(this.visualEffect.soundimpact != '***'){
+    if(this.visualEffect.soundimpact && this.visualEffect.soundimpact != '***' && this.visualEffect.soundimpact != '****'){
       if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature) || this.object?.audioEmitter instanceof AudioEmitter){
-        this.object.audioEmitter.playSound(this.visualEffect.soundimpact);
+        this.object.audioEmitter.playSound(this.visualEffect.soundimpact)?.catch?.(() => {});
       }
     }
   }
@@ -235,8 +235,8 @@ export class EffectVisualEffect extends GameEffect {
           if(!this.adoptModel(model, this.object.model)) return;
           this.impact_root_model = model;
           TextureLoader.LoadQueue();
-        });
-      });
+        }).catch(() => {});
+      }).catch(() => {});
     }
   }
 
@@ -253,9 +253,9 @@ export class EffectVisualEffect extends GameEffect {
             if(!this.adoptModel(model, head)) return;
             this.impact_head_model = model;
             TextureLoader.LoadQueue();
-          })
+          }).catch(() => {});
         }
-      );
+      ).catch(() => {});
     }
   }
 
@@ -307,17 +307,17 @@ export class EffectVisualEffect extends GameEffect {
                     context: this.object.context,
                     isForceShield: true,
                   }).then((head: OdysseyModel3D) => {
-                    this.model.attachHead(head);
+                    this.model?.attachHead(head);
                     //head.disableMatrixUpdate();
                     TextureLoader.LoadQueue();
-                  })
-                })
+                  }).catch(() => { TextureLoader.LoadQueue(); });
+                }).catch(() => { TextureLoader.LoadQueue(); });
               }else{
                 TextureLoader.LoadQueue();
               }
-            })
+            }).catch(() => {});
           }
-        );
+        ).catch(() => {});
       }
 
     }
@@ -335,6 +335,7 @@ export class EffectVisualEffect extends GameEffect {
       if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
         const creature = this.object as ModuleCreature;
         MDLLoader.loader.load(creature.bodyModel).then((mdl: OdysseyModel) => {
+          if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             textureVar: fx_tex,
             isForceShield: true,
@@ -354,7 +355,7 @@ export class EffectVisualEffect extends GameEffect {
                     context: this.object.context,
                     isForceShield: true,
                   }).then((head: OdysseyModel3D) => {
-                    this.model.attachHead(head);
+                    this.model?.attachHead(head);
                     //head.disableMatrixUpdate();
                     TextureLoader.LoadQueue();
                   }).catch(() => {
@@ -367,8 +368,8 @@ export class EffectVisualEffect extends GameEffect {
                 TextureLoader.LoadQueue();
               }
             }
-          });
-        });
+          }).catch(() => {});
+        }).catch(() => {});
       }
 
     }

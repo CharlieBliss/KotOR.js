@@ -66,6 +66,12 @@ export interface EngineHooks {
    * Space doesn't stop it. Only the mode pauses it (isWorldPaused)
    */
   sharedWorld(): boolean;
+  /**
+   * A module left is saved to the game in progress and comes back as it was left (KotOR's own play). Not in a
+   * GM session: its world is the GM's (sessions save it), and an area saved with what the GM spawned in it came
+   * back with those as the area's own on the GM's machine only, so players' screens were missing them
+   */
+  keepsModuleState(): boolean;
   /** The mode draws its own combat HUD (a GM session's player): KotOR's target, action, queue and party panels hide */
   ownsCombatHud(): boolean;
   /** The area leaves out its own placeables, creatures or triggers */
@@ -80,6 +86,7 @@ export interface EngineHooks {
   /** An effect came off an object, or a spot (GameEffect.retire has run) */
   onEffectRemoved(owner: any, effect: GameEffect): void;
   onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number): void;
+  onHostSpellCast(caster: ModuleObject, target: ModuleObject | undefined, spellId: number, casthandvisual: string, projmodel: string, castTime: number, conjureTime: number, range?: string): void;
   /** by opened door (by is the door itself when it opened on its own) */
   onDoorOpened(door: ModuleDoor, by: ModuleObject): void;
   onMineChanged(mine: ModuleTrigger): void;
@@ -137,11 +144,13 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   cutsceneCamera: () => null,
   ownsCombatHud: () => false,
   sharedWorld: () => false,
+  keepsModuleState: () => true,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
   onEffectApplied: () => {},
   onEffectRemoved: () => {},
   onHostProjectile: () => {},
+  onHostSpellCast: () => {},
   onDoorOpened: () => {},
   onMineChanged: () => {},
   onMineRemoved: () => {},

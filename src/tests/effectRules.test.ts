@@ -7,9 +7,13 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 import { ModuleCreature } from "@/module/ModuleCreature";
 import { ModuleObject } from "@/module/ModuleObject";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { GameEffectSetStateType } from "@/enums/effects/GameEffectSetStateType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ModuleItemProperty } from "@/enums/module/ModuleItemProperty";
 import { ModuleItem } from "@/module/ModuleItem";
+import { EffectSetState } from "@/effects/EffectSetState";
+import { EffectLightSaberThrow } from "@/effects/EffectLightSaberThrow";
+import { Dice } from "@/utility/Dice";
 import { GameState } from "@/GameState";
 
 const C = ModuleCreature.prototype as any;
@@ -162,5 +166,72 @@ describe("usable items", () => {
     expect(ModuleItem.GetCastSpellId({ subType: 64 } as any)).toBe(64);
     expect(ModuleItem.GetCastSpellId({ subType: 87 } as any)).toBe(87);
     expect(ModuleItem.GetCastSpellId({ subType: 999 } as any)).toBe(-1);
+  });
+});
+
+describe("Whirlwind, Force Push & Saber Throw fixes", () => {
+  afterEach(() => {
+    Dice.setRng(null);
+    delete (GameState as any).GameEffectFactory;
+  });
+
+  test("Force Whirlwind counts as debilitated on ModuleCreature", () => {
+    const cre = creature();
+    expect(cre.isWhirlwind()).toBe(false);
+    expect(cre.isDebilitated()).toBe(false);
+    cre.effects.push(effect(GameEffectType.EffectSetState, GameEffectSetStateType.WHIRLWIND));
+    expect(cre.isWhirlwind()).toBe(true);
+    expect(cre.isDebilitated()).toBe(true);
+  });
+
+  test("EffectSetState Force Push resets pose flags on apply and respects mirrored & missing model", () => {
+    const push = new EffectSetState();
+    push.setInt(0, GameEffectSetStateType.FORCEPUSH);
+    push.setFloat(0, 0); push.setFloat(1, 0); push.setFloat(2, 0);
+    push.setFloat(3, 5); push.setFloat(4, 0); push.setFloat(5, 0);
+    push.setFloat(6, 5);
+    const obj: any = {
+      position: { x: 1, y: 2, z: 0, copy: jest.fn(), set: jest.fn() },
+      fp_push_played: true, fp_land_played: true, fp_getup_played: true,
+    };
+    push.setAttachedObject(obj);
+    push.mirrored = true;
+    push.onApply();
+    expect(obj.fp_push_played).toBe(false);
+    expect(obj.fp_land_played).toBe(false);
+    expect(obj.fp_getup_played).toBe(false);
+
+    // During landing phase, a mirrored effect does not overwrite client-smoothed position or crash without model/box
+    push.elapsed = 0.6;
+    expect(() => push.updateForcePush(0.016)).not.toThrow();
+    expect(obj.position.set).not.toHaveBeenCalled();
+    expect(obj.fp_push_played).toBe(true);
+  });
+
+  test("EffectLightSaberThrow.strike uses Dice PRNG deterministically", () => {
+    const applied: any[] = [];
+    (GameState as any).GameEffectFactory = {
+      EffectDamage: class {
+        ints: number[] = [];
+        setCreator() {}
+        setSpellId() {}
+        setInt(i: number, v: number) { this.ints[i] = v; }
+        initialize() {}
+      },
+    };
+    const thrower: any = creature({ str: 16, getBaseAttackBonus: () => 5 });
+    const target: any = creature({ getAC: () => 15, addEffect: (e: any) => applied.push(e) });
+    const saber = { getBaseDamage: () => 12, getDamageBonus: () => 2, getBaseDamageType: () => 2 };
+
+    // Roll 1 -> natural 1 always misses
+    Dice.setRng(() => 0);
+    expect(EffectLightSaberThrow.strike(thrower, target, saber)).toBe(false);
+    expect(applied).toHaveLength(0);
+
+    // Roll 20 -> natural 20 always hits and deals saber + STR damage
+    Dice.setRng(() => 0.99);
+    expect(EffectLightSaberThrow.strike(thrower, target, saber)).toBe(true);
+    expect(applied).toHaveLength(1);
+    expect(applied[0].ints[2]).toBe(17);
   });
 });

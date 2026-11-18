@@ -330,7 +330,10 @@ export class ModuleCreature extends ModuleObject {
 
     this.perceptionList = [];
 
-    this.setAnimationState(ModuleCreatureAnimState.IDLE);
+    // HP is still 0 before load() / setCreatureHP(); calling setAnimationState(IDLE) here would trigger BodyOwner.DEAD
+    // (10006) and force every newly spawned creature/player through GET_UP_DEAD (10223) on frame 1.
+    this.resetAnimationState();
+    this.animationState.animation = this.animationConstantToAnimation(ModuleCreatureAnimState.IDLE);
     this.combatData.combatActionTimer = 3; 
     this.combatData.combatState = false;
     this.combatData.lastAttackAction = ActionType.ActionInvalid;
@@ -908,7 +911,7 @@ export class ModuleCreature extends ModuleObject {
         continue;
       }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
-        if(GameState.PartyManager.party.indexOf(this) == -1){
+        if(GameState.PartyManager.party.indexOf(this) == -1 && !(this as any).isPlayer){
           if(this.isHostile(creature)){
             this.resetExcitedDuration();
             if(this == GameState.getCurrentPlayer() && !this.combatData.combatState){
@@ -943,7 +946,7 @@ export class ModuleCreature extends ModuleObject {
         continue;
       }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
-        if(GameState.PartyManager.party.indexOf(this) == -1){
+        if(GameState.PartyManager.party.indexOf(this) == -1 && !(this as any).isPlayer){
           if(this.isHostile(creature)){
             this.resetExcitedDuration();
           }
@@ -1837,16 +1840,18 @@ export class ModuleCreature extends ModuleObject {
   }
 
   updateItems(delta = 0){
-
-    if(this.equipment.RIGHTHAND){
-      if(this.equipment.RIGHTHAND.model instanceof OdysseyModel3D){
-        this.equipment.RIGHTHAND.model.update(delta)
-      }
+    const keepLit = !GameState.hooks.isNetReplica(this) && !this.isDead() && !!this.combatData?.combatState;
+    if(keepLit){
+      this.weaponPowered(true);
     }
 
-    if(this.equipment.LEFTHAND){
-      if(this.equipment.LEFTHAND.model instanceof OdysseyModel3D){
-        this.equipment.LEFTHAND.model.update(delta)
+    for(const item of [this.equipment.RIGHTHAND, this.equipment.LEFTHAND]){
+      if(item?.model instanceof OdysseyModel3D){
+        item.model.update(delta);
+        // Once a one-shot 'powerup' finishes, transition immediately into the looping 'powered' blade state.
+        if(item.isPowered && !item.model.animationManager?.currentAnimation){
+          item.setPowered(true);
+        }
       }
     }
 
@@ -2337,7 +2342,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   isDebilitated(){
-    return this.isConfused() || this.isStunned() || this.isDroidStunned() || this.isParalyzed() || this.isFrightened() || this.isChoking() || this.isForcePushed() || this.isHorrified();
+    return this.isConfused() || this.isStunned() || this.isDroidStunned() || this.isParalyzed() || this.isFrightened() || this.isChoking() || this.isForcePushed() || this.isWhirlwind() || this.isHorrified();
   }
 
   setCommadable(bCommandable = 0){
@@ -2559,11 +2564,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getMaxFP(){
-    return this.maxForcePoints;
+    return Number.isFinite(Number(this.maxForcePoints)) ? Number(this.maxForcePoints) : (Number(this.forcePoints) || 0);
   }
 
   setFP(nAmount = 0){
-    let bonus = this.maxForcePoints - this.forcePoints;
+    const bonus = this.getMaxFP() - (Number(this.forcePoints) || 0);
     this.currentForce = nAmount - bonus;
   }
 
@@ -3505,7 +3510,7 @@ export class ModuleCreature extends ModuleObject {
       this.model = model;
       this.model.userData.moduleObject = this;
       this.container.add(this.model);
-      this.box.setFromObject(this.container);
+      if(this.box) this.box.setFromObject(this.container);
 
       try{
         if(this.model.lhand instanceof OdysseyObject3D){

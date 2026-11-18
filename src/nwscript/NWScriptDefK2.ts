@@ -5441,7 +5441,13 @@ NWScriptDefK2.Actions = {
     name: 'EffectForceBody',
     type: NWScriptDataType.EFFECT,
     args: [ NWScriptDataType.INTEGER ],
-    action: undefined
+    action: function(this: NWScriptInstance, args: [number]){
+      const effect = new GameState.GameEffectFactory.EffectBodyFuel();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, args[0] || 0);
+      return effect.initialize();
+    }
   },
   771: {
     comment: 'FAK-OEI 12/15/2003\n771: Get the number of components for an item',
@@ -5483,14 +5489,21 @@ NWScriptDefK2.Actions = {
     name: 'GetSpellForcePointCost',
     type: NWScriptDataType.INTEGER,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      return Number(this.lastSpell?.getForcePointCost?.(this.lastSpellCaster as ModuleCreature)) || 0;
+    }
   },
   777: {
     comment: 'DJS-OEI 1/2/2004\n777: Create a Fury effect.',
     name: 'EffectFury',
     type: NWScriptDataType.EFFECT,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectHaste();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      return effect.initialize();
+    }
   },
   778: {
     comment: 'DJS-OEI 1/3/2004\n778: Create a Blind effect.',
@@ -5504,21 +5517,40 @@ NWScriptDefK2.Actions = {
     name: 'EffectFPRegenModifier',
     type: NWScriptDataType.EFFECT,
     args: [ NWScriptDataType.INTEGER ],
-    action: undefined
+    action: function(this: NWScriptInstance, args: [number]){
+      const effect = new GameState.GameEffectFactory.EffectHealForcePoints();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, Math.max(0, args[0] || 0));
+      return effect.initialize();
+    }
   },
   780: {
     comment: 'DJS-OEI 1/4/2004\n780: Create a VP regeneration modifier effect.',
     name: 'EffectVPRegenModifier',
     type: NWScriptDataType.EFFECT,
     args: [ NWScriptDataType.INTEGER ],
-    action: undefined
+    action: function(this: NWScriptInstance, args: [number]){
+      const effect = new GameState.GameEffectFactory.EffectRegenerate();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, args[0] || 0);
+      effect.setInt(1, 6000);
+      return effect.initialize();
+    }
   },
   781: {
     comment: 'DJS-OEI 1/9/2004\n781: Create a Force Crush effect.',
     name: 'EffectCrush',
     type: NWScriptDataType.EFFECT,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectSetState();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, 7);
+      return effect.initialize();
+    }
   },
   782: {
     comment: 'FAK - OEI 1/12/04\n782: Minigame grabs a swoop bike upgrade',
@@ -5549,7 +5581,11 @@ NWScriptDefK2.Actions = {
     name: 'GetSpellAcquired',
     type: NWScriptDataType.INTEGER,
     args: [ NWScriptDataType.INTEGER, NWScriptDataType.OBJECT ],
-    action: undefined
+    action: function(this: NWScriptInstance, args: [number, ModuleObject]){
+      const cre = args[1] as ModuleCreature;
+      if(!BitWise.InstanceOfObject(cre, ModuleObjectType.ModuleCreature)) return NW_FALSE;
+      return cre.getSpells?.().some((s: any) => s.id === args[0]) ? NW_TRUE : NW_FALSE;
+    }
   },
   785: {
     comment: 'FAK-OEI 1/12/2004\n785: Displays the Swoop Bike upgrade screen.',
@@ -5796,7 +5832,11 @@ NWScriptDefK2.Actions = {
     name: 'IsFormActive',
     type: NWScriptDataType.INTEGER,
     args: [ NWScriptDataType.OBJECT, NWScriptDataType.INTEGER ],
-    action: undefined
+    action: function(this: NWScriptInstance, args: [ModuleObject, number]){
+      const cre = args[0] as any;
+      if(!BitWise.InstanceOfObject(cre, ModuleObjectType.ModuleCreature)) return NW_FALSE;
+      return cre.activeForm === args[1] ? NW_TRUE : NW_FALSE;
+    }
   },
   817: {
     comment: '817\nDJS-OEI 3/28/2004\nReturns the Form Mask of the requested spell. This is used\nto determine if a spell is affected by various Forms, usually\nConsular forms that modify duration/range.',
@@ -5851,7 +5891,12 @@ NWScriptDefK2.Actions = {
     name: 'EffectForceSight',
     type: NWScriptDataType.EFFECT,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectTrueSeeing();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      return effect.initialize();
+    }
   },
   824: {
     comment: '824\nFAK - OEI 5/7/04\ngets the walk state of the creature: 0 walk or standing, 1 is running',
@@ -6058,14 +6103,26 @@ NWScriptDefK2.Actions = {
     name: 'EffectMindTrick',
     type: NWScriptDataType.EFFECT,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectSetState();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, 1);
+      return effect.initialize();
+    }
   },
   849: {
     comment: '849\nCreate a Faction Modifier effect.',
     name: 'EffectFactionModifier',
     type: NWScriptDataType.EFFECT,
     args: [ NWScriptDataType.INTEGER ],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectSetState();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, 1);
+      return effect.initialize();
+    }
   },
   850: {
     comment: '850\nChangeObjectAppearance\noObjectToChange = Object to change appearance of\nnAppearance = appearance to change to (from appearance.2da)',
@@ -6088,7 +6145,13 @@ NWScriptDefK2.Actions = {
     name: 'EffectDroidScramble',
     type: NWScriptDataType.EFFECT,
     args: [],
-    action: undefined
+    action: function(this: NWScriptInstance){
+      const effect = new GameState.GameEffectFactory.EffectSetState();
+      effect.setCreator(this.caller);
+      effect.setSpellId(this.getSpellId());
+      effect.setInt(0, 1);
+      return effect.initialize();
+    }
   },
   853: {
     comment: '853\nActionSwitchWeapons\nForces the creature to switch between Config 1 and Config 2\nof their equipment. Does not work in dialogs. Works with\nAssignCommand()',

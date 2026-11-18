@@ -383,6 +383,15 @@ export class GMSpawner {
     }
 
     const model = await creature.loadModel();
+    // Removed or hidden while its model was still loading: discard the half-built replica cleanly
+    if (creature.destroyed || !creature.box) {
+      if (model) {
+        model.removeFromParent();
+        try { model.dispose(); } catch {}
+      }
+      delete creature.gmSpawning;
+      return null;
+    }
     if (model) {
       model.userData.moduleObject = creature;
       model.hasCollision = true;
@@ -494,6 +503,14 @@ export class GMSpawner {
     }
 
     const model = await plc.loadModel();
+    if (plc.destroyed || !plc.box) {
+      if (model) {
+        model.removeFromParent();
+        try { model.dispose(); } catch {}
+      }
+      delete plc.gmSpawning;
+      return null;
+    }
     if (plc.container && scale !== 1.0) {
       plc.container.scale.setScalar(scale);
     }
@@ -669,14 +686,16 @@ export class GMSpawner {
     opts: { netIdPrefix: string; existingNetId?: string; remote?: boolean; leadParty?: boolean; possess?: boolean }
   ): Promise<ModulePlayer> {
     const area = GameState.module.area;
+    const pos = area.getNearestWalkablePoint ? area.getNearestWalkablePoint(loc.position, player.getHitDistance?.() || 0.5) : loc.position;
+    player.position.copy(pos);
+    player.setFacing(loc.facing, true);
+    player.getCurrentRoom();
+
     const model = await player.loadModel();
     if (model) {
       model.userData.moduleObject = player;
       model.hasCollision = true;
     }
-
-    player.position.copy(loc.position);
-    player.setFacing(loc.facing, true);
 
     if (!GMManager.spawnedPlayers.includes(player)) {
       GMManager.spawnedPlayers.push(player);
@@ -784,7 +803,7 @@ export class GMSpawner {
     item.equippedRes = resKey;
     item.inventoryRes = resKey;
     item.stackSize = 1;
-    item.load();
+    item.initProperties();
     return item;
   }
 

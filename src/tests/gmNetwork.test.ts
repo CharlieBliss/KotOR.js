@@ -261,6 +261,7 @@ describe("GM multiplayer host authority", () => {
       expect(spawn).not.toHaveBeenCalled();
       expect(GMNetworkManager.peers.get("peer_a")?.controlledNetId).toBe("pc_1");
       expect(sent).toContainEqual(expect.objectContaining({ type: "actor.assign", targetPeerId: "peer_a", payload: expect.objectContaining({ netId: "pc_1" }) }));
+      expect(sent).toContainEqual(expect.objectContaining({ type: "player.sheet", targetPeerId: "peer_a" }));
     });
 
     test("a new player still gets a freshly spawned character", async () => {
@@ -408,6 +409,164 @@ describe("GM multiplayer host authority", () => {
       cre.effects = [effect(GameEffectType.EffectSetState, 1), effect(GameEffectType.EffectVisualEffect, 0), effect(GameEffectType.EffectHeal, 1)];
       const lasting = GMReplication.lastingMirrors().filter((e) => e.netId === "cre_0");
       expect(lasting.map((e) => e.effect.type)).toEqual([GameEffectType.EffectSetState]);
+    });
+
+    test("Force Speed reaches players as its effect, and their copy works its speed out from it", () => {
+      GMNetworkManager.role = "host";
+      (GameState as any).PartyManager = { party: [] };
+      (GameState as any).module = { readyToProcessEvents: true, area: { creatures: [], placeables: [], doors: [] } };
+      const hostPc = mockCreature("pc_1", {
+        movementSpeed: 1.99,
+        equipment: {},
+        getTemplateResRef: () => "",
+        getName: () => "Speedy",
+        getTag: () => "speedy",
+        getHP: () => 50,
+        getMaxHP: () => 50,
+        getFacing: () => 0,
+      });
+      const speedFx: any = {
+        type: GameEffectType.EffectMovementSpeedIncrease,
+        spellId: 11,
+        object: hostPc,
+        intList: [99],
+        floatList: [],
+        mirrored: false,
+        getInt: (i: number) => (i === 0 ? 99 : 0),
+        getObject: (): undefined => undefined,
+        getDurationType: () => 1,
+        getDuration: () => 36,
+      };
+      hostPc.effects = [speedFx];
+      GMReplication.onEffectApplied(hostPc, speedFx);
+
+      const sent = fxSent();
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({
+        kind: "effect.add",
+        netId: "pc_1",
+        effect: { type: GameEffectType.EffectMovementSpeedIncrease, spellId: 11, ints: [99], duration: 36 },
+      });
+      expect(GMReplication.lastingMirrors().filter((e) => e.netId === "pc_1").map((e) => e.effect.type))
+        .toEqual([GameEffectType.EffectMovementSpeedIncrease]);
+
+      // Client applies the mirrored effect and updates movementSpeed
+      GMNetworkManager.role = "client";
+      GMNetworkManager.assignedActorNetId = "pc_1";
+      GMNetworkManager.awaitingHost = false;
+      GMManager.sceneLoading = false;
+      GMManager.controlMode = "POSSESS";
+      GMManager.netIdMap.clear();
+      const fakeFactoryEffect = () => ({
+        intList: [] as number[],
+        floatList: [] as number[],
+        spellId: -1,
+        mirrored: false,
+        setInt(i: number, v: number) { this.intList[i] = v; },
+        setFloat(i: number, v: number) { this.floatList[i] = v; },
+        setSpellId(id: number) { this.spellId = id; },
+        setDurationType() {},
+        setDuration() {},
+        initialize() {},
+        retire: () => true,
+      });
+      (GameState as any).GameEffectFactory = {
+        EffectMovementSpeedIncrease: function () { return fakeFactoryEffect(); },
+        EffectMovementSpeedDecrease: function () { return fakeFactoryEffect(); },
+      };
+
+      const clientPc = mockCreature("pc_1", {
+        effects: [] as any[],
+        movementSpeed: 1,
+        equipment: {},
+        stealthMode: false,
+        setFacing: jest.fn(),
+        setStealthMode: jest.fn(),
+        setHeldStance: jest.fn(),
+        setMaxHP: jest.fn(),
+        setHP: jest.fn(),
+        updateMovementSpeed() {
+          const inc = this.effects.find((e: any) => e.intList?.[0] === 99);
+          this.movementSpeed = inc ? 1.99 : 1;
+        },
+        addEffect(e: any) { this.effects.push(e); this.updateMovementSpeed(); },
+        removeEffect(e: any) { this.detachEffect(e); },
+        detachEffect(e: any) {
+          const idx = this.effects.indexOf(e);
+          if (idx >= 0) this.effects.splice(idx, 1);
+          this.updateMovementSpeed();
+        },
+      });
+
+      GMReplication.applyFxEventOnClient(sent[0]);
+      expect(clientPc.effects).toHaveLength(1);
+      expect(clientPc.effects[0].spellId).toBe(11);
+      expect(clientPc.movementSpeed).toBe(1.99);
+
+      // Removing the effect restores normal speed
+      GMReplication.applyFxEventOnClient({ kind: "effect.remove", netId: "pc_1", fxId: sent[0].effect.fxId });
+      expect(clientPc.effects).toHaveLength(0);
+      expect(clientPc.movementSpeed).toBe(1);
+
+    });
+
+    test("Force Push debilitation blocks client WASD override on host and drives client motion", () => {
+      GMNetworkManager.role = "host";
+      const pc = mockCreature("pc_1", {
+        gmOwnerPeerId: "peer_a",
+        gmHostDriven: false,
+        effects: [{ type: GameEffectType.EffectSetState, getInt: (i: number) => (i === 0 ? 9 : 0) }],
+        isForcePushed() { return true; },
+        isDebilitated() { return true; },
+        setFacing: jest.fn(),
+        setHeldStance: jest.fn(),
+      });
+      pc.position.set(5, 0, 0);
+      expect(GMReplication.isNetMotionDriven(pc)).toBe(false);
+      GMReplication.applyClientInputOnHost("peer_a", { netId: "pc_1", x: 0, y: 0, z: 0, facing: 1 });
+      expect(pc.gmNetTarget).toBeUndefined();
+      expect(pc.setFacing).not.toHaveBeenCalled();
+
+      // Client side: while pushed, client's own actor follows host position ticks
+      GMNetworkManager.role = "client";
+      GMNetworkManager.assignedActorNetId = "pc_1";
+      GMNetworkManager.awaitingHost = false;
+      GMManager.sceneLoading = false;
+      expect(GMReplication.isNetMotionDriven(pc)).toBe(true);
+      GMReplication.applyWorldTickOnClient([{
+        netId: "pc_1", kind: "player", templateResRef: "", appearanceId: 1, name: "Hero", tag: "", factionId: 1,
+        hp: 50, maxHp: 50, x: 5.5, y: 0, z: 0, facing: 0,
+      }]);
+      expect(pc.gmNetTarget?.x).toBe(5.5);
+    });
+
+    test("cast.fx mirrors SpellCastInstance visuals to clients with impactscript cleared", () => {
+      GMNetworkManager.role = "host";
+      const caster = mockCreature("pc_1");
+      const target = mockCreature("npc_1");
+      GMReplication.onHostSpellCast(caster, target, 28, "v_throw_hand", "w_lghtsbr_001", 1000, 500, "L");
+      const sent = fxSent();
+      expect(sent).toEqual([{
+        kind: "cast.fx",
+        netId: "pc_1",
+        targetNetId: "npc_1",
+        spellId: 28,
+        casthandvisual: "v_throw_hand",
+        projmodel: "w_lghtsbr_001",
+        castTime: 1000,
+        conjureTime: 500,
+        range: "L",
+      }]);
+
+      GMNetworkManager.role = "client";
+      const attached: any[] = [];
+      (GameState as any).module = { area: { attachSpellInstance: (inst: any) => attached.push(inst) } };
+      GMReplication.applyFxEventOnClient(sent[0]);
+      expect(attached).toHaveLength(1);
+      expect(attached[0].mirrored).toBe(true);
+      expect(attached[0].impactscript).toBe("");
+      expect(attached[0].casthandvisual).toBe("v_throw_hand");
+      attached[0].dispose();
     });
 
     test("players replay the animation and keep the host's state index", () => {
@@ -1409,6 +1568,18 @@ describe("GM multiplayer host authority", () => {
 
       GMReplication.updateNetMotion(cre, 1 / 60);
       expect(cre.animationState.index).toBe(ModuleCreatureAnimState.READY);
+    });
+
+    test("stops stealth locomotion and powers down weapons when host exits combat", () => {
+      const cre = mockCreature("cre_0", { weaponPowered: jest.fn(), equipment: { RIGHTHAND: { isPowered: true } } });
+      cre.animationState.index = ModuleCreatureAnimState.WALK_STEALTH;
+      cre.gmNetAnim = ModuleCreatureAnimState.PAUSE;
+      GMReplication.setNetTarget(cre, 0, 0, 0);
+      GMReplication.updateNetMotion(cre, 1 / 60);
+      expect(cre.animationState.index).toBe(ModuleCreatureAnimState.PAUSE);
+
+      GMReplication.syncWeaponPower(cre, false);
+      expect(cre.weaponPowered).toHaveBeenCalledWith(false);
     });
   });
 });

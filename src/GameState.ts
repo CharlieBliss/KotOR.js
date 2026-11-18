@@ -68,6 +68,7 @@ import { IPCMessageTypeDebug } from "@/enums/server/ipc/IPCMessageTypeDebug";
 import { DEFAULT_ENGINE_HOOKS } from "@/engine/EngineHooks";
 import type { EngineHooks } from "@/engine/EngineHooks";
 import { PerformanceMonitor } from "@/utility/PerformanceMonitor";
+import { Dice } from "@/utility/Dice";
 
 export interface GameStateInitializeOptions {
   Game: GameEngineType,
@@ -180,6 +181,32 @@ export class GameState implements EngineContext {
 
   static setTimeScale(scale: number){
     GameState.timeScale = Math.max(0.25, Math.min(4, Number(scale) || 1));
+  }
+
+  /**
+   * When true, requestAnimationFrame stops advancing frames automatically so tests can call
+   * GameState.stepFixed(...) for fast, deterministic simulation without wall-clock waits.
+   */
+  static manualStep = false;
+
+  /** Simulation clock in milliseconds, advancing by `delta * 1000` on every simulated frame */
+  static simTimeMs = 0;
+
+  private static randomState: number | null = null;
+
+  /** Seed GameState.random() and Dice rolls (pass null to return to Math.random) */
+  static setRandomSeed(seed: number | null){
+    GameState.randomState = seed === null || seed === undefined ? null : (Number(seed) >>> 0);
+    Dice.setRng(GameState.randomState === null ? null : () => GameState.random());
+  }
+
+  /** Deterministic PRNG (Mulberry32) when seeded, else Math.random() */
+  static random(): number {
+    if(GameState.randomState === null) return Math.random();
+    let t = (GameState.randomState += 0x6D2B79F5) >>> 0;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
   /** Where the engine lets the active game mode step in (see EngineHooks): GM mode's while it's on */
@@ -1087,7 +1114,7 @@ export class GameState implements EngineContext {
       for(const movie of [sMovie1, sMovie2, sMovie3, sMovie4, sMovie5, sMovie6]){
         GameState.VideoManager.queueMovie(movie, true);
       }
-      await GameState.unloadCurrentModule(true);
+      await GameState.unloadCurrentModule(GameState.hooks.keepsModuleState());
 
       const module = await GameState.Module.Load(name, waypoint);
       await GameState.buildModuleScene(module);
@@ -1447,16 +1474,98 @@ export class GameState implements EngineContext {
 
   static forwardVector = new THREE.Vector3(0, 0, );
 
+  private static lastRafStepAt: number = 0;
+  private static lastBackgroundStepAt: number = 0;
+  private static backgroundWorker: Worker | null = null;
+  private static backgroundInterval: ReturnType<typeof setInterval> | null = null;
+
+  /**
+   * Keep an authoritative GM host ticking at ~30 Hz when Chromium throttles or suspends
+   * requestAnimationFrame (e.g. when the host browser tab is backgrounded/unfocused).
+   * Dedicated Web Workers avoid browser background-tab timer throttling.
+   */
+  private static ensureBackgroundTicker(){
+    if(typeof window === 'undefined') return;
+    if(GameState.backgroundWorker || GameState.backgroundInterval) return;
+    try{
+      if(typeof Worker !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function'){
+        const blob = new Blob(['setInterval(function(){ postMessage(0); }, 33);'], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        const worker = new Worker(url);
+        URL.revokeObjectURL(url);
+        worker.onmessage = () => GameState.stepBackgroundIfNeeded();
+        GameState.backgroundWorker = worker;
+        return;
+      }
+    }catch(e){}
+    GameState.backgroundInterval = setInterval(() => GameState.stepBackgroundIfNeeded(), 33);
+  }
+
+  static stepBackgroundIfNeeded(){
+    if(GameState.manualStep) return;
+    if(!GameState.gmMode || GMNetworkManager.role !== 'host') return;
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    if(now - GameState.lastRafStepAt < 120) return;
+
+    const prev = GameState.lastBackgroundStepAt || GameState.lastRafStepAt || now;
+    const rawDt = Math.max(0.005, (now - prev) / 1000);
+    const dt = Math.min(0.05, rawDt) * GameState.timeScale;
+    GameState.lastBackgroundStepAt = now;
+    // Drain THREE.Clock so returning focus to rAF does not produce a multi-second delta spike
+    GameState.clock?.getDelta?.();
+    GameState.stepFrame(dt, false);
+  }
+
   static Update(){
-    
+
     requestAnimationFrame( GameState.Update );
+    GameState.ensureBackgroundTicker();
+
+    if(GameState.manualStep){
+      // Drain clock delta so returning to live play does not cause a huge jump
+      GameState.clock.getDelta();
+      return;
+    }
+
+    GameState.lastRafStepAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    GameState.lastBackgroundStepAt = 0;
+    const delta = Math.min(0.1, GameState.clock.getDelta()) * GameState.timeScale;
+    GameState.stepFrame(delta, true);
+  }
+
+  /**
+   * Advance the engine by a fixed duration in deterministic `stepSize` increments.
+   * Skips per-step WebGL rendering by default (rendering once at the end) so multi-second checks finish in milliseconds.
+   */
+  static stepFixed(seconds: number, stepSize: number = 1 / 30, options?: { renderFinal?: boolean; renderEachStep?: boolean }): number {
+    const dt = Math.max(1 / 120, Math.min(0.1, Number(stepSize) || (1 / 30)));
+    const steps = Math.max(1, Math.round(Math.max(0, Number(seconds) || 0) / dt));
+    const renderEachStep = !!options?.renderEachStep;
+    const renderFinal = options?.renderFinal !== false;
+    const prevManual = GameState.manualStep;
+    GameState.manualStep = true;
+    try{
+      for(let i = 0; i < steps; i++){
+        GameState.stepFrame(dt, renderEachStep);
+      }
+      if(!renderEachStep && renderFinal && GameState.renderer && GameState.composer){
+        GameState.Render(0);
+      }
+    }finally{
+      GameState.manualStep = prevManual;
+      GameState.clock?.getDelta?.();
+    }
+    return steps;
+  }
+
+  static stepFrame(delta: number, render: boolean = true){
 
     GameState.forwardVector.set(0, 0, -1);
 
-    const delta = GameState.clock.getDelta() * GameState.timeScale;
     GameState.processEventListener('beforeRender', [delta]);
     GameState.delta = delta;
     GameState.deltaTime += delta;
+    GameState.simTimeMs += delta * 1000;
     GameState.deltaTimeFixed += (1/60);
 
     /**
@@ -1519,7 +1628,9 @@ export class GameState implements EngineContext {
 
     AudioEngine.GetAudioEngine().update(delta, GameState.currentCamera.position, GameState.currentCamera.rotation, GameState.forwardVector);
 
-    GameState.Render(delta);
+    if(render){
+      GameState.Render(delta);
+    }
 
     //NoClickTimer: Update
     if( ((GameState.Mode == EngineMode.MINIGAME || GameState.Mode == EngineMode.DIALOG) || (GameState.Mode == EngineMode.INGAME)) && GameState.State != EngineState.PAUSED){

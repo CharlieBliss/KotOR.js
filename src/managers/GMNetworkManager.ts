@@ -82,6 +82,7 @@ export interface GMEffectMirror {
   fxId: string;
   /** GameEffectType */
   type: number;
+  spellId?: number;
   ints: number[];
   floats: number[];
   durationType: number;
@@ -100,7 +101,8 @@ export type GMFxEvent =
   /** A visual effect at a spot (an area power's burst, a grenade blast, a beam aimed at a spot) */
   | { kind: 'vfx.at'; fxId: string; vfx: number; miss: number; durationType: number; duration: number; x: number; y: number; z: number;
       beam?: { casterNetId: string; bodyPart: number } }
-  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number };
+  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number }
+  | { kind: 'cast.fx'; netId: string; targetNetId?: string; spellId: number; casthandvisual?: string; projmodel?: string; castTime: number; conjureTime: number; range?: string };
 
 /** A question the GM asks players, as an NPC or as the GM, with replies to pick from */
 export interface GMDmPrompt {
@@ -194,6 +196,10 @@ export interface GMSerializedActor {
   hidden?: boolean;
   /** In stealth (shown see-through) */
   stealth?: boolean;
+  /** Movement speed multiplier from active speed effects (1 = normal) */
+  movementSpeed?: number;
+  /** True when the creature is a Force user on the host */
+  forceUser?: boolean;
   rightHandResRef?: string;
   leftHandResRef?: string;
   armorResRef?: string;
@@ -370,7 +376,7 @@ export interface GMWorldSource {
   buildWorldSnapshot(): GMWorldSnapshot;
   serializeActorsForTick(): GMSerializedActor[];
   /** A networked object, for streaming our own character's position */
-  getNetObject(netId: string): { position: { x: number; y: number; z: number }; getFacing?: () => number; animState?: number } | undefined;
+  getNetObject(netId: string): { position: { x: number; y: number; z: number }; getFacing?: () => number; animState?: number; animationState?: { index: number } } | undefined;
 }
 
 const PEER_ID_STORAGE_KEY = 'kotor_gm_peer_id';
@@ -926,7 +932,7 @@ export class GMNetworkManager {
             y: controlled.position.y,
             z: controlled.position.z,
             facing: typeof controlled.getFacing === 'function' ? controlled.getFacing() : 0,
-            animState: controlled.animState || 0,
+            animState: controlled.animationState?.index ?? controlled.animState ?? 0,
             teleportSeq: this.teleportSeq,
             // Our character sat down or stood up: the host's copy (and everyone's) does too
             ...(this.stanceToSend(controlled))

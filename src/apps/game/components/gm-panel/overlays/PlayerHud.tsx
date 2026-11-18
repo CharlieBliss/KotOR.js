@@ -482,7 +482,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
                 <GameImage texture={icon} alt="" className="gm-hud-icon" />
               </span>
             ))}
-            <button className="gm-hud-stop" onClick={() => GMNetworkManager.sendIntent('cancel')} title="Stop: drop the queue and stand down">Stop</button>
+            <button className="gm-hud-stop" onClick={() => GMPlayerHud.stop()} title="Stop: drop the queue and stand down">Stop</button>
           </div>
         )}
         <div className={`gm-hud-bar-slots ${frozen ? 'frozen' : ''}`} role="toolbar" aria-label="Power bar">

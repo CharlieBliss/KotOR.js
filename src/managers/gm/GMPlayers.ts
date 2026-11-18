@@ -370,7 +370,7 @@ export class GMPlayers {
   static buildPlayerSheet(cre: ModuleCreature): GMPlayerSheet {
     const equipment: Record<string, string> = {};
     for (const slot of this.PLAYER_EQUIP_SLOTS) {
-      const item: ModuleItem | undefined = (cre.equipment as any)[slot];
+      const item: ModuleItem | undefined = (cre.equipment as any)?.[slot];
       const resRef = gmItemResRef(item);
       if (resRef) equipment[slot] = resRef;
     }
@@ -380,8 +380,8 @@ export class GMPlayers {
       attributes: { str: cre.str, dex: cre.dex, con: cre.con, int: cre.int, wis: cre.wis, cha: cre.cha },
       feats: (cre.feats || []).map((f) => f.id),
       skills: (cre.skills || []).map((s) => s?.rank ?? 0),
-      hp: cre.getHP(),
-      maxHp: cre.getMaxHP(),
+      hp: cre.getHP?.() ?? (cre.currentHitPoints || 0),
+      maxHp: cre.getMaxHP?.() ?? (cre.maxHitPoints || 0),
       forcePoints: cre.forcePoints || 0,
       maxForcePoints: cre.maxForcePoints || 0,
       currentForce: cre.currentForce || 0,
@@ -564,6 +564,7 @@ export class GMPlayers {
     peerInfo.controlledNetId = spawnedNetId;
     net.sendWorldSnapshot(peerId);
     if (spawnedNetId) assign(spawnedNetId);
+    this.updatePlayerSheets();
     net.notifyChange();
   }
 

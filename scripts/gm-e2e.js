@@ -28,7 +28,7 @@
  * If nothing is serving GM_E2E_URL, `npm run dev` is started for the run and stopped afterwards.
  */
 const { app } = require('electron');
-const { configureApp, createGameWindow, evalIn, bootToMenu, setGameSpeed, sleep } = require('./lib/game-window');
+const { configureApp, createGameWindow, evalIn, bootToMenu, setGameSpeed, checkLayoutInvariants, checkWorldInvariants, sleep } = require('./lib/game-window');
 const { createDevServer } = require('./lib/dev-server');
 
 const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/$/, '');
@@ -119,6 +119,7 @@ class GameWindow {
     this.win = createGameWindow({ show: SHOW, title: `GM e2e — ${label}` });
     // Collected by the window; reported at the end of the run
     this.uncaughtErrors = this.win.pageErrors;
+    this.consoleErrors = this.win.consoleErrors;
   }
 
   /** Run a function inside the page. It receives KotOR and the given args. */
@@ -149,6 +150,7 @@ class GameWindow {
       throw new CheckFailed(`${this.label}: ${e.message}`);
     }
     await setGameSpeed(this.win, SPEED);
+    await this.eval((KotOR) => { KotOR.GameState.setRandomSeed?.(0x6d_e2e); return true; });
   }
 
   close() {
@@ -394,6 +396,8 @@ async function run() {
       for (const [label, length] of Object.entries(result.seen)) expect(length > 20, `the ${label} tab rendered nothing (${length} characters)`);
       expect(result.kept === 'e2e-kept', `the Scene tab's search was lost when switching tabs (${JSON.stringify(result.kept)})`);
       expect(result.drawerClosed, 'the drawer did not close');
+      const layoutIssues = await checkLayoutInvariants(gm.win);
+      expect(layoutIssues.length === 0, `GM UI layout issues: ${layoutIssues.join('; ')}`);
       return `tabs: ${Object.keys(result.seen).join(', ')}`;
     });
 
@@ -401,6 +405,8 @@ async function run() {
       for (const p of players) {
         await p.waitFor('the placed items', (KotOR, ids) => ids.every((id) => KotOR.GMManager.netIdMap.has(id)), SYNC_TIMEOUT, placed.items);
       }
+      const worldIssues = await checkWorldInvariants(gm.win, players.map((p) => p.win));
+      expect(worldIssues.length === 0, `world invariant mismatch: ${worldIssues.join('; ')}`);
     });
 
     await must('GM places friendly NPCs', async () => {
@@ -556,6 +562,8 @@ async function run() {
         expect(seen[i].damageNumbers > 0, `Player ${i + 1} was shown no combat text on the NPC`);
         expect(playerNetIds.every((id) => seen[i].attackers.includes(id)), `Player ${i + 1} didn't see both players attack (animations seen for ${JSON.stringify(seen[i].attackers)}). Host each second, P1 | P2 (actions@distance): ${hostSamples.slice(-8).join(' ;; ')}`);
       }
+      const worldIssues = await checkWorldInvariants(gm.win, players.map((p) => p.win));
+      expect(worldIssues.length === 0, `world invariant mismatch after combat: ${worldIssues.join('; ')}`);
       return `combat text shown: ${seen.map((s) => s.damageNumbers).join(' / ')}`;
     });
 
@@ -832,6 +840,8 @@ async function run() {
       for (const p of players) {
         await p.waitFor('the restored objects', (KotOR, objIds) => objIds.every((id) => KotOR.GMManager.netIdMap.has(id)), SYNC_TIMEOUT, ids);
       }
+      const worldIssues = await checkWorldInvariants(gm.win, players.map((p) => p.win));
+      expect(worldIssues.length === 0, `world invariant mismatch after loadSession: ${worldIssues.join('; ')}`);
     });
 
     await must('Everyone leaves the session', async () => {
@@ -845,9 +855,14 @@ async function run() {
     return ok;
   } finally {
     const uncaught = everyone.flatMap((w) => w.uncaughtErrors.map((e) => `${w.label}: ${e}`));
+    const consoleErrs = everyone.flatMap((w) => (w.consoleErrors || []).map((e) => `${w.label}: ${e}`));
     if (uncaught.length) {
       log(`Uncaught errors in the game windows (${uncaught.length}):`);
       for (const line of [...new Set(uncaught)].slice(0, 20)) log(`  ${line}`);
+    }
+    if (consoleErrs.length) {
+      log(`Console errors in the game windows (${consoleErrs.length}):`);
+      for (const line of [...new Set(consoleErrs)].slice(0, 20)) log(`  ${line}`);
     }
     if (!(SHOW && KEEP_OPEN)) everyone.forEach((w) => w.close());
   }

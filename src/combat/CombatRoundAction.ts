@@ -8,6 +8,7 @@ import { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import { SpellCastInstance } from "@/combat/SpellCastInstance";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { BitWise } from "@/utility/BitWise";
+import { Dice } from "@/utility/Dice";
 import { ModuleObjectType } from "@/enums";
 
 export class CombatRoundAction {
@@ -169,7 +170,7 @@ export class CombatRoundAction {
       const target: ModuleCreature = this.target as any;
       if(owner.isDuelingObject(target)){
         attackKey = 'c';
-        attackType = Math.round(Math.random()*4)+1;
+        attackType = Math.round(Dice.random()*4)+1;
       }
     }
     

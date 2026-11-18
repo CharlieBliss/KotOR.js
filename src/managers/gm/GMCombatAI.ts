@@ -85,9 +85,11 @@ export interface GMCombatTactic {
 const HEAL_BELOW = 0.4;
 const SPELL_ROW = (id: number) => GameState.TwoDAManager.datatables.get('spells')?.rows?.[id] || {};
 const isSet = (v: any) => v !== undefined && v !== null && v !== '' && v !== '****';
+const rand = () => (typeof GameState.random === 'function' ? GameState.random() : Math.random());
+const clockNow = () => ((GameState as any).simTimeMs > 0 ? (GameState as any).simTimeMs : performance.now());
 // A plain function: the dev build reads .ts as TSX, where a generic arrow would parse as JSX
 function pick<T>(list: T[]): T | undefined {
-  return list[Math.floor(Math.random() * list.length)];
+  return list[Math.floor(rand() * list.length)];
 }
 
 /**
@@ -132,6 +134,7 @@ export class GMCombatAI {
     if (npc.gmCombatClosingRound) return;
     const GM = GameState.GMManager;
     if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldHeld()) return;
+    if (npc.gmHidden) return;
     // A player's character: back to the enemy its player chose, once what they queued has gone off
     if (GM.isPlayerCharacter?.(npc)) {
       GMPlayers.keepFighting(npc);
@@ -155,7 +158,7 @@ export class GMCombatAI {
    * swap. Deciding again now would start an attack, which clears what it was about to do.
    */
   static isActing(npc: ModuleCreature): boolean {
-    if ((npc.gmCombatActingUntil || 0) > performance.now()) return true;
+    if ((npc.gmCombatActingUntil || 0) > clockNow()) return true;
     return (npc.actionQueue || []).some((a: any) => a?.type === ActionType.ActionCastSpell || a?.type === ActionType.ActionItemCastSpell);
   }
 
@@ -165,7 +168,7 @@ export class GMCombatAI {
     // Told to stand down or run: its scripts don't send it back into the fight
     const order = npc.gmOrder?.kind;
     if (order === 'standDown' || order === 'flee') return true;
-    if ((npc.gmCombatHoldUntil || 0) > performance.now()) return true;
+    if ((npc.gmCombatHoldUntil || 0) > clockNow()) return true;
     return this.isActing(npc);
   }
 
@@ -185,6 +188,8 @@ export class GMCombatAI {
     // (which leave the leader alone) ran it like an NPC: at the end of every combat round k_ai_master cleared the
     // player's queued powers and picked its own attack
     if (npc.gmOwnerPeerId || npc.gmPlayerConfig || GM.isPlayerCharacter?.(npc)) return false;
+    // Hidden by the GM: off the stage, it does nothing of its own (its story scripts still run)
+    if (npc.gmHidden) return false;
     if (!GM.isAutonomousNpc(npc) || npc.gmScripted) return true;
     return !(GM.npcAiEnabled || npc.gmOrder);
   }
@@ -207,7 +212,7 @@ export class GMCombatAI {
    * or someone else to fight. Without this it walks on the spot, and its combat rounds never start.
    */
   static checkStuck(npc: ModuleCreature, everyone: ModuleCreature[]) {
-    const now = performance.now();
+    const now = clockNow();
     // A combat round holding an action that never started, with nothing queued to start it: nothing will.
     // (It counts as busy, so the NPC would never decide again.)
     const round = npc.combatRound;
@@ -273,7 +278,7 @@ export class GMCombatAI {
   /** It couldn't get to this target lately (checkStuck) */
   static isUnreachable(npc: ModuleCreature, target: ModuleCreature): boolean {
     const u = npc.gmCombatUnreachable;
-    return !!u && u.targetId === target.id && u.until > performance.now();
+    return !!u && u.targetId === target.id && u.until > clockNow();
   }
 
   /** Attacking this target already (an attack action in its queue, or one in its combat round) */
@@ -288,7 +293,7 @@ export class GMCombatAI {
     if (!npc || !target || target.isDead?.()) return '';
     if (this.isActing(npc)) return 'acting';
     // Standing ready for an opening (no way through to anyone it could swing at)
-    if ((npc.gmCombatHoldUntil || 0) > performance.now()) return 'hold';
+    if ((npc.gmCombatHoldUntil || 0) > clockNow()) return 'hold';
     const style: GMCombatStyle = npc.gmCombatStyle || 'all';
     const attack = () => {
       // Already swinging at them: let the attack carry on
@@ -366,7 +371,7 @@ export class GMCombatAI {
       fp: Number(npc.getFP?.()) || 0,
       enemyInMelee: enemies.some((c) => c.position.distanceTo(npc.position) <= (c.getMeleeRange?.(npc) ?? 2) + this.MELEE_DISTANCE - 2),
       kit: this.kitOf(npc),
-      now: performance.now(),
+      now: clockNow(),
     };
   }
 
@@ -486,7 +491,11 @@ export class GMCombatAI {
   }
 
   static isForceUser(cre: ModuleCreature): boolean {
-    return (Number(cre?.getMaxFP?.()) || 0) > 0;
+    if (!cre) return false;
+    if ((cre as any).gmForceUser) return true;
+    return (Number(cre.getMaxFP?.()) || 0) > 0
+      || (cre.classes || []).some((c: any) => !!c?.spellcaster)
+      || (cre.getSpells?.() || []).length > 0;
   }
 
   /** It can use this on that target now: affordable, in reach, on a target it works on */
@@ -632,7 +641,7 @@ export class GMCombatAI {
           // Not again on a target still under it (stun, slow, fear...)
           .filter((t) => !GMCombatAI.hasEffectFrom(s.target, t.spellId));
         const choice = pick(options);
-        return choice ? { score: 64 + Math.random() * 12, choice } : null;
+        return choice ? { score: 64 + rand() * 12, choice } : null;
       },
       act: (s, t: GMCombatTalent) => GMCombatAI.use(s, t, s.target),
     },
@@ -664,7 +673,7 @@ export class GMCombatAI {
       score: (s) => {
         const feats = s.npc.isRangedEquipped?.() ? s.kit.rangedFeats : s.kit.meleeFeats;
         const feat = pick(feats);
-        return feat ? { score: 45 + Math.random() * 15, choice: feat } : null;
+        return feat ? { score: 45 + rand() * 15, choice: feat } : null;
       },
       act: (s, feat: TalentFeat) => {
         feat.useTalentOnObject(s.target, s.npc);

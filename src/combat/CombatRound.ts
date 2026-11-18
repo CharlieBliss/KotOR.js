@@ -793,6 +793,7 @@ export class CombatRound {
   reflectBolt(deflector: ModuleCreature, weapon: ModuleItem){
     const shooter = this.owner as ModuleCreature;
     if(!shooter || shooter === deflector || shooter.isDead?.()) return;
+    GameState.ProjectileManager?.FireWeapon(deflector, shooter, weapon, true, 0);
     const amount = Math.max(1, (weapon.getBaseDamage?.() || 0) + (weapon.getDamageBonus?.() || 0));
     const type = weapon.getBaseDamageType?.() ?? 0;
     const index = type >= 0 && type <= 15 ? type : 14;
@@ -804,6 +805,7 @@ export class CombatRound {
     damage.setInt(17, 1 << index);
     damage.initialize();
     shooter.addEffect(damage);
+    TextSprite3D.CreateOnObject(shooter, amount.toString(), TextSprite3DType.HOSTILE, 1500);
   }
 
   /**
@@ -839,7 +841,7 @@ export class CombatRound {
     if(isHit && !hasAssuredHit){
       const target = combatAction.target as ModuleCreature;
       const missChance = Math.max(target?.getConcealment?.() || 0, creature.getMissChance?.() || 0);
-      if(missChance > 0 && Math.floor(Math.random() * 100) < missChance) isHit = false;
+      if(missChance > 0 && Math.floor(Dice.random() * 100) < missChance) isHit = false;
     }
 
     if(isHit){
@@ -890,7 +892,7 @@ export class CombatRound {
       if(attackKey == 'm'){
         if(this.engaged && !this.attacksIncludeKillingBlow()){
           attackKey = 'c';
-          attackType = Math.round(Math.random()*4)+1;
+          attackType = Math.round(Dice.random()*4)+1;
         }
       }
 

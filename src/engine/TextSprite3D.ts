@@ -275,6 +275,22 @@ export class TextSprite3D {
     this.container.removeFromParent();
   }
 
+  private static recent: WeakMap<ModuleObject, Map<string, number>> = new WeakMap();
+
+  /**
+   * The same word once over the same object, however many things say it at once: a power resisted is said by
+   * its resisted effect and by the damage it didn't do, and showed "resisted" twice
+   */
+  static CreateOnObjectOnce(object: ModuleObject, text: string = '', type: TextSprite3DType = TextSprite3DType.NEUTRAL, timer: number = 3000, withinMs: number = 500){
+    if(!object) return;
+    let said = TextSprite3D.recent.get(object);
+    if(!said) TextSprite3D.recent.set(object, (said = new Map()));
+    const now = performance.now();
+    if(now - (said.get(text) ?? -Infinity) < withinMs) return;
+    said.set(text, now);
+    return TextSprite3D.CreateOnObject(object, text, type, timer);
+  }
+
   static CreateOnObject(object: ModuleObject, text: string = '', type: TextSprite3DType = TextSprite3DType.NEUTRAL, timer: number = 3000){
     if(!object) return;
     TextSprite3D.onCreateOnObject?.(object, text, type, timer);

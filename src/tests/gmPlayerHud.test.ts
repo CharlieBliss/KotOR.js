@@ -245,6 +245,27 @@ describe('what the target allows', () => {
     expect(runMenuItem.mock.calls[0][1]).toBe(door);
     expect(GMPlayerHud.runTargetAction('open')).toMatchObject({ ok: false, message: 'Locked' });
   });
+
+  test('in Host POSSESS or Offline GM mode, runTargetAction attacks/interacts locally and stop() clears queue', () => {
+    const foe = creature('Foe', 3, { hostile: true });
+    pc.cancelCombat = jest.fn();
+    pc.clearAllActions = jest.fn();
+    pc.attackCreature = jest.fn();
+    pc.combatRound = { clearActions: jest.fn() };
+    pc.gmFightTarget = foe;
+    GMNetworkManager.role = 'host';
+    (GameState as any).hooks = { isPlayerCharacter: (o: any) => !!o?.isPC, interceptInteraction: () => false };
+    GameState.CursorManager.selectedObject = foe;
+
+    expect(GMPlayerHud.runTargetAction('attack')).toEqual({ ok: true });
+    expect(pc.clearAllActions).toHaveBeenCalled();
+    expect(pc.attackCreature).toHaveBeenCalledWith(foe, undefined);
+
+    GMPlayerHud.stop();
+    expect(pc.cancelCombat).toHaveBeenCalled();
+    expect(pc.combatRound.clearActions).toHaveBeenCalled();
+    expect(pc.gmFightTarget).toBeUndefined();
+  });
 });
 
 describe('where an ability lands now', () => {

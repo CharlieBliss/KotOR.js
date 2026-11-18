@@ -114,6 +114,7 @@
         id: r.__index,
         label: r.label,
         name: tlk(r.name) || r.label,
+        userType: num(r.usertype),
         group: USER_TYPES[num(r.usertype)] || `User type ${r.usertype}`,
         script: r.impactscript,
         hostile: valid(r.forcehostile),
@@ -125,7 +126,7 @@
   function listFeats() {
     const rows = Object.values(GS.TwoDAManager.datatables.get('feat').rows);
     return rows
-      .filter((r) => valid(r.category) || num(r.spellid) >= 0)
+      .filter((r) => r.category === '0x1104' || r.category === '0x1111' || num(r.spellid) >= 0)
       .map((r) => ({
         kind: 'feat',
         id: r.__index,
@@ -150,7 +151,7 @@
     const out = [];
     for (const resref of resrefs) {
       let item;
-      try { item = await G.createItemFromResRefAsync(resref); } catch (e) { continue; }
+      try { item = await K.GMSpawner.createItemFromResRefAsync(resref); } catch (e) { continue; }
       if (!item || !Array.isArray(item.properties)) continue;
       const castSpell = item.properties.find((p) => p && p.is && p.is(K.ModuleItemProperty.CastSpell));
       if (!castSpell) continue;
@@ -194,7 +195,7 @@
   async function spawn(presetName, overrides, offsetX) {
     const preset = G.CREATURE_PRESETS.find((c) => c.name === presetName);
     const pos = GS.module.area.getNearestWalkablePoint(origin.clone().add(new THREE.Vector3(offsetX, 0, 0)), 0.5).clone();
-    return G.spawnCreature({ ...preset, ...overrides }, pos, offsetX > 0 ? Math.PI / 2 : -Math.PI / 2);
+    return K.GMSpawner.spawnCreature({ ...preset, ...overrides }, pos, offsetX > 0 ? Math.PI / 2 : -Math.PI / 2);
   }
 
   const ATTACK_RESULTS = { 0: 'invalid', 1: 'hit', 2: 'critical hit', 3: 'automatic hit', 4: 'missed', 5: 'resisted', 6: 'failed', 8: 'parried', 9: 'deflected' };
@@ -308,7 +309,7 @@
       } else if (ability.kind === 'feat') {
         new GS.TalentFeat(ability.id).useTalentOnObject(recipient, caster);
       } else if (ability.kind === 'item') {
-        item = await G.createItemFromResRefAsync(ability.id);
+        item = await K.GMSpawner.createItemFromResRefAsync(ability.id);
         caster.inventory.push(item);
         result.notes.push(`stack ${item.getStackSize ? item.getStackSize() : '?'}`);
         item.useItemOnObject(caster, recipient);
@@ -359,8 +360,7 @@
       for (const c of [caster, target]) {
         try { if (c) G.deleteObject(c); } catch (e) {}
       }
-      try { (GS.module.area.spellInstances || []).length = 0; } catch (e) {}
-      try { K.ProjectileManager.Clear(); } catch (e) {}
+      resetArena();
     }
 
     result.calls = [...current.calls].sort();
@@ -373,10 +373,10 @@
 
     // A script that throws part-way, or calls a missing function (which leaves its stack unbalanced), leaves
     // state behind on its parsed instructions, and the next ability using the same script then fails too.
-    // Drop the parsed scripts so every ability is measured on its own.
+    // Drop the parsed scripts and delayed module events so every ability is measured in a clean arena.
     if (result.errors.length || result.missing.length) {
-      try { K.NWScript.scripts.clear(); } catch (e) {}
-      result.notes.push('reset scripts after error');
+      resetArena(true);
+      result.notes.push('reset arena after error');
     }
     current = null;
 
@@ -390,8 +390,23 @@
     } else {
       result.status = 'works';
     }
-    await sleep(300);
     return result;
+  }
+
+  function resetArena(clearScripts = false) {
+    try { if (GS.module?.eventQueue) GS.module.eventQueue.length = 0; } catch (e) {}
+    const area = GS.module?.area;
+    if (area) {
+      for (const s of area.spellInstances || []) { try { s?.dispose?.(); } catch (e) {} }
+      try { if (area.spellInstances) area.spellInstances.length = 0; } catch (e) {}
+      for (const aoe of [...(area.areaOfEffects || [])]) { try { aoe?.destroy?.(); } catch (e) {} }
+      for (const txt of area.textSprites || []) { try { txt?.dispose?.(); } catch (e) {} }
+      try { if (area.textSprites) area.textSprites.length = 0; } catch (e) {}
+    }
+    try { K.ProjectileManager.Clear(); } catch (e) {}
+    if (clearScripts) {
+      try { K.NWScript.scripts.clear(); } catch (e) {}
+    }
   }
 
   window.AbilityBench = {
@@ -402,6 +417,7 @@
     /** Usable items among the given templates (the runner scans in batches to show progress) */
     listItems,
     runOne: runAbility,
+    resetArena,
     implementedFunctionCount() {
       const actions = (GS.GameKey === K.GameEngineType.TSL ? K.NWScriptDefK2 : K.NWScriptDefK1).Actions;
       const defs = Object.values(actions);

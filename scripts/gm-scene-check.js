@@ -10,13 +10,14 @@
  *   visible, alive and under which order, whether attackers closed in and movers arrived, plus screenshots.
  * It writes report.md and the screenshots to the output folder.
  *
- * Usage:  npm run scene:check -- <plan.json> [--out <folder>] [--beat-seconds 15] [--speed 3] [--no-beats]
+ * Usage:  npm run scene:check -- <plan.json> [--out <folder>] [--beat-seconds 15] [--speed 3] [--step-fixed] [--no-beats]
  *   --beat-seconds  game seconds to let each beat play (default 15)
  *   --speed         how much faster than real time the game runs during the check (default 3, at most 4)
+ *   --step-fixed    advance each beat synchronously with GameState.stepFixed (no wall-clock wait)
  * Needs the dev server (npm run dev) with the game files, like scripts/gm-e2e.js.
  */
 const { app } = require('electron');
-const { configureApp, createGameWindow, bootToMenu, setGameSpeed } = require('./lib/game-window');
+const { configureApp, createGameWindow, bootToMenu, setGameSpeed, stepSimulation, checkLayoutInvariants } = require('./lib/game-window');
 const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
@@ -29,6 +30,7 @@ const PLAN_FILE = argv.find((a, i) => !a.startsWith('--') && !['--out', '--beat-
 /** Game seconds each beat is given; the wait is shorter by the game speed */
 const BEAT_SECONDS = Number(opt('--beat-seconds', 15));
 const SPEED = Math.max(1, Math.min(4, Number(opt('--speed', 3)) || 3));
+const STEP_FIXED = argv.includes('--step-fixed');
 const RUN_BEATS = !argv.includes('--no-beats');
 const ROOT = path.resolve(__dirname, '..');
 const CHECKER = path.join(ROOT, 'skills', 'kotor-gm-scenes', 'scripts', 'check_plan.py');
@@ -247,17 +249,13 @@ async function run() {
   const findings = [];
   const sections = [];
   const shots = [];
-  const errors = [];
 
   log(`Offline check (check_plan.py)...`);
   const offline = offlinePrediction(path.resolve(PLAN_FILE), OUT);
   if (!offline) findings.push('Python not found: no comparison with the offline check.');
 
   const win = createGameWindow({ title: 'Scene check' });
-  win.webContents.on('console-message', (event) => {
-    const message = String(event.message || '');
-    if ((event.level === 'error' || event.level === 3) && /Uncaught|Unhandled|TypeError|ReferenceError/i.test(message)) errors.push(message.split('\n')[0].slice(0, 240));
-  });
+  const errors = win.consoleErrors;
 
   const key = plan.content === 'tsl' ? 'tsl' : 'kotor';
   const url = `${BASE_URL}/game/?key=${key}`;
@@ -265,8 +263,10 @@ async function run() {
   await bootToMenu(win, url);
 
   log(`Importing "${plan.title}"...`);
-  await evalIn(win, (K) => { K.GameState.EnterGMMode(); return true; });
+  await evalIn(win, (K) => { K.GameState.setRandomSeed?.(0x5c3e_c4ec); K.GameState.EnterGMMode(); return true; });
   await waitFor(win, 'GM mode', (K) => !!(K.GameState.gmMode && K.GameState.module && K.GameState.module.readyToProcessEvents && K.GMManager.active), SCENE_TIMEOUT);
+  const layoutIssues = await checkLayoutInvariants(win);
+  for (const issue of layoutIssues) findings.push(`UI layout: ${issue}`);
   const imported = await evalIn(win, async (K, p) => {
     const runner = await K.GMScenePlan.import(p);
     return { log: runner ? [...runner.log] : ['import returned nothing'], start: runner?.playerStart ? [runner.playerStart.x, runner.playerStart.y, runner.playerStart.z] : null };
@@ -302,6 +302,8 @@ async function run() {
     const got = placed[g.id] || [];
     const want = Math.max(1, Math.min(20, g.count || 1));
     if (got.length < want) findings.push(`${g.kind} "${g.id}": ${got.length} of ${want} placed.`);
+    const missingModels = got.filter((o) => !o.model);
+    if (missingModels.length) findings.push(`${g.kind} "${g.id}": ${missingModels.length} placed copy/copies missing a 3D model.`);
     const predicted = offline?.positions?.placed?.[g.id] || [];
     got.forEach((o, i) => {
       const pr = predicted[i];
@@ -430,7 +432,11 @@ async function run() {
       } catch (e) {
         findings.push(`Beat ${b + 1} "${beat.title || ''}" threw: ${e.message}`);
       }
-      await sleep((BEAT_SECONDS / SPEED) * 1000);
+      if (STEP_FIXED) {
+        await stepSimulation(win, BEAT_SECONDS, 1 / 30);
+      } else {
+        await sleep((BEAT_SECONDS / SPEED) * 1000);
+      }
       const after = await evalIn(win, () => window.__sceneCheck.objects());
       if (process.env.SCENE_CHECK_DEBUG) for (const [id, objs] of Object.entries(after)) log(`  ${id}: ` + objs.map((o) => `${o.x},${o.y} q[${o.queue}] path ${JSON.stringify(o.path)}`).join(' | '));
       const newNotes = await evalIn(win, (K, n) => K.GMScenePlan.active.log.slice(n), logBefore);

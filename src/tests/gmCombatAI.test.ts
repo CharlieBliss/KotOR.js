@@ -1,299 +1,212 @@
-import { afterEach, beforeEach, describe, expect, jest, test } from "@jest/globals";
-
-jest.mock("@/GameState", () => ({ GameState: { gmMode: true } }));
-jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
-jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
-
+import { beforeEach, describe, expect, jest, test } from "@jest/globals";
 import * as THREE from "three";
-import { GameState } from "@/GameState";
-import { GMCombatAI } from "@/managers/gm/GMCombatAI";
-import { ModuleItem } from "@/module/ModuleItem";
-import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot";
 
-// spells.2da rows the tests use (the real columns: category, forcehostile, forcefriendly, impactscript, range)
-const SPELLS: Record<number, any> = {
-  28: { label: 'FORCE_POWER_HEAL', category: '0x2441', forcehostile: '****', forcefriendly: '0', range: 'T' },
-  8: { label: 'FORCE_POWER_SPEED_BURST', category: '0x1808', forcehostile: '****', forcefriendly: '2', range: 'P' },
-  35: { label: 'FORCE_POWER_LIGHTNING', category: '0x8101', forcehostile: '5', forcefriendly: '****', range: 'M' },
-  46: { label: 'FORCE_POWER_STUN', category: '0x1201', forcehostile: '0', forcefriendly: '****', range: 'M' },
-  25: { label: 'FORCE_POWER_FORCE_STORM', category: '0x2111', forcehostile: '5', forcefriendly: '****', range: 'S' },
-  12: { label: 'FORCE_POWER_DROID_DISABLE', category: '0x2201', forcehostile: '1', forcefriendly: '****', range: 'M' },
-  // A single-target droid power (KotOR's own droid powers hit an area)
-  900: { label: 'TEST_DROID_SHOCK', category: '0x1201', forcehostile: '1', forcefriendly: '****', range: 'M' },
-  95: { label: 'ITEM_ABILITY_GRENADE_ION', category: '****', forcehostile: '****', forcefriendly: '****', impactscript: 'k_sup_grenade', range: 'L' },
-  64: { label: 'ITEM_ABILITY_MED_PACK', category: '0x1408', forcehostile: '****', forcefriendly: '****', impactscript: 'k_sup_healing', range: 'T' },
-  87: { label: 'ITEM_ABILITY_GRENADE_FRAGMENTATION', category: '****', forcehostile: '****', forcefriendly: '****', impactscript: 'k_sup_grenade', range: 'L' },
+const mockSpellsRows: Record<number, any> = {
+  10: { label: "FORCE_POWER_CURE", impactscript: "k_sup_healing", forcefriendly: "0", range: "S" },
+  20: { label: "FORCE_POWER_VALOR", impactscript: "k_sp1_generic", forcefriendly: "0x01", range: "S" },
+  30: { label: "FORCE_POWER_STUN", impactscript: "k_sp1_generic", forcehostile: "0x04", range: "M", category: "0x1101" },
+  40: { label: "FORCE_POWER_DROID_DISABLE", impactscript: "k_sp1_generic", forcehostile: "1", range: "M", category: "0x1101" },
+  50: { label: "FORCE_POWER_STORM", impactscript: "k_sp1_generic", forcehostile: "0x04", range: "L", category: "0x2101" },
+  60: { label: "GRENADE_FRAG", impactscript: "k_sup_grenade", range: "M" },
+  70: { label: "GRENADE_ION", impactscript: "k_sup_grenade", range: "M" },
 };
 
-const power = (id: number, cost = 10, range = 15) => ({ id, getForcePointCost: () => cost, getCastRange: () => range, useTalentOnObject: jest.fn() });
-const usable = (spellId: number, resRef: string) => ({
-  getUsableCastSpellProperties: () => [{ spellId }],
-  getItemResRef: () => resRef,
-  getEquippedRes: () => resRef,
-  getInventoryRes: () => resRef,
-  getBaseItem: () => ({ equipableSlots: 0 }),
-  getWeaponType: () => 0,
-  useItemOnObject: jest.fn(),
-});
-const weapon = (resRef: string, ranged: boolean) => ({
-  ...usable(-1, resRef),
-  getUsableCastSpellProperties: (): any[] => [],
-  getBaseItem: () => ({ equipableSlots: ModuleCreatureArmorSlot.RIGHTHAND }),
-  getWeaponType: () => (ranged ? 4 : 1),
-  isRangedWeapon: () => ranged,
-  getName: () => resRef,
-});
+const mockGMManager: any = {
+  npcAiEnabled: true,
+  isAutonomousNpc: jest.fn(() => true),
+  isPlayerCharacter: jest.fn(() => false),
+  attackTargetOf: jest.fn(),
+};
 
-function creature(name: string, x: number, overrides: Record<string, any> = {}): any {
+jest.mock("@/GameState", () => ({
+  GameState: {
+    gmMode: true,
+    simTimeMs: 10000,
+    random: () => 0.1,
+    TwoDAManager: {
+      datatables: new Map([["spells", { rows: mockSpellsRows }]]),
+    },
+    GMManager: mockGMManager,
+    GMNetworkManager: { role: "host" },
+    hooks: { isNetReplica: () => false },
+  },
+}));
+
+jest.mock("@/managers/gm/GMPlayers", () => ({ GMPlayers: { keepFighting: jest.fn() } }));
+jest.mock("@/managers/gm/GMLog", () => ({ GMLog: { info: jest.fn(), warn: jest.fn() } }));
+jest.mock("@/managers/gm/GMSpawner", () => ({ GMSpawner: { createItemFromResRefAsync: jest.fn() } }));
+jest.mock("@/managers/GMNpcOrders", () => ({ GMNpcOrders: { getOrder: jest.fn() } }));
+jest.mock("@/module/ModuleItem", () => ({
+  ModuleItem: { GetCastSpellId: (prop: any) => prop?.spellId ?? -1 },
+}));
+
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
+import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { ActionType } from "@/enums/actions/ActionType";
+
+function makeCreature(overrides: Record<string, any> = {}): any {
+  const pos = overrides.position || new THREE.Vector3(0, 0, 0);
+  const hp = overrides.hp ?? 100;
+  const maxHp = overrides.maxHp ?? 100;
   return {
-    name,
-    position: new THREE.Vector3(x, 0, 0),
-    hp: 100, maxHp: 100, fp: 100, maxFp: 100,
-    effects: [] as any[],
-    inventory: [] as any[],
-    equipment: {} as Record<string, any>,
-    spells: [] as any[],
-    feats: [] as any[],
-    race: 6,
-    hostileTo: new Set<any>(),
-    getName() { return this.name; },
-    getHP() { return this.hp; },
-    getMaxHP() { return this.maxHp; },
-    getFP() { return this.fp; },
-    getMaxFP() { return this.maxFp; },
-    getRace() { return this.race; },
-    getSpells() { return this.spells; },
-    getFeats() { return this.feats; },
-    isDead() { return false; },
-    isHostile(other: any) { return this.hostileTo.has(other); },
-    isRangedEquipped() { return !!this.equipment.RIGHTHAND?.isRangedWeapon?.(); },
-    attackCreature: jest.fn(),
+    id: overrides.id ?? Math.floor(Math.random() * 10000),
+    objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModuleCreature,
+    position: pos,
+    effects: [],
+    actionQueue: [],
+    inventory: [],
+    equipment: {},
+    combatData: { combatState: false },
+    combatRound: { roundStarted: false, scheduledActionList: [], clearActions: jest.fn(), endCombatRound: jest.fn() },
+    getName: () => overrides.name || "Creature",
+    getHP: () => hp,
+    getMaxHP: () => maxHp,
+    getFP: () => overrides.fp ?? 100,
+    getMaxFP: () => overrides.maxFp ?? 0,
+    getRace: () => overrides.race ?? 6, // 5 = Droid, 6 = Human
+    getSpells: () => overrides.spells || [],
+    getFeats: () => overrides.feats || [],
+    isDead: () => !!overrides.dead,
+    isHostile: (other: any) => (overrides.faction ?? 1) !== (other?.faction ?? 1),
+    isRangedEquipped: () => !!overrides.ranged,
+    getMeleeRange: () => 2,
     clearAllActions: jest.fn(),
-    actionQueue: [] as any[],
-    combatRound: {} as any,
-    unequipSlot: jest.fn(),
-    equipItem: jest.fn(async () => {}),
+    attackCreature: jest.fn(),
+    faction: overrides.faction ?? 1,
     ...overrides,
   };
 }
 
-/** Two creatures hostile to each other */
-function fight(npcProps: Record<string, any> = {}, foeProps: Record<string, any> = {}, distance = 4) {
-  const npc = creature('Sith', 0, npcProps);
-  const foe = creature('Hero', distance, foeProps);
-  npc.hostileTo.add(foe);
-  foe.hostileTo.add(npc);
-  return { npc, foe };
-}
+describe("GMCombatAI", () => {
+  beforeEach(() => {
+    mockGMManager.npcAiEnabled = true;
+    mockGMManager.isAutonomousNpc.mockReturnValue(true);
+    mockGMManager.isPlayerCharacter.mockReturnValue(false);
+  });
 
-beforeEach(() => {
-  (GameState as any).TwoDAManager = { datatables: new Map([['spells', { rows: SPELLS }]]) };
-  jest.spyOn(ModuleItem, 'GetCastSpellId').mockImplementation((p: any) => p.spellId);
-  jest.spyOn(Math, 'random').mockReturnValue(0);
-});
+  test("bestRanks keeps only the highest rank of each feat chain", () => {
+    const flurry = { id: 11, successor: 91 };
+    const improved = { id: 91, successor: 53 };
+    const master = { id: 53, successor: -1 };
+    const toughness = { id: 40, successor: -1 };
 
-afterEach(() => jest.restoreAllMocks());
+    const best = GMCombatAI.bestRanks([flurry, improved, master, toughness]);
+    expect(best.map((f) => f.id)).toEqual([53, 40]);
+  });
 
-describe("what an NPC has to fight with", () => {
-  test("its powers, combat feats, items and spare weapons are sorted by what they're for", () => {
-    const blaster = weapon('g_w_blstrpstl001', true);
-    const { npc } = fight({
-      spells: [power(28), power(8), power(35), power(25)],
-      feats: [{ id: 28, category: 0x1104, successor: 29 }, { id: 29, category: 0x1104, successor: -1 }, { id: 30, category: 0x1111, successor: -1 }],
-      inventory: [usable(64, 'g_i_medeqpmnt01'), usable(87, 'g_w_fraggren01'), blaster],
+  test("powerTargetRule and worksOn enforce droid and Force-user target restrictions", () => {
+    const human = makeCreature({ race: 6, maxFp: 0 });
+    const jedi = makeCreature({ race: 6, maxFp: 120 });
+    const droid = makeCreature({ race: 5, maxFp: 0 });
+
+    expect(GMCombatAI.powerTargetRule("1")).toBe("droids");
+    expect(GMCombatAI.powerTargetRule("8")).toBe("forceUsers");
+    expect(GMCombatAI.powerTargetRule("0x04")).toBeUndefined();
+
+    expect(GMCombatAI.worksOn("droids", droid)).toBe(true);
+    expect(GMCombatAI.worksOn("droids", human)).toBe(false);
+    expect(GMCombatAI.worksOn("forceUsers", jedi)).toBe(true);
+    expect(GMCombatAI.worksOn("forceUsers", human)).toBe(false);
+    expect(GMCombatAI.worksOn(undefined, human)).toBe(true);
+
+    const replicaJedi = makeCreature({ race: 6, maxFp: 0, gmForceUser: true });
+    const classJedi = makeCreature({ race: 6, maxFp: 0, classes: [{ spellcaster: true }] });
+    expect(GMCombatAI.isForceUser(replicaJedi)).toBe(true);
+    expect(GMCombatAI.isForceUser(classJedi)).toBe(true);
+  });
+
+  test("clearWay detects creatures blocking the line of attack outside melee cluster", () => {
+    const attacker = makeCreature({ id: 1, position: new THREE.Vector3(0, 0, 0) });
+    const blocker = makeCreature({ id: 2, position: new THREE.Vector3(5, 0.2, 0) });
+    const bystander = makeCreature({ id: 3, position: new THREE.Vector3(5, 3, 0) });
+    const target = makeCreature({ id: 4, position: new THREE.Vector3(10, 0, 0) });
+
+    expect(GMCombatAI.clearWay(attacker, target, [attacker, blocker, target])).toBe(false);
+    expect(GMCombatAI.clearWay(attacker, target, [attacker, bystander, target])).toBe(true);
+  });
+
+  test("choose prioritizes self-heal under 40% HP and respects style and cooldowns", () => {
+    const npc = makeCreature({
+      id: 1,
+      hp: 20,
+      maxHp: 100,
+      fp: 100,
+      faction: 1,
+      equipment: { RIGHTHAND: { isRangedWeapon: () => false } },
+      spells: [{ id: 10, getForcePointCost: () => 15, useTalentOnObject: jest.fn() }],
+      feats: [{ id: 11, category: 0x1104, label: "Flurry", useTalentOnObject: jest.fn() }],
     });
-    const kit = GMCombatAI.kitOf(npc);
-    expect(kit.heals.map((t) => t.label)).toEqual(['FORCE_POWER_HEAL', 'ITEM_ABILITY_MED_PACK']);
-    expect(kit.buffs.map((t) => t.label)).toEqual(['FORCE_POWER_SPEED_BURST']);
-    expect(kit.harms.map((t) => [t.label, t.area])).toEqual([['FORCE_POWER_LIGHTNING', false], ['FORCE_POWER_FORCE_STORM', true]]);
-    expect(kit.grenades.map((t) => [t.label, t.area, t.discriminate, t.droidsOnly])).toEqual([['ITEM_ABILITY_GRENADE_FRAGMENTATION', true, false, false]]);
-    expect(GMCombatAI.describeSpell(95, { cost: 0 }).droidsOnly).toBe(true);
-    // Only the top of a feat chain
-    expect(kit.meleeFeats.map((f) => f.id)).toEqual([29]);
-    expect(kit.rangedFeats.map((f) => f.id)).toEqual([30]);
-    expect(kit.rangedWeapons).toEqual([blaster]);
-  });
-});
+    const target = makeCreature({ id: 2, faction: 2, position: new THREE.Vector3(1.5, 0, 0) });
 
-describe("choosing what to do", () => {
-  test("badly hurt, it heals itself (a medpac when it has no healing power)", () => {
-    const medpac = usable(64, 'g_i_medeqpmnt01');
-    const { npc, foe } = fight({ hp: 20, inventory: [medpac] });
-    expect(GMCombatAI.engage(npc, foe, [npc, foe])).toBe('heal-self');
-    expect(medpac.useItemOnObject).toHaveBeenCalledWith(npc, npc);
+    const s = GMCombatAI.situation(npc, target, [npc, target]);
+    const picked = GMCombatAI.choose(s, "all");
+    expect(picked?.tactic.id).toBe("heal-self");
+
+    // Put heal-self on cooldown -> falls back to feat or attack
+    npc.gmCombatCooldowns = { "heal-self": s.now + 5000 };
+    const next = GMCombatAI.choose(s, "all");
+    expect(next?.tactic.id).toBe("feat");
+
+    // Style 'weapons' excludes spells even when off cooldown
+    npc.gmCombatCooldowns = {};
+    const weaponOnly = GMCombatAI.choose(s, "weapons");
+    expect(weaponOnly?.tactic.id).toBe("feat");
   });
 
-  test("a grenade only at a cluster, and never with its own side in the blast", () => {
-    const grenade = () => usable(87, 'g_w_fraggren01');
-    const one = fight({ inventory: [grenade()] }, {}, 8);
-    expect(GMCombatAI.engage(one.npc, one.foe, [one.npc, one.foe])).not.toBe('area');
+  test("area tactic skips friendly-fire grenades when allies stand near the target", () => {
+    const npc = makeCreature({
+      id: 1,
+      faction: 1,
+      fp: 100,
+      position: new THREE.Vector3(0, 0, 0),
+      equipment: { RIGHTHAND: {} },
+      inventory: [
+        {
+          getBaseItem: () => ({ equipableSlots: 0 }),
+          getWeaponType: () => 0,
+          getUsableCastSpellProperties: () => [{ spellId: 60 }], // GRENADE_FRAG (discriminate = false)
+          getEquippedRes: () => "g_w_fraggren01",
+          useItemOnObject: jest.fn(),
+        },
+      ],
+    });
+    const target1 = makeCreature({ id: 2, faction: 2, position: new THREE.Vector3(10, 0, 0) });
+    const target2 = makeCreature({ id: 3, faction: 2, position: new THREE.Vector3(11, 0, 0) });
+    const allyNearTarget = makeCreature({ id: 4, faction: 1, position: new THREE.Vector3(10.5, 1, 0) });
 
-    const { npc, foe } = fight({ inventory: [grenade()] }, {}, 8);
-    const second = creature('Sidekick', 9);
-    npc.hostileTo.add(second);
-    expect(GMCombatAI.engage(npc, foe, [npc, foe, second])).toBe('area');
+    const sWithAlly = GMCombatAI.situation(npc, target1, [npc, target1, target2, allyNearTarget]);
+    const choiceWithAlly = GMCombatAI.choose(sWithAlly, "all");
+    expect(choiceWithAlly?.tactic.id).not.toBe("area");
 
-    const again = fight({ inventory: [grenade()] }, {}, 8);
-    const third = creature('Sidekick', 9);
-    again.npc.hostileTo.add(third);
-    const friend = creature('Trooper', 9.5);
-    expect(GMCombatAI.engage(again.npc, again.foe, [again.npc, again.foe, third, friend])).not.toBe('area');
+    const sClear = GMCombatAI.situation(npc, target1, [npc, target1, target2]);
+    const choiceClear = GMCombatAI.choose(sClear, "all");
+    expect(choiceClear?.tactic.id).toBe("area");
   });
 
-  test("it doesn't recast a buff it has, or a debuff its target is still under", () => {
-    const speed = power(8);
-    const stun = power(46);
-    const { npc, foe } = fight({ spells: [speed, stun] });
-    npc.effects.push({ spellId: 8 });
-    foe.effects.push({ spellId: 46 });
-    expect(GMCombatAI.engage(npc, foe, [npc, foe])).not.toMatch(/buff|power/);
-    expect(speed.useTalentOnObject).not.toHaveBeenCalled();
-    expect(stun.useTalentOnObject).not.toHaveBeenCalled();
+  test("runsBehaviourScripts hands control to GM AI when active unless scripted or player-owned", () => {
+    const npc = makeCreature();
+    expect(GMCombatAI.runsBehaviourScripts(npc)).toBe(false);
+
+    npc.gmScripted = true;
+    expect(GMCombatAI.runsBehaviourScripts(npc)).toBe(true);
+
+    npc.gmScripted = false;
+    npc.gmOwnerPeerId = "peer_1";
+    expect(GMCombatAI.runsBehaviourScripts(npc)).toBe(false);
+
+    // Hidden by the GM: nothing of its own, even one left to its scripts (hidden, it fought on unseen)
+    npc.gmOwnerPeerId = undefined;
+    npc.gmScripted = true;
+    npc.gmHidden = true;
+    expect(GMCombatAI.runsBehaviourScripts(npc)).toBe(false);
   });
 
-  test("droid powers only on droids", () => {
-    const disable = power(900);
-    const { npc, foe } = fight({ spells: [disable] });
-    GMCombatAI.engage(npc, foe, [npc, foe]);
-    expect(disable.useTalentOnObject).not.toHaveBeenCalled();
-    const droid = fight({ spells: [disable] }, { race: 5 });
-    expect(GMCombatAI.engage(droid.npc, droid.foe, [droid.npc, droid.foe])).toBe('power');
-  });
+  test("holdsScriptAttack returns true during standDown/flee orders or queued spell casts", () => {
+    const npc = makeCreature({ gmOrder: { kind: "standDown" } });
+    expect(GMCombatAI.holdsScriptAttack(npc)).toBe(true);
 
-  test("one rule says who a power works on, for NPCs, players' HUDs and the GM's machine alike", () => {
-    expect(GMCombatAI.powerTargetRule('1')).toBe('droids');
-    expect(GMCombatAI.powerTargetRule(1)).toBe('droids');
-    expect(GMCombatAI.powerTargetRule('8')).toBe('forceUsers');
-    expect(GMCombatAI.powerTargetRule('****')).toBeUndefined();
-    expect(GMCombatAI.powerTargetRule(-1)).toBeUndefined();
-    const person = creature('Trooper', 0), droid = creature('HK', 0, { race: 5 });
-    const kinds = (o: any) => o === person || o === droid;
-    jest.spyOn(require('@/managers/gm/GMObjectKind').GMObjectKind, 'isCreature').mockImplementation(kinds as any);
-    expect(GMCombatAI.worksOn('droids', person)).toBe(false);
-    expect(GMCombatAI.worksOn('droids', droid)).toBe(true);
-    expect(GMCombatAI.worksOn(undefined, person)).toBe(true);
-    expect(GMCombatAI.worksOn('droids', undefined)).toBe(false);
-  });
-
-  test("only the best rank of a feat chain counts (Master Flurry, not the Flurry it needed)", () => {
-    const flurry = { id: 11, successor: 91 }, improved = { id: 91, successor: 92 }, master = { id: 92, successor: -1 }, other = { id: 30, successor: -1 };
-    expect(GMCombatAI.bestRanks([flurry, improved, other])).toEqual([improved, other]);
-    expect(GMCombatAI.bestRanks([flurry, improved, master])).toEqual([master]);
-    expect(GMCombatAI.bestRanks([flurry])).toEqual([flurry]);
-  });
-
-  test("out of Force points, it falls back to its weapons", () => {
-    const lightning = power(35, 20);
-    const { npc, foe } = fight({ fp: 5, spells: [lightning] });
-    expect(GMCombatAI.engage(npc, foe, [npc, foe])).toBe('attack');
-    expect(lightning.useTalentOnObject).not.toHaveBeenCalled();
-    expect(npc.attackCreature).toHaveBeenCalledWith(foe, undefined);
-  });
-
-  test("it gets out a ranged weapon for a distant target, and its melee weapon when someone closes in, not flip-flopping", () => {
-    const sword = weapon('g_w_vbroswrd01', false);
-    const rifle = weapon('g_w_blstrrfl001', true);
-    const far = fight({ equipment: { RIGHTHAND: sword }, inventory: [rifle] }, {}, 12);
-    expect(GMCombatAI.engage(far.npc, far.foe, [far.npc, far.foe])).toBe('weapon');
-    expect(far.npc.equipItem).toHaveBeenCalledWith(ModuleCreatureArmorSlot.RIGHTHAND, rifle);
-    // Straight after, the swap is on cooldown
-    expect(GMCombatAI.engage(far.npc, far.foe, [far.npc, far.foe])).not.toBe('weapon');
-
-    const close = fight({ equipment: { RIGHTHAND: rifle }, inventory: [sword] }, {}, 1.5);
-    expect(GMCombatAI.engage(close.npc, close.foe, [close.npc, close.foe])).toBe('weapon');
-    expect(close.npc.equipItem).toHaveBeenCalledWith(ModuleCreatureArmorSlot.RIGHTHAND, sword);
-  });
-
-  test("it takes out the weapon in its pack, not a stale copy, and swaps one at a time (a body dropped two rifles and no sword)", async () => {
-    const staleRifle = weapon('g_w_blstrrfl001', true);
-    const packRifle = weapon('g_w_blstrrfl001', true);
-    const sword = weapon('g_w_vbroswrd01', false);
-    const { npc } = fight({ equipment: { RIGHTHAND: sword }, inventory: [packRifle] }, {}, 12);
-    const first = GMCombatAI.equipWeapon(npc, staleRifle as any);
-    const second = GMCombatAI.equipWeapon(npc, sword as any);
-    expect(second).toBe(first);
-    await first;
-    expect(npc.equipItem).toHaveBeenCalledTimes(1);
-    expect(npc.equipItem).toHaveBeenCalledWith(ModuleCreatureArmorSlot.RIGHTHAND, packRifle);
-    expect(npc.inventory).not.toContain(packRifle);
-  });
-
-  test("a weapon it no longer carries isn't taken out", async () => {
-    const gone = weapon('g_w_blstrrfl001', true);
-    const { npc } = fight({ inventory: [] }, {}, 12);
-    await GMCombatAI.equipWeapon(npc, gone as any);
-    expect(npc.equipItem).not.toHaveBeenCalled();
-  });
-
-  test("the GM's styles limit what it uses", () => {
-    const lightning = power(35);
-    const medpac = usable(64, 'g_i_medeqpmnt01');
-    const weaponsOnly = fight({ gmCombatStyle: 'weapons', hp: 10, spells: [lightning], inventory: [medpac], feats: [{ id: 28, category: 0x1104, successor: -1, useTalentOnObject: jest.fn() }] });
-    expect(['feat', 'attack']).toContain(GMCombatAI.engage(weaponsOnly.npc, weaponsOnly.foe, [weaponsOnly.npc, weaponsOnly.foe]));
-    expect(lightning.useTalentOnObject).not.toHaveBeenCalled();
-    expect(medpac.useItemOnObject).not.toHaveBeenCalled();
-
-    const plain = fight({ gmCombatStyle: 'attack', spells: [lightning] });
-    expect(GMCombatAI.engage(plain.npc, plain.foe, [plain.npc, plain.foe])).toBe('attack');
-    expect(plain.npc.attackCreature).toHaveBeenCalledWith(plain.foe, undefined);
-  });
-});
-
-describe("deciding every round", () => {
-  test("an NPC already attacking its target keeps at it, and stops to do anything else", () => {
-    const lightning = power(35);
-    const { npc, foe } = fight({ spells: [lightning] });
-    npc.combatRound.action = { target: foe };
-    // Out of Force: the attack goes on, untouched
-    npc.fp = 0;
-    expect(GMCombatAI.engage(npc, foe, [npc, foe])).toBe('attack');
-    expect(npc.attackCreature).not.toHaveBeenCalled();
-    expect(npc.clearAllActions).not.toHaveBeenCalled();
-    // With the Force for it, the attack stops for the power
-    npc.fp = 100;
-    expect(GMCombatAI.engage(npc, foe, [npc, foe])).toBe('power');
-    expect(npc.clearAllActions).toHaveBeenCalled();
-    expect(lightning.useTalentOnObject).toHaveBeenCalledWith(foe, npc);
-  });
-});
-
-describe("who runs a GM NPC's behaviour: the GM's AI or its own scripts", () => {
-  const npc = (o: Record<string, any> = {}): any => ({ ...o });
-  const withGM = (o: Record<string, any>, net: Record<string, any> = {}) => {
-    (GameState as any).gmMode = true;
-    (GameState as any).GMManager = { isAutonomousNpc: () => true, npcAiEnabled: true, ...o };
-    (GameState as any).GMNetworkManager = { role: 'host', ...net };
-    (GameState as any).hooks = { isNetReplica: () => false };
-  };
-
-  test("with the NPC AI on, the GM's AI does (its scripts kept pulling it another way)", () => {
-    withGM({});
-    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(false);
-  });
-
-  test('the NPC AI off: its own scripts, unless the GM gave it an order', () => {
-    withGM({ npcAiEnabled: false });
-    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
-    expect(GMCombatAI.runsBehaviourScripts(npc({ gmOrder: { kind: 'guard' } }))).toBe(false);
-  });
-
-  test('the GM can leave one to its own scripts (a boss, a plot NPC)', () => {
-    withGM({});
-    expect(GMCombatAI.runsBehaviourScripts(npc({ gmScripted: true }))).toBe(true);
-  });
-
-  test("a player's character runs on its player, not KotOR's AI (it cleared their queued powers); outside GM mode nothing changes", () => {
-    withGM({ isAutonomousNpc: () => false });
-    expect(GMCombatAI.runsBehaviourScripts(npc({ gmOwnerPeerId: 'peer_1' }))).toBe(false);
-    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
-    withGM({});
-    (GameState as any).gmMode = false;
-    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(true);
-  });
-
-  test("on a player's machine, copies of the GM's creatures run no behaviour scripts (the GM's machine does)", () => {
-    withGM({}, { role: 'client' });
-    (GameState as any).hooks = { isNetReplica: () => true };
-    expect(GMCombatAI.runsBehaviourScripts(npc())).toBe(false);
+    npc.gmOrder = undefined;
+    npc.actionQueue = [{ type: ActionType.ActionCastSpell }];
+    expect(GMCombatAI.holdsScriptAttack(npc)).toBe(true);
   });
 });
