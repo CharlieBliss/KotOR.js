@@ -33,6 +33,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
   private static _v3D = new THREE.Vector3();
   private static _quat = new THREE.Quaternion();
   private static _mat4 = new THREE.Matrix4();
+  private static _mat3 = new THREE.Matrix3();
+  /** How fast area wind carries particles that it affects, per level of the area's wind power (m/s) */
+  static WIND_SPEED_PER_LEVEL = 0.01;
 
   static BirthTime: number = 1;
   static PlaneGeometry: THREE.PlaneGeometry = new THREE.PlaneGeometry(1, 1, 1, 1);
@@ -693,6 +696,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     }
     this._lastWorldPos.copy(currentWorldPos);
     this._hasLastWorldPos = true;
+
+    // Gravity points at the world's floor, so it's worked out again as the emitter turns
+    this.updateGravity();
 
     // Tinting: update tint color from scene ambient if isTinted
     if(this.node.flags.isTinted && this.context){
@@ -1653,25 +1659,32 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
   /**
    * Blast impulses (emitter-generated) plus area wind using {@link resolveDanglyWindPower}
-   * and the same world wind axis as dangly (`ODYSSEY_AREA_WIND_DIRECTION`), transformed to
-   * emitter-local offsets.
+   * and the same world wind axis as dangly (`ODYSSEY_AREA_WIND_DIRECTION`). Particles kept in world space
+   * (Normal, Motion_Blur) take the wind as it is; the others take it in the emitter's own space, scaled with it.
+   *
+   * It used Vector3.transformDirection, which also makes the vector one long: every particle was pushed a full
+   * unit a frame (40-60 m/s), whatever the wind, so fog shot across Dantooine and sparks flew off as they appeared
    */
   private applyWindForces(delta: number): void {
-    const windStrength = resolveDanglyWindPower(this.context) * 0.01;
+    const windSpeed = resolveDanglyWindPower(this.context) * OdysseyEmitter3D.WIND_SPEED_PER_LEVEL;
     const wm = GameState.windManager;
     const hasImpulses = wm && wm.pointSourceWinds.length > 0;
-    if(!hasImpulses && windStrength <= 1e-6){
+    if(!hasImpulses && windSpeed <= 1e-6){
       return;
     }
+
+    const inWorld = this.particlesInWorld();
+    // World displacement to the offsets' space: as is in world space; through the inverse world matrix's 3x3
+    // otherwise (rotation and scale, no translation, and its length kept)
+    const toOffsets = OdysseyEmitter3D._mat3;
+    if(!inWorld) toOffsets.setFromMatrix4(OdysseyEmitter3D._mat4.copy(this.matrixWorld).invert());
 
     let ax = 0;
     let ay = 0;
     let az = 0;
-    if(windStrength > 1e-6){
-      const w = OdysseyEmitter3D._v3A;
-      w.copy(ODYSSEY_AREA_WIND_DIRECTION).multiplyScalar(windStrength * delta);
-      OdysseyEmitter3D._mat4.copy(this.matrixWorld).invert();
-      w.transformDirection(OdysseyEmitter3D._mat4);
+    if(windSpeed > 1e-6){
+      const w = OdysseyEmitter3D._v3A.copy(ODYSSEY_AREA_WIND_DIRECTION).normalize().multiplyScalar(windSpeed * delta);
+      if(!inWorld) w.applyMatrix3(toOffsets);
       ax = w.x;
       ay = w.y;
       az = w.z;
@@ -1685,19 +1698,20 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
       const py = this.offsets.getY(i);
       const pz = this.offsets.getZ(i);
 
-      if(wm && wm.pointSourceWinds.length > 0){
-        const worldPos = OdysseyEmitter3D._v3B.set(px, py, pz).applyMatrix4(this.matrixWorld);
+      if(hasImpulses){
+        const worldPos = OdysseyEmitter3D._v3B.set(px, py, pz);
+        if(!inWorld) worldPos.applyMatrix4(this.matrixWorld);
         const gust = wm.getGlobalPointWind(worldPos);
         if(gust.lengthSq() > 1e-12){
-          const localGust = OdysseyEmitter3D._v3C.copy(gust);
-          localGust.transformDirection(OdysseyEmitter3D._mat4);
-          this.offsets.setX(i, px + localGust.x);
-          this.offsets.setY(i, py + localGust.y);
-          this.offsets.setZ(i, pz + localGust.z);
+          const push = OdysseyEmitter3D._v3C.copy(gust);
+          if(!inWorld) push.applyMatrix3(toOffsets);
+          this.offsets.setX(i, px + push.x);
+          this.offsets.setY(i, py + push.y);
+          this.offsets.setZ(i, pz + push.z);
         }
       }
 
-      if(windStrength > 1e-6){
+      if(windSpeed > 1e-6){
         this.offsets.setX(i, this.offsets.getX(i) + ax);
         this.offsets.setY(i, this.offsets.getY(i) + ay);
         this.offsets.setZ(i, this.offsets.getZ(i) + az);
@@ -1829,14 +1843,34 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     }
   }
 
+  /** Gravity: metres a second squared, a unit of mass (KotOR's: positive mass falls, negative rises) */
+  static GRAVITY = 9.8;
+
+  /**
+   * The shader's gravity (its mass uniform): down in the world, mass x GRAVITY. Particles kept in world space
+   * (Normal, Motion_Blur) take it as is; the others in the emitter's own space. It was the emitter's local up
+   */
+  updateGravity(){
+    const uniform = this.material?.uniforms?.mass;
+    if(!uniform) return;
+    const g = OdysseyEmitter3D._v3D.set(0, 0, -this.mass * OdysseyEmitter3D.GRAVITY);
+    if(!this.particlesInWorld()){
+      const quat = OdysseyEmitter3D._quat;
+      this.getWorldQuaternion(quat);
+      g.applyQuaternion(quat.invert());
+    }
+    if(!uniform.value.equals(g)){
+      uniform.value.copy(g);
+      this.material.uniformsNeedUpdate = true;
+    }
+  }
+
   attributeChanged(attr: string){
     const quat = OdysseyEmitter3D._quat;
     switch(attr){
       case 'mass':
         if(!this.parent) return;
-        this.parent.getWorldQuaternion(quat);
-        this.vec3.set(0, 0, this.mass).applyQuaternion(this.quaternion);
-        this.material.uniforms.mass.value.copy(this.vec3);
+        this.updateGravity();
         this.material.uniformsNeedUpdate = true;
       break;
     }

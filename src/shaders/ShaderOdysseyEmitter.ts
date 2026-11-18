@@ -184,11 +184,13 @@ export class ShaderOdysseyEmitter extends Shader {
 
       vec3 force = vec3(0.0);
       vec3 vel   = vec3(velocity.xyz) * age;
+      // mass: the emitter's gravity, an acceleration in the particles' space (OdysseyEmitter3D.updateGravity).
+      // It was mass * age * 5: a steady 5 m/s a unit of mass, upward, so falling sparks shot straight up
       vec3 accel = mass;
 
       force += vel;
       force *= 1.0 - (positionInTime * 0.5) * drag;
-      force += accel * (age*5.0);
+      force += accel * (0.5 * age * age);
 
       //SpriteSheet Calculations
       float framesX = textureAnimation.x;
@@ -284,7 +286,8 @@ export class ShaderOdysseyEmitter extends Shader {
           //Render particles as plane geometry so we can control it's rotation
           #ifdef Motion_Blur
             vec4 mvCenter = viewMatrix * vec4(offset + force, 1.0);
-            vec3 instVel = velocity.xyz + mass * 5.0;
+            // Its velocity now (launch, then gravity): the streak lies along where it's going
+            vec3 instVel = velocity.xyz + accel * age;
             vec3 mvVel = (viewMatrix * vec4(instVel, 0.0)).xyz;
             vec2 vel2 = length(mvVel.xy) > 0.0001 ? normalize(mvVel.xy) : vec2(0.0, 1.0);
             vec2 perp2 = vec2(-vel2.y, vel2.x);
