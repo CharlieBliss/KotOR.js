@@ -218,7 +218,9 @@ export class OdysseyModelAnimationManager {
     //this.updateAnimationNode(anim, anim.rooNode);
     state.lastTime = state.elapsed;
     state.elapsed = Math.min(state.elapsed + delta, anim.length);
-    
+    // A pose: where it's frozen, whatever the time (its blend from the last animation still runs)
+    if(state.holdAt != null) state.elapsed = Math.max(0, Math.min(anim.length, state.holdAt));
+
     this.updateAnimationEvents(anim, state);
 
     if(this.lastAnimation && this.lastAnimationState){
@@ -239,7 +241,8 @@ export class OdysseyModelAnimationManager {
       this.transElapsed = 0;
     }
 
-    if(state.elapsed >= anim.length){
+    // A pose never ends
+    if(state.holdAt == null && state.elapsed >= anim.length){
       this.updateAnimationEvents(anim, state);
 
       state.lastTime = anim.length;

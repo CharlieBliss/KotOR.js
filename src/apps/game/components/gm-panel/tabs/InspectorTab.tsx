@@ -15,12 +15,15 @@ const EDIT_LABELS: Record<string, string> = {
 import { ItemOptions, PlayerOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
 import { SelectionGroup } from "@/apps/game/components/gm-panel/tabs/SelectionGroup";
 import { GearEditor } from "@/apps/game/components/gm-panel/controls/GearEditor";
+import { PoseEditor } from "@/apps/game/components/gm-panel/controls/PoseEditor";
 import { StatusSection } from "@/apps/game/components/gm-panel/controls/StatusSection";
 
 /** Inspect tab: edit the selected object, or browse everything in the scene */
 export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active }) => {
   useGMStore(active);
   // Inspector tab states
+  // The pose editor, open for the creature selected (by its id)
+  const [posing, setPosing] = useState<number | null>(null);
   const [inspectorFilter, setInspectorFilter] = useState<'all' | 'creatures' | 'placeables' | 'doors'>('all');
   const [inspectorAddItemResRef, setInspectorAddItemResRef] = useState<string>('g_w_lghtsbr01');
   const [inspectorBarkInput, setInspectorBarkInput] = useState<string>('');
@@ -221,7 +224,7 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                         <label>Stance</label>
                         <select className="gm-select" value={current} onChange={(e) => edit('setCreatureStance', () => GMManager.setStanceOrSit(cre, e.target.value))}>
                           <option value="">Standing</option>
-                          {current && !stances.some((c) => c.id === current) && <option value={current}>{current}</option>}
+                          {current && !stances.some((c) => c.id === current) && <option value={current}>{GMManager.stanceLabel(current)}</option>}
                           {groups(stances).map((g) => (
                             <optgroup key={g} label={g}>
                               {stances.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -243,6 +246,14 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     </div>
                   );
                 })()}
+
+                {!selectedObj.gmOwnerPeerId && (posing === selectedObj.id
+                  ? <PoseEditor cre={selectedObj as KotOR.ModuleCreature} onDone={() => setPosing(null)} />
+                  : (
+                    <div className="gm-row">
+                      <button className="gm-btn small" onClick={() => setPosing(selectedObj.id)} title="Hold any moment of any of its animations as its stance">Make a pose…</button>
+                    </div>
+                  ))}
 
                 <StatusSection creature={selectedObj as KotOR.ModuleCreature} />
 

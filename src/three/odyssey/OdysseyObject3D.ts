@@ -71,7 +71,7 @@ export class OdysseyObject3D extends THREE.Object3D {
     throw new Error("Method not implemented.");
   }
 
-  playAnimation(arg0: any, aLooping: boolean, reverse?: boolean) {
+  playAnimation(arg0: any, aLooping: boolean, reverse?: boolean, holdAt?: number) {
     throw new Error("Method not implemented.");
   }
 

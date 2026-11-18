@@ -695,11 +695,13 @@ export class ModuleArea extends ModuleObject {
     const audioEngine = AudioEngine.GetAudioEngine();
     const oPC = GameState.getCurrentPlayer();
     if(!oPC) return;
-    if(oPC.excitedDuration > 0 && audioEngine.bgmMode == BackgroundMusicMode.AREA && audioEngine.battleMusicLoaded){
+    // A fight's excitement, not a weapon drawn to show it (a flourish)
+    const fighting = typeof (oPC as any).isExcitedByCombat === 'function' ? (oPC as any).isExcitedByCombat() : oPC.excitedDuration > 0;
+    if(fighting && audioEngine.bgmMode == BackgroundMusicMode.AREA && audioEngine.battleMusicLoaded){
       audioEngine.bgmMode = BackgroundMusicMode.BATTLE;
       audioEngine.areaMusicDayAudioEmitter.stop();
       audioEngine.battleMusicAudioEmitter.play(true);
-    }else if(oPC.excitedDuration <= 0 && audioEngine.bgmMode == BackgroundMusicMode.BATTLE && audioEngine.battleMusicLoaded){
+    }else if(!fighting && audioEngine.bgmMode == BackgroundMusicMode.BATTLE && audioEngine.battleMusicLoaded){
       audioEngine.bgmMode = audioEngine.battleStingerLoaded ? BackgroundMusicMode.BATTLE_STINGER : BackgroundMusicMode.AREA;
       audioEngine.battleMusicAudioEmitter.stop();
     }

@@ -910,13 +910,23 @@ export class GMManager {
   /** The animation a creature would play for a choice, or '' when its model has none of them */
   static animationFor(cre: ModuleCreature, choice: GMAnimationChoice, looping: boolean): string {
     for (const name of choice.anims) {
-      if (!cre.hasModelAnimation?.(name)) continue;
-      const row = OdysseyModelAnimation.GetAnimation2DA(name);
+      // A pose ('kneel@2.9'): the animation behind it, any kind (it's held, not looped)
+      const { anim, holdAt } = ModuleCreature.parseStance(name);
+      if (!cre.hasModelAnimation?.(anim)) continue;
+      const row = OdysseyModelAnimation.GetAnimation2DA(anim);
       if (!row) continue;
-      if (looping && String(row.looping) !== '1') continue;
+      if (looping && holdAt == null && String(row.looping) !== '1') continue;
       return name;
     }
     return '';
+  }
+
+  /** A stance in words: its label, or for a pose the GM made, its animation and moment */
+  static stanceLabel(stance: string): string {
+    const choice = this.STANCES.find((c) => c.id === stance || c.anims.includes(stance));
+    if (choice) return choice.label;
+    const { anim, holdAt } = ModuleCreature.parseStance(stance);
+    return holdAt != null ? `Pose: ${anim} at ${holdAt.toFixed(2)} s` : anim;
   }
 
   /** The choices this creature's model can do */
@@ -1449,6 +1459,7 @@ export class GMManager {
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
     isWorldPaused: () => GMManager.worldHeld(),
     ownsCombatHud: () => GMPlayerHud.active(),
+    padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),
     sharedWorld: () => GMNetworkManager.role !== 'offline',
     keepsModuleState: () => false,
     cutsceneCamera: () => GMCutscene.renderCamera(),

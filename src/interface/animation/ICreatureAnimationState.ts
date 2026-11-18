@@ -24,4 +24,6 @@ export interface ICreatureAnimationState {
   phase?: 'in' | 'hold' | 'out';
   /** Played backwards (the hands coming down) */
   reverse?: boolean;
+  /** Held frozen at this moment (seconds): a pose stance ('kneel@0.8') */
+  holdAt?: number;
 }

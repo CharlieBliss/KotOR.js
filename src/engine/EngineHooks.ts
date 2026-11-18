@@ -74,6 +74,11 @@ export interface EngineHooks {
   keepsModuleState(): boolean;
   /** The mode draws its own combat HUD (a GM session's player): KotOR's target, action, queue and party panels hide */
   ownsCombatHud(): boolean;
+  /**
+   * Gamepad inputs the mode handles itself this frame, by GamePad field name ('button_x', 'trigger_r'...), or
+   * 'all' while its own interface has the pad (a GM session player's open menu): the engine doesn't see them
+   */
+  padClaims(): readonly string[] | 'all' | null;
   /** The area leaves out its own placeables, creatures or triggers */
   skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean;
 
@@ -143,6 +148,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isLeaderLocked: () => false,
   cutsceneCamera: () => null,
   ownsCombatHud: () => false,
+  padClaims: () => null,
   sharedWorld: () => false,
   keepsModuleState: () => true,
   skipsModuleObjects: () => false,

@@ -1,0 +1,338 @@
+// A GM session player's screens in KotOR's own interface: its frames, colours and font, taken from the game by
+// kotor/kotorSkin.ts (the --k-* variables). Laid over the player HUD's layout (gm-player-hud.scss): the layout
+// and controls stay, the look is the game's. Before the game's pieces are in, the plain colours stand in.
+
+// A panel or button: KotOR's border (9-slice from its border textures) on near-black, square
+@mixin k-frame($frame: '--k-frame', $width: 9px, $fill: rgba(0, 0, 0, 0.8)) {
+  border: 1px solid rgb(var(--k-border, 13 89 69));
+  border-image: var(#{$frame}) var(--k-frame-slice, 16) / #{$width} / 0 stretch;
+  border-radius: 0;
+  background: $fill;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+@mixin k-button {
+  @include k-frame('--k-frame', 8px, rgba(0, 0, 0, 0.72));
+  color: rgb(var(--k-text, 26 178 140));
+  cursor: pointer;
+  &:hover:not(:disabled), &.on, &.active, &.selected, &.open {
+    @include k-frame('--k-frame-hl', 8px, rgba(0, 0, 0, 0.82));
+    // Focused text: KotOR I's yellow, KotOR II's cream
+    color: rgb(var(--k-hl-text, var(--k-hl, 204 204 178)));
+  }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+}
+
+.gm-panel-root.player-view {
+  --k-t: rgb(var(--k-text, 26 178 140));
+  --k-t-dim: rgb(var(--k-text, 26 178 140) / 0.62);
+  --k-h: rgb(var(--k-hl, 204 204 178));
+  --k-ht: rgb(var(--k-hl-text, var(--k-hl, 204 204 178)));
+  --k-b: rgb(var(--k-border, 13 89 69));
+  // KotOR's own: hostile red, the party's teal, the rest its cream
+  --k-enemy: #d23a2a;
+  --k-ally: var(--k-t);
+  --k-neutral: var(--k-h);
+
+  // Every word in the game's font, unbolded (a bitmap font made bold smears)
+  &, & * {
+    font-family: var(--k-font, 'Segoe UI'), 'Segoe UI', Tahoma, sans-serif !important;
+    font-weight: 400 !important;
+    font-synthesis: none;
+    letter-spacing: 0 !important;
+    text-shadow: none;
+  }
+
+  // The browser's own controls in the game's colours: thin scrollbars, checkboxes and sliders
+  accent-color: var(--k-t);
+  * { scrollbar-width: thin; scrollbar-color: var(--k-b) rgba(0, 0, 0, 0.6); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.6); }
+  ::-webkit-scrollbar-thumb { background: var(--k-b); border: 1px solid var(--k-t); }
+
+  .gm-topbar {
+    @include k-frame('--k-frame', 9px, rgba(0, 0, 0, 0.78));
+    padding: 4px 10px;
+    color: var(--k-t);
+  }
+  .gm-badge {
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: var(--k-t) !important;
+    &.client, &.connected, &[class*='connected'] { color: var(--k-h) !important; }
+  }
+  .gm-btn {
+    @include k-button;
+    padding: 3px 12px;
+  }
+  .gm-btn.danger { color: var(--k-enemy); }
+  .gm-btn.success { color: var(--k-h); }
+
+  // The combat HUD
+  .gm-player-hud {
+    --hud-enemy: var(--k-enemy);
+    --hud-ally: var(--k-ally);
+    --hud-neutral: var(--k-neutral);
+    --hud-object: var(--k-neutral);
+    --hud-panel: rgba(0, 0, 0, 0.78);
+    --hud-panel-solid: rgba(0, 0, 0, 0.9);
+    --hud-edge: var(--k-b);
+    --hud-text: var(--k-t);
+    --hud-dim: var(--k-t-dim);
+    --hud-hp: #b52020;
+    --hud-fp: #2a64c8;
+    color: var(--k-t);
+
+    kbd {
+      border: 1px solid var(--k-b);
+      border-radius: 0;
+      background: rgba(0, 0, 0, 0.8);
+      color: var(--k-h);
+      font-size: 9px;
+    }
+
+    // The selection ring: KotOR's thin reticle colours
+    .gm-hud-ring { box-shadow: none; border-width: 2px; }
+
+    .gm-hud-target {
+      @include k-frame('--k-frame', 9px, rgba(0, 0, 0, 0.8));
+      padding: 7px 12px 8px;
+      // As wide as its words: KotOR's lettering is wider than the fixed width allowed ("No T…")
+      &.empty {
+        @include k-frame('--k-frame', 9px, rgba(0, 0, 0, 0.6));
+        color: var(--k-t-dim);
+        width: auto;
+        min-width: 0;
+        max-width: calc(100vw - 460px);
+        .gm-hud-target-name { overflow: visible; flex: none; }
+        .gm-hud-keys { font-size: 9.5px; }
+      }
+    }
+    .gm-hud-target-side { color: var(--hud-side, var(--k-t)); font-size: 9px; }
+    .gm-hud-target-name { color: var(--k-h); font-size: 13px; }
+
+    // Bars: KotOR's flat, thin-framed meters
+    .gm-hud-bar {
+      height: 13px;
+      border-radius: 0;
+      border: 1px solid var(--k-b);
+      background: rgba(0, 0, 0, 0.85);
+      > span { box-shadow: none; }
+      > em { color: #fff; font-size: 9px; line-height: 11px; }
+    }
+
+    .gm-hud-paused {
+      @include k-frame('--k-frame-hl', 9px, rgba(0, 0, 0, 0.85));
+      color: var(--k-h);
+    }
+
+    .gm-hud-action { @include k-button; padding: 3px 11px; font-size: 11px; }
+    .gm-hud-action.primary { @include k-frame('--k-frame-hl', 8px, rgba(0, 0, 0, 0.82)); color: var(--k-ht); }
+
+    .gm-hud-buff {
+      @include k-frame('--k-frame', 6px, rgba(0, 0, 0, 0.75));
+      color: var(--k-t);
+      font-size: 9.5px;
+    }
+
+    .gm-hud-quick button { @include k-button; padding: 4px 6px; font-size: 10.5px; }
+
+    .gm-hud-self {
+      @include k-frame('--k-frame', 9px, rgba(0, 0, 0, 0.8));
+      padding: 7px 9px;
+      &:hover { @include k-frame('--k-frame-hl', 9px, rgba(0, 0, 0, 0.85)); }
+    }
+    .gm-hud-portrait { border-radius: 0; border: 1px solid var(--k-b); background: #000; }
+    .gm-hud-self-name { color: var(--k-h); small { color: var(--k-t-dim); } }
+
+    .gm-hud-popover { @include k-frame('--k-frame', 10px, rgba(0, 0, 0, 0.92)); }
+    .gm-hud-popover-head {
+      background: transparent;
+      border-bottom: 1px solid var(--k-b);
+      strong { color: var(--k-h); font-size: 13px; }
+      span { color: var(--k-t-dim); }
+    }
+    .gm-hud-mini-close { @include k-button; padding: 2px 9px; }
+    .gm-hud-skills-popover {
+      --cc-panel-2: rgba(0, 0, 0, 0.6);
+      --cc-line: var(--k-b);
+      --cc-line-bright: var(--k-h);
+      --cc-text: var(--k-t);
+      --cc-text-strong: var(--k-h);
+      --cc-on: rgba(26, 178, 140, 0.18);
+    }
+    .gm-hud-abilities-controls { background: transparent; border-bottom: 1px solid var(--k-b); }
+    .gm-hud-cat-tab { @include k-button; padding: 3px 10px; font-size: 11px; }
+    .gm-hud-search {
+      border-radius: 0;
+      border: 1px solid var(--k-b);
+      background: rgba(0, 0, 0, 0.85);
+      color: var(--k-h);
+      &:focus { border-color: var(--k-h); }
+    }
+    .gm-hud-abilities-list { border-right: 1px solid var(--k-b); }
+    .gm-hud-ability-row {
+      border-radius: 0;
+      border: 1px solid transparent;
+      color: var(--k-t);
+      &:hover { background: rgba(26, 178, 140, 0.08); border-color: var(--k-b); }
+      &.selected { background: rgba(26, 178, 140, 0.14); border-color: var(--k-h); color: var(--k-h); }
+    }
+    .gm-hud-ability-icon-sm, .gm-hud-detail-icon { border-radius: 0; border: 1px solid var(--k-b); }
+    .gm-hud-ability-row-text small { color: var(--k-t-dim); }
+    .gm-hud-detail-title { color: var(--k-h); font-size: 15px; }
+    .gm-hud-pill {
+      border-radius: 0;
+      background: transparent;
+      border: 1px solid var(--k-b);
+      color: var(--k-t);
+      font-size: 9.5px;
+      &.aim-enemy { color: var(--k-enemy); border-color: currentColor; }
+      &.aim-ally, &.aim-self { color: var(--k-t); }
+      &.fp { color: #6f9ae8; }
+      &.count { color: var(--k-h); }
+    }
+    .gm-hud-detail-warn { border-radius: 0; background: rgba(120, 20, 10, 0.35); border-color: var(--k-enemy); color: #ff9a8a; }
+    .gm-hud-detail-desc, .gm-hud-hover-desc, .gm-hud-wheel-desc { color: var(--k-t); }
+    .gm-hud-detail-footer { border-top: 1px solid var(--k-b); }
+    .gm-hud-cast-btn {
+      @include k-frame('--k-frame-hl', 9px, rgba(0, 0, 0, 0.82));
+      color: var(--k-h);
+      cursor: pointer;
+      &:hover:not(:disabled) { box-shadow: none; filter: brightness(1.25); }
+      &:disabled { opacity: 0.45; }
+    }
+    .gm-hud-pin-slot {
+      @include k-button;
+      padding: 2px 6px;
+      &.on { color: var(--k-h); }
+    }
+
+    .gm-hud-hover-card, .gm-hud-wheel-centre { @include k-frame('--k-frame', 9px, rgba(0, 0, 0, 0.9)); }
+    .gm-hud-hover-head strong, .gm-hud-wheel-centre strong { color: var(--k-h); }
+    .gm-hud-toast { @include k-frame('--k-frame-hl', 8px, rgba(0, 0, 0, 0.88)); color: var(--k-h); }
+    .gm-hud-queue { @include k-frame('--k-frame', 7px, rgba(0, 0, 0, 0.78)); }
+    .gm-hud-label { color: var(--k-t-dim); letter-spacing: 0 !important; }
+    .gm-hud-queue-item { border-radius: 0; border-color: var(--k-b); &.now { border-color: var(--k-h); } }
+    .gm-hud-stop { @include k-button; color: var(--k-enemy); padding: 2px 8px; }
+
+    // The power bar: KotOR's quick slots, each in its own frame
+    .gm-hud-bar-slots { @include k-frame('--k-frame', 10px, rgba(0, 0, 0, 0.72)); padding: 8px; gap: 5px; }
+    .gm-hud-slot {
+      @include k-frame('--k-frame', 8px, #000);
+      border-width: 1px;
+      transition: none;
+      &.aim-enemy, &.aim-ally, &.aim-self { border-color: var(--k-b); }
+      &.empty, &.all { border-style: solid; }
+      &:hover, &.all.open { @include k-frame('--k-frame-hl', 8px, #000); transform: none; }
+      .gm-hud-icon-wrap { padding: 4px; }
+    }
+    .gm-hud-slot-key { background: transparent !important; border: none !important; color: var(--k-h) !important; }
+    .gm-hud-lands {
+      border-radius: 0;
+      border: none;
+      background: rgba(0, 0, 0, 0.75);
+      font-size: 7.5px;
+      &.side-enemy, &.side-nearest { color: var(--k-enemy); }
+      &.side-ally, &.side-self { color: var(--k-t); }
+      &.side-neutral, &.side-object { color: var(--k-h); }
+      &.side-none { color: var(--k-t-dim); }
+    }
+    .gm-hud-cost, .gm-hud-count { border-radius: 0; background: rgba(0, 0, 0, 0.8); font-size: 8.5px; }
+    .gm-hud-cost { color: #6f9ae8; }
+    .gm-hud-count { color: var(--k-h); }
+    .gm-hud-slot-empty, .gm-hud-slot-name-static { color: var(--k-t-dim); }
+
+    .gm-hud-wheel { background: radial-gradient(circle at center, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.25) 60%, transparent 100%); }
+    .gm-hud-wheel-item {
+      border: 1px solid var(--k-b);
+      background: #000;
+      &.aim-enemy, &.aim-ally, &.aim-self { border-color: var(--k-b); }
+      &.hovered { border-color: var(--k-h); box-shadow: none; }
+    }
+  }
+
+  // Notices: the GM's questions, being down, rolls and Light / Dark Side points
+  .gm-prompt {
+    @include k-frame('--k-frame', 10px, rgba(0, 0, 0, 0.9));
+    color: var(--k-t);
+  }
+  .gm-prompt-speaker { color: var(--k-h) !important; }
+  .gm-prompt-text { color: var(--k-t) !important; }
+
+  .gm-roll {
+    @include k-frame('--k-frame', 8px, rgba(0, 0, 0, 0.88));
+    color: var(--k-t);
+    &.natural-20 { @include k-frame('--k-frame-hl', 8px, rgba(0, 0, 0, 0.88)); color: var(--k-h); }
+    &.natural-1 { color: var(--k-enemy); }
+  }
+  .gm-roll-who, .gm-roll-total { color: var(--k-h); }
+  .gm-roll-detail { color: var(--k-t-dim); }
+
+  .gm-align-alert {
+    @include k-frame('--k-frame', 10px, rgba(0, 0, 0, 0.9));
+    color: var(--k-t);
+    &.light { @include k-frame('--k-frame-hl', 10px, rgba(0, 0, 0, 0.9)); }
+    &.dark .gm-align-title { color: var(--k-enemy); }
+  }
+  .gm-align-alert .gm-align-badge {
+    border: 1px solid var(--k-b);
+    border-radius: 0;
+    background: #000;
+    box-shadow: none;
+    text-shadow: none;
+    color: var(--k-h);
+  }
+  .gm-align-alert.dark .gm-align-badge { color: var(--k-enemy); }
+  .gm-align-alert .gm-align-title { color: var(--k-h); span { background: transparent; color: var(--k-h); } }
+  .gm-align-text { color: var(--k-t); }
+
+  // The character sheet (the creator's frame, coloured as KotOR's)
+  .sheet-frame, .cc-frame {
+    --cc-panel: rgba(0, 0, 0, 0.92);
+    --cc-panel-2: rgba(0, 0, 0, 0.6);
+    --cc-line: var(--k-b);
+    --cc-line-bright: var(--k-h);
+    --cc-text: var(--k-t);
+    --cc-text-strong: var(--k-h);
+    --cc-on: rgba(26, 178, 140, 0.16);
+    @include k-frame('--k-frame', 12px, rgba(0, 0, 0, 0.94));
+    color: var(--k-t);
+  }
+  .cc-titlebar { background: transparent !important; border-bottom: 1px solid var(--k-b) !important; color: var(--k-h); }
+  .cc-tabs button, .cc-button { @include k-button; }
+  .cc-button.primary { @include k-frame('--k-frame-hl', 8px, rgba(0, 0, 0, 0.82)); color: var(--k-ht); }
+  .cc-big { color: var(--k-h); }
+  .cc-hint { color: var(--k-t-dim); }
+  .sheet-xp-bar { border-radius: 0; border: 1px solid var(--k-b); background: #000; }
+}
+
+// The controller: what the pad is on (a menu's control, a power-bar slot), in KotOR's focused frame, and the
+// buttons' legend while a pad is in use (overlays/PlayerHud usePadControls)
+.gm-panel-root.player-view {
+  .gm-pad-focus {
+    outline: 2px solid var(--k-ht, #ccccb2);
+    outline-offset: 1px;
+    color: var(--k-ht) !important;
+  }
+  .gm-player-hud .gm-hud-slot.pad-slot {
+    @include k-frame('--k-frame-hl', 8px, #000);
+    outline: 2px solid var(--k-ht);
+    outline-offset: 1px;
+  }
+  .gm-hud-pad-legend {
+    @include k-frame('--k-frame', 7px, rgba(0, 0, 0, 0.78));
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 12px;
+    max-width: min(640px, calc(100vw - 32px));
+    padding: 3px 12px;
+    color: var(--k-t-dim);
+    font-size: 9.5px;
+    pointer-events: none;
+    b { color: var(--k-ht); margin-right: 4px; }
+  }
+}

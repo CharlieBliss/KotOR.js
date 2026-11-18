@@ -92,4 +92,11 @@ export class AnalogInput {
     }
   }
 
+
+  /** Seen by nothing else this frame: the active mode has it (EngineHooks.padClaims) */
+  suppress(){
+    this.value = 0;
+    this.pressed = false;
+  }
+
 }

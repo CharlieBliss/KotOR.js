@@ -80,6 +80,13 @@ export class KeyInput {
     }
   }
 
+  /** Seen by nothing else this frame: the active mode has it (EngineHooks.padClaims) */
+  suppress(){
+    this.down = false;
+    this.pressed = false;
+    this.repeating = false;
+  }
+
   keyDown(){
     this.down = true;
     if(!this.pressed) this.pressed = true;

@@ -164,6 +164,8 @@ export class ModuleCreature extends ModuleObject {
   regenTimer: number;
   regenTimerMax: number;
   excitedDuration: number;
+  /** Excited only from drawing its weapon (flourish): the ready stance, not a fight (no battle music) */
+  excitedForShow: boolean = false;
   turning: number;
   deathAnimationPlayed: boolean;
   deathStarted: boolean;
@@ -1125,11 +1127,17 @@ export class ModuleCreature extends ModuleObject {
         this.animationState.hold = (this.animationState.hold || 0) - delta;
         if(this.animationState.hold <= 0) this.nextCastPhase();
       }
+      // The same animation held at another moment (a pose moved by the GM's slider), or no longer held: the one
+      // playing follows, as it isn't started again for a name it already has
+      if(currentAnimation == this.animationState.animation.name?.toLowerCase()){
+        const playing = (this.model as any).animationManager?.currentAnimationState;
+        if(playing && playing.holdAt !== this.animationState.holdAt) playing.holdAt = this.animationState.holdAt;
+      }
       if(currentAnimation != this.animationState.animation.name?.toLowerCase()){
         if(!this.animationState.started){
           this.animationState.started = true;
           let aLooping = (!parseInt(this.animationState.animation.fireforget) && parseInt(this.animationState.animation.looping) == 1);
-          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping, !!this.animationState.reverse);
+          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping || this.animationState.holdAt != null, !!this.animationState.reverse, this.animationState.holdAt);
         }else if(!this.nextCastPhase()){
           this.setAnimationState(ModuleCreatureAnimState.PAUSE);
         }
@@ -1317,8 +1325,15 @@ export class ModuleCreature extends ModuleObject {
 
   }
 
-  resetExcitedDuration(){
+  /** Into its ready stance for a while: a fight (or forShow, its weapon drawn: the stance only, no battle music) */
+  resetExcitedDuration(forShow: boolean = false){
     this.excitedDuration = 10000;
+    this.excitedForShow = forShow;
+  }
+
+  /** In a fight, as its music and anything else that means combat reads it: excited by one, not by a flourish */
+  isExcitedByCombat(): boolean {
+    return this.excitedDuration > 0 && !this.excitedForShow;
   }
 
   cancelExcitedDuration(){
@@ -1467,10 +1482,21 @@ export class ModuleCreature extends ModuleObject {
    */
   heldStance: string = '';
 
+  /**
+   * A stance's animation and, for a pose, the moment it's held at: 'kneel@0.8' is kneel frozen 0.8 s in (the GM's
+   * poses: any moment of any animation the model has); 'sit' is sit, looping
+   */
+  static parseStance(stance: string = ''): { anim: string; holdAt?: number } {
+    const m = /^([^@]+)@(\d+(?:\.\d+)?)$/.exec(String(stance || '').trim().toLowerCase());
+    if(m) return { anim: m[1], holdAt: Number(m[2]) };
+    return { anim: String(stance || '').trim().toLowerCase() };
+  }
+
   setHeldStance(name: string = ''){
     const previous = this.heldStance;
     this.heldStance = String(name || '').trim().toLowerCase();
-    if(previous && previous !== this.heldStance && this.animationState.animation?.name?.toLowerCase() === previous){
+    const playing = this.animationState.animation?.name?.toLowerCase();
+    if(previous && previous !== this.heldStance && (playing === ModuleCreature.parseStance(previous).anim)){
       // Back to standing (or straight into the new stance)
       this.setAnimationState(ModuleCreatureAnimState.PAUSE);
     }
@@ -1482,15 +1508,21 @@ export class ModuleCreature extends ModuleObject {
     if(!this.heldStance || this.isDead() || this.combatData?.combatState) return;
     const state = this.animationState;
     if(state.index !== ModuleCreatureAnimState.PAUSE) return;
+    const { anim: name, holdAt } = ModuleCreature.parseStance(this.heldStance);
     const current = state.animation?.name?.toLowerCase();
-    if(current === this.heldStance) return;
+    if(current === name && state.holdAt === holdAt) return;
     // Let a gesture or scripted animation finish first
-    if(state.animation && !this.isIdleStanceAnimation(state.animation)) return;
+    if(state.animation && !this.isIdleStanceAnimation(state.animation) && current !== name) return;
     // A model without it would fall straight back to idle and try again every frame
-    if(!this.hasModelAnimation(this.heldStance)) return;
-    const anim = OdysseyModelAnimation.GetAnimation2DA(this.heldStance);
+    if(!this.hasModelAnimation(name)) return;
+    const anim = OdysseyModelAnimation.GetAnimation2DA(name);
     if(!anim) return;
-    this.playTwoDAAnimation(anim);
+    if(holdAt == null){ this.playTwoDAAnimation(anim); return; }
+    // A pose: the animation frozen at its moment. Not sent to players as an animation (it would play through on
+    // their screens first): their copy holds it from the stance itself, as this one does
+    if(!allowsOneOffAnimation(bodyOwner(this))) return;
+    this.resetAnimationState();
+    this.animationState = { index: ModuleCreatureAnimState.PAUSE, animation: anim, started: false, speed: 1, holdAt };
   }
 
   /**
@@ -1564,6 +1596,7 @@ export class ModuleCreature extends ModuleObject {
     this.animationState.phase = undefined;
     this.animationState.hold = 0;
     this.animationState.reverse = false;
+    this.animationState.holdAt = undefined;
   }
   
   resetAnimationState(){
@@ -1986,7 +2019,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   flourish(){
-    this.resetExcitedDuration();
+    // Ready stance, lightsaber lit: not combat, so no battle music (Y on a pad, X on the keyboard played it)
+    this.resetExcitedDuration(this.excitedDuration > 0 && !this.excitedForShow ? false : true);
     let isSimple = this.isSimpleCreature();
     let weaponType = this.getCombatAnimationWeaponType();
     

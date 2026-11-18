@@ -235,3 +235,18 @@ describe("Whirlwind, Force Push & Saber Throw fixes", () => {
     expect(applied[0].ints[2]).toBe(17);
   });
 });
+
+describe("drawing a weapon isn't a fight", () => {
+  test("a flourish readies the stance without the battle music's excitement; combat, or a flourish in one, is a fight", () => {
+    const cre = creature({ excitedDuration: 0 });
+    cre.isSimpleCreature = () => true; // the stance and weapon need a model; the excitement is what's checked
+    cre.flourish();
+    expect(cre.excitedDuration).toBeGreaterThan(0);
+    expect(cre.isExcitedByCombat()).toBe(false);
+    cre.resetExcitedDuration();
+    expect(cre.isExcitedByCombat()).toBe(true);
+    // Drawn mid-fight: still a fight
+    cre.flourish();
+    expect(cre.isExcitedByCombat()).toBe(true);
+  });
+});

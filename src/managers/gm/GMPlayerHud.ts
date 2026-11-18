@@ -102,6 +102,12 @@ export class GMPlayerHud {
   /** Whether the wheel is open on this machine (told to the host once per open/close) */
   static wheelOpen: boolean = false;
 
+  /**
+   * Gamepad inputs the HUD handles itself (its controller layer sets it each frame): 'all' while one of its menus
+   * has the pad, else the buttons KotOR's hidden action menu used. The engine leaves them alone (EngineHooks.padClaims)
+   */
+  static padClaims: readonly string[] | 'all' | null = null;
+
   /** The latest thing the host told this player about what they asked for (GMPlayers.tellPlayer), for the HUD */
   static lastNotice: { text: string; at: number } | null = null;
 

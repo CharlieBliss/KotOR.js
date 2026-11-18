@@ -7,7 +7,10 @@ import { gameTextureUrl } from "@/apps/game/components/gm-panel/creator/gameText
 import { SkillRollGrid } from "@/apps/game/components/gm-panel/sheet/sections";
 import type { GMHudAbility, GMHudCategory, GMHudRelation, GMHudTargetAction } from "@/managers/gm/GMPlayerHud";
 import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
+import { useKotorSkin } from "@/apps/game/components/gm-panel/kotor/kotorSkin";
+import { PAD, PadEdges, activate, closePanel, moveFocus, readPad, scrollPanel, setPadFocus, switchTab, wheelIndex } from "@/apps/game/components/gm-panel/controls/padNav";
 import "@/apps/game/components/gm-panel/gm-player-hud.scss";
+import "@/apps/game/components/gm-panel/gm-kotor-skin.scss";
 
 const { GMPlayerHud } = KotOR;
 
@@ -475,8 +478,13 @@ const PowerWheel: React.FC<{
  * A GM session player's combat HUD: target frame and rings, categorized abilities drawer (tap Q),
  * radial quick wheel (hold Q), quick skill roller (K), unified menu strip, and 1–8 hotbar with descriptions.
  */
+/** The pad buttons the HUD drives in the world (KotOR's action menu, party and pause had them): the engine leaves them be */
+const PAD_WORLD_CLAIMS: readonly string[] = ['button_x', 'button_bumper_l', 'button_bumper_r', 'button_d_up', 'button_d_down', 'button_d_left', 'button_d_right', 'trigger_l', 'trigger_r'];
+
 export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => void; onOpenChat: () => void }> = ({ onOpenSheet, onOpenChat }) => {
   useGMStore();
+  // KotOR's own frames, colours and font, read from the game (kotor/kotorSkin)
+  useKotorSkin();
   useTicker(200);
   const [wheel, setWheel] = useState<{ open: boolean; sticky: boolean }>({ open: false, sticky: false });
   const [panel, setPanel] = useState<'none' | 'skills' | 'powers'>('none');
@@ -680,6 +688,112 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
     };
   }, [openWheel, closeWheel, pick, use, act, sneak, say]);
 
+  // The controller (Xbox layout). KotOR's own pad bindings stay (stick moves, A interacts, B cancels, Y draws the
+  // lightsaber, View sneaks, Menu is options); the buttons its hidden action menu had drive this HUD, and while one
+  // of its menus is open the pad is that menu's. GMPlayerHud.padClaims tells the engine which it mustn't act on
+  const [padSlot, setPadSlot] = useState(-1);
+  const [padSeenAt, setPadSeenAt] = useState(0);
+  const pad = useRef({ area: 'none' as 'none' | 'quick' | 'target', wheel: false, slot: -1 });
+  pad.current.slot = padSlot;
+  useEffect(() => {
+    const edges = new PadEdges();
+    let raf = 0;
+    let seen = 0;
+    const leaveArea = () => { pad.current.area = 'none'; setPadFocus(null); };
+    const tick = () => {
+      raf = requestAnimationFrame(tick);
+      const s = live.current;
+      const frame = readPad();
+      const now = performance.now();
+      edges.update(frame, now);
+      if (!frame || !s.visible) { GMPlayerHud.padClaims = null; return; }
+      if (edges.touched && now - seen > 1000) { seen = now; setPadSeenAt(Date.now()); }
+      const G = KotOR.GameState;
+      // KotOR's own menus (inventory, equipment, a container, a conversation) take the pad as they always have
+      const menu = G.MenuManager?.GetCurrentMenu?.();
+      if (G.Mode !== KotOR.EngineMode.INGAME || (menu && menu !== G.MenuManager.InGameOverlay)) {
+        GMPlayerHud.padClaims = null;
+        if (pad.current.area !== 'none') leaveArea();
+        return;
+      }
+
+      // The wheel, held open by RB: the left stick points, letting go casts
+      if (s.wheel.open && pad.current.wheel) {
+        GMPlayerHud.padClaims = 'all';
+        const i = wheelIndex(frame.axes[0] || 0, frame.axes[1] || 0, s.abilities.length);
+        if (i >= 0 && i !== s.hovered) setHovered(i);
+        if (edges.pressed.has(PAD.B)) { pad.current.wheel = false; closeWheel(); return; }
+        if (edges.released.has(PAD.RB)) {
+          pad.current.wheel = false;
+          if (s.hovered >= 0) pick(s.hovered); else closeWheel();
+        }
+        return;
+      }
+
+      // A menu that's open: the GM's question or being down, the sheet, Powers or Skills, or a row the d-pad went to
+      const area = pad.current.area === 'quick' ? document.querySelector('.gm-player-hud .gm-hud-quick')
+        : pad.current.area === 'target' ? document.querySelector('.gm-player-hud .gm-hud-target-actions') : null;
+      const container = document.querySelector('.gm-panel-root .gm-prompt')
+        || document.querySelector('.gm-panel-root .sheet-frame')
+        || document.querySelector('.gm-player-hud .gm-hud-popover')
+        || area;
+      if (pad.current.area !== 'none' && !area) pad.current.area = 'none';
+      if (container) {
+        GMPlayerHud.padClaims = 'all';
+        const focus = moveFocus(container, edges.dir());
+        if (edges.pressed.has(PAD.A)) activate(focus);
+        if (edges.pressed.has(PAD.LB)) switchTab(container, -1);
+        if (edges.pressed.has(PAD.RB)) switchTab(container, 1);
+        const scroll = frame.axes[3] || 0;
+        if (scroll) scrollPanel(container, scroll * 16);
+        if (edges.pressed.has(PAD.B)) {
+          if (container === area) leaveArea();
+          // The GM's question and being down are answered, not closed
+          // Its own Close: a faked Escape reached KotOR's keyboard too, and opened its Options menu
+          else if (!container.matches('.gm-prompt')) {
+            setPadFocus(null);
+            if (!closePanel(container)) setPanel('none');
+          }
+        }
+        return;
+      }
+      setPadFocus(null);
+
+      // In the world
+      GMPlayerHud.padClaims = PAD_WORLD_CLAIMS;
+      if (edges.pressed.has(PAD.RT) && !GMPlayerHud.cycle('enemy')) say('No enemies in sight');
+      if (edges.pressed.has(PAD.LT) && !GMPlayerHud.cycle('ally')) say('No allies nearby');
+      const slots = s.bar.length;
+      const step = edges.pressed.has(PAD.RIGHT) ? 1 : edges.pressed.has(PAD.LEFT) ? -1 : 0;
+      if (step) {
+        const next = pad.current.slot < 0 ? (step > 0 ? 0 : slots) : (pad.current.slot + step + slots + 1) % (slots + 1);
+        setPadSlot(next);
+        setHoveredSlot(next < slots ? next : -1);
+      }
+      if (edges.pressed.has(PAD.X)) {
+        const at = pad.current.slot < 0 ? 0 : pad.current.slot;
+        if (at >= slots) setPanel((p) => (p === 'powers' ? 'none' : 'powers'));
+        else {
+          const key = s.bar[at];
+          const ability = key ? s.byKey.get(key) : undefined;
+          if (!key) say(`Slot ${at + 1} is empty: LB opens Powers to pin one`);
+          else if (!ability) say('None left');
+          else use(ability);
+        }
+      }
+      if (edges.pressed.has(PAD.LB)) setPanel((p) => (p === 'powers' ? 'none' : 'powers'));
+      if (edges.pressed.has(PAD.RB)) { pad.current.wheel = true; openWheel(false); }
+      if (edges.pressed.has(PAD.UP)) {
+        if (document.querySelector('.gm-player-hud .gm-hud-target-actions button')) pad.current.area = 'target';
+        else say(GMPlayerHud.selected() ? 'Nothing to do with it' : 'No target: RT picks an enemy');
+      }
+      if (edges.pressed.has(PAD.DOWN)) pad.current.area = 'quick';
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { cancelAnimationFrame(raf); GMPlayerHud.padClaims = null; setPadFocus(null); };
+  }, [openWheel, closeWheel, pick, use, say]);
+  const padInUse = padSeenAt > 0 && Date.now() - padSeenAt < 60000;
+
   if (!visible || !pc) return null;
 
   const queue: string[] = Array.isArray(pc.gmNetQueue) ? pc.gmNetQueue.filter(Boolean).slice(0, 4) : [];
@@ -764,6 +878,19 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
             <button className="gm-hud-stop" onClick={() => GMPlayerHud.stop()} title="Stop: drop the queue and stand down">Stop</button>
           </div>
         )}
+        {padInUse && (
+          <div className="gm-hud-pad-legend" aria-label="Controller">
+            {panel !== 'none' || wheel.open ? (
+              <>
+                <span><b>✚</b> move</span><span><b>A</b> select</span><span><b>B</b> back</span><span><b>LB RB</b> tabs</span><span><b>R</b> scroll</span>
+              </>
+            ) : (
+              <>
+                <span><b>RT LT</b> enemy / ally</span><span><b>◀ ▶</b> slot</span><span><b>X</b> use</span><span><b>LB</b> powers</span><span><b>RB</b> hold: wheel</span><span><b>▲</b> target</span><span><b>▼</b> menu</span>
+              </>
+            )}
+          </div>
+        )}
         <div className={`gm-hud-bar-slots ${frozen ? 'frozen' : ''}`} role="toolbar" aria-label="Power bar">
           {bar.map((key, i) => {
             const a = key ? byKey.get(key) : undefined;
@@ -771,7 +898,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
             return (
               <button
                 key={i}
-                className={`gm-hud-slot ${a ? `aim-${a.aim}` : 'empty'} ${a && !a.usable ? 'unusable' : ''} ${lands?.side === 'none' ? 'no-one' : ''}`}
+                className={`gm-hud-slot ${a ? `aim-${a.aim}` : 'empty'} ${a && !a.usable ? 'unusable' : ''} ${lands?.side === 'none' ? 'no-one' : ''} ${padInUse && padSlot === i ? 'pad-slot' : ''}`}
                 onMouseEnter={() => setHoveredSlot(i)}
                 onMouseLeave={() => setHoveredSlot((s) => (s === i ? -1 : s))}
                 onFocus={() => setHoveredSlot(i)}
@@ -789,7 +916,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
             );
           })}
           <button
-            className={`gm-hud-slot all ${panel === 'powers' ? 'open' : ''}`}
+            className={`gm-hud-slot all ${panel === 'powers' ? 'open' : ''} ${padInUse && padSlot === bar.length ? 'pad-slot' : ''}`}
             title="Powers & Abilities (tap Q for categorized menu, hold Q for quick wheel)"
             onClick={() => setPanel((p) => (p === 'powers' ? 'none' : 'powers'))}
           >

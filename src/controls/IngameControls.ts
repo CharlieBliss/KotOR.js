@@ -937,6 +937,13 @@ export class IngameControls {
       KeyMapper.BindGamepad(this.gamePad);
     }
     this.gamePad.updateState(delta);
+    // What the active mode's own interface handles: the game doesn't act on it as well
+    const claims = GameState.hooks.padClaims();
+    if(claims){
+      for(const name of GamePad.INPUT_NAMES){
+        if(claims === 'all' || claims.includes(name)) (this.gamePad as any)[name]?.suppress?.();
+      }
+    }
 
     if(currentMenu){
       if(this.gamePad.button_a.pressed){

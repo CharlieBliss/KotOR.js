@@ -160,6 +160,13 @@ export class GamePad {
   }
 
 
+  /** Every input, by field name (what EngineHooks.padClaims names) */
+  static INPUT_NAMES: readonly string[] = [
+    'button_a', 'button_b', 'button_x', 'button_y', 'button_back', 'button_start',
+    'button_d_up', 'button_d_down', 'button_d_left', 'button_d_right', 'button_bumper_l', 'button_bumper_r',
+    'trigger_l', 'trigger_r', 'stick_l_x', 'stick_l_y', 'stick_l', 'stick_r_x', 'stick_r_y', 'stick_r',
+  ];
+
   static CurrentGamePad: GamePad;
   static CurrentGamePadIndex: number = -1;
   static GamePads: any = {};

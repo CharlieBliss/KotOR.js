@@ -19,4 +19,6 @@ export interface OdysseyModelAnimationManagerState {
   animation?: any;
   /** Played backwards: a cast's raise played again lowers the hands (KotOR has no separate animation for it) */
   reverse?: boolean;
+  /** Frozen at this moment (seconds): a pose (a GM stance 'kneel@0.8'), held until something else plays */
+  holdAt?: number;
 }
