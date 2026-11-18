@@ -8,9 +8,63 @@ import { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import { SpellCastInstance } from "@/combat/SpellCastInstance";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { BitWise } from "@/utility/BitWise";
+import { Dice } from "@/utility/Dice";
 import { ModuleObjectType } from "@/enums";
 
 export class CombatRoundAction {
+
+  /**
+   * The attack animation to play, from the one the attack calls for (key, weapon wield, attack number: "f1a3" is
+   * a feat attack with a stun baton). Not every model has every one: a Trandoshan has no feat or dueling swings
+   * for a baton, and an attack whose animation is missing lands without moving. So the nearest one its model has:
+   * the same attack's first, the plain swing for that weapon, then a plain one-handed swing (or shot).
+   */
+  static isPowerBlastFeat(featId: number): boolean {
+    return (
+      featId === CombatFeatType.POWER_BLAST ||
+      featId === CombatFeatType.IMPROVED_POWER_BLAST ||
+      featId === CombatFeatType.MASTER_POWER_BLAST
+    );
+  }
+
+  static pickAttackAnimation(owner: ModuleCreature | undefined, name: string | string[]): { name: string, animation: ITwoDAAnimation | undefined } {
+    const primary = Array.isArray(name) ? (name[0] || '') : name;
+    const tries: string[] = Array.isArray(name) ? [...name] : [name];
+    const seed = tries[0] || primary;
+    const m = /^([a-z])(\d+)a(\d+)([a-z]?)$/.exec(String(seed || ''));
+    if(m){
+      const [, key, wield, type, variant] = m;
+      if(key === 'f'){
+        const order = variant ? [variant, 'a', 'b', 'c', ''] : ['a', 'b', 'c'];
+        for(const suf of order){
+          const cand = `f${wield}a${type}${suf}`;
+          if(!tries.includes(cand)) tries.push(cand);
+        }
+        // Fallback to single-blade feat animation when a specific wield lacks feat variants
+        if(wield !== '2'){
+          for(const suf of ['a', 'b', 'c', '']){
+            const cand = `f2a${type}${suf}`;
+            if(!tries.includes(cand)) tries.push(cand);
+          }
+        }
+      }
+      if(key === 'b' && wield === '9' && type === '3'){
+        // Heavy blasters lack b9a3 in humanoid supermodels; fall back to rifle sniper aim (b7a3)
+        tries.push('b7a3');
+      }
+      tries.push(`${key}${wield}a1`);
+      if(key === 'f' || key === 'c' || key === 'm') tries.push(`m${wield}a1`, `m${wield}a2`, 'm2a1', 'g8a1');
+      if(key === 'b') tries.push(`b${wield}a1`, 'b5a1');
+    }
+    const hasModel = !!owner?.model && typeof owner.hasModelAnimation === 'function';
+    for(const candidate of tries){
+      if(!candidate) continue;
+      const animation = OdysseyModelAnimation.GetAnimation2DA(candidate);
+      if(!animation) continue;
+      if(!hasModel || owner!.hasModelAnimation(animation.name)) return { name: candidate, animation };
+    }
+    return { name: primary, animation: OdysseyModelAnimation.GetAnimation2DA(primary) };
+  }
   owner: ModuleObject;
 
   actionTimer: number = 0;
@@ -99,24 +153,37 @@ export class CombatRoundAction {
       isRanged = true;
     }
 
+    let variantSuffix = '';
     if(this.feat){
-      if(attackKey == 'm'){
-        attackKey = 'f';
+      if(attackKey == 'm' || attackKey == 'g'){
+        const baseWield = attackKey == 'g' ? 10 : weaponWield;
         switch(this.feat.id){
           case CombatFeatType.CRITICAL_STRIKE:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 1; variantSuffix = 'a';
+          break;
           case CombatFeatType.IMPROVED_CRITICAL_STRIKE:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 1; variantSuffix = 'b';
+          break;
           case CombatFeatType.MASTER_CRITICAL_STRIKE:
-            attackType = 1;
+            attackKey = 'f'; weaponWield = baseWield; attackType = 1; variantSuffix = 'c';
           break;
           case CombatFeatType.FLURRY:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 2; variantSuffix = 'a';
+          break;
           case CombatFeatType.IMPROVED_FLURRY:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 2; variantSuffix = 'b';
+          break;
           case CombatFeatType.MASTER_FLURRY:
-            attackType = 2;
+            attackKey = 'f'; weaponWield = baseWield; attackType = 4; variantSuffix = '';
           break;
           case CombatFeatType.POWER_ATTACK:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 3; variantSuffix = 'a';
+          break;
           case CombatFeatType.IMPROVED_POWER_ATTACK:
+            attackKey = 'f'; weaponWield = baseWield; attackType = 3; variantSuffix = 'b';
+          break;
           case CombatFeatType.MASTER_POWER_ATTACK:
-            attackType = 3;
+            attackKey = 'f'; weaponWield = baseWield; attackType = 3; variantSuffix = 'c';
           break;
         }
       }else if(attackKey == 'b'){
@@ -129,6 +196,16 @@ export class CombatRoundAction {
           case CombatFeatType.SNIPER_SHOT:
           case CombatFeatType.IMPROVED_SNIPER_SHOT:
           case CombatFeatType.MASTER_SNIPER_SHOT:
+          case CombatFeatType.PRECISE_SHOT_I:
+          case CombatFeatType.PRECISE_SHOT_II:
+          case CombatFeatType.PRECISE_SHOT_III:
+          case CombatFeatType.PRECISE_SHOT_IV:
+          case CombatFeatType.PRECISE_SHOT_V:
+          case CombatFeatType.XXXPRECISE_SHOT_I:
+          case CombatFeatType.XXXPRECISE_SHOT_II:
+          case CombatFeatType.XXXPRECISE_SHOT_III:
+          case CombatFeatType.XXXPRECISE_SHOT_IV:
+          case CombatFeatType.XXXPRECISE_SHOT_V:
             attackType = 3;
           break;
           case CombatFeatType.POWER_BLAST:
@@ -145,17 +222,21 @@ export class CombatRoundAction {
       const target: ModuleCreature = this.target as any;
       if(owner.isDuelingObject(target)){
         attackKey = 'c';
-        attackType = Math.round(Math.random()*4)+1;
+        attackType = Math.round(Dice.random()*4)+1;
       }
     }
     
-    let animation = attackKey+weaponWield+'a'+attackType;
+    let animation = attackKey+weaponWield+'a'+attackType+variantSuffix;
+    const candidates: string[] | string = (attackKey === 'f' && attackType === 4)
+      ? [animation, `f${weaponWield}a2c`, `f${weaponWield}a2a`]
+      : animation;
     if(this.isCutsceneAttack){
       animation = this.animationName;
     }
 
-    this.animationName = animation;
-    this.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(animation);
+    const picked = this.isCutsceneAttack ? { name: animation, animation: OdysseyModelAnimation.GetAnimation2DA(animation) } : CombatRoundAction.pickAttackAnimation(owner, candidates);
+    this.animationName = picked.name;
+    this.twoDAAnimation = picked.animation;
   }
 
 }

@@ -134,6 +134,16 @@ export const CALL_CONST = function( this: NWScriptInstance, instruction: NWScrip
  * @author KobaltBlu <https://github.com/KobaltBlu>
  * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
  */
+/** What a script function that isn't implemented returns: its type's empty value */
+const defaultActionValue = (type: NWScriptDataType): any => {
+  switch(type){
+    case NWScriptDataType.INTEGER: return NW_FALSE;
+    case NWScriptDataType.FLOAT: return 0.0;
+    case NWScriptDataType.STRING: return '';
+    default: return undefined;
+  }
+};
+
 export const CALL_ACTION = function( this: NWScriptInstance, instruction: NWScriptInstruction ){
   const action_definition: INWScriptDefAction = instruction.actionDefinition;
   const args: any[] = [];
@@ -182,6 +192,11 @@ export const CALL_ACTION = function( this: NWScriptInstance, instruction: NWScri
     }
   }else{
     console.warn(`NWScript Action ${action_definition.name} not found`, action_definition);
+    // The script still expects its result on the stack. Pushing nothing shifted every value after it: KotOR II's
+    // damage roll (IsFormActive) left area powers reading a number as their target, and hitting a trigger
+    if(action_definition.type != NWScriptDataType.VOID){
+      this.stack.push( defaultActionValue(action_definition.type), action_definition.type );
+    }
   }
 
 }

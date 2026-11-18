@@ -1,4 +1,5 @@
 import type { GMObjectState } from "@/managers/gm/GMObjectState";
+import { isBehaviourScript } from "@/module/creature/ScriptControl";
 import * as THREE from "three";
 import type { Action } from "@/actions/Action";
 import { ActionQueue } from "@/actions/ActionQueue";
@@ -10,6 +11,7 @@ import type { GameEffect } from "@/effects/GameEffect";
 import EngineLocation from "@/engine/EngineLocation";
 import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { ModulePlaceableAnimState } from "@/enums/module/ModulePlaceableAnimState";
 import { NWScriptEventType } from "@/enums/nwscript/NWScriptEventType";
@@ -391,7 +393,7 @@ export class ModuleObject {
     if(!resRef){ return true; }
     const buffer = ResourceLoader.loadCachedResource(resType, resRef);
     if(!buffer){
-      console.error(`Failed to load ${this.constructor.name} template ${resRef}`);
+      console.warn(`Failed to load ${this.constructor.name} template ${resRef}`);
       return false;
     }
     this.template.merge(new GFFObject(buffer));
@@ -488,23 +490,28 @@ export class ModuleObject {
   }
 
   /**
-   * Update the movement speed
+   * The movement speed multiplier from its effects. An increase holds the new speed in percent (EffectMovementSpeedIncrease
+   * turns 99 into 199: Burst of Speed doubles it); a decrease holds the percent taken off. Like effects don't
+   * stack, as in the Aurora rules: the biggest increase and the biggest decrease count. It added the new speed on
+   * top of the old one, and nothing called it once the effect was on the creature, so Force Speed did nothing
    */
   updateMovementSpeed(){
-    let movementSpeed = 1.0;
-
-    for(let i = 0, len = this.effects.length; i < len; i++){
-      const effect = this.effects[i];
-      if(!effect) continue; let rate = 0;
+    let faster = 1, slower = 0;
+    for(const effect of this.effects){
+      if(!effect) continue;
       if(effect.type == GameEffectType.EffectMovementSpeedIncrease){
-        rate = (effect.getInt(0) / 100);
+        const percent = effect.getInt(0);
+        faster = Math.max(faster, (percent < 100 ? percent + 100 : percent) / 100);
       }else if(effect.type == GameEffectType.EffectMovementSpeedDecrease){
-        rate = (effect.getInt(0) / -100);
+        slower = Math.max(slower, Math.min(99, Math.max(0, effect.getInt(0))) / 100);
       }
-      movementSpeed += rate;
     }
+    this.movementSpeed = faster * (1 - slower);
+  }
 
-    this.movementSpeed = movementSpeed;
+  /** What its effects decide, worked out again whenever one goes on or comes off */
+  effectsChanged(){
+    this.updateMovementSpeed();
   }
 
   /**
@@ -845,7 +852,9 @@ export class ModuleObject {
     const animations2DA = GameState.TwoDAManager.datatables.get('animations');
     if(animations2DA){
 
-      const debilitatedEffect = this.effects.find( e => e.type == GameEffectType.EffectSetState );
+      // Stunned, held, choking...: that pose, whatever it's doing. Not once dead: killed while held, it kept the
+      // stun pose for "die" and "dead" and never fell (on the GM's machine, where the stun is)
+      const debilitatedEffect = this.isDead() ? undefined : this.effects.find( e => e.type == GameEffectType.EffectSetState );
       if(debilitatedEffect){
         switch(debilitatedEffect.getInt(0)){
           case 1: //Confused
@@ -1086,11 +1095,20 @@ export class ModuleObject {
   }
 
   /**
-   * Trigger the user defined event
-   * @param event 
+   * Whether this object's script for slot runs now. A creature's behaviour scripts (ScriptControl) don't when
+   * something else runs its behaviour (EngineHooks.runsBehaviourScripts: a GM session's AI); its story and rules
+   * scripts always do
    */
+  runsScript(slot: string, userEvent?: number): boolean {
+    if(!BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)) return true;
+    if(!isBehaviourScript(slot, userEvent)) return true;
+    return GameState.hooks.runsBehaviourScripts(this as any);
+  }
+
+  /** Trigger the user defined event */
   triggerUserDefinedEvent( event: NWScriptEvent ){
     if(!(event instanceof NWScriptEvent)){ return; }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnUserDefined, parseInt(event.getInt(0)))){ return; }
 
     let onUserDefined: NWScriptInstance;
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)){
@@ -1113,6 +1131,7 @@ export class ModuleObject {
    */
   triggerSpellCastAtEvent( event: NWScriptEvent ){
     if(!(event instanceof NWScriptEvent)){ return; }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnSpellAt)){ return; }
 
     let onSpellAt: NWScriptInstance;
     if(BitWise.InstanceOfObject(this, ModuleObjectType.ModuleCreature)){
@@ -1158,6 +1177,9 @@ export class ModuleObject {
   triggerHeartbeat(){
     //Only allow the heartbeat script to run after the onspawn is called
     if(!(this.spawned === true && GameState.module.readyToProcessEvents)){
+      return;
+    }
+    if(!this.runsScript(ModuleObjectScript.CreatureOnHeartbeat)){
       return;
     }
 
@@ -1597,7 +1619,7 @@ export class ModuleObject {
       onDamaged = this.scripts[ModuleObjectScript.DoorOnDamaged];
     }
 
-    if(onDamaged){
+    if(onDamaged && this.runsScript(ModuleObjectScript.CreatureOnDamaged)){
       onDamaged.run(this);
     }
   }
@@ -2180,6 +2202,7 @@ export class ModuleObject {
       effect.setAttachedObject(this);
       effect.onApply(this);
     }
+    this.effectsChanged();
   }
 
   /**
@@ -2215,11 +2238,42 @@ export class ModuleObject {
 
     if(this.isImmuneToEffect(effect)) return;
 
+    // Already on another object (one effect a script applies to several): this one gets its own
+    if(effect.applied && effect.object && effect.object !== this){
+      effect = effect.clone();
+      effect.initialize();
+    }
+
     effect.setAttachedObject(this);
     effect.loadModel();
     effect.onApply(this);
+    GameState.hooks.onEffectApplied(this, effect);
+    // A heal, hit or resurrection has done its work once applied: kept, it sat on the creature for good, listed
+    // as a "Heal" or "Damage" with no source
+    if(ModuleObject.ONE_SHOT_EFFECTS.has(effect.type) && effect.getDurationType() == GameEffectDurationType.INSTANT){
+      return;
+    }
     this.effects.push(effect);
+    this.effectsChanged();
   }
+
+  /**
+   * Take an effect off: off the list, its clean-up and models (GameEffect.retire), and the mode told (a GM
+   * session's players take it off too). Every way an effect comes off goes through here
+   */
+  detachEffect(effect: GameEffect){
+    const index = this.effects.indexOf(effect);
+    if(index < 0) return;
+    this.effects.splice(index, 1);
+    if(effect.retire()) GameState.hooks.onEffectRemoved(this, effect);
+    this.effectsChanged();
+  }
+
+  /** Effects that act once, when applied instantly (other types default to instant and still last) */
+  static ONE_SHOT_EFFECTS = new Set<number>([
+    GameEffectType.EffectHeal, GameEffectType.EffectDamage, GameEffectType.EffectHealForcePoints,
+    GameEffectType.EffectDamageForcePoints, GameEffectType.EffectResurrection, GameEffectType.EffectDeath,
+  ]);
 
   /**
    * Get an effect by type
@@ -2252,16 +2306,8 @@ export class ModuleObject {
     if(!(oCreator instanceof ModuleObject)){
       return;
     }
-    let eIndex = this.effects.length - 1;
-    let effect = this.effects[eIndex];
-    while(effect){
-      if(effect.getCreator() == oCreator){
-        let index = this.effects.indexOf(effect);
-        if(index >= 0){
-          this.effects.splice(index, 1)[0].onRemove();
-        }
-      }
-      effect = this.effects[--eIndex];
+    for(const effect of this.effects.filter((e) => e.getCreator() == oCreator)){
+      this.detachEffect(effect);
     }
   }
 
@@ -2270,13 +2316,8 @@ export class ModuleObject {
    * @param type 
    */
   removeEffectsByType(type: number = -1){
-    let effect = this.getEffect(type);
-    while(effect){
-      let index = this.effects.indexOf(effect);
-      if(index >= 0){
-        this.effects.splice(index, 1)[0].onRemove();
-      }
-      effect = this.getEffect(type);
+    for(const effect of this.effects.filter((e) => e.type == type)){
+      this.detachEffect(effect);
     }
   }
 
@@ -2286,9 +2327,7 @@ export class ModuleObject {
    */
   removeEffect(effect: GameEffect){
     if(!effect){ return; }
-    const arrIdx = this.effects.indexOf(effect);
-    if(arrIdx == -1){ return; }
-    this.effects.splice(arrIdx, 1)[0].onRemove();
+    this.detachEffect(effect);
   }
 
   /**
@@ -2564,7 +2603,7 @@ export class ModuleObject {
       this.model.updateMatrix();
     }
     
-    if(this.model instanceof THREE.Object3D)
+    if(this.box && this.model instanceof THREE.Object3D)
       this.box.setFromObject(this.model);
   }
 
@@ -2785,7 +2824,7 @@ export class ModuleObject {
       onNotice = this.scripts[ModuleObjectScript.CreatureOnNotice];
     }
 
-    if(triggerOnNotice && onNotice){
+    if(triggerOnNotice && onNotice && this.runsScript(ModuleObjectScript.CreatureOnNotice)){
       const instance = onNotice.nwscript.newInstance();
       (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
@@ -2834,7 +2873,7 @@ export class ModuleObject {
       onNotice = this.scripts[ModuleObjectScript.CreatureOnNotice];
     }
 
-    if(triggerOnNotice && onNotice){
+    if(triggerOnNotice && onNotice && this.runsScript(ModuleObjectScript.CreatureOnNotice)){
       const instance = onNotice.nwscript.newInstance();
       (this as any).lastPerceived = perceptionObject; instance.lastPerceived = perceptionObject;
       instance.run(this);
@@ -3333,10 +3372,9 @@ export class ModuleObject {
 
       // Dispose all game effects
       if(this.effects && this.effects.length > 0){
+        // The object is going: its effects' models go with it (nobody needs telling, the object itself goes)
         for(let i = this.effects.length - 1; i >= 0; i--){
-          if(this.effects[i]){
-            this.effects[i].onRemove();
-          }
+          this.effects[i]?.retire();
         }
         this.effects.length = 0;
       }

@@ -10,6 +10,7 @@ import { type ModuleCreature, type ModuleObject } from "@/module";
 // import type { NWScriptInstance } from "@/nwscript/NWScriptInstance";
 import { GFFStruct } from "@/resource/GFFStruct";
 import { BitWise } from "@/utility/BitWise";
+import { Utility } from "@/utility/Utility";
 import { ActionParameter } from "@/actions/ActionParameter";
 import { ActionQueue } from "@/actions/ActionQueue";
 import * as THREE from "three";
@@ -161,6 +162,18 @@ export class Action {
    * adjusts movement vectors to avoid them. Only applies to creature-type
    * objects that are part of the party.
    */
+  /** Milliseconds an NPC follows a path around someone before it may plan another */
+  static AVOIDANCE_REPLAN_MS = 700;
+
+  /** When each NPC last planned its way around someone */
+  static lastAvoidance = new WeakMap<ModuleObject, number>();
+
+  /** Milliseconds an NPC keeps going round the same creature on the same side */
+  static DETOUR_STICKY_MS = 2500;
+
+  /** The side each NPC last went round someone on */
+  static lastDetour = new WeakMap<ModuleObject, { obstacle: ModuleObject; first: boolean; at: number }>();
+
   runCreatureAvoidance(delta = 0, finalTarget: THREE.Vector3, excludeTarget?: ModuleObject) {
     if (!BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)) return;
     const owner: ModuleCreature = this.owner as any;
@@ -174,7 +187,7 @@ export class Action {
     // Constants for avoidance behavior
     const AVOIDANCE_DISTANCE = 1.0; // Distance ahead to check for obstacles
     const AVOIDANCE_DISTANCE_SHORT = 0.5; // Shorter distance for closer detection
-    const SAFETY_BUFFER = 1.1; // Multiplier for hit distance safety
+    const PASSING_ROOM = 0.25; // Clearance (m) between two bodies walking past each other
     const BLOCKING_DECAY_RATE = 0.5; // Rate at which blocking timer decreases
 
     // Calculate look-ahead points (fixed direction - was backwards)
@@ -190,6 +203,14 @@ export class Action {
     const checkCreatureCollision = (creature: ModuleCreature) => {
       if (creature === owner || creature.isDead() || !creature.getAppearance()) return;
 
+      // Not there for the creatures around it (a GM's hidden actor)
+      if (GameState.hooks.walksThrough(creature)) return;
+
+      // Walking the same way: it's moving out of the way too (a group setting off together). Detouring around
+      // it would only send both in circles. Judged by where each is going: their facings swing as they step
+      // round others, and two walking back to their posts together zigzagged round each other for metres
+      if ((creature.force > 0 || creature.speed > 0.5) && Action.headingSameWay(owner, creature, finalTarget)) return;
+
       // Skip the target object if it's specified
       if (excludeTarget && creature === excludeTarget) {
         return;
@@ -200,13 +221,11 @@ export class Action {
         return;
       }
 
-      // For NPCs, avoid both other NPCs and party members
-      if (!isPlayerCharacter && GameState.PartyManager.party.indexOf(creature) >= 0) {
-        // Skip party members for NPCs to prevent them from avoiding each other
-        return;
-      }
+      // NPCs avoid party members too (in GM mode, the players' characters): they skipped them, and walked
+      // into a player standing in their way and stuck there
 
-      const hitDistance = creature.getAppearance().hitdist * SAFETY_BUFFER;
+      // Close enough to bump: both bodies and a little room (collision stops them that far apart)
+      const hitDistance = Action.bodyRadius(creature) + Action.bodyRadius(owner) + PASSING_ROOM;
       const creaturePos = creature.position;
 
       // Check both look-ahead points
@@ -247,9 +266,14 @@ export class Action {
       // For player character, use force-based avoidance (adjust movement vector)
       this.applyPlayerAvoidance(owner, closestObstacle, closestDistance, delta);
     } else {
-      // For NPCs, use full path recalculation
-      this.calculateAvoidancePath(owner, closestObstacle, finalTarget, closestDistance);
-      this.coordinateObstacleAvoidance(owner, closestObstacle);
+      // For NPCs, a new path around it: not again for a moment while it walks the last one (a new path every
+      // frame, around someone also moving, never gets anywhere)
+      const now = performance.now();
+      if (now - (Action.lastAvoidance.get(owner) || 0) >= Action.AVOIDANCE_REPLAN_MS) {
+        Action.lastAvoidance.set(owner, now);
+        this.calculateAvoidancePath(owner, closestObstacle, finalTarget, closestDistance);
+        this.coordinateObstacleAvoidance(owner, closestObstacle);
+      }
     }
 
     owner.blockingTimer += 1;
@@ -290,12 +314,32 @@ export class Action {
     }
   }
 
+  /** Two walkers heading the same way (within 60°): toward where each is walking to, else the way each faces */
+  static headingSameWay(owner: ModuleCreature, other: ModuleCreature, ownerTarget: THREE.Vector3): boolean {
+    const theirs = other.action?.type === ActionType.ActionMoveToPoint
+      ? new THREE.Vector3(other.action.getParameter<number>(0) - other.position.x, other.action.getParameter<number>(1) - other.position.y, 0)
+      : undefined;
+    const ours = ownerTarget ? new THREE.Vector3(ownerTarget.x - owner.position.x, ownerTarget.y - owner.position.y, 0) : undefined;
+    if (theirs && ours && theirs.lengthSq() > 0.25 && ours.lengthSq() > 0.25) {
+      return theirs.normalize().dot(ours.normalize()) > Math.cos(Math.PI / 3);
+    }
+    return Math.abs(Utility.NormalizeRadian(other.getFacing() - owner.getFacing())) < Math.PI / 3;
+  }
+
+  /** A creature's body radius (ModuleCreature.getBodyRadius), for anything that might not have one */
+  static bodyRadius(creature: any): number {
+    return typeof creature?.getBodyRadius === 'function' ? creature.getBodyRadius() : 0.4;
+  }
+
+  /** Room left between two bodies when one steps round the other (m) */
+  static DETOUR_ROOM = 0.45;
+
   /**
    * Calculates the avoidance path around an obstacle
    */
   private calculateAvoidancePath(owner: ModuleCreature, obstacle: ModuleCreature, finalTarget: THREE.Vector3, obstacleDistance: number) {
-    const SAFETY_BUFFER = 1.5;
-    const safeRadius = obstacle.getHitDistance() * SAFETY_BUFFER;
+    // Just room for both bodies to pass (it was 3 m to the side of a person: NPCs went far out of their way)
+    const safeRadius = Action.bodyRadius(obstacle) + Action.bodyRadius(owner) + Action.DETOUR_ROOM;
 
     // Calculate perpendicular direction for detour
     const direction = owner.forceVector.clone().normalize();
@@ -304,17 +348,26 @@ export class Action {
     // Calculate two possible detour points
     const detourPoint1 = owner.area.getNearestWalkablePoint(
       obstacle.position.clone().add(perpendicular.clone().multiplyScalar(safeRadius)),
-      owner.getHitDistance()
+      Action.bodyRadius(owner)
     );
     const detourPoint2 = owner.area.getNearestWalkablePoint(
       obstacle.position.clone().sub(perpendicular.clone().multiplyScalar(safeRadius)),
-      owner.getHitDistance()
+      Action.bodyRadius(owner)
     );
 
-     // Choose the better detour point based on edge distance
-    const detour1Score = owner.area.scorePointEdgeDistance(detourPoint1);
-    const detour2Score = owner.area.scorePointEdgeDistance(detourPoint2);
-    const usePoint1 = detour1Score > detour2Score;
+    // The side that keeps it heading where it's going (a detour backwards is how NPCs end up circling); when
+    // both cost about the same, the one with more room from the walls
+    const cost = (p: THREE.Vector3) => p.distanceTo(owner.position) + p.distanceTo(finalTarget);
+    const cost1 = cost(detourPoint1), cost2 = cost(detourPoint2);
+    // Going round the same one again: the same side as last time, so it doesn't swing from side to side
+    const last = Action.lastDetour.get(owner);
+    const now = performance.now();
+    const usePoint1 = last && last.obstacle === obstacle && now - last.at < Action.DETOUR_STICKY_MS
+      ? last.first
+      : Math.abs(cost1 - cost2) > 0.5
+        ? cost1 < cost2
+        : owner.area.scorePointEdgeDistance(detourPoint1) > owner.area.scorePointEdgeDistance(detourPoint2);
+    Action.lastDetour.set(owner, { obstacle, first: usePoint1, at: now });
     const chosenDetourPoint = usePoint1 ? detourPoint1 : detourPoint2;
 
     // Create and set the avoidance path
@@ -353,11 +406,11 @@ export class Action {
       // Calculate alternate detour (opposite of what we chose)
       const direction = obstacle.forceVector.clone().normalize();
       const perpendicular = new THREE.Vector3(-direction.y, direction.x, 0).normalize();
-      const safeRadius = obstacle.getHitDistance() * 1.5;
-      
+      const safeRadius = Action.bodyRadius(obstacle) + Action.bodyRadius(owner) + Action.DETOUR_ROOM;
+
       const alternateDetour = owner.area.getNearestWalkablePoint(
         obstacle.position.clone().sub(perpendicular.clone().multiplyScalar(safeRadius)),
-        obstacle.getHitDistance()
+        Action.bodyRadius(obstacle)
       );
 
       const path = ComputedPath.FromVector3List([obstacle.position, alternateDetour]);

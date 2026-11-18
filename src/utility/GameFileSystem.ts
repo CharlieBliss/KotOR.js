@@ -6,7 +6,7 @@ import { IGameFileSystemReadDirOptions } from "@/interface/filesystem/IGameFileS
 import { isUsableDirectoryHandle } from "@/utility/gameDirectoryAccess";
 declare const dialog: any;
 
-const webHandleHasRemove = typeof (FileSystemFileHandle.prototype as any).remove === 'function'
+const webHandleHasRemove = typeof FileSystemFileHandle !== 'undefined' && typeof (FileSystemFileHandle.prototype as any).remove === 'function'
 
 const spleep = (time: number = 0) => {
   return new Promise( (resolve, reject) => {
@@ -567,8 +567,11 @@ export class GameFileSystem {
             }
           }
         }catch(e){
-          console.log(dirOrFilePath);
-          console.error(e);
+          // Not there: that's the answer. Anything else went wrong
+          if((e as any)?.name !== 'NotFoundError'){
+            console.log(dirOrFilePath);
+            console.error(e);
+          }
           resolve(false);
           return;
         }

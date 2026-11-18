@@ -1,995 +1,995 @@
-template	name	base item
-100_belt01	Safety Harness	Belt
-100_fore01	Peragus Mining Shield	Forearm_Bands
-100_mask01	Survey Gear	Mask
-a_band_c01	{c01}<FullName>'s Armband	Forearm_Bands
-a_band_x01	{x01}Nomi's Armband	Forearm_Bands
-a_band_x02	{x02}Vao Armband	Forearm_Bands
-a_band_x03	{x03}Ludo Kressh's Armband	Forearm_Bands
-a_belt_01	{01}Adrenaline Amplifier	Belt
-a_belt_02	{02}Cardio-Regulator	Belt
-a_belt_03	{03}Stealth Field Generator	Stealth_Unit
-a_belt_04	{04}Czerka Utility Belt	Belt
-a_belt_05	{05}Advanced Adrenaline Amplifier	Belt
-a_belt_06	{06}Aratech SD Belt	Stealth_Unit
-a_belt_07	{07}Strength Enhancer	Belt
-a_belt_08	{08}Systech Cardio-Regulator	Belt
-a_belt_09	{09}Hyper Adrenaline Amplifier	Belt
-a_belt_10	{10}Exchange Shadow Caster	Stealth_Unit
-a_belt_11	{11}Inertial Inhibitor	Belt
-a_belt_12	{12}Electrical Capacitance Shield	Belt
-a_belt_13	{13}Thermal Shield Generator	Belt
-a_belt_14	{14}Eriadu Stealth Unit	Stealth_Unit
-a_belt_15	{15}CNS Strength Enhancer	Belt
-a_belt_16	{16}Exchange Utility Belt	Belt
-a_belt_17	{17}Immunity Belt	Belt
-a_belt_18	{18}Adrenaline Stimulator	Belt
-a_belt_19	{19}Nerve Amplifier Belt	Belt
-a_belt_20	{20}Jal Shey Belt	Belt
-a_belt_21	{21}Multishield Generator	Belt
-a_belt_22	{22}Defel Mimicker	Stealth_Unit
-a_belt_23	{23}Frozian Scout Belt	Stealth_Unit
-a_belt_24	{24}Tech Specialist Belt	Belt
-a_belt_25	{25}Aratech Cardio-Regulator	Belt
-a_belt_26	{26}GNS Strength Enhancer	Belt
-a_belt_27	{27}Qel-Droma Belt	Belt
-a_belt_28	{28}Immortality Belt	Belt
-a_belt_29	{29}Aratech Echo Belt	Stealth_Unit
-a_belt_30	{30}Jal Shey Mentor Belt	Belt
-a_gloves_01	{01}Insulated Gloves	Gauntlets
-a_gloves_02	{02}Exchange Casual Gloves	Gauntlets
-a_gloves_04	{04}Taris Survival Gloves	Gauntlets
-a_gloves_05	{05}Accuracy Gloves	Gauntlets
-a_gloves_06	{06}Gamorrean Gauntlets	Gauntlets
-a_gloves_07	{07}Exchange Work Gloves	Gauntlets
-a_gloves_08	{08}Czerka Defensive Gauntlets	Gauntlets
-a_gloves_09	{09}Detonator Gloves	Gauntlets
-a_gloves_10	{10}Unarmed Accuracy Gloves	Gauntlets
-a_gloves_11	{11}Infiltrator Gloves	Gauntlets
-a_gloves_12	{12}Jal Shey Perception Gloves	Gauntlets
-a_gloves_13	{13}Gamorrean Wargloves	Gauntlets
-a_gloves_14	{14}Eriadu Strength Amplifier	Gauntlets
-a_gloves_15	{15}Karakan Gauntlets	Gauntlets
-a_gloves_16	{16}Bothan Precision Gloves	Gauntlets
-a_gloves_17	{17}Sith Power Gauntlets	Gauntlets
-a_gloves_18	{18}Gamorrean Power Gauntlets	Gauntlets
-a_gloves_19	{19}Nagai Combat Gloves	Gauntlets
-a_gloves_20	{20}Kubaz Scoundrel Gloves	Gauntlets
-a_gloves_21	{21}Automation Gloves	Gauntlets
-a_gloves_22	{22}Jal Shey Meditation Gloves	Gauntlets
-a_gloves_23	{23}Echani Accuracy Gloves	Gauntlets
-a_gloves_24	{24}Zeison Sha Gloves	Gauntlets
-a_gloves_25	{25}Dominator Gauntlets	Gauntlets
-a_gloves_26	{26}Nikto Soldier Gloves	Gauntlets
-a_gloves_27	{27}Ossluk's Gloves	Gauntlets
-a_gloves_28	{28}Disruption Gloves	Gauntlets
-a_gloves_29	{29}Improved Automation Gloves	Gauntlets
-a_gloves_30	{30}Lightning Gloves	Gauntlets
-a_heavy_01	{hvy 01}Battle Armor	Armor_Class_8
-a_heavy_02	{hvy 02}Heavy Battle Armor	Armor_Class_9
-a_heavy_03	{hvy 03}Echani Heavy Armor	Armor_Class_8
-a_heavy_04	{hvy 04}Durasteel Heavy Armor	Armor_Class_9
-a_heavy_05	{hvy 05}Powered Battle Armor	Armor_Class_8
-a_heavy_06	{hvy 06}Flex Heavy Armor	Armor_Class_9
-a_heavy_07	{hvy 07}Mandalorian Battle Armor	Armor_Class_9
-a_heavy_08	{hvy 08}Mandalorian Heavy Armor	Armor_Class_9
-a_heavy_09	{hvy 09}Verpine Zal Alloy Mesh	Armor_Class_8
-a_heavy_10	{hvy 10}Mandalorian Assault Armor	Armor_Class_9
-a_heavy_11	{hvy 11}Corellian Powersuit	Armor_Class_8
-a_heavy_12	{hvy 12}M'uhk'gfa	Armor_Class_8
-a_heavy_13	{hvy 13}Iotran Braceman Armor	Armor_Class_8
-a_heavy_14	{hvy 14}Felenar Armor	Armor_Class_9
-a_heavy_15	{hvy 15}Matrix Armor	Armor_Class_9
-a_heavy_x01	{hvy x01}Mandalore's Armor	Armor_Class_9
-a_helmet_01	{01}Neural Band	Mask
-a_helmet_02	{02}Breath Mask	Mask
-a_helmet_03	{03}Rakatan Band	Mask
-a_helmet_04	{04}Stealth Field Enhancer	Mask
-a_helmet_05	{05}Bothan Perception Visor	Mask
-a_helmet_06	{06}Sonic Nullifiers	Mask
-a_helmet_07	{07}Interface Band	Mask
-a_helmet_08	{08}Targeting Visor	Mask
-a_helmet_09	{09}Shielding Visor	Mask
-a_helmet_10	{10}Spacer's Sensor	Mask
-a_helmet_11	{11}Regal Visor	Mask
-a_helmet_12	{12}Meditation Band	Mask
-a_helmet_13	{13}Bothan Sensory Visor	Mask
-a_helmet_14	{14}Arkanian Blinders	Mask
-a_helmet_15	{15}Combat Sensor	Mask
-a_helmet_16	{16}Multi-spectral Target Assessor	Mask
-a_helmet_17	{17}Consciousness Helm	Mask
-a_helmet_18	{18}Rebreather Mask	Mask
-a_helmet_19	{19}Das'skar Hunting Mask	Mask
-a_helmet_20	{20}Force Mask	Mask
-a_helmet_21	{21}Sith Mask	Mask
-a_helmet_22	{22}Stabilizer Mask	Mask
-a_helmet_23	{23}Matukai Meditation Band	Mask
-a_helmet_24	{24}Target Assessor	Mask
-a_helmet_25	{25}Circlet of Saresh	Mask
-a_helmet_26	{26}Bindo's Band	Mask
-a_helmet_27	{27}Enhanced Shielding Visor	Mask
-a_helmet_28	{28}Force Shield	Mask
-a_helmet_29	{29}Absorption Visor	Mask
-a_helmet_30	{30}Force Focusing Visor	Mask
-a_khoonda	Khoonda Militia Armor	Armor_Class_6
-a_light_01	{light 01}Light Combat Suit	Armor_Class_4
-a_light_02	{light 02}Combat Suit	Armor_Class_4
-a_light_03	{light 03}Heavy Combat Suit	Armor_Class_5
-a_light_04	{light 04}Mandalorian Combat Suit	Armor_Class_4
-a_light_05	{light 05}Zabrak Combat Suit	Armor_Class_4
-a_light_06	{light 06}Bonadan Alloy Heavy Suit	Armor_Class_5
-a_light_07	{light 07}Echani Light Armor	Armor_Class_4
-a_light_08	{light 08}Massassi Ceremonial Armor	Armor_Class_4
-a_light_09	{light 09}Mandalorian Heavy Suit	Armor_Class_4
-a_light_10	{light 10}Zabrak Battle Armor	Armor_Class_5
-a_light_11	{light 11}Ubese Environmental Suit	Armor_Armd_Flight_Suit
-a_light_12	{light 12}Echani Shield Suit	Armor_Class_5
-a_light_13	{light 13}Reinforced Fiber Armor	Armor_Class_5
-a_light_14	{light 14}Zabrak Field Armor	Armor_Class_5
-a_light_15	{light 15}Ulic Qel Droma's Mesh Suit	Armor_Class_5
-a_light_x02	{light x02}Atton's Ribbed Jacket	Basic_Clothing
-a_light_x08	{light x08}Electromesh Suit	Armor_Class_4
-a_light_x09	{light x09}Mira's Ballistic Mesh Jacket	Basic_Clothing
-a_medium_01	{med 01}Military Suit	Armor_Class_6
-a_medium_02	{med 02}Light Battle Armor	Armor_Class_7
-a_medium_03	{med 03}Echani Battle Armor	Armor_Class_6
-a_medium_04	{med 04}Cinnagar War Suit	Armor_Class_6
-a_medium_05	{med 05}Sith Battle Suit	Armor_Class_6
-a_medium_06	{med 06}Bronzium Light Battle Armor	Armor_Class_7
-a_medium_07	{med 07}Verpine Fiber Mesh	Armor_Class_6
-a_medium_08	{med 08}Krath Heavy Armor	Armor_Class_7
-a_medium_09	{med 09}Powered Light Battle Armor	Armor_Class_7
-a_medium_10	{med 10}Krath Holy Battle Suit	Armor_Class_7
-a_medium_11	{med 11}Exar Kun's Light Battle Suit	Armor_Class_6
-a_medium_12	{med 12}Heavy Cinnagar War Suit	Armor_Class_6
-a_medium_13	{med 13}Verpine Fiber Ultramesh	Armor_Class_6
-a_medium_14	{med 14}Electromesh Armor	Armor_Class_7
-a_medium_15	{med 15}Jamoh Hogra's Battle Armor	Armor_Class_7
-a_robe_01	{01}Clothing	Basic_Clothing
-a_robe_02	{02}Padawan Robe	Jedi_Robe
-a_robe_03	{03}Dark Padawan Robe	Jedi_Robe
-a_robe_04	{04}Baran Do Novice Robe	Jedi_Robe
-a_robe_05	{05}Matukai Apprentice Robe	Jedi_Master_Robe
-a_robe_06	{06}Zeison Sha Initiate Armor	Armor_Zeison_Sha
-a_robe_07	{07}Jal Shey Neophyte Armor	Armor_Zeison_Sha
-a_robe_08	{08}Jedi Robe	Jedi_Robe
-a_robe_09	{09}Dark Jedi Robe	Jedi_Robe
-a_robe_10	{10}Norris Robe	Jedi_Robe
-a_robe_11	{11}Jal Shey Advisor Armor	Armor_Zeison_Sha
-a_robe_12	{12}Gray Jedi Robe	Jedi_Master_Robe
-a_robe_13	{13}Jedi Knight Robe	Jedi_Master_Robe
-a_robe_14	{14}Dark Jedi Knight Robe	Jedi_Master_Robe
-a_robe_15	{15}Matukai Adept Robe	Jedi_Master_Robe
-a_robe_16	{16}Zeison Sha Warrior Armor	Armor_Zeison_Sha
-a_robe_17	{17}Jedi Master Robe	Jedi_Master_Robe
-a_robe_18	{18}Dark Jedi Master Robe	Jedi_Master_Robe
-a_robe_19	{19}Baran Do Sage Robe	Jedi_Robe
-a_robe_20	{20}Jal Shey Mentor Armor	Armor_Zeison_Sha
-a_robe_21	{21}Ossus Keeper Robe	Jedi_Robe
-a_robe_22	{22}Natth Cowling	Jedi_Master_Robe
-a_robe_23	{23}Arca Jeth's Robe	Jedi_Master_Robe
-a_robe_24	{24}Aleema Keto's Robe	Jedi_Master_Robe
-a_robe_25	{25}Sylvar's Robe	Jedi_Master_Robe
-a_robe_26	{26}Darth Malak's Armor	Armor_Zeison_Sha
-a_robe_27	{27}Jolee's Robe	Jedi_Robe
-a_robe_28	{28}Thon's Robe	Jedi_Master_Robe
-a_robe_29	{29}Crado's Robe	Jedi_Master_Robe
-a_robe_30	{30}Nomi's Robe	Jedi_Master_Robe
-a_robe_x01	{x01}Handmaiden's Robe	Jedi_Knight_Robe
-a_shield_01	Energy Shield	Forearm_Bands
-a_shield_02	Mandalorian Melee Shield	Forearm_Bands
-a_shield_03	Arkanian Energy Shield	Forearm_Bands
-a_shield_04	Echani Shield	Forearm_Bands
-a_shield_05	Mandalorian Power Shield	Forearm_Bands
-a_shield_06	Echani Dueling Shield	Forearm_Bands
-a_shield_07	Verpine Prototype Shield	Forearm_Bands
-brokenitem	Broken Item	Plot_Useable_Items
-chem_00001	Chemicals	Chemicals
-comlink	Comlink	Plot_Useable_Items
-compont_00001	Components	Components
-d_armor_01	Droid Impact Armor Mark I	Droid_Light_Plating
-d_armor_02	Droid Modular Plating Mark I	Droid_Medium_Plating
-d_armor_03	Droid Impact Armor Mark II	Droid_Light_Plating
-d_armor_04	Droid Desh Plating	Droid_Heavy_Plating
-d_armor_05	Droid Impact Armor Mark III	Droid_Light_Plating
-d_armor_06	Droid Modular Plating Mark II	Droid_Medium_Plating
-d_armor_07	Droid Modular Plating Mark III	Droid_Medium_Plating
-d_armor_08	Droid Agrinium Armor	Droid_Light_Plating
-d_armor_09	Droid Dura Plating Mark I	Droid_Heavy_Plating
-d_armor_10	Droid Quadranium Armor	Droid_Medium_Plating
-d_armor_11	Droid Dura Plating Mark II	Droid_Heavy_Plating
-d_armor_12	Droid Diatium Plating	Droid_Heavy_Plating
-d_armor_13	Droid Energized Armor Mark I	Droid_Heavy_Plating
-d_armor_14	Droid Energized Armor Mark II	Droid_Heavy_Plating
-d_armor_15	Droid Energized Armor Mark III	Droid_Heavy_Plating
-d_device_01	Droid Neural Pacifier	Droid_Utility_Device
-d_device_02	Droid Repulsor	Droid_Utility_Device
-d_device_03	Droid Flame Thrower	Droid_Utility_Device
-d_device_04	Droid Toxin Emitter	Droid_Utility_Device
-d_device_05	Droid Neural Scrambler	Droid_Utility_Device
-d_device_06	Droid Ion Striker	Droid_Utility_Device
-d_device_07	Droid Molten Cannon	Droid_Utility_Device
-d_device_08	Droid Carbonite Projector	Droid_Utility_Device
-d_device_09	Droid Plasma Thrower	Droid_Utility_Device
-d_device_10	Droid Bio-Assault Spray	Droid_Utility_Device
-d_device_11	Droid Carbonite Emitter	Droid_Utility_Device
-d_device_12	Droid Ion Blast Mark I	Droid_Utility_Device
-d_device_13	Droid Ion Blast Mark II	Droid_Utility_Device
-d_device_14	Droid Ion Blast Mark III	Droid_Utility_Device
-d_device_15	Droid Multi-spectral Emitter	Droid_Utility_Device
-d_g0t0_01	Droid Stealth Booster	Droid_Computer_Spike_Mount_x
-d_g0t0_02	Droid Omniscience Unit	Droid_Targeting_Computers
-d_g0t0_03	Droid Singulararity Projector	Droid_Computer_Spike_Mount_x
-d_g0t0_04	Goto Targeting Module	Droid_Computer_Spike_Mount_x
-d_hk47_01	{hk47 01}Droid Assassin's Rifle	Disrupter_Rifle
-d_hk47_02	Droid Capacitor Armor	Droid_Heavy_Plating
-d_hk47_03	Droid Assassination Module	Droid_Targeting_Computers
-d_interface_01	Droid Optimized Interface	Droid_Computer_Spike_Mount_x
-d_interface_02	Droid Stabilization Subroutine	Droid_Computer_Spike_Mount_x
-d_interface_03	Droid Machine Interface	Droid_Computer_Spike_Mount_x
-d_interface_04	Droid Lockout Bypass	Droid_Computer_Spike_Mount_x
-d_interface_05	Droid Parabolic Guides	Droid_Computer_Spike_Mount_x
-d_interface_06	Droid Motivator Booster	Droid_Computer_Spike_Mount_x
-d_interface_07	Droid Durability Upgrade	Droid_Computer_Spike_Mount_x
-d_interface_08	Droid Agility Upgrade	Droid_Computer_Spike_Mount_x
-d_interface_09	Droid Wisdom Upgrade	Droid_Computer_Spike_Mount_x
-d_interface_10	Droid Exchange Interface	Droid_Computer_Spike_Mount_x
-d_interface_11	Droid Remote Interface	Droid_Computer_Spike_Mount_x
-d_interface_12	Droid Anatomy Library	Droid_Computer_Spike_Mount_x
-d_interface_13	Droid Scavenger Upgrade	Droid_Computer_Spike_Mount_x
-d_interface_14	Droid Source Ripper	Droid_Computer_Spike_Mount_x
-d_interface_15	Droid Systems Upgrade	Droid_Computer_Spike_Mount_x
-d_shield_01	Droid Deflector Mark I	Droid_Shield
-d_shield_02	Droid Deflector Mark II	Droid_Shield
-d_shield_03	Droid Defense Barrier	Droid_Shield
-d_shield_04	Droid Energy Collector	Droid_Shield
-d_shield_05	Droid Deflector Mark III	Droid_Shield
-d_shield_06	Droid Unity Grid	Droid_Shield
-d_t3m4_01	Droid Shock Arm	Droid_Utility_Device
-d_t3m4_02	Droid Self-Sustaining Unit	Droid_Computer_Spike_Mount_x
-d_t3m4_03	Droid Renewable Shield	Droid_Shield
-d_tool_01	Droid Motion Tracker	Droid_Targeting_Computers
-d_tool_02	Droid Upgrade Slot	Droid_Targeting_Computers
-d_tool_03	Droid Surveillance Upgrade	Droid_Targeting_Computers
-d_tool_04	Droid Advanced Upgrade Slot	Droid_Targeting_Computers
-d_tool_05	Droid Reference Database	Droid_Targeting_Computers
-d_tool_06	Droid System Fortification	Droid_Targeting_Computers
-d_tool_07	Droid Fighting Upgrade	Droid_Targeting_Computers
-d_tool_08	Droid Perception Sensors	Droid_Targeting_Computers
-d_tool_09	Droid Memory Upgrade	Droid_Targeting_Computers
-d_tool_10	Droid Warfare Upgrade	Droid_Targeting_Computers
-d_tool_11	Droid Battle Upgrade	Droid_Targeting_Computers
-d_tool_12	Droid CERS	Droid_Targeting_Computers
-d_tool_13	Droid CESS	Droid_Targeting_Computers
-d_tool_14	Droid CEPB	Droid_Targeting_Computers
-d_tool_15	Droid Micro-Optics	Droid_Targeting_Computers
-e_imp1_01	{imp1 01}Reflex Package	Implant_1
-e_imp1_02	{imp1 02}Pheromone Package	Implant_1
-e_imp1_03	{imp1 03}Cardio Package	Implant_1
-e_imp1_04	{imp1 04}Strength Package	Implant_1
-e_imp1_05	{imp1 05}Response Package	Implant_1
-e_imp1_06	{imp1 06}Fitness Package	Implant_1
-e_imp1_07	{imp1 07}Skills Package	Implant_1
-e_imp1_08	{imp1 08}Health Package	Implant_1
-e_imp1_09	{imp1 09}Physical Boost Package	Implant_1
-e_imp1_10	{imp1 10}Mental Boost Package	Implant_1
-e_imp2_01	{imp2 01}Retinal Combat Implant	Implant_2
-e_imp2_02	{imp2 02}Lornan Implant	Implant_2
-e_imp2_03	{imp2 03}Biotech Implant	Implant_2
-e_imp2_04	{imp2 04}Power Implant	Implant_2
-e_imp2_05	{imp2 05}Alacrity Implant	Implant_2
-e_imp2_06	{imp2 06}Insight Implant	Implant_2
-e_imp2_07	{imp2 07}Skills Implant	Implant_2
-e_imp2_08	{imp2 08}Durability Implant	Implant_2
-e_imp2_09	{imp2 09}Physical Boost Implant	Implant_2
-e_imp2_10	{imp2 10}Mental Boost Implant	Implant_2
-e_imp3_01	{imp3 01}Bio-Antidote System	Implant_3
-e_imp3_02	{imp3 02}Nerve Enhancement System	Implant_3
-e_imp3_03	{imp3 03}Reaction System	Implant_3
-e_imp3_04	{imp3 04}Advanced Combat System	Implant_3
-e_imp3_05	{imp3 05}Bavakar Strength System	Implant_3
-e_imp3_06	{imp3 06}Cardio Power System	Implant_3
-e_imp3_07	{imp3 07}Skills System	Implant_3
-e_imp3_08	{imp3 08}Numbness System	Implant_3
-e_imp3_09	{imp3 09}Physical Boost System	Implant_3
-e_imp3_10	{imp3 10}Mental Boost System	Implant_3
-e_imp4_01	{imp4 01}Strength D-Package	Implant_3
-e_imp4_02	{imp4 02}Immunity D-Package	Implant_3
-e_imp4_03	{imp4 03}Perception D-Package	Implant_3
-e_imp4_04	{imp4 04}Enhancement D-Package	Implant_3
-e_imp4_05	{imp4 05}Immortality D-Package	Implant_3
-e_imp4_06	{imp4 06}Quickness D-Package	Implant_3
-e_imp4_07	{imp4 07}Skills D-Package	Implant_3
-e_imp4_08	{imp4 08}Universal D-Package	Implant_3
-e_imp4_09	{imp4 09}Physical Boost D-Package	Implant_3
-e_imp4_10	{imp4 10}Mental Boost D-Package	Implant_3
-g1_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g1_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g1_w_lghtsbr01	Lightsaber	Lightsaber
-g1_w_lghtsbr02	Lightsaber	Lightsaber
-g1_w_sbrcrstl20	Door Cutting	Lightsaber_Crystals
-g1_w_sbrcrstl21	+ dual strike <CUSTOM0>	Lightsaber_Crystals
-g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber
-g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber
-g_a_armrdfsuit	Armored Flight Suit	Armor_Armd_Flight_Suit
-g_a_clothes01	Clothing	Basic_Clothing
-g_a_clothes010	Clothing {Variant 09}	Basic_Clothing
-g_a_clothes011	Clothing {Variant Czerka}	Basic_Clothing
-g_a_clothes012	Clothing {Variant 11}	Basic_Clothing
-g_a_clothes02	Clothing {Variant 02}	Basic_Clothing
-g_a_clothes03	Clothing {Variant 03}	Basic_Clothing
-g_a_clothes04	Clothing {Variant 04}	Basic_Clothing
-g_a_clothes05	Clothing {Variant 05}	Basic_Clothing
-g_a_clothes06	Clothing {Variant 06}	Basic_Clothing
-g_a_clothes07	Clothing {Variant 01}	Basic_Clothing
-g_a_clothes08	Clothing {Variant 07}	Basic_Clothing
-g_a_clothes09	Clothing {Variant 08}	Basic_Clothing
-g_d_blowtrch01	Blowtorch	Droid_Utility_Device
-g_d_blowtrch02	Advanced Blowtorch	Droid_Utility_Device
-g_d_firesupres01	Fire Suppression System	Droid_Utility_Device
-g_danceroutfit	Dancer's Outfit	Slave_Outfit
-g_i_adrnaline001	Adrenal Strength	Adrenaline
-g_i_adrnaline002	Adrenal Alacrity	Adrenaline
-g_i_adrnaline003	Adrenal Stamina	Adrenaline
-g_i_adrnaline004	Hyper-adrenal Strength	Adrenaline
-g_i_adrnaline005	Hyper-adrenal Alacrity	Adrenaline
-g_i_adrnaline006	Hyper-adrenal Stamina	Adrenaline
-g_i_asthitem001	Aesthetic Item	Aesthetic_Item
-g_i_bithitem001	Bith Guitar	Blaster_Pistol
-g_i_bithitem002	Bith Clarinet	Blaster_Pistol
-g_i_bithitem003	Bith Trombone	Blaster_Pistol
-g_i_bithitem004	Bith Accordian	Blaster_Pistol
-g_i_cmbtshot001	Battle Stimulant	Combat_Shots
-g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots
-g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots
-g_i_credits001	Credits	Credits
-g_i_credits002	Credits	Credits
-g_i_credits003	Credits	Credits
-g_i_credits004	Credits	Credits
-g_i_credits005	Credits	Credits
-g_i_credits006	Credits	Credits
-g_i_credits007	Credits	Credits
-g_i_credits008	Credits	Credits
-g_i_credits009	Credits	Credits
-g_i_credits010	Credits	Credits
-g_i_credits011	Credits	Credits
-g_i_credits012	Credits	Credits
-g_i_credits013	Credits	Credits
-g_i_credits014	Credits	Credits
-g_i_credits015	Credits	Credits
-g_i_crhide001	Assault Droid Mark I Hide	Creature_Hide_Item
-g_i_crhide002	Assault Droid Mark IV Hide	Creature_Hide_Item
-g_i_crhide003	Rakghoul Fiend & Kataarn Hide	Creature_Hide_Item
-g_i_crhide004	Tuk'ata Hide	Creature_Hide_Item
-g_i_crhide005	Katarn Hide	Creature_Hide_Item
-g_i_crhide006	Tuk'ata Hide	Creature_Hide_Item
-g_i_crhide007	Canderous' Hide	Creature_Hide_Item
-g_i_crhide008	Droid Hide	Creature_Hide_Item
-g_i_crhide009	HK-47 Hide 1	Creature_Hide_Item
-g_i_crhide010	HK-47 Hide 2	Creature_Hide_Item
-g_i_crhide011	HK-47 Hide 3	Creature_Hide_Item
-g_i_crhide012	HK-47 Hide 4	Creature_Hide_Item
-g_i_crhide013	HK-47 Hide 0	Creature_Hide_Item
-g_i_crhide014	Canderous' Agility Hide	Creature_Hide_Item
-g_i_crhide015	Droid Hide Debuffer	Creature_Hide_Item
-g_i_crhide016	Canderous' Strength Hide	Creature_Hide_Item
-g_i_crhide017	Canderous' Endurance Hide	Creature_Hide_Item
-g_i_crhide018	Canderous' Regen Hide	Creature_Hide_Item
-g_i_datapad001	Datapad	Data_Pad
-g_i_drdrepeqp001	Repair Kit	Droid_Repair_Equipment
-g_i_drdrepeqp002	Advanced Repair Kit	Droid_Repair_Equipment
-g_i_drdrepeqp003	Construction Kit	Droid_Repair_Equipment
-g_i_medeqpmnt01	Medpac	Medical_Equipment
-g_i_medeqpmnt02	Advanced Medpac	Medical_Equipment
-g_i_medeqpmnt03	Life Support Pack	Medical_Equipment
-g_i_medeqpmnt04	Antidote Kit	Medical_Equipment
-g_i_medeqpmnt08	Squad Recovery Stim	Squad_Recovery_kit
-g_i_parts01	Parts	Programming_Spikes
-g_i_pazcard_001	Pazaak Card +1	Pazaak_Card
-g_i_pazcard_002	Pazaak Card +2	Pazaak_Card
-g_i_pazcard_003	Pazaak Card +3	Pazaak_Card
-g_i_pazcard_004	Pazaak Card +4	Pazaak_Card
-g_i_pazcard_005	Pazaak Card +5	Pazaak_Card
-g_i_pazcard_006	Pazaak Card +6	Pazaak_Card
-g_i_pazcard_007	Pazaak Card -1	Pazaak_Card
-g_i_pazcard_008	Pazaak Card -2	Pazaak_Card
-g_i_pazcard_009	Pazaak Card -3	Pazaak_Card
-g_i_pazcard_010	Pazaak Card -4	Pazaak_Card
-g_i_pazcard_011	Pazaak Card -5	Pazaak_Card
-g_i_pazcard_012	Pazaak Card -6	Pazaak_Card
-g_i_pazcard_013	Pazaak Card +/-1	Pazaak_Card
-g_i_pazcard_014	Pazaak Card +/-2	Pazaak_Card
-g_i_pazcard_015	Pazaak Card +/-3	Pazaak_Card
-g_i_pazcard_016	Pazaak Card +/-4	Pazaak_Card
-g_i_pazcard_017	Pazaak Card +/-5	Pazaak_Card
-g_i_pazcard_018	Pazaak Card +/-6	Pazaak_Card
-g_i_pazcard_019	Pazaak Card +/- 1/2	Pazaak_Card
-g_i_pazcard_020	Pazaak Card Double	Pazaak_Card
-g_i_pazcard_021	Pazaak Card Tie Breaker	Pazaak_Card
-g_i_pazcard_022	Pazaak Card Flip 2&4	Pazaak_Card
-g_i_pazcard_023	Pazaak Card Flip 3&6	Pazaak_Card
-g_i_pazdeck	Pazaak Deck	Aesthetic_Item
-g_i_pazsidebd001	Pazaak Side Deck	Pazaak_Sideboard
-g_i_pltuseitm01	Keycard	Plot_Useable_Items
-g_i_progspike01	Computer Spike	Programming_Spikes
-g_i_secspike01	Security Tunneler	Security_Spikes
-g_i_secspike02	Security Spike Tunneler	Security_Spikes
-g_i_trapkit001	Minor Flash Mine	Trap_Kit
-g_i_trapkit002	Average Flash Mine	Trap_Kit
-g_i_trapkit003	Blinding Flash Mine	Trap_Kit
-g_i_trapkit004	Minor Frag Mine	Trap_Kit
-g_i_trapkit005	Average Frag Mine	Trap_Kit
-g_i_trapkit006	Deadly Frag Mine	Trap_Kit
-g_i_trapkit007	Minor Plasma Mine	Trap_Kit
-g_i_trapkit008	Average Plasma Mine	Trap_Kit
-g_i_trapkit009	Deadly Plasma Mine	Trap_Kit
-g_i_trapkit010	Minor Gas Mine	Trap_Kit
-g_i_trapkit011	Average Gas Mine	Trap_Kit
-g_i_trapkit012	Deadly Gas Mine	Trap_Kit
-g_i_trapkit013	Minor Sonic Mine	Trap_Kit
-g_i_trapkit014	Average Sonic Mine	Trap_Kit
-g_i_trapkit015	Deadly Sonic Mine	Trap_Kit
-g_i_trapkit016	Strong Flash Mine	Trap_Kit
-g_i_trapkit017	Devastating Flash Mine	Trap_Kit
-g_i_trapkit018	Strong Frag Mine	Trap_Kit
-g_i_trapkit019	Devastating Frag Mine	Trap_Kit
-g_i_trapkit020	Strong Plasma Mine	Trap_Kit
-g_i_trapkit021	Devastating Plasma Mine	Trap_Kit
-g_i_trapkit022	Strong Gas Mine	Trap_Kit
-g_i_trapkit023	Devastating Gas Mine	Trap_Kit
-g_i_trapkit024	Strong Sonic Mine	Trap_Kit
-g_i_trapkit025	Devastating Sonic Mine	Trap_Kit
-g_i_upgrade001	Scope	Plot_Useable_Items
-g_i_upgrade002	Improved Energy Cell	Plot_Useable_Items
-g_i_upgrade003	Beam Splitter	Plot_Useable_Items
-g_i_upgrade004	Hair Trigger	Plot_Useable_Items
-g_i_upgrade005	Armor Reinforcement	Plot_Useable_Items
-g_i_upgrade006	Mesh Underlay	Plot_Useable_Items
-g_i_upgrade007	Vibration Cell	Plot_Useable_Items
-g_i_upgrade008	Durasteel Bonding Alloy	Plot_Useable_Items
-g_i_upgrade009	Energy Projector	Plot_Useable_Items
-g_i_wristlaunch	Wrist Launcher	Wrist_Launcher
-g_w_adhsvgren001	Adhesive Grenade	Adhesive_Grenade
-g_w_crgore001	Katarn Slam	Creature_Item_Pierce
-g_w_crgore002	Dire Katarn Slam	Creature_Item_Pierce
-g_w_crslash001	Claw1d4	Creature_Item_Slash
-g_w_crslash002	Claw1d6	Creature_Item_Slash
-g_w_crslash003	Claw1d10	Creature_Item_Slash
-g_w_crslash004	Claw2d12	Creature_Item_Slash
-g_w_crslash005	Claw3d6	Creature_Item_Slash
-g_w_crslash006	Claw10d6	Creature_Item_Slash
-g_w_crslash007	Selkath Lesser Claw	Creature_Item_Slash
-g_w_crslash008	Selkath Greater Claw	Creature_Item_Slash
-g_w_crslash009	Kinrath Claw	Creature_Item_Slash
-g_w_crslash010	Tach Claw	Creature_Item_Slash
-g_w_crslash011	Kinrath Claw	Creature_Item_Slash
-g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash
-g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc
-g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc
-g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade
-g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr007	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr008	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr009	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr010	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_dblsbr011	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber
-g_w_drkjdisbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber
-g_w_firegren001	Plasma Grenade	Fire_Grenade
-g_w_fraggren01	Frag Grenade	Fragmentation_Grenades
-g_w_iongren01	Ion Grenade	Ion_Grenade
-g_w_lghtsbr01	Lightsaber	Lightsaber
-g_w_lghtsbr02	Lightsaber	Lightsaber
-g_w_lghtsbr03	Lightsaber	Lightsaber
-g_w_lghtsbr04	Lightsaber	Lightsaber
-g_w_lghtsbr05	Lightsaber	Lightsaber
-g_w_lghtsbr07	Lightsaber	Lightsaber
-g_w_lghtsbr08	Lightsaber	Lightsaber
-g_w_lghtsbr09	Lightsaber	Lightsaber
-g_w_lghtsbr10	Lightsaber	Lightsaber
-g_w_lghtsbr11	Lightsaber	Lightsaber
-g_w_null001	Blaster Pistol: Null	Blaster_Pistol
-g_w_null002	Heavy Blaster: Null	Heavy_Blaster
-g_w_null003	Ion Rifle: Null	Ion_Rifle
-g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster
-g_w_null005	Blaster Rifle: Null	Blaster_Rifle
-g_w_null006	Blaster Carbine: Null	Blaster_Carbine
-g_w_poisngren01	Poison Grenade	Poison_Grenade
-g_w_shortsbr01	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr02	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr03	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr04	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr05	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr07	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr08	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr09	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr10	Short Lightsaber	Short_Lightsaber
-g_w_shortsbr11	Short Lightsaber	Short_Lightsaber
-g_w_sonicdet01	Minor Sonic Detonator	Sonic_Grenade
-g_w_sonicdet02	Sonic Detonator	Sonic_Grenade
-g_w_sonicgren01	Sonic Grenade	Sonic_Grenade
-g_w_stungren01	Concussion Grenade	Stun_Grenades
-g_w_thermldet01	Thermal Detonator	Thermal_Detonator
-hkpart01	HK Droid Processor	Plot_Useable_Items
-hkpart02	HK Chassis	Plot_Useable_Items
-hkpart03	HK Control Cluster	Plot_Useable_Items
-hkpart04	HK Vocabulator	Plot_Useable_Items
-hkpart05	HK Protocol Pacifist Package	Plot_Useable_Items
-killblaster	KillBlaster	Blaster_Pistol
-killstick	Killstick	Quarter_Staff
-lspart01	Lightsaber Energy Cell Fixture	Plot_Useable_Items
-lspart02	Lightsaber Emitter Fixture	Plot_Useable_Items
-lspart03	Lightsaber Focusing Lens Fixture	Plot_Useable_Items
-mineruniform	Miner Uniform	Miner_Uniform
-mininglaser	Mining Laser	
-propbc01	{Prop BC 01}	Blaster_Carbine
-propbc02	{Prop BC 02}	Blaster_Carbine
-propbc03	{Prop BC 03}	Blaster_Carbine
-propbc04	{Prop BC 04}	Blaster_Carbine
-propbc05	{Prop BC 05}	Blaster_Carbine
-propbp01	{Prop BP 01}	Blaster_Pistol
-propbp02	{Prop BP 02}	Blaster_Pistol
-propbp03	{Prop BP 03}	Blaster_Pistol
-propbp04	{Prop BP 04}	Blaster_Pistol
-propbp05	{Prop BP 05}	Blaster_Pistol
-propbr01	{Prop BR 01}	Blaster_Rifle
-propbr02	{Prop BR 02}	Blaster_Rifle
-propbr03	{Prop BR 03}	Blaster_Rifle
-propbr04	{Prop BR 04}	Blaster_Rifle
-propbr05	{Prop BR 05}	Blaster_Rifle
-propdb01	{Prop DB 01}	Double_Bladed_Sword
-propdb02	{Prop DB 02}	Double_Bladed_Sword
-propdb03	{Prop DB 03}	Double_Bladed_Sword
-propdb04	{Prop DB 04}	Double_Bladed_Sword
-propdp01	{Prop DP 01}	Disrupter_Pistol
-propdp02	{Prop DP 02}	Disrupter_Pistol
-propdr01	{Prop DR 01}	Disrupter_Rifle
-propdr02	{Prop DR 02}	Disrupter_Rifle
-propfp01	{Prop FP 01}	Force_Pike
-propga01	{Prop GA 01}	Gammorean_Battleaxe
-prophb01	{Prop HB 01}	Heavy_Blaster
-prophb02	{Prop HB 02}	Heavy_Blaster
-prophb03	{Prop HB 03}	Heavy_Blaster
-prophb04	{Prop HB 04}	Heavy_Blaster
-prophb05	{Prop HB 05}	Heavy_Blaster
-propho01	{Prop HO 01}	Hold_Out_Blaster
-propho02	{Prop HO 02}	Hold_Out_Blaster
-propho03	{Prop HO 03}	Hold_Out_Blaster
-propho04	{Prop HO 04}	Hold_Out_Blaster
-prophr01	{Prop HR 01}	Heavy_Repeating_Blaster
-prophr02	{Prop HR 02}	Heavy_Repeating_Blaster
-propip01	{Prop IP 01}	Ion_Blaster
-propip02	{Prop IP 02}	Ion_Blaster
-propir01	{Prop IR 01}	Ion_Rifle
-propir02	{Prop IR 02}	Ion_Rifle
-propir03	{Prop IR 03}	Ion_Rifle
-propls01	{Prop LS 01}	Long_Sword
-propls02	{Prop LS 02}	Long_Sword
-propls03	{Prop LS 03}	Long_Sword
-propls04	{Prop LS 04}	Long_Sword
-propls05	{Prop LS 05}	Long_Sword
-propqs01	{Prop QS 01}	Quarter_Staff
-propqs02	{Prop QS 02}	Quarter_Staff
-propqs03	{Prop QS 03}	Quarter_Staff
-proprb01	{Prop RB 01}	Repeating_Blaster
-proprb02	{Prop RB 02}	Repeating_Blaster
-proprb03	{Prop RB 03}	Repeating_Blaster
-propsb01	{Prop SB 01}	Stun_Baton
-propsb02	{Prop SB 02}	Stun_Baton
-propsb03	{Prop SB 03}	Stun_Baton
-propsp01	{Prop SP 01}	Sonic_Pistol
-propsp02	{Prop SP 02}	Sonic_Pistol
-propsr01	{Prop SR 01}	Sonic_Rifle
-propsr02	{Prop SR 02}	Sonic_Rifle
-propsr03	{Prop SR 03}	Sonic_Rifle
-propss01	{Prop SS 01}	Short_Sword
-propss02	{Prop SS 02}	Short_Sword
-propss03	{Prop SS 03}	Short_Sword
-propvb01	{Prop VB 01}	Vibro_Blade
-propvb02	{Prop VB 02}	Vibro_Blade
-propvb03	{Prop VB 03}	Vibro_Blade
-propvb04	{Prop VB 04}	Vibro_Blade
-propvd01	{Prop VD 01}	Vibro_Double_Blade
-propvd02	{Prop VD 02}	Vibro_Double_Blade
-propvd03	{Prop VD 03}	Vibro_Double_Blade
-propvd04	{Prop VD 04}	Vibro_Double_Blade
-propvs01	{Prop VS 01}	Vibro_Sword
-propvs02	{Prop VS 02}	Vibro_Sword
-propvs03	{Prop VS 03}	Vibro_Sword
-propvs04	{Prop VS 04}	Vibro_Sword
-propvs05	{Prop VS 05}	Vibro_Sword
-propvs06	{Prop VS 06}	Vibro_Sword
-propwb01	{Prop WB 01}	Bowcaster
-propwb02	{Prop WB 02}	Bowcaster
-propww01	{Prop WW 01}	Wookie_Warblade
-qcrystal_1_0	<FullName> Crystal{01_VD}	Lightsaber_Crystals
-qcrystal_1_1	<FullName> Crystal{01_D}	Lightsaber_Crystals
-qcrystal_1_2	<FullName> Crystal{01_N}	Lightsaber_Crystals
-qcrystal_1_3	<FullName> Crystal{01_L}	Lightsaber_Crystals
-qcrystal_1_4	<FullName> Crystal{01_VL}	Lightsaber_Crystals
-qcrystal_2_0	<FullName> Crystal{02_VD}	Lightsaber_Crystals
-qcrystal_2_1	<FullName> Crystal{02_D}	Lightsaber_Crystals
-qcrystal_2_2	<FullName> Crystal{02_N}	Lightsaber_Crystals
-qcrystal_2_3	<FullName> Crystal{02_L}	Lightsaber_Crystals
-qcrystal_2_4	<FullName> Crystal{02_VL}	Lightsaber_Crystals
-qcrystal_3_0	<FullName> Crystal{03_VD}	Lightsaber_Crystals
-qcrystal_3_1	<FullName> Crystal{03_D}	Lightsaber_Crystals
-qcrystal_3_2	<FullName> Crystal{03_N}	Lightsaber_Crystals
-qcrystal_3_3	<FullName> Crystal{03_L}	Lightsaber_Crystals
-qcrystal_3_4	<FullName> Crystal{03_VL}	Lightsaber_Crystals
-qcrystal_4_0	<FullName> Crystal{04_VD}	Lightsaber_Crystals
-qcrystal_4_1	<FullName> Crystal{04_D}	Lightsaber_Crystals
-qcrystal_4_2	<FullName> Crystal{04_N}	Lightsaber_Crystals
-qcrystal_4_3	<FullName> Crystal{04_L}	Lightsaber_Crystals
-qcrystal_4_4	<FullName> Crystal{04_VL}	Lightsaber_Crystals
-qcrystal_5_0	<FullName> Crystal{05_VD}	Lightsaber_Crystals
-qcrystal_5_1	<FullName> Crystal{05_D}	Lightsaber_Crystals
-qcrystal_5_2	<FullName> Crystal{05_N}	Lightsaber_Crystals
-qcrystal_5_3	<FullName> Crystal{05_L}	Lightsaber_Crystals
-qcrystal_5_4	<FullName> Crystal{05_VL}	Lightsaber_Crystals
-qcrystal_6_0	<FullName> Crystal{06_VD}	Lightsaber_Crystals
-qcrystal_6_1	<FullName> Crystal{06_D}	Lightsaber_Crystals
-qcrystal_6_2	<FullName> Crystal{06_N}	Lightsaber_Crystals
-qcrystal_6_3	<FullName> Crystal{06_L}	Lightsaber_Crystals
-qcrystal_6_4	<FullName> Crystal{06_VL}	Lightsaber_Crystals
-qcrystal_7_0	<FullName> Crystal{07_VD}	Lightsaber_Crystals
-qcrystal_7_1	<FullName> Crystal{07_D}	Lightsaber_Crystals
-qcrystal_7_2	<FullName> Crystal{07_N}	Lightsaber_Crystals
-qcrystal_7_3	<FullName> Crystal{07_L}	Lightsaber_Crystals
-qcrystal_7_4	<FullName> Crystal{07_VL}	Lightsaber_Crystals
-qcrystal_8_0	<FullName> Crystal{08_VD}	Lightsaber_Crystals
-qcrystal_8_1	<FullName> Crystal{08_D}	Lightsaber_Crystals
-qcrystal_8_2	<FullName> Crystal{08_N}	Lightsaber_Crystals
-qcrystal_8_3	<FullName> Crystal{08_L}	Lightsaber_Crystals
-qcrystal_8_4	<FullName> Crystal{08_VL}	Lightsaber_Crystals
-qcrystal_9_0	<FullName> Crystal{09_VD}	Lightsaber_Crystals
-qcrystal_9_1	<FullName> Crystal{09_D}	Lightsaber_Crystals
-qcrystal_9_2	<FullName> Crystal{09_N}	Lightsaber_Crystals
-qcrystal_9_3	<FullName> Crystal{09_L}	Lightsaber_Crystals
-qcrystal_9_4	<FullName> Crystal{09_VL}	Lightsaber_Crystals
-u_a_over_01	{ov 01}Heat Shielding Mark I	Upgrade_Items
-u_a_over_02	{ov 02}Armorply Plating Mark I	Upgrade_Items
-u_a_over_03	{ov 03}Sound Dampening Overlay Mark I	Upgrade_Items
-u_a_over_04	{ov 04}Ablative Plating Mark I	Upgrade_Items
-u_a_over_05	{ov 05}Energy Shielding Mark I	Upgrade_Items
-u_a_over_06	{ov 06}Ballistic Shielding Mark I	Upgrade_Items
-u_a_over_07	{ov 07}Bonded Plates Mark I	Upgrade_Items
-u_a_over_08	{ov 08}Heavy Bonded Plates Mark I	Upgrade_Items
-u_a_over_09	{ov 09}Heat Shielding Mark II	Upgrade_Items
-u_a_over_10	{ov 10}Armorply Plating Mark II	Upgrade_Items
-u_a_over_11	{ov 11}Sound Dampening Overlay Mark II	Upgrade_Items
-u_a_over_12	{ov 12}Ablative Plating Mark II	Upgrade_Items
-u_a_over_13	{ov 13}Energy Shielding Mark II	Upgrade_Items
-u_a_over_14	{ov 14}Ballistic Shielding Mark II	Upgrade_Items
-u_a_over_15	{ov 15}Bonded Plates Mark II	Upgrade_Items
-u_a_over_16	{ov 16}Heavy Bonded Plates Mark II	Upgrade_Items
-u_a_over_17	{ov 17}Heat Shielding Mark III	Upgrade_Items
-u_a_over_18	{ov 18}Armorply Plating Mark III	Upgrade_Items
-u_a_over_19	{ov 19}Sound Dampening Overlay Mark III	Upgrade_Items
-u_a_over_20	{ov 20}Ablative Plating Mark III	Upgrade_Items
-u_a_over_21	{ov 21}Energy Shielding Mark III	Upgrade_Items
-u_a_over_22	{ov 22}Ballistic Shielding Mark III	Upgrade_Items
-u_a_over_23	{ov 23}Bonded Plates Mark III	Upgrade_Items
-u_a_over_24	{ov 24}Heavy Bonded Plates Mark III	Upgrade_Items
-u_a_over_25	{ov 25}Heat Shielding Mark IV	Upgrade_Items
-u_a_over_26	{ov 26}Armorply Plating Mark IV	Upgrade_Items
-u_a_over_27	{ov 27}Sound Dampening Overlay Mark IV	Upgrade_Items
-u_a_over_28	{ov 28}Ablative Plating Mark IV	Upgrade_Items
-u_a_over_29	{ov 29}Energy Shielding Mark IV	Upgrade_Items
-u_a_over_30	{ov 30}Bonded Plates Mark IV	Upgrade_Items
-u_a_unde_01	{un 01}Environment Underlay Mark I	Upgrade_Items
-u_a_unde_02	{un 02}Biorestorative Underlay Mark I	Upgrade_Items
-u_a_unde_03	{un 03}Armorweave Underlay Mark I	Upgrade_Items
-u_a_unde_04	{un 04}Strengthening Underlay Mark I	Upgrade_Items
-u_a_unde_05	{un 05}Flexible Underlay Mark I	Upgrade_Items
-u_a_unde_06	{un 06}Durasteel Underlay Mark I	Upgrade_Items
-u_a_unde_07	{un 07}Environment Underlay Mark II	Upgrade_Items
-u_a_unde_08	{un 08}Biorestorative Underlay Mark II	Upgrade_Items
-u_a_unde_09	{un 09}Armorweave Underlay Mark II	Upgrade_Items
-u_a_unde_10	{un 10}Strengthening Underlay Mark II	Upgrade_Items
-u_a_unde_11	{un 11}Flexible Underlay Mark II	Upgrade_Items
-u_a_unde_12	{un 12}Durasteel Underlay Mark II	Upgrade_Items
-u_a_unde_13	{un 13}Environment Underlay Mark III	Upgrade_Items
-u_a_unde_14	{un 14}Biorestorative Underlay Mark III	Upgrade_Items
-u_a_unde_15	{un 15}Armorweave Underlay Mark III	Upgrade_Items
-u_a_unde_16	{un 16}Strengthening Underlay Mark III	Upgrade_Items
-u_a_unde_17	{un 17}Flexible Underlay Mark III	Upgrade_Items
-u_a_unde_18	{un 18}Durasteel Underlay Mark III	Upgrade_Items
-u_a_unde_19	{un 19}Environment Underlay Mark IV	Upgrade_Items
-u_a_unde_20	{un 20}Biorestorative Underlay Mark IV	Upgrade_Items
-u_a_unde_21	{un 21}Armorweave Underlay Mark IV	Upgrade_Items
-u_a_unde_22	{un 22}Strengthening Underlay Mark IV	Upgrade_Items
-u_a_unde_23	{un 23}Flexible Underlay Mark IV	Upgrade_Items
-u_a_unde_24	{un 24}Durasteel Underlay Mark IV	Upgrade_Items
-u_a_unde_25	{un 25}Environment Underlay Mark V	Upgrade_Items
-u_a_unde_26	{un 26}Biorestorative Underlay Mark V	Upgrade_Items
-u_a_unde_27	{un 27}Armorweave Underlay Mark V	Upgrade_Items
-u_a_unde_28	{un 28}Strengthening Underlay Mark V	Upgrade_Items
-u_a_unde_29	{un 29}Flexible Underlay Mark V	Upgrade_Items
-u_a_unde_30	{un 30}Durasteel Underlay Mark V	Upgrade_Items
-u_l_cell_01	{ce 01}Discharge Energy Cell	Plot_Useable_Items
-u_l_cell_02	{ce 02}Diatium Energy Cell	Plot_Useable_Items
-u_l_cell_03	{ce 03}Ion Energy Cell	Plot_Useable_Items
-u_l_cell_04	{ce 04}Telgorn Jolt Cell Mark I	Plot_Useable_Items
-u_l_cell_05	{ce 05}Improved Discharge Energy Cell	Plot_Useable_Items
-u_l_cell_06	{ce 06}Improved Diatium Energy Cell	Plot_Useable_Items
-u_l_cell_07	{ce 07}Improved Ion Energy Cell	Plot_Useable_Items
-u_l_cell_08	{ce 08}Telgorn Jolt Cell Mark II	Plot_Useable_Items
-u_l_cell_09	{ce 09}Superior Discharge Energy Cell	Plot_Useable_Items
-u_l_cell_10	{ce 10}Superior Diatium Energy Cell	Plot_Useable_Items
-u_l_cell_11	{ce 11}Superior Ion Energy Cell	Plot_Useable_Items
-u_l_cell_12	{ce 12}Telgorn Jolt Cell Mark III	Plot_Useable_Items
-u_l_cell_13	{ce 13}Ultimate Diatium Energy Cell	Plot_Useable_Items
-u_l_colo_01	{color 01}Crystal, Blue	Lightsaber_Crystals
-u_l_colo_02	{color 02}Crystal, Green	Lightsaber_Crystals
-u_l_colo_03	{color 03}Crystal, Yellow	Lightsaber_Crystals
-u_l_colo_04	{color 04}Crystal, Red	Lightsaber_Crystals
-u_l_colo_05	{color 05}Crystal, Violet	Lightsaber_Crystals
-u_l_colo_06	{color 06}Crystal, Cyan	Lightsaber_Crystals
-u_l_colo_07	{color 07}Crystal, Silver	Lightsaber_Crystals
-u_l_colo_08	{color 08}Crystal, Orange	Lightsaber_Crystals
-u_l_colo_09	{color 09}Crystal, Viridian	Lightsaber_Crystals
-u_l_colo_10	{color 10 NOT USED}Crystal, Bronze	Lightsaber_Crystals
-u_l_crys_01	{cr 01}Crystal, Adegan	Lightsaber_Crystals
-u_l_crys_02	{cr 02}Crystal, Rubat	Lightsaber_Crystals
-u_l_crys_03	{cr 03}Crystal, Ruusan	Lightsaber_Crystals
-u_l_crys_04	{cr 04}Crystal, Nextor	Lightsaber_Crystals
-u_l_crys_05	{cr 05}Crystal, Dragite	Lightsaber_Crystals
-u_l_crys_06	{cr 06}Crystal, Firkrann	Lightsaber_Crystals
-u_l_crys_07	{cr 07}Crystal, Phond	Lightsaber_Crystals
-u_l_crys_08	{cr 08}Crystal, Bondar	Lightsaber_Crystals
-u_l_crys_09	{cr 09}Crystal, Velmorite	Lightsaber_Crystals
-u_l_crys_10	{cr 10}Crystal, Sigil	Lightsaber_Crystals
-u_l_crys_11	{cr 11}Crystal, Jenruax	Lightsaber_Crystals
-u_l_crys_12	{cr 12}Crystal, Kasha	Lightsaber_Crystals
-u_l_crys_13	{cr 13}Crystal, Opila	Lightsaber_Crystals
-u_l_crys_14	{cr 14}Crystal, Eralam	Lightsaber_Crystals
-u_l_crys_15	{cr 15}Crystal, Stygium	Lightsaber_Crystals
-u_l_crys_16	{cr 16}Crystal, Damind	Lightsaber_Crystals
-u_l_crys_17	{cr 17}Crystal, Sapith	Lightsaber_Crystals
-u_l_crys_18	{cr 18}Crystal, Pontite	Lightsaber_Crystals
-u_l_crys_19	{cr 19}Crystal, Upari	Lightsaber_Crystals
-u_l_crys_20	{cr 20}Ultima-pearl	Lightsaber_Crystals
-u_l_crys_21	{cr 21}Crystal, Solari	Lightsaber_Crystals
-u_l_crys_21x	{cr x21}Crystal, Qixoni	Lightsaber_Crystals
-u_l_crys_22	{cr 22}Lorrdian Gemstone	Lightsaber_Crystals
-u_l_crys_23	{cr 23}Barab Ore Ingot	Lightsaber_Crystals
-u_l_crys_24	{cr 24}Ankarres Sapphire	Lightsaber_Crystals
-u_l_crys_25	{cr 25}Crystal, Kaiburr	Lightsaber_Crystals
-u_l_crys_x23	{cr x23}Crystal, Hurrikaine	Lightsaber_Crystals
-u_l_emit_01	{em 01}Deflection Emitter	Plot_Useable_Items
-u_l_emit_02	{em 02}Disrupting Emitter	Plot_Useable_Items
-u_l_emit_03	{em 03}Crude Phobium Emitter	Plot_Useable_Items
-u_l_emit_04	{em 04}Fencing Emitter	Plot_Useable_Items
-u_l_emit_05	{em 05}Improved Deflection Emitter	Plot_Useable_Items
-u_l_emit_06	{em 06}Advanced Disrupting Emitter	Plot_Useable_Items
-u_l_emit_07	{em 07}Synthesized Phobium Emitter	Plot_Useable_Items
-u_l_emit_08	{em 08}Improved Fencing Emitter	Plot_Useable_Items
-u_l_emit_09	{em 09}Expert Deflection Emitter	Plot_Useable_Items
-u_l_emit_10	{em 10}Superior Disrupting Emitter	Plot_Useable_Items
-u_l_emit_11	{em 11}Phobium Alloy Emitter	Plot_Useable_Items
-u_l_emit_12	{em 12}Expert Fencing Emitter	Plot_Useable_Items
-u_l_emit_13	{em 13}Refined Phobium Emitter	Plot_Useable_Items
-u_l_lens_01	{le 01}Synthesized Kunda Lens	Plot_Useable_Items
-u_l_lens_02	{le 02}Dragite Lens	Plot_Useable_Items
-u_l_lens_03	{le 03}Synthesized Byrothsis Lens	Plot_Useable_Items
-u_l_lens_04	{le 04}Beam Gem Lens	Plot_Useable_Items
-u_l_lens_05	{le 05}Vibration Lens	Plot_Useable_Items
-u_l_lens_06	{le 06}Pure Kunda Lens	Plot_Useable_Items
-u_l_lens_07	{le 07}Adegan Lens	Plot_Useable_Items
-u_l_lens_08	{le 08}Pure Byrothsis Lens	Plot_Useable_Items
-u_l_lens_09	{le 09}Improved Beam Gem Lens	Plot_Useable_Items
-u_l_lens_10	{le 10}Improved Vibration Lens	Plot_Useable_Items
-u_l_lens_11	{le 11}Ossus Dueling Lens	Plot_Useable_Items
-u_l_lens_12	{le 12}Pontite Lens	Plot_Useable_Items
-u_l_lens_13	{le 13}Enhanced Byrothsis Lens	Plot_Useable_Items
-u_m_cell_01	{mc 01}Ion Cell	Plot_Useable_Items
-u_m_cell_02	{mc 02}Vibration Cell	Plot_Useable_Items
-u_m_cell_03	{mc 03}Enhanced Energy Cell	Plot_Useable_Items
-u_m_cell_04	{mc 04}Sonic Discharge Cell	Plot_Useable_Items
-u_m_cell_05	{mc 05}Ion Cell Mark II	Plot_Useable_Items
-u_m_cell_06	{mc 06}Vibration Cell Mark II	Plot_Useable_Items
-u_m_cell_07	{mc 07}Enhanced Energy Cell Mark II	Plot_Useable_Items
-u_m_cell_08	{mc 08}Sonic Discharge Cell Mark II	Plot_Useable_Items
-u_m_cell_09	{mc 09}Ion Cell Mark III	Plot_Useable_Items
-u_m_cell_10	{mc 10}Vibration Cell Mark III	Plot_Useable_Items
-u_m_cell_11	{mc 11}Enhanced Energy Cell Mark III	Plot_Useable_Items
-u_m_cell_12	{mc 12}Sonic Discharge Cell Mark III	Plot_Useable_Items
-u_m_cell_13	{mc 13}Ion Cell Mark IV	Plot_Useable_Items
-u_m_cell_14	{mc 14}Vibration Cell Mark IV	Plot_Useable_Items
-u_m_cell_15	{mc 15}Enhanced Energy Cell Mark IV	Plot_Useable_Items
-u_m_edge_01	{ed 01}Mild Devaronian Edge	Plot_Useable_Items
-u_m_edge_02	{ed 02}Basic Ionite Edge	Plot_Useable_Items
-u_m_edge_03	{ed 03}Basic Mullinine Edge	Plot_Useable_Items
-u_m_edge_04	{ed 04}Basic Neutronium Edge	Plot_Useable_Items
-u_m_edge_05	{ed 05}Moderate Devaronian Edge	Plot_Useable_Items
-u_m_edge_06	{ed 06}Improved Ionite Edge	Plot_Useable_Items
-u_m_edge_07	{ed 07}Improved Mullinine Edge	Plot_Useable_Items
-u_m_edge_08	{ed 08}Improved Neutronium Edge	Plot_Useable_Items
-u_m_edge_09	{ed 09}Severe Devaronian Edge	Plot_Useable_Items
-u_m_edge_10	{ed 10}Superior Ionite Edge	Plot_Useable_Items
-u_m_edge_11	{ed 11}Superior Mullinine Edge	Plot_Useable_Items
-u_m_edge_12	{ed 12}Superior Neutronium Edge	Plot_Useable_Items
-u_m_edge_13	{ed 13}Deadly Devaronian Edge	Plot_Useable_Items
-u_m_edge_14	{ed 14}Quadranium Edge	Plot_Useable_Items
-u_m_edge_15	{ed 15}Ostrine Edge	Plot_Useable_Items
-u_m_grip_01	{gr 01}Agrinium Grip	Plot_Useable_Items
-u_m_grip_02	{gr 02}Contoured Grip	Plot_Useable_Items
-u_m_grip_03	{gr 03}Zabrak Grip	Plot_Useable_Items
-u_m_grip_04	{gr 04}Basket Hilt	Plot_Useable_Items
-u_m_grip_05	{gr 05}Nagai Grip	Plot_Useable_Items
-u_m_grip_06	{gr 06}Advanced Agrinium Grip	Plot_Useable_Items
-u_m_grip_07	{gr 07}Advanced Contoured Grip	Plot_Useable_Items
-u_m_grip_08	{gr 08}Advanced Zabrak Grip	Plot_Useable_Items
-u_m_grip_09	{gr 09}Advanced Basket Hilt	Plot_Useable_Items
-u_m_grip_10	{gr 10}Advanced Nagai Grip	Plot_Useable_Items
-u_m_grip_11	{gr 11}Superior Agrinium Grip	Plot_Useable_Items
-u_m_grip_12	{gr 12}Superior Contoured Grip	Plot_Useable_Items
-u_m_grip_13	{gr 13}Superior Zabrak Grip	Plot_Useable_Items
-u_m_grip_14	{gr 14}Superior Basket Hilt	Plot_Useable_Items
-u_m_grip_15	{gr 15}Superior Nagai Grip	Plot_Useable_Items
-u_r_firi_01	{fc 01}Broadening Chamber Mark I	Plot_Useable_Items
-u_r_firi_02	{fc 02}Amplifying Chamber Mark I	Plot_Useable_Items
-u_r_firi_03	{fc 03}Precision Chamber Mark I	Plot_Useable_Items
-u_r_firi_04	{fc 04}Beam Splitter Mark I	Plot_Useable_Items
-u_r_firi_05	{fc 05}Mandalorian Chamber Mark I	Plot_Useable_Items
-u_r_firi_06	{fc 06}Broadened Chamber Mark II	Plot_Useable_Items
-u_r_firi_07	{fc 07}Amplifying Chamber Mark II	Plot_Useable_Items
-u_r_firi_08	{fc 08}Precision Chamber Mark II	Plot_Useable_Items
-u_r_firi_09	{fc 09}Beam Splitter Mark II	Plot_Useable_Items
-u_r_firi_10	{fc 10}Mandalorian Chamber Mark II	Plot_Useable_Items
-u_r_firi_11	{fc 11}Broadened Chamber Mark III	Plot_Useable_Items
-u_r_firi_12	{fc 12}Amplifying Chamber Mark III	Plot_Useable_Items
-u_r_firi_13	{fc 13}Precision Chamber Mark III	Plot_Useable_Items
-u_r_firi_14	{fc 14}Beam Splitter Mark III	Plot_Useable_Items
-u_r_firi_15	{fc 15}Mandalorian Chamber Mark III	Plot_Useable_Items
-u_r_powe_01	{pp 01}Ion Charger Mark I	Plot_Useable_Items
-u_r_powe_02	{pp 02}Power Pulsator Mark I	Plot_Useable_Items
-u_r_powe_03	{pp 03}Basic Rylith Power Cell	Plot_Useable_Items
-u_r_powe_04	{pp 04}Ion Charger Mark II	Plot_Useable_Items
-u_r_powe_05	{pp 05}Power Pulsator Mark II	Plot_Useable_Items
-u_r_powe_06	{pp 06}Standard Rylith Power Cell	Plot_Useable_Items
-u_r_powe_07	{pp 07}Ion Charger Mark III	Plot_Useable_Items
-u_r_powe_08	{pp 08}Power Pulsator Mark III	Plot_Useable_Items
-u_r_powe_09	{pp 09}Advanced Rylith Power Cell	Plot_Useable_Items
-u_r_powe_10	{pp 10}Ion Charger Mark IV	Plot_Useable_Items
-u_r_powe_11	{pp 11}Power Pulsator Mark IV	Plot_Useable_Items
-u_r_powe_12	{pp 12}Superior Rylith Power Cell	Plot_Useable_Items
-u_r_powe_13	{pp 13}Ion Charger Mark V	Plot_Useable_Items
-u_r_powe_14	{pp 14}Power Pulsator Mark V	Plot_Useable_Items
-u_r_powe_15	{pp 15}Pure Rylith Power Cell	Plot_Useable_Items
-u_r_targ_01	{sc 01}Pinpoint Scope Mark I	Plot_Useable_Items
-u_r_targ_02	{sc 02}Accuracy Scope Mark I	Plot_Useable_Items
-u_r_targ_03	{sc 03}Targeting Scope Mark I	Plot_Useable_Items
-u_r_targ_04	{sc 04}Crippling Scope Mark I	Plot_Useable_Items
-u_r_targ_05	{sc 05}Pinpoint Scope Mark II	Plot_Useable_Items
-u_r_targ_06	{sc 06}Accuracy Scope Mark II	Plot_Useable_Items
-u_r_targ_07	{sc 07}Targeting Scope Mark II	Plot_Useable_Items
-u_r_targ_08	{sc 08}Crippling Scope Mark II	Plot_Useable_Items
-u_r_targ_09	{sc 09}Pinpoint Scope Mark III	Plot_Useable_Items
-u_r_targ_10	{sc 10}Accuracy Scope Mark III	Plot_Useable_Items
-u_r_targ_11	{sc 11}Targeting Scope Mark III	Plot_Useable_Items
-u_r_targ_12	{sc 12}Crippling Scope Mark III	Plot_Useable_Items
-u_r_targ_13	{sc 13}Pinpoint Scope Mark IV	Plot_Useable_Items
-u_r_targ_14	{sc 14}Accuracy Scope Mark IV	Plot_Useable_Items
-u_r_targ_15	{sc 15}Targeting Scope Mark IV	Plot_Useable_Items
-vibrocutter	Vibrocutter	Vibro_Blade
-w_blaste_01	{01}Blaster Pistol	Blaster_Pistol
-w_blaste_02	{02}Ion Blaster	Ion_Blaster
-w_blaste_03	{03}Field Survival Pistol	Hold_Out_Blaster
-w_blaste_04	{04}Sonic Pistol	Sonic_Pistol
-w_blaste_05	{05}Disruptor Pistol	Disrupter_Pistol
-w_blaste_06	{06}Heavy Blaster	Heavy_Blaster
-w_blaste_07	{07}Scout Enforcer	Hold_Out_Blaster
-w_blaste_08	{08}Systech Aural Blaster	Sonic_Pistol
-w_blaste_09	{09}Republic Blaster	Blaster_Pistol
-w_blaste_10	{10}Aratech Droid Oxidizer	Ion_Blaster
-w_blaste_11	{11}Arkanian Heavy Pistol	Heavy_Blaster
-w_blaste_12	{12}Mandalorian Blaster	Blaster_Pistol
-w_blaste_13	{13}Systech Static Blaster	Blaster_Pistol
-w_blaste_14	{14}Arkanian Sonic Blaster	Sonic_Pistol
-w_blaste_15	{15}Sith Disruptor	Disrupter_Pistol
-w_blaste_16	{16}Mandalorian Heavy Blaster	Heavy_Blaster
-w_blaste_17	{17}Heavy Sonic Blaster	Sonic_Pistol
-w_blaste_18	{18}Watchman Blaster	Hold_Out_Blaster
-w_blaste_19	{19}Zabrak Blaster Pistol	Blaster_Pistol
-w_blaste_20	{20}Mandalorian Ripper	Disrupter_Pistol
-w_blaste_21	{21}Aratech Ionmaster	Ion_Blaster
-w_blaste_22	{22}Onasi Blaster	Blaster_Pistol
-w_blaste_23	{23}Dashade Sonic Blaster	Sonic_Pistol
-w_blaste_24	{24}Zabrak Heavy Blaster	Heavy_Blaster
-w_blaste_25	{25}Systech Electric Blaster	Blaster_Pistol
-w_blaste_26	{26}Micro-Pulse Blaster	Blaster_Pistol
-w_blaste_27	{27}Elite Watchman Blaster	Hold_Out_Blaster
-w_blaste_28	{28}Mandalorian Disintegrator	Disrupter_Pistol
-w_blaste_29	{29}Dashade Sonic Disruptor	Sonic_Pistol
-w_blaste_30	{30}Freedon Nadd's Blaster	Heavy_Blaster
-w_blaste_x05	{x05}Luxa's Disruptor	Disrupter_Pistol
-w_blaste_x20	{x20}Remote's Blaster	Blaster_Pistol
-w_brifle_01	{01}Blaster Carbine	Blaster_Carbine
-w_brifle_02	{02}Ion Carbine	Ion_Rifle
-w_brifle_03	{03}Sonic Carbine	Sonic_Rifle
-w_brifle_04	{04}Blaster Rifle	Blaster_Rifle
-w_brifle_05	{05}Bowcaster	Bowcaster
-w_brifle_06	{06}Repeating Blaster Carbine	Repeating_Blaster
-w_brifle_07	{07}Ion Rifle	Ion_Rifle
-w_brifle_08	{08}Disruptor Carbine	Disrupter_Rifle
-w_brifle_09	{09}Sonic Rifle	Sonic_Rifle
-w_brifle_10	{10}Repeating Blaster Rifle	Repeating_Blaster
-w_brifle_11	{11}War Bowcaster	Bowcaster
-w_brifle_12	{12}Arkanian Blaster Rifle	Blaster_Rifle
-w_brifle_13	{13}Disruptor Rifle	Disrupter_Rifle
-w_brifle_14	{14}Argazdan Riot Buster	Sonic_Rifle
-w_brifle_15	{15}Bothan Droid Disruptor	Ion_Rifle
-w_brifle_16	{16}Combat Enforcer	Repeating_Blaster
-w_brifle_17	{17}Heavy Repeating Carbine	Heavy_Repeating_Blaster
-w_brifle_18	{18}Plasma Projector	Blaster_Rifle
-w_brifle_19	{19}Mandalorian Assault Rifle	Blaster_Rifle
-w_brifle_20	{20}Verpine Droid Disruptor	Ion_Rifle
-w_brifle_21	{21}Ceremonial Bowcaster	Bowcaster
-w_brifle_22	{22}Heavy Repeating Rifle	Heavy_Repeating_Blaster
-w_brifle_23	{23}Charric	Disrupter_Rifle
-w_brifle_24	{24}Zabrak Blaster Carbine	Blaster_Carbine
-w_brifle_25	{25}Slavemaster Stun Carbine	Blaster_Carbine
-w_brifle_26	{26}Onderon Repeating Carbine	Repeating_Blaster
-w_brifle_27	{27}Sonic Disruptor	Sonic_Rifle
-w_brifle_28	{28}Mandalorian Heavy Repeater	Heavy_Repeating_Blaster
-w_brifle_29	{29}Verpine Droid Disintegrator	Ion_Rifle
-w_brifle_30	{30}Zersium Rifle	Blaster_Rifle
-w_drink_01	{Special}Drink In Hand	Blaster_Pistol
-w_emptyhnd_01	{Special}Empty Hand	Blaster_Pistol
-w_ls_x01	Visas Marr's Lightsaber	Lightsaber
-w_melee_01	{01}Short Sword	Short_Sword
-w_melee_02	{02}Long Sword	Long_Sword
-w_melee_03	{03}Energy Baton	Stun_Baton
-w_melee_04	{04}Quarterstaff	Quarter_Staff
-w_melee_05	{05}Vibroblade	Vibro_Blade
-w_melee_06	{06}Vibrosword	Vibro_Sword
-w_melee_07	{07}Double-Bladed Sword	Double_Bladed_Sword
-w_melee_08	{08}Exchange Negotiator	Stun_Baton
-w_melee_09	{09}Gamorrean War Axe	Gammorean_Battleaxe
-w_melee_10	{10}Zabrak Vibroblade	Vibro_Blade
-w_melee_11	{11}Rodian Blade	Short_Sword
-w_melee_12	{12}Sith War Sword	Vibro_Double_Blade
-w_melee_13	{13}Trandoshan Sword	Long_Sword
-w_melee_14	{14}Force Pike	Force_Pike
-w_melee_15	{15}Vibro Double-Blade	Vibro_Double_Blade
-w_melee_16	{16}Gamorrean Cleaver	Gammorean_Battleaxe
-w_melee_17	{17}Rodian Death Blade	Short_Sword
-w_melee_18	{18}Gand Silencer	Stun_Baton
-w_melee_19	{19}Ryyk Blade	Short_Sword
-w_melee_20	{20}Trandoshan Double-Blade	Vibro_Double_Blade
-w_melee_21	{21}Echani Vibrosword	Vibro_Sword
-w_melee_22	{22}Sith Tremor Sword	Vibro_Sword
-w_melee_23	{23}Gand Shockstaff	Force_Pike
-w_melee_24	{24}Shyarn	Long_Sword
-w_melee_25	{25}Arg'garok	Gammorean_Battleaxe
-w_melee_26	{26}Geonosian Electro-Staff	Quarter_Staff
-w_melee_27	{27}Tehk'la Blade	Vibro_Blade
-w_melee_28	{28}Zhaboka	Vibro_Double_Blade
-w_melee_29	{29}Gand Discharger	Stun_Baton
-w_melee_30	{30}Freyyr's Warblade	Wookie_Warblade
-w_melee_x01	{x01}Handmaiden's Staff	Quarter_Staff
-w_melee_x02	{x02}Twi'lek Spinning Blade	Short_Sword
-w_melee_x03	{x03}Twi'lek Spinning Blade	Short_Sword
-w_melee_x12	{x12}Ludo Kressh's War Sword	Vibro_Double_Blade
-w_pazaak_01	{Special}Pazaak Cards In Hand	Blaster_Pistol
-w_rocket_01	Explosive Rocket	Rocket
-w_rocket_02	Tranquilizer Dart	Rocket
-w_rocket_03	Buster Rocket	Rocket
-w_rocket_04	Kyber Dart	Rocket
-w_rocket_05	Plasma Rocket	Rocket
-w_rocket_06	Poison Rocket	Rocket
-w_rocket_07	Poison Dart	Rocket
-w_rocket_08	Piercing Dart	Rocket
-w_rocket_09	Paralysis Dart	Rocket
-w_rocket_10	Ion Rocket	Rocket
-w_rocket_11	Concussion Rocket	Rocket
-w_sls_x02	Freedon Nadd's Short Lightsaber	Short_Lightsaber
+template	name	base item	combat
+100_belt01	Safety Harness	Belt	
+100_fore01	Peragus Mining Shield	Forearm_Bands	
+100_mask01	Survey Gear	Mask	
+a_band_c01	{c01}<FullName>'s Armband	Forearm_Bands	
+a_band_x01	{x01}Nomi's Armband	Forearm_Bands	
+a_band_x02	{x02}Vao Armband	Forearm_Bands	
+a_band_x03	{x03}Ludo Kressh's Armband	Forearm_Bands	
+a_belt_01	{01}Adrenaline Amplifier	Belt	
+a_belt_02	{02}Cardio-Regulator	Belt	
+a_belt_03	{03}Stealth Field Generator	Stealth_Unit	
+a_belt_04	{04}Czerka Utility Belt	Belt	
+a_belt_05	{05}Advanced Adrenaline Amplifier	Belt	
+a_belt_06	{06}Aratech SD Belt	Stealth_Unit	
+a_belt_07	{07}Strength Enhancer	Belt	
+a_belt_08	{08}Systech Cardio-Regulator	Belt	
+a_belt_09	{09}Hyper Adrenaline Amplifier	Belt	
+a_belt_10	{10}Exchange Shadow Caster	Stealth_Unit	
+a_belt_11	{11}Inertial Inhibitor	Belt	
+a_belt_12	{12}Electrical Capacitance Shield	Belt	
+a_belt_13	{13}Thermal Shield Generator	Belt	
+a_belt_14	{14}Eriadu Stealth Unit	Stealth_Unit	
+a_belt_15	{15}CNS Strength Enhancer	Belt	
+a_belt_16	{16}Exchange Utility Belt	Belt	
+a_belt_17	{17}Immunity Belt	Belt	
+a_belt_18	{18}Adrenaline Stimulator	Belt	
+a_belt_19	{19}Nerve Amplifier Belt	Belt	
+a_belt_20	{20}Jal Shey Belt	Belt	
+a_belt_21	{21}Multishield Generator	Belt	
+a_belt_22	{22}Defel Mimicker	Stealth_Unit	
+a_belt_23	{23}Frozian Scout Belt	Stealth_Unit	
+a_belt_24	{24}Tech Specialist Belt	Belt	
+a_belt_25	{25}Aratech Cardio-Regulator	Belt	
+a_belt_26	{26}GNS Strength Enhancer	Belt	
+a_belt_27	{27}Qel-Droma Belt	Belt	
+a_belt_28	{28}Immortality Belt	Belt	
+a_belt_29	{29}Aratech Echo Belt	Stealth_Unit	
+a_belt_30	{30}Jal Shey Mentor Belt	Belt	
+a_gloves_01	{01}Insulated Gloves	Gauntlets	
+a_gloves_02	{02}Exchange Casual Gloves	Gauntlets	
+a_gloves_04	{04}Taris Survival Gloves	Gauntlets	
+a_gloves_05	{05}Accuracy Gloves	Gauntlets	
+a_gloves_06	{06}Gamorrean Gauntlets	Gauntlets	
+a_gloves_07	{07}Exchange Work Gloves	Gauntlets	
+a_gloves_08	{08}Czerka Defensive Gauntlets	Gauntlets	
+a_gloves_09	{09}Detonator Gloves	Gauntlets	
+a_gloves_10	{10}Unarmed Accuracy Gloves	Gauntlets	
+a_gloves_11	{11}Infiltrator Gloves	Gauntlets	
+a_gloves_12	{12}Jal Shey Perception Gloves	Gauntlets	
+a_gloves_13	{13}Gamorrean Wargloves	Gauntlets	
+a_gloves_14	{14}Eriadu Strength Amplifier	Gauntlets	
+a_gloves_15	{15}Karakan Gauntlets	Gauntlets	
+a_gloves_16	{16}Bothan Precision Gloves	Gauntlets	
+a_gloves_17	{17}Sith Power Gauntlets	Gauntlets	
+a_gloves_18	{18}Gamorrean Power Gauntlets	Gauntlets	
+a_gloves_19	{19}Nagai Combat Gloves	Gauntlets	
+a_gloves_20	{20}Kubaz Scoundrel Gloves	Gauntlets	
+a_gloves_21	{21}Automation Gloves	Gauntlets	
+a_gloves_22	{22}Jal Shey Meditation Gloves	Gauntlets	
+a_gloves_23	{23}Echani Accuracy Gloves	Gauntlets	
+a_gloves_24	{24}Zeison Sha Gloves	Gauntlets	
+a_gloves_25	{25}Dominator Gauntlets	Gauntlets	
+a_gloves_26	{26}Nikto Soldier Gloves	Gauntlets	
+a_gloves_27	{27}Ossluk's Gloves	Gauntlets	
+a_gloves_28	{28}Disruption Gloves	Gauntlets	
+a_gloves_29	{29}Improved Automation Gloves	Gauntlets	
+a_gloves_30	{30}Lightning Gloves	Gauntlets	
+a_heavy_01	{hvy 01}Battle Armor	Armor_Class_8	armour 8
+a_heavy_02	{hvy 02}Heavy Battle Armor	Armor_Class_9	armour 9
+a_heavy_03	{hvy 03}Echani Heavy Armor	Armor_Class_8	armour 10
+a_heavy_04	{hvy 04}Durasteel Heavy Armor	Armor_Class_9	armour 10
+a_heavy_05	{hvy 05}Powered Battle Armor	Armor_Class_8	armour 9
+a_heavy_06	{hvy 06}Flex Heavy Armor	Armor_Class_9	armour 10
+a_heavy_07	{hvy 07}Mandalorian Battle Armor	Armor_Class_9	armour 11
+a_heavy_08	{hvy 08}Mandalorian Heavy Armor	Armor_Class_9	armour 12
+a_heavy_09	{hvy 09}Verpine Zal Alloy Mesh	Armor_Class_8	armour 12
+a_heavy_10	{hvy 10}Mandalorian Assault Armor	Armor_Class_9	armour 13
+a_heavy_11	{hvy 11}Corellian Powersuit	Armor_Class_8	armour 10
+a_heavy_12	{hvy 12}M'uhk'gfa	Armor_Class_8	armour 8
+a_heavy_13	{hvy 13}Iotran Braceman Armor	Armor_Class_8	armour 11
+a_heavy_14	{hvy 14}Felenar Armor	Armor_Class_9	armour 11
+a_heavy_15	{hvy 15}Matrix Armor	Armor_Class_9	armour 13
+a_heavy_x01	{hvy x01}Mandalore's Armor	Armor_Class_9	armour 11
+a_helmet_01	{01}Neural Band	Mask	
+a_helmet_02	{02}Breath Mask	Mask	
+a_helmet_03	{03}Rakatan Band	Mask	
+a_helmet_04	{04}Stealth Field Enhancer	Mask	
+a_helmet_05	{05}Bothan Perception Visor	Mask	
+a_helmet_06	{06}Sonic Nullifiers	Mask	
+a_helmet_07	{07}Interface Band	Mask	
+a_helmet_08	{08}Targeting Visor	Mask	
+a_helmet_09	{09}Shielding Visor	Mask	
+a_helmet_10	{10}Spacer's Sensor	Mask	
+a_helmet_11	{11}Regal Visor	Mask	
+a_helmet_12	{12}Meditation Band	Mask	
+a_helmet_13	{13}Bothan Sensory Visor	Mask	
+a_helmet_14	{14}Arkanian Blinders	Mask	
+a_helmet_15	{15}Combat Sensor	Mask	
+a_helmet_16	{16}Multi-spectral Target Assessor	Mask	
+a_helmet_17	{17}Consciousness Helm	Mask	
+a_helmet_18	{18}Rebreather Mask	Mask	
+a_helmet_19	{19}Das'skar Hunting Mask	Mask	
+a_helmet_20	{20}Force Mask	Mask	
+a_helmet_21	{21}Sith Mask	Mask	
+a_helmet_22	{22}Stabilizer Mask	Mask	
+a_helmet_23	{23}Matukai Meditation Band	Mask	
+a_helmet_24	{24}Target Assessor	Mask	
+a_helmet_25	{25}Circlet of Saresh	Mask	
+a_helmet_26	{26}Bindo's Band	Mask	
+a_helmet_27	{27}Enhanced Shielding Visor	Mask	
+a_helmet_28	{28}Force Shield	Mask	
+a_helmet_29	{29}Absorption Visor	Mask	
+a_helmet_30	{30}Force Focusing Visor	Mask	
+a_khoonda	Khoonda Militia Armor	Armor_Class_6	armour 6
+a_light_01	{light 01}Light Combat Suit	Armor_Class_4	armour 4
+a_light_02	{light 02}Combat Suit	Armor_Class_4	armour 4
+a_light_03	{light 03}Heavy Combat Suit	Armor_Class_5	armour 5
+a_light_04	{light 04}Mandalorian Combat Suit	Armor_Class_4	armour 4
+a_light_05	{light 05}Zabrak Combat Suit	Armor_Class_4	armour 5
+a_light_06	{light 06}Bonadan Alloy Heavy Suit	Armor_Class_5	armour 6
+a_light_07	{light 07}Echani Light Armor	Armor_Class_4	armour 5
+a_light_08	{light 08}Massassi Ceremonial Armor	Armor_Class_4	armour 5
+a_light_09	{light 09}Mandalorian Heavy Suit	Armor_Class_4	armour 5
+a_light_10	{light 10}Zabrak Battle Armor	Armor_Class_5	armour 6
+a_light_11	{light 11}Ubese Environmental Suit	Armor_Armd_Flight_Suit	armour 5
+a_light_12	{light 12}Echani Shield Suit	Armor_Class_5	armour 7
+a_light_13	{light 13}Reinforced Fiber Armor	Armor_Class_5	armour 7
+a_light_14	{light 14}Zabrak Field Armor	Armor_Class_5	armour 7
+a_light_15	{light 15}Ulic Qel Droma's Mesh Suit	Armor_Class_5	armour 8
+a_light_x02	{light x02}Atton's Ribbed Jacket	Basic_Clothing	
+a_light_x08	{light x08}Electromesh Suit	Armor_Class_4	armour 5
+a_light_x09	{light x09}Mira's Ballistic Mesh Jacket	Basic_Clothing	
+a_medium_01	{med 01}Military Suit	Armor_Class_6	armour 6
+a_medium_02	{med 02}Light Battle Armor	Armor_Class_7	armour 7
+a_medium_03	{med 03}Echani Battle Armor	Armor_Class_6	armour 7
+a_medium_04	{med 04}Cinnagar War Suit	Armor_Class_6	armour 7
+a_medium_05	{med 05}Sith Battle Suit	Armor_Class_6	armour 7
+a_medium_06	{med 06}Bronzium Light Battle Armor	Armor_Class_7	armour 8
+a_medium_07	{med 07}Verpine Fiber Mesh	Armor_Class_6	armour 8
+a_medium_08	{med 08}Krath Heavy Armor	Armor_Class_7	armour 9
+a_medium_09	{med 09}Powered Light Battle Armor	Armor_Class_7	armour 8
+a_medium_10	{med 10}Krath Holy Battle Suit	Armor_Class_7	armour 9
+a_medium_11	{med 11}Exar Kun's Light Battle Suit	Armor_Class_6	armour 9
+a_medium_12	{med 12}Heavy Cinnagar War Suit	Armor_Class_6	armour 9
+a_medium_13	{med 13}Verpine Fiber Ultramesh	Armor_Class_6	armour 10
+a_medium_14	{med 14}Electromesh Armor	Armor_Class_7	armour 7
+a_medium_15	{med 15}Jamoh Hogra's Battle Armor	Armor_Class_7	armour 11
+a_robe_01	{01}Clothing	Basic_Clothing	
+a_robe_02	{02}Padawan Robe	Jedi_Robe	
+a_robe_03	{03}Dark Padawan Robe	Jedi_Robe	
+a_robe_04	{04}Baran Do Novice Robe	Jedi_Robe	
+a_robe_05	{05}Matukai Apprentice Robe	Jedi_Master_Robe	
+a_robe_06	{06}Zeison Sha Initiate Armor	Armor_Zeison_Sha	armour 4
+a_robe_07	{07}Jal Shey Neophyte Armor	Armor_Zeison_Sha	armour 3
+a_robe_08	{08}Jedi Robe	Jedi_Robe	
+a_robe_09	{09}Dark Jedi Robe	Jedi_Robe	
+a_robe_10	{10}Norris Robe	Jedi_Robe	
+a_robe_11	{11}Jal Shey Advisor Armor	Armor_Zeison_Sha	armour 3
+a_robe_12	{12}Gray Jedi Robe	Jedi_Master_Robe	
+a_robe_13	{13}Jedi Knight Robe	Jedi_Master_Robe	
+a_robe_14	{14}Dark Jedi Knight Robe	Jedi_Master_Robe	
+a_robe_15	{15}Matukai Adept Robe	Jedi_Master_Robe	
+a_robe_16	{16}Zeison Sha Warrior Armor	Armor_Zeison_Sha	armour 5
+a_robe_17	{17}Jedi Master Robe	Jedi_Master_Robe	
+a_robe_18	{18}Dark Jedi Master Robe	Jedi_Master_Robe	
+a_robe_19	{19}Baran Do Sage Robe	Jedi_Robe	
+a_robe_20	{20}Jal Shey Mentor Armor	Armor_Zeison_Sha	armour 4
+a_robe_21	{21}Ossus Keeper Robe	Jedi_Robe	
+a_robe_22	{22}Natth Cowling	Jedi_Master_Robe	
+a_robe_23	{23}Arca Jeth's Robe	Jedi_Master_Robe	
+a_robe_24	{24}Aleema Keto's Robe	Jedi_Master_Robe	
+a_robe_25	{25}Sylvar's Robe	Jedi_Master_Robe	
+a_robe_26	{26}Darth Malak's Armor	Armor_Zeison_Sha	armour 7
+a_robe_27	{27}Jolee's Robe	Jedi_Robe	
+a_robe_28	{28}Thon's Robe	Jedi_Master_Robe	
+a_robe_29	{29}Crado's Robe	Jedi_Master_Robe	
+a_robe_30	{30}Nomi's Robe	Jedi_Master_Robe	
+a_robe_x01	{x01}Handmaiden's Robe	Jedi_Knight_Robe	
+a_shield_01	Energy Shield	Forearm_Bands	
+a_shield_02	Mandalorian Melee Shield	Forearm_Bands	
+a_shield_03	Arkanian Energy Shield	Forearm_Bands	
+a_shield_04	Echani Shield	Forearm_Bands	
+a_shield_05	Mandalorian Power Shield	Forearm_Bands	
+a_shield_06	Echani Dueling Shield	Forearm_Bands	
+a_shield_07	Verpine Prototype Shield	Forearm_Bands	
+brokenitem	Broken Item	Plot_Useable_Items	
+chem_00001	Chemicals	Chemicals	
+comlink	Comlink	Plot_Useable_Items	
+compont_00001	Components	Components	
+d_armor_01	Droid Impact Armor Mark I	Droid_Light_Plating	armour 3
+d_armor_02	Droid Modular Plating Mark I	Droid_Medium_Plating	armour 4
+d_armor_03	Droid Impact Armor Mark II	Droid_Light_Plating	armour 4
+d_armor_04	Droid Desh Plating	Droid_Heavy_Plating	armour 9
+d_armor_05	Droid Impact Armor Mark III	Droid_Light_Plating	armour 6
+d_armor_06	Droid Modular Plating Mark II	Droid_Medium_Plating	armour 6
+d_armor_07	Droid Modular Plating Mark III	Droid_Medium_Plating	armour 7
+d_armor_08	Droid Agrinium Armor	Droid_Light_Plating	armour 5
+d_armor_09	Droid Dura Plating Mark I	Droid_Heavy_Plating	armour 9
+d_armor_10	Droid Quadranium Armor	Droid_Medium_Plating	armour 7
+d_armor_11	Droid Dura Plating Mark II	Droid_Heavy_Plating	armour 10
+d_armor_12	Droid Diatium Plating	Droid_Heavy_Plating	armour 9
+d_armor_13	Droid Energized Armor Mark I	Droid_Heavy_Plating	armour 12
+d_armor_14	Droid Energized Armor Mark II	Droid_Heavy_Plating	armour 13
+d_armor_15	Droid Energized Armor Mark III	Droid_Heavy_Plating	armour 14
+d_device_01	Droid Neural Pacifier	Droid_Utility_Device	
+d_device_02	Droid Repulsor	Droid_Utility_Device	
+d_device_03	Droid Flame Thrower	Droid_Utility_Device	
+d_device_04	Droid Toxin Emitter	Droid_Utility_Device	
+d_device_05	Droid Neural Scrambler	Droid_Utility_Device	
+d_device_06	Droid Ion Striker	Droid_Utility_Device	
+d_device_07	Droid Molten Cannon	Droid_Utility_Device	
+d_device_08	Droid Carbonite Projector	Droid_Utility_Device	
+d_device_09	Droid Plasma Thrower	Droid_Utility_Device	
+d_device_10	Droid Bio-Assault Spray	Droid_Utility_Device	
+d_device_11	Droid Carbonite Emitter	Droid_Utility_Device	
+d_device_12	Droid Ion Blast Mark I	Droid_Utility_Device	
+d_device_13	Droid Ion Blast Mark II	Droid_Utility_Device	
+d_device_14	Droid Ion Blast Mark III	Droid_Utility_Device	
+d_device_15	Droid Multi-spectral Emitter	Droid_Utility_Device	
+d_g0t0_01	Droid Stealth Booster	Droid_Computer_Spike_Mount_x	
+d_g0t0_02	Droid Omniscience Unit	Droid_Targeting_Computers	
+d_g0t0_03	Droid Singulararity Projector	Droid_Computer_Spike_Mount_x	
+d_g0t0_04	Goto Targeting Module	Droid_Computer_Spike_Mount_x	
+d_hk47_01	{hk47 01}Droid Assassin's Rifle	Disrupter_Rifle	ranged 5.18 +5
+d_hk47_02	Droid Capacitor Armor	Droid_Heavy_Plating	armour 13
+d_hk47_03	Droid Assassination Module	Droid_Targeting_Computers	
+d_interface_01	Droid Optimized Interface	Droid_Computer_Spike_Mount_x	
+d_interface_02	Droid Stabilization Subroutine	Droid_Computer_Spike_Mount_x	
+d_interface_03	Droid Machine Interface	Droid_Computer_Spike_Mount_x	
+d_interface_04	Droid Lockout Bypass	Droid_Computer_Spike_Mount_x	
+d_interface_05	Droid Parabolic Guides	Droid_Computer_Spike_Mount_x	
+d_interface_06	Droid Motivator Booster	Droid_Computer_Spike_Mount_x	
+d_interface_07	Droid Durability Upgrade	Droid_Computer_Spike_Mount_x	
+d_interface_08	Droid Agility Upgrade	Droid_Computer_Spike_Mount_x	
+d_interface_09	Droid Wisdom Upgrade	Droid_Computer_Spike_Mount_x	
+d_interface_10	Droid Exchange Interface	Droid_Computer_Spike_Mount_x	
+d_interface_11	Droid Remote Interface	Droid_Computer_Spike_Mount_x	
+d_interface_12	Droid Anatomy Library	Droid_Computer_Spike_Mount_x	
+d_interface_13	Droid Scavenger Upgrade	Droid_Computer_Spike_Mount_x	
+d_interface_14	Droid Source Ripper	Droid_Computer_Spike_Mount_x	
+d_interface_15	Droid Systems Upgrade	Droid_Computer_Spike_Mount_x	
+d_shield_01	Droid Deflector Mark I	Droid_Shield	
+d_shield_02	Droid Deflector Mark II	Droid_Shield	
+d_shield_03	Droid Defense Barrier	Droid_Shield	
+d_shield_04	Droid Energy Collector	Droid_Shield	
+d_shield_05	Droid Deflector Mark III	Droid_Shield	
+d_shield_06	Droid Unity Grid	Droid_Shield	
+d_t3m4_01	Droid Shock Arm	Droid_Utility_Device	
+d_t3m4_02	Droid Self-Sustaining Unit	Droid_Computer_Spike_Mount_x	
+d_t3m4_03	Droid Renewable Shield	Droid_Shield	
+d_tool_01	Droid Motion Tracker	Droid_Targeting_Computers	
+d_tool_02	Droid Upgrade Slot	Droid_Targeting_Computers	
+d_tool_03	Droid Surveillance Upgrade	Droid_Targeting_Computers	
+d_tool_04	Droid Advanced Upgrade Slot	Droid_Targeting_Computers	
+d_tool_05	Droid Reference Database	Droid_Targeting_Computers	
+d_tool_06	Droid System Fortification	Droid_Targeting_Computers	
+d_tool_07	Droid Fighting Upgrade	Droid_Targeting_Computers	
+d_tool_08	Droid Perception Sensors	Droid_Targeting_Computers	
+d_tool_09	Droid Memory Upgrade	Droid_Targeting_Computers	
+d_tool_10	Droid Warfare Upgrade	Droid_Targeting_Computers	
+d_tool_11	Droid Battle Upgrade	Droid_Targeting_Computers	
+d_tool_12	Droid CERS	Droid_Targeting_Computers	
+d_tool_13	Droid CESS	Droid_Targeting_Computers	
+d_tool_14	Droid CEPB	Droid_Targeting_Computers	
+d_tool_15	Droid Micro-Optics	Droid_Targeting_Computers	
+e_imp1_01	{imp1 01}Reflex Package	Implant_1	
+e_imp1_02	{imp1 02}Pheromone Package	Implant_1	
+e_imp1_03	{imp1 03}Cardio Package	Implant_1	
+e_imp1_04	{imp1 04}Strength Package	Implant_1	
+e_imp1_05	{imp1 05}Response Package	Implant_1	
+e_imp1_06	{imp1 06}Fitness Package	Implant_1	
+e_imp1_07	{imp1 07}Skills Package	Implant_1	
+e_imp1_08	{imp1 08}Health Package	Implant_1	
+e_imp1_09	{imp1 09}Physical Boost Package	Implant_1	
+e_imp1_10	{imp1 10}Mental Boost Package	Implant_1	
+e_imp2_01	{imp2 01}Retinal Combat Implant	Implant_2	
+e_imp2_02	{imp2 02}Lornan Implant	Implant_2	
+e_imp2_03	{imp2 03}Biotech Implant	Implant_2	
+e_imp2_04	{imp2 04}Power Implant	Implant_2	
+e_imp2_05	{imp2 05}Alacrity Implant	Implant_2	
+e_imp2_06	{imp2 06}Insight Implant	Implant_2	
+e_imp2_07	{imp2 07}Skills Implant	Implant_2	
+e_imp2_08	{imp2 08}Durability Implant	Implant_2	
+e_imp2_09	{imp2 09}Physical Boost Implant	Implant_2	
+e_imp2_10	{imp2 10}Mental Boost Implant	Implant_2	
+e_imp3_01	{imp3 01}Bio-Antidote System	Implant_3	
+e_imp3_02	{imp3 02}Nerve Enhancement System	Implant_3	
+e_imp3_03	{imp3 03}Reaction System	Implant_3	
+e_imp3_04	{imp3 04}Advanced Combat System	Implant_3	
+e_imp3_05	{imp3 05}Bavakar Strength System	Implant_3	
+e_imp3_06	{imp3 06}Cardio Power System	Implant_3	
+e_imp3_07	{imp3 07}Skills System	Implant_3	
+e_imp3_08	{imp3 08}Numbness System	Implant_3	
+e_imp3_09	{imp3 09}Physical Boost System	Implant_3	
+e_imp3_10	{imp3 10}Mental Boost System	Implant_3	
+e_imp4_01	{imp4 01}Strength D-Package	Implant_3	
+e_imp4_02	{imp4 02}Immunity D-Package	Implant_3	
+e_imp4_03	{imp4 03}Perception D-Package	Implant_3	
+e_imp4_04	{imp4 04}Enhancement D-Package	Implant_3	
+e_imp4_05	{imp4 05}Immortality D-Package	Implant_3	
+e_imp4_06	{imp4 06}Quickness D-Package	Implant_3	
+e_imp4_07	{imp4 07}Skills D-Package	Implant_3	
+e_imp4_08	{imp4 08}Universal D-Package	Implant_3	
+e_imp4_09	{imp4 09}Physical Boost D-Package	Implant_3	
+e_imp4_10	{imp4 10}Mental Boost D-Package	Implant_3	
+g1_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.64
+g1_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.71
+g1_w_lghtsbr01	Lightsaber	Lightsaber	melee 11.22
+g1_w_lghtsbr02	Lightsaber	Lightsaber	melee 10.9
+g1_w_sbrcrstl20	Door Cutting	Lightsaber_Crystals	
+g1_w_sbrcrstl21	+ dual strike <CUSTOM0>	Lightsaber_Crystals	
+g1_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.87
+g1_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 8.58
+g_a_armrdfsuit	Armored Flight Suit	Armor_Armd_Flight_Suit	armour 5
+g_a_clothes01	Clothing	Basic_Clothing	
+g_a_clothes010	Clothing {Variant 09}	Basic_Clothing	
+g_a_clothes011	Clothing {Variant Czerka}	Basic_Clothing	
+g_a_clothes012	Clothing {Variant 11}	Basic_Clothing	
+g_a_clothes02	Clothing {Variant 02}	Basic_Clothing	
+g_a_clothes03	Clothing {Variant 03}	Basic_Clothing	
+g_a_clothes04	Clothing {Variant 04}	Basic_Clothing	
+g_a_clothes05	Clothing {Variant 05}	Basic_Clothing	
+g_a_clothes06	Clothing {Variant 06}	Basic_Clothing	
+g_a_clothes07	Clothing {Variant 01}	Basic_Clothing	
+g_a_clothes08	Clothing {Variant 07}	Basic_Clothing	
+g_a_clothes09	Clothing {Variant 08}	Basic_Clothing	
+g_d_blowtrch01	Blowtorch	Droid_Utility_Device	
+g_d_blowtrch02	Advanced Blowtorch	Droid_Utility_Device	
+g_d_firesupres01	Fire Suppression System	Droid_Utility_Device	
+g_danceroutfit	Dancer's Outfit	Slave_Outfit	
+g_i_adrnaline001	Adrenal Strength	Adrenaline	
+g_i_adrnaline002	Adrenal Alacrity	Adrenaline	
+g_i_adrnaline003	Adrenal Stamina	Adrenaline	
+g_i_adrnaline004	Hyper-adrenal Strength	Adrenaline	
+g_i_adrnaline005	Hyper-adrenal Alacrity	Adrenaline	
+g_i_adrnaline006	Hyper-adrenal Stamina	Adrenaline	
+g_i_asthitem001	Aesthetic Item	Aesthetic_Item	
+g_i_bithitem001	Bith Guitar	Blaster_Pistol	ranged 4.82
+g_i_bithitem002	Bith Clarinet	Blaster_Pistol	ranged 5.16
+g_i_bithitem003	Bith Trombone	Blaster_Pistol	ranged 4.6
+g_i_bithitem004	Bith Accordian	Blaster_Pistol	ranged 4.67
+g_i_cmbtshot001	Battle Stimulant	Combat_Shots	
+g_i_cmbtshot002	Hyper-battle Stimulant	Combat_Shots	
+g_i_cmbtshot003	Echani Battle Stimulant	Combat_Shots	
+g_i_credits001	Credits	Credits	
+g_i_credits002	Credits	Credits	
+g_i_credits003	Credits	Credits	
+g_i_credits004	Credits	Credits	
+g_i_credits005	Credits	Credits	
+g_i_credits006	Credits	Credits	
+g_i_credits007	Credits	Credits	
+g_i_credits008	Credits	Credits	
+g_i_credits009	Credits	Credits	
+g_i_credits010	Credits	Credits	
+g_i_credits011	Credits	Credits	
+g_i_credits012	Credits	Credits	
+g_i_credits013	Credits	Credits	
+g_i_credits014	Credits	Credits	
+g_i_credits015	Credits	Credits	
+g_i_crhide001	Assault Droid Mark I Hide	Creature_Hide_Item	
+g_i_crhide002	Assault Droid Mark IV Hide	Creature_Hide_Item	
+g_i_crhide003	Rakghoul Fiend & Kataarn Hide	Creature_Hide_Item	
+g_i_crhide004	Tuk'ata Hide	Creature_Hide_Item	
+g_i_crhide005	Katarn Hide	Creature_Hide_Item	
+g_i_crhide006	Tuk'ata Hide	Creature_Hide_Item	
+g_i_crhide007	Canderous' Hide	Creature_Hide_Item	
+g_i_crhide008	Droid Hide	Creature_Hide_Item	
+g_i_crhide009	HK-47 Hide 1	Creature_Hide_Item	
+g_i_crhide010	HK-47 Hide 2	Creature_Hide_Item	
+g_i_crhide011	HK-47 Hide 3	Creature_Hide_Item	
+g_i_crhide012	HK-47 Hide 4	Creature_Hide_Item	
+g_i_crhide013	HK-47 Hide 0	Creature_Hide_Item	
+g_i_crhide014	Canderous' Agility Hide	Creature_Hide_Item	
+g_i_crhide015	Droid Hide Debuffer	Creature_Hide_Item	
+g_i_crhide016	Canderous' Strength Hide	Creature_Hide_Item	
+g_i_crhide017	Canderous' Endurance Hide	Creature_Hide_Item	
+g_i_crhide018	Canderous' Regen Hide	Creature_Hide_Item	
+g_i_datapad001	Datapad	Data_Pad	
+g_i_drdrepeqp001	Repair Kit	Droid_Repair_Equipment	
+g_i_drdrepeqp002	Advanced Repair Kit	Droid_Repair_Equipment	
+g_i_drdrepeqp003	Construction Kit	Droid_Repair_Equipment	
+g_i_medeqpmnt01	Medpac	Medical_Equipment	
+g_i_medeqpmnt02	Advanced Medpac	Medical_Equipment	
+g_i_medeqpmnt03	Life Support Pack	Medical_Equipment	
+g_i_medeqpmnt04	Antidote Kit	Medical_Equipment	
+g_i_medeqpmnt08	Squad Recovery Stim	Squad_Recovery_kit	
+g_i_parts01	Parts	Programming_Spikes	
+g_i_pazcard_001	Pazaak Card +1	Pazaak_Card	
+g_i_pazcard_002	Pazaak Card +2	Pazaak_Card	
+g_i_pazcard_003	Pazaak Card +3	Pazaak_Card	
+g_i_pazcard_004	Pazaak Card +4	Pazaak_Card	
+g_i_pazcard_005	Pazaak Card +5	Pazaak_Card	
+g_i_pazcard_006	Pazaak Card +6	Pazaak_Card	
+g_i_pazcard_007	Pazaak Card -1	Pazaak_Card	
+g_i_pazcard_008	Pazaak Card -2	Pazaak_Card	
+g_i_pazcard_009	Pazaak Card -3	Pazaak_Card	
+g_i_pazcard_010	Pazaak Card -4	Pazaak_Card	
+g_i_pazcard_011	Pazaak Card -5	Pazaak_Card	
+g_i_pazcard_012	Pazaak Card -6	Pazaak_Card	
+g_i_pazcard_013	Pazaak Card +/-1	Pazaak_Card	
+g_i_pazcard_014	Pazaak Card +/-2	Pazaak_Card	
+g_i_pazcard_015	Pazaak Card +/-3	Pazaak_Card	
+g_i_pazcard_016	Pazaak Card +/-4	Pazaak_Card	
+g_i_pazcard_017	Pazaak Card +/-5	Pazaak_Card	
+g_i_pazcard_018	Pazaak Card +/-6	Pazaak_Card	
+g_i_pazcard_019	Pazaak Card +/- 1/2	Pazaak_Card	
+g_i_pazcard_020	Pazaak Card Double	Pazaak_Card	
+g_i_pazcard_021	Pazaak Card Tie Breaker	Pazaak_Card	
+g_i_pazcard_022	Pazaak Card Flip 2&4	Pazaak_Card	
+g_i_pazcard_023	Pazaak Card Flip 3&6	Pazaak_Card	
+g_i_pazdeck	Pazaak Deck	Aesthetic_Item	
+g_i_pazsidebd001	Pazaak Side Deck	Pazaak_Sideboard	
+g_i_pltuseitm01	Keycard	Plot_Useable_Items	
+g_i_progspike01	Computer Spike	Programming_Spikes	
+g_i_secspike01	Security Tunneler	Security_Spikes	
+g_i_secspike02	Security Spike Tunneler	Security_Spikes	
+g_i_trapkit001	Minor Flash Mine	Trap_Kit	
+g_i_trapkit002	Average Flash Mine	Trap_Kit	
+g_i_trapkit003	Blinding Flash Mine	Trap_Kit	
+g_i_trapkit004	Minor Frag Mine	Trap_Kit	
+g_i_trapkit005	Average Frag Mine	Trap_Kit	
+g_i_trapkit006	Deadly Frag Mine	Trap_Kit	
+g_i_trapkit007	Minor Plasma Mine	Trap_Kit	
+g_i_trapkit008	Average Plasma Mine	Trap_Kit	
+g_i_trapkit009	Deadly Plasma Mine	Trap_Kit	
+g_i_trapkit010	Minor Gas Mine	Trap_Kit	
+g_i_trapkit011	Average Gas Mine	Trap_Kit	
+g_i_trapkit012	Deadly Gas Mine	Trap_Kit	
+g_i_trapkit013	Minor Sonic Mine	Trap_Kit	
+g_i_trapkit014	Average Sonic Mine	Trap_Kit	
+g_i_trapkit015	Deadly Sonic Mine	Trap_Kit	
+g_i_trapkit016	Strong Flash Mine	Trap_Kit	
+g_i_trapkit017	Devastating Flash Mine	Trap_Kit	
+g_i_trapkit018	Strong Frag Mine	Trap_Kit	
+g_i_trapkit019	Devastating Frag Mine	Trap_Kit	
+g_i_trapkit020	Strong Plasma Mine	Trap_Kit	
+g_i_trapkit021	Devastating Plasma Mine	Trap_Kit	
+g_i_trapkit022	Strong Gas Mine	Trap_Kit	
+g_i_trapkit023	Devastating Gas Mine	Trap_Kit	
+g_i_trapkit024	Strong Sonic Mine	Trap_Kit	
+g_i_trapkit025	Devastating Sonic Mine	Trap_Kit	
+g_i_upgrade001	Scope	Plot_Useable_Items	
+g_i_upgrade002	Improved Energy Cell	Plot_Useable_Items	
+g_i_upgrade003	Beam Splitter	Plot_Useable_Items	
+g_i_upgrade004	Hair Trigger	Plot_Useable_Items	
+g_i_upgrade005	Armor Reinforcement	Plot_Useable_Items	
+g_i_upgrade006	Mesh Underlay	Plot_Useable_Items	
+g_i_upgrade007	Vibration Cell	Plot_Useable_Items	
+g_i_upgrade008	Durasteel Bonding Alloy	Plot_Useable_Items	
+g_i_upgrade009	Energy Projector	Plot_Useable_Items	
+g_i_wristlaunch	Wrist Launcher	Wrist_Launcher	
+g_w_adhsvgren001	Adhesive Grenade	Adhesive_Grenade	
+g_w_crgore001	Katarn Slam	Creature_Item_Pierce	melee 0
+g_w_crgore002	Dire Katarn Slam	Creature_Item_Pierce	melee 0
+g_w_crslash001	Claw1d4	Creature_Item_Slash	melee 0
+g_w_crslash002	Claw1d6	Creature_Item_Slash	melee 0
+g_w_crslash003	Claw1d10	Creature_Item_Slash	melee 0
+g_w_crslash004	Claw2d12	Creature_Item_Slash	melee 0
+g_w_crslash005	Claw3d6	Creature_Item_Slash	melee 0
+g_w_crslash006	Claw10d6	Creature_Item_Slash	melee 0
+g_w_crslash007	Selkath Lesser Claw	Creature_Item_Slash	melee 0
+g_w_crslash008	Selkath Greater Claw	Creature_Item_Slash	melee 0
+g_w_crslash009	Kinrath Claw	Creature_Item_Slash	melee 0
+g_w_crslash010	Tach Claw	Creature_Item_Slash	melee 0
+g_w_crslash011	Kinrath Claw	Creature_Item_Slash	melee 0
+g_w_crslash012	Kinrath Stalker Claw	Creature_Item_Slash	melee 0
+g_w_crslprc001	Veerkal Bite	Creature_Weapon_Sl_Prc	melee 4.26
+g_w_crslprc002	Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
+g_w_crslprc003	Gizka Bite	Creature_Weapon_Sl_Prc	melee 0
+g_w_crslprc004	Dire Tuk'ata Bite	Creature_Weapon_Sl_Prc	melee 0 +5
+g_w_crslprc005	Shyrack Wyrm Bite	Creature_Weapon_Sl_Prc	melee 9.29
+g_w_cryobgren001	CryoBan Grenade	Cryoban_Grenade	
+g_w_dblsbr001	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.22
+g_w_dblsbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.06
+g_w_dblsbr003	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.03
+g_w_dblsbr004	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.73
+g_w_dblsbr005	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13
+g_w_dblsbr007	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.97
+g_w_dblsbr008	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.04
+g_w_dblsbr009	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 13.1
+g_w_dblsbr010	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.65
+g_w_dblsbr011	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.49
+g_w_drkjdisbr001	Dark Jedi Lightsaber	Lightsaber	melee 11.12
+g_w_drkjdisbr002	Double-Bladed Lightsaber	Double_Bladed_Lightsaber	melee 12.72
+g_w_firegren001	Plasma Grenade	Fire_Grenade	
+g_w_fraggren01	Frag Grenade	Fragmentation_Grenades	
+g_w_iongren01	Ion Grenade	Ion_Grenade	
+g_w_lghtsbr01	Lightsaber	Lightsaber	melee 11.01
+g_w_lghtsbr02	Lightsaber	Lightsaber	melee 11.27
+g_w_lghtsbr03	Lightsaber	Lightsaber	melee 11.43
+g_w_lghtsbr04	Lightsaber	Lightsaber	melee 10.98
+g_w_lghtsbr05	Lightsaber	Lightsaber	melee 10.91
+g_w_lghtsbr07	Lightsaber	Lightsaber	melee 10.52
+g_w_lghtsbr08	Lightsaber	Lightsaber	melee 11.16
+g_w_lghtsbr09	Lightsaber	Lightsaber	melee 10.92
+g_w_lghtsbr10	Lightsaber	Lightsaber	melee 11.35
+g_w_lghtsbr11	Lightsaber	Lightsaber	melee 10.49
+g_w_null001	Blaster Pistol: Null	Blaster_Pistol	ranged 4.64
+g_w_null002	Heavy Blaster: Null	Heavy_Blaster	ranged 5.57
+g_w_null003	Ion Rifle: Null	Ion_Rifle	ranged 5.46
+g_w_null004	Light Repeating Blaster: Null	Repeating_Blaster	ranged 7.54
+g_w_null005	Blaster Rifle: Null	Blaster_Rifle	ranged 6.68
+g_w_null006	Blaster Carbine: Null	Blaster_Carbine	ranged 6.18
+g_w_poisngren01	Poison Grenade	Poison_Grenade	
+g_w_shortsbr01	Short Lightsaber	Short_Lightsaber	melee 8.87
+g_w_shortsbr02	Short Lightsaber	Short_Lightsaber	melee 9.05
+g_w_shortsbr03	Short Lightsaber	Short_Lightsaber	melee 9.01
+g_w_shortsbr04	Short Lightsaber	Short_Lightsaber	melee 8.69
+g_w_shortsbr05	Short Lightsaber	Short_Lightsaber	melee 8.3
+g_w_shortsbr07	Short Lightsaber	Short_Lightsaber	melee 8.5
+g_w_shortsbr08	Short Lightsaber	Short_Lightsaber	melee 8.45
+g_w_shortsbr09	Short Lightsaber	Short_Lightsaber	melee 8.75
+g_w_shortsbr10	Short Lightsaber	Short_Lightsaber	melee 8.98
+g_w_shortsbr11	Short Lightsaber	Short_Lightsaber	melee 8.89
+g_w_sonicdet01	Minor Sonic Detonator	Sonic_Grenade	
+g_w_sonicdet02	Sonic Detonator	Sonic_Grenade	
+g_w_sonicgren01	Sonic Grenade	Sonic_Grenade	
+g_w_stungren01	Concussion Grenade	Stun_Grenades	
+g_w_thermldet01	Thermal Detonator	Thermal_Detonator	
+hkpart01	HK Droid Processor	Plot_Useable_Items	
+hkpart02	HK Chassis	Plot_Useable_Items	
+hkpart03	HK Control Cluster	Plot_Useable_Items	
+hkpart04	HK Vocabulator	Plot_Useable_Items	
+hkpart05	HK Protocol Pacifist Package	Plot_Useable_Items	
+killblaster	KillBlaster	Blaster_Pistol	ranged 4.51 +5
+killstick	Killstick	Quarter_Staff	melee 12.91 +5
+lspart01	Lightsaber Energy Cell Fixture	Plot_Useable_Items	
+lspart02	Lightsaber Emitter Fixture	Plot_Useable_Items	
+lspart03	Lightsaber Focusing Lens Fixture	Plot_Useable_Items	
+mineruniform	Miner Uniform	Miner_Uniform	armour 1
+mininglaser	Mining Laser		
+propbc01	{Prop BC 01}	Blaster_Carbine	ranged 6.86
+propbc02	{Prop BC 02}	Blaster_Carbine	ranged 6.87
+propbc03	{Prop BC 03}	Blaster_Carbine	ranged 6.49
+propbc04	{Prop BC 04}	Blaster_Carbine	ranged 6.7
+propbc05	{Prop BC 05}	Blaster_Carbine	ranged 6.6
+propbp01	{Prop BP 01}	Blaster_Pistol	ranged 4.6
+propbp02	{Prop BP 02}	Blaster_Pistol	ranged 4.52
+propbp03	{Prop BP 03}	Blaster_Pistol	ranged 4.08
+propbp04	{Prop BP 04}	Blaster_Pistol	ranged 4.8
+propbp05	{Prop BP 05}	Blaster_Pistol	ranged 4.79
+propbr01	{Prop BR 01}	Blaster_Rifle	ranged 6.72
+propbr02	{Prop BR 02}	Blaster_Rifle	ranged 6.34
+propbr03	{Prop BR 03}	Blaster_Rifle	ranged 6.39
+propbr04	{Prop BR 04}	Blaster_Rifle	ranged 7.29
+propbr05	{Prop BR 05}	Blaster_Rifle	ranged 7.02
+propdb01	{Prop DB 01}	Double_Bladed_Sword	melee 7.26
+propdb02	{Prop DB 02}	Double_Bladed_Sword	melee 6.75
+propdb03	{Prop DB 03}	Double_Bladed_Sword	melee 6.95
+propdb04	{Prop DB 04}	Double_Bladed_Sword	melee 7.07
+propdp01	{Prop DP 01}	Disrupter_Pistol	ranged 3.43
+propdp02	{Prop DP 02}	Disrupter_Pistol	ranged 3.79
+propdr01	{Prop DR 01}	Disrupter_Rifle	ranged 5.83
+propdr02	{Prop DR 02}	Disrupter_Rifle	ranged 5.74
+propfp01	{Prop FP 01}	Force_Pike	melee 7.12
+propga01	{Prop GA 01}	Gammorean_Battleaxe	melee 6.78
+prophb01	{Prop HB 01}	Heavy_Blaster	ranged 5.13
+prophb02	{Prop HB 02}	Heavy_Blaster	ranged 5.5
+prophb03	{Prop HB 03}	Heavy_Blaster	ranged 5.22
+prophb04	{Prop HB 04}	Heavy_Blaster	ranged 5.89
+prophb05	{Prop HB 05}	Heavy_Blaster	ranged 5.72
+propho01	{Prop HO 01}	Hold_Out_Blaster	ranged 2.61
+propho02	{Prop HO 02}	Hold_Out_Blaster	ranged 2.46
+propho03	{Prop HO 03}	Hold_Out_Blaster	ranged 2.32
+propho04	{Prop HO 04}	Hold_Out_Blaster	ranged 2.35
+prophr01	{Prop HR 01}	Heavy_Repeating_Blaster	ranged 8.87
+prophr02	{Prop HR 02}	Heavy_Repeating_Blaster	ranged 9.1
+propip01	{Prop IP 01}	Ion_Blaster	ranged 3.76
+propip02	{Prop IP 02}	Ion_Blaster	ranged 3.07
+propir01	{Prop IR 01}	Ion_Rifle	ranged 5.36
+propir02	{Prop IR 02}	Ion_Rifle	ranged 5.63
+propir03	{Prop IR 03}	Ion_Rifle	ranged 5.61
+propls01	{Prop LS 01}	Long_Sword	melee 6.34
+propls02	{Prop LS 02}	Long_Sword	melee 5.88
+propls03	{Prop LS 03}	Long_Sword	melee 6.68
+propls04	{Prop LS 04}	Long_Sword	melee 6.94
+propls05	{Prop LS 05}	Long_Sword	melee 6.07
+propqs01	{Prop QS 01}	Quarter_Staff	melee 3.62
+propqs02	{Prop QS 02}	Quarter_Staff	melee 3.53
+propqs03	{Prop QS 03}	Quarter_Staff	melee 3.52
+proprb01	{Prop RB 01}	Repeating_Blaster	ranged 7.02
+proprb02	{Prop RB 02}	Repeating_Blaster	ranged 6.92
+proprb03	{Prop RB 03}	Repeating_Blaster	ranged 6.41
+propsb01	{Prop SB 01}	Stun_Baton	melee 4.56
+propsb02	{Prop SB 02}	Stun_Baton	melee 4.73
+propsb03	{Prop SB 03}	Stun_Baton	melee 4.64
+propsp01	{Prop SP 01}	Sonic_Pistol	ranged 2.6
+propsp02	{Prop SP 02}	Sonic_Pistol	ranged 2.59
+propsr01	{Prop SR 01}	Sonic_Rifle	ranged 5.35
+propsr02	{Prop SR 02}	Sonic_Rifle	ranged 5.55
+propsr03	{Prop SR 03}	Sonic_Rifle	ranged 5.41
+propss01	{Prop SS 01}	Short_Sword	melee 3.28
+propss02	{Prop SS 02}	Short_Sword	melee 3.44
+propss03	{Prop SS 03}	Short_Sword	melee 3.36
+propvb01	{Prop VB 01}	Vibro_Blade	melee 5.19
+propvb02	{Prop VB 02}	Vibro_Blade	melee 5.6
+propvb03	{Prop VB 03}	Vibro_Blade	melee 5.79
+propvb04	{Prop VB 04}	Vibro_Blade	melee 5.88
+propvd01	{Prop VD 01}	Vibro_Double_Blade	melee 8.8
+propvd02	{Prop VD 02}	Vibro_Double_Blade	melee 8.97
+propvd03	{Prop VD 03}	Vibro_Double_Blade	melee 9.25
+propvd04	{Prop VD 04}	Vibro_Double_Blade	melee 9.14
+propvs01	{Prop VS 01}	Vibro_Sword	melee 6.46
+propvs02	{Prop VS 02}	Vibro_Sword	melee 7.1
+propvs03	{Prop VS 03}	Vibro_Sword	melee 7.01
+propvs04	{Prop VS 04}	Vibro_Sword	melee 7.07
+propvs05	{Prop VS 05}	Vibro_Sword	melee 6.98
+propvs06	{Prop VS 06}	Vibro_Sword	melee 7.03
+propwb01	{Prop WB 01}	Bowcaster	ranged 5.58
+propwb02	{Prop WB 02}	Bowcaster	ranged 5.62
+propww01	{Prop WW 01}	Wookie_Warblade	melee 4.97
+qcrystal_1_0	<FullName> Crystal{01_VD}	Lightsaber_Crystals	
+qcrystal_1_1	<FullName> Crystal{01_D}	Lightsaber_Crystals	
+qcrystal_1_2	<FullName> Crystal{01_N}	Lightsaber_Crystals	
+qcrystal_1_3	<FullName> Crystal{01_L}	Lightsaber_Crystals	
+qcrystal_1_4	<FullName> Crystal{01_VL}	Lightsaber_Crystals	
+qcrystal_2_0	<FullName> Crystal{02_VD}	Lightsaber_Crystals	
+qcrystal_2_1	<FullName> Crystal{02_D}	Lightsaber_Crystals	
+qcrystal_2_2	<FullName> Crystal{02_N}	Lightsaber_Crystals	
+qcrystal_2_3	<FullName> Crystal{02_L}	Lightsaber_Crystals	
+qcrystal_2_4	<FullName> Crystal{02_VL}	Lightsaber_Crystals	
+qcrystal_3_0	<FullName> Crystal{03_VD}	Lightsaber_Crystals	
+qcrystal_3_1	<FullName> Crystal{03_D}	Lightsaber_Crystals	
+qcrystal_3_2	<FullName> Crystal{03_N}	Lightsaber_Crystals	
+qcrystal_3_3	<FullName> Crystal{03_L}	Lightsaber_Crystals	
+qcrystal_3_4	<FullName> Crystal{03_VL}	Lightsaber_Crystals	
+qcrystal_4_0	<FullName> Crystal{04_VD}	Lightsaber_Crystals	
+qcrystal_4_1	<FullName> Crystal{04_D}	Lightsaber_Crystals	
+qcrystal_4_2	<FullName> Crystal{04_N}	Lightsaber_Crystals	
+qcrystal_4_3	<FullName> Crystal{04_L}	Lightsaber_Crystals	
+qcrystal_4_4	<FullName> Crystal{04_VL}	Lightsaber_Crystals	
+qcrystal_5_0	<FullName> Crystal{05_VD}	Lightsaber_Crystals	
+qcrystal_5_1	<FullName> Crystal{05_D}	Lightsaber_Crystals	
+qcrystal_5_2	<FullName> Crystal{05_N}	Lightsaber_Crystals	
+qcrystal_5_3	<FullName> Crystal{05_L}	Lightsaber_Crystals	
+qcrystal_5_4	<FullName> Crystal{05_VL}	Lightsaber_Crystals	
+qcrystal_6_0	<FullName> Crystal{06_VD}	Lightsaber_Crystals	
+qcrystal_6_1	<FullName> Crystal{06_D}	Lightsaber_Crystals	
+qcrystal_6_2	<FullName> Crystal{06_N}	Lightsaber_Crystals	
+qcrystal_6_3	<FullName> Crystal{06_L}	Lightsaber_Crystals	
+qcrystal_6_4	<FullName> Crystal{06_VL}	Lightsaber_Crystals	
+qcrystal_7_0	<FullName> Crystal{07_VD}	Lightsaber_Crystals	
+qcrystal_7_1	<FullName> Crystal{07_D}	Lightsaber_Crystals	
+qcrystal_7_2	<FullName> Crystal{07_N}	Lightsaber_Crystals	
+qcrystal_7_3	<FullName> Crystal{07_L}	Lightsaber_Crystals	
+qcrystal_7_4	<FullName> Crystal{07_VL}	Lightsaber_Crystals	
+qcrystal_8_0	<FullName> Crystal{08_VD}	Lightsaber_Crystals	
+qcrystal_8_1	<FullName> Crystal{08_D}	Lightsaber_Crystals	
+qcrystal_8_2	<FullName> Crystal{08_N}	Lightsaber_Crystals	
+qcrystal_8_3	<FullName> Crystal{08_L}	Lightsaber_Crystals	
+qcrystal_8_4	<FullName> Crystal{08_VL}	Lightsaber_Crystals	
+qcrystal_9_0	<FullName> Crystal{09_VD}	Lightsaber_Crystals	
+qcrystal_9_1	<FullName> Crystal{09_D}	Lightsaber_Crystals	
+qcrystal_9_2	<FullName> Crystal{09_N}	Lightsaber_Crystals	
+qcrystal_9_3	<FullName> Crystal{09_L}	Lightsaber_Crystals	
+qcrystal_9_4	<FullName> Crystal{09_VL}	Lightsaber_Crystals	
+u_a_over_01	{ov 01}Heat Shielding Mark I	Upgrade_Items	
+u_a_over_02	{ov 02}Armorply Plating Mark I	Upgrade_Items	
+u_a_over_03	{ov 03}Sound Dampening Overlay Mark I	Upgrade_Items	
+u_a_over_04	{ov 04}Ablative Plating Mark I	Upgrade_Items	
+u_a_over_05	{ov 05}Energy Shielding Mark I	Upgrade_Items	
+u_a_over_06	{ov 06}Ballistic Shielding Mark I	Upgrade_Items	
+u_a_over_07	{ov 07}Bonded Plates Mark I	Upgrade_Items	
+u_a_over_08	{ov 08}Heavy Bonded Plates Mark I	Upgrade_Items	
+u_a_over_09	{ov 09}Heat Shielding Mark II	Upgrade_Items	
+u_a_over_10	{ov 10}Armorply Plating Mark II	Upgrade_Items	
+u_a_over_11	{ov 11}Sound Dampening Overlay Mark II	Upgrade_Items	
+u_a_over_12	{ov 12}Ablative Plating Mark II	Upgrade_Items	
+u_a_over_13	{ov 13}Energy Shielding Mark II	Upgrade_Items	
+u_a_over_14	{ov 14}Ballistic Shielding Mark II	Upgrade_Items	
+u_a_over_15	{ov 15}Bonded Plates Mark II	Upgrade_Items	
+u_a_over_16	{ov 16}Heavy Bonded Plates Mark II	Upgrade_Items	
+u_a_over_17	{ov 17}Heat Shielding Mark III	Upgrade_Items	
+u_a_over_18	{ov 18}Armorply Plating Mark III	Upgrade_Items	
+u_a_over_19	{ov 19}Sound Dampening Overlay Mark III	Upgrade_Items	
+u_a_over_20	{ov 20}Ablative Plating Mark III	Upgrade_Items	
+u_a_over_21	{ov 21}Energy Shielding Mark III	Upgrade_Items	
+u_a_over_22	{ov 22}Ballistic Shielding Mark III	Upgrade_Items	
+u_a_over_23	{ov 23}Bonded Plates Mark III	Upgrade_Items	
+u_a_over_24	{ov 24}Heavy Bonded Plates Mark III	Upgrade_Items	
+u_a_over_25	{ov 25}Heat Shielding Mark IV	Upgrade_Items	
+u_a_over_26	{ov 26}Armorply Plating Mark IV	Upgrade_Items	
+u_a_over_27	{ov 27}Sound Dampening Overlay Mark IV	Upgrade_Items	
+u_a_over_28	{ov 28}Ablative Plating Mark IV	Upgrade_Items	
+u_a_over_29	{ov 29}Energy Shielding Mark IV	Upgrade_Items	
+u_a_over_30	{ov 30}Bonded Plates Mark IV	Upgrade_Items	
+u_a_unde_01	{un 01}Environment Underlay Mark I	Upgrade_Items	
+u_a_unde_02	{un 02}Biorestorative Underlay Mark I	Upgrade_Items	
+u_a_unde_03	{un 03}Armorweave Underlay Mark I	Upgrade_Items	
+u_a_unde_04	{un 04}Strengthening Underlay Mark I	Upgrade_Items	
+u_a_unde_05	{un 05}Flexible Underlay Mark I	Upgrade_Items	
+u_a_unde_06	{un 06}Durasteel Underlay Mark I	Upgrade_Items	
+u_a_unde_07	{un 07}Environment Underlay Mark II	Upgrade_Items	
+u_a_unde_08	{un 08}Biorestorative Underlay Mark II	Upgrade_Items	
+u_a_unde_09	{un 09}Armorweave Underlay Mark II	Upgrade_Items	
+u_a_unde_10	{un 10}Strengthening Underlay Mark II	Upgrade_Items	
+u_a_unde_11	{un 11}Flexible Underlay Mark II	Upgrade_Items	
+u_a_unde_12	{un 12}Durasteel Underlay Mark II	Upgrade_Items	
+u_a_unde_13	{un 13}Environment Underlay Mark III	Upgrade_Items	
+u_a_unde_14	{un 14}Biorestorative Underlay Mark III	Upgrade_Items	
+u_a_unde_15	{un 15}Armorweave Underlay Mark III	Upgrade_Items	
+u_a_unde_16	{un 16}Strengthening Underlay Mark III	Upgrade_Items	
+u_a_unde_17	{un 17}Flexible Underlay Mark III	Upgrade_Items	
+u_a_unde_18	{un 18}Durasteel Underlay Mark III	Upgrade_Items	
+u_a_unde_19	{un 19}Environment Underlay Mark IV	Upgrade_Items	
+u_a_unde_20	{un 20}Biorestorative Underlay Mark IV	Upgrade_Items	
+u_a_unde_21	{un 21}Armorweave Underlay Mark IV	Upgrade_Items	
+u_a_unde_22	{un 22}Strengthening Underlay Mark IV	Upgrade_Items	
+u_a_unde_23	{un 23}Flexible Underlay Mark IV	Upgrade_Items	
+u_a_unde_24	{un 24}Durasteel Underlay Mark IV	Upgrade_Items	
+u_a_unde_25	{un 25}Environment Underlay Mark V	Upgrade_Items	
+u_a_unde_26	{un 26}Biorestorative Underlay Mark V	Upgrade_Items	
+u_a_unde_27	{un 27}Armorweave Underlay Mark V	Upgrade_Items	
+u_a_unde_28	{un 28}Strengthening Underlay Mark V	Upgrade_Items	
+u_a_unde_29	{un 29}Flexible Underlay Mark V	Upgrade_Items	
+u_a_unde_30	{un 30}Durasteel Underlay Mark V	Upgrade_Items	
+u_l_cell_01	{ce 01}Discharge Energy Cell	Plot_Useable_Items	
+u_l_cell_02	{ce 02}Diatium Energy Cell	Plot_Useable_Items	
+u_l_cell_03	{ce 03}Ion Energy Cell	Plot_Useable_Items	
+u_l_cell_04	{ce 04}Telgorn Jolt Cell Mark I	Plot_Useable_Items	
+u_l_cell_05	{ce 05}Improved Discharge Energy Cell	Plot_Useable_Items	
+u_l_cell_06	{ce 06}Improved Diatium Energy Cell	Plot_Useable_Items	
+u_l_cell_07	{ce 07}Improved Ion Energy Cell	Plot_Useable_Items	
+u_l_cell_08	{ce 08}Telgorn Jolt Cell Mark II	Plot_Useable_Items	
+u_l_cell_09	{ce 09}Superior Discharge Energy Cell	Plot_Useable_Items	
+u_l_cell_10	{ce 10}Superior Diatium Energy Cell	Plot_Useable_Items	
+u_l_cell_11	{ce 11}Superior Ion Energy Cell	Plot_Useable_Items	
+u_l_cell_12	{ce 12}Telgorn Jolt Cell Mark III	Plot_Useable_Items	
+u_l_cell_13	{ce 13}Ultimate Diatium Energy Cell	Plot_Useable_Items	
+u_l_colo_01	{color 01}Crystal, Blue	Lightsaber_Crystals	
+u_l_colo_02	{color 02}Crystal, Green	Lightsaber_Crystals	
+u_l_colo_03	{color 03}Crystal, Yellow	Lightsaber_Crystals	
+u_l_colo_04	{color 04}Crystal, Red	Lightsaber_Crystals	
+u_l_colo_05	{color 05}Crystal, Violet	Lightsaber_Crystals	
+u_l_colo_06	{color 06}Crystal, Cyan	Lightsaber_Crystals	
+u_l_colo_07	{color 07}Crystal, Silver	Lightsaber_Crystals	
+u_l_colo_08	{color 08}Crystal, Orange	Lightsaber_Crystals	
+u_l_colo_09	{color 09}Crystal, Viridian	Lightsaber_Crystals	
+u_l_colo_10	{color 10 NOT USED}Crystal, Bronze	Lightsaber_Crystals	
+u_l_crys_01	{cr 01}Crystal, Adegan	Lightsaber_Crystals	
+u_l_crys_02	{cr 02}Crystal, Rubat	Lightsaber_Crystals	
+u_l_crys_03	{cr 03}Crystal, Ruusan	Lightsaber_Crystals	
+u_l_crys_04	{cr 04}Crystal, Nextor	Lightsaber_Crystals	
+u_l_crys_05	{cr 05}Crystal, Dragite	Lightsaber_Crystals	
+u_l_crys_06	{cr 06}Crystal, Firkrann	Lightsaber_Crystals	
+u_l_crys_07	{cr 07}Crystal, Phond	Lightsaber_Crystals	
+u_l_crys_08	{cr 08}Crystal, Bondar	Lightsaber_Crystals	
+u_l_crys_09	{cr 09}Crystal, Velmorite	Lightsaber_Crystals	
+u_l_crys_10	{cr 10}Crystal, Sigil	Lightsaber_Crystals	
+u_l_crys_11	{cr 11}Crystal, Jenruax	Lightsaber_Crystals	
+u_l_crys_12	{cr 12}Crystal, Kasha	Lightsaber_Crystals	
+u_l_crys_13	{cr 13}Crystal, Opila	Lightsaber_Crystals	
+u_l_crys_14	{cr 14}Crystal, Eralam	Lightsaber_Crystals	
+u_l_crys_15	{cr 15}Crystal, Stygium	Lightsaber_Crystals	
+u_l_crys_16	{cr 16}Crystal, Damind	Lightsaber_Crystals	
+u_l_crys_17	{cr 17}Crystal, Sapith	Lightsaber_Crystals	
+u_l_crys_18	{cr 18}Crystal, Pontite	Lightsaber_Crystals	
+u_l_crys_19	{cr 19}Crystal, Upari	Lightsaber_Crystals	
+u_l_crys_20	{cr 20}Ultima-pearl	Lightsaber_Crystals	
+u_l_crys_21	{cr 21}Crystal, Solari	Lightsaber_Crystals	
+u_l_crys_21x	{cr x21}Crystal, Qixoni	Lightsaber_Crystals	
+u_l_crys_22	{cr 22}Lorrdian Gemstone	Lightsaber_Crystals	
+u_l_crys_23	{cr 23}Barab Ore Ingot	Lightsaber_Crystals	
+u_l_crys_24	{cr 24}Ankarres Sapphire	Lightsaber_Crystals	
+u_l_crys_25	{cr 25}Crystal, Kaiburr	Lightsaber_Crystals	
+u_l_crys_x23	{cr x23}Crystal, Hurrikaine	Lightsaber_Crystals	
+u_l_emit_01	{em 01}Deflection Emitter	Plot_Useable_Items	
+u_l_emit_02	{em 02}Disrupting Emitter	Plot_Useable_Items	
+u_l_emit_03	{em 03}Crude Phobium Emitter	Plot_Useable_Items	
+u_l_emit_04	{em 04}Fencing Emitter	Plot_Useable_Items	
+u_l_emit_05	{em 05}Improved Deflection Emitter	Plot_Useable_Items	
+u_l_emit_06	{em 06}Advanced Disrupting Emitter	Plot_Useable_Items	
+u_l_emit_07	{em 07}Synthesized Phobium Emitter	Plot_Useable_Items	
+u_l_emit_08	{em 08}Improved Fencing Emitter	Plot_Useable_Items	
+u_l_emit_09	{em 09}Expert Deflection Emitter	Plot_Useable_Items	
+u_l_emit_10	{em 10}Superior Disrupting Emitter	Plot_Useable_Items	
+u_l_emit_11	{em 11}Phobium Alloy Emitter	Plot_Useable_Items	
+u_l_emit_12	{em 12}Expert Fencing Emitter	Plot_Useable_Items	
+u_l_emit_13	{em 13}Refined Phobium Emitter	Plot_Useable_Items	
+u_l_lens_01	{le 01}Synthesized Kunda Lens	Plot_Useable_Items	
+u_l_lens_02	{le 02}Dragite Lens	Plot_Useable_Items	
+u_l_lens_03	{le 03}Synthesized Byrothsis Lens	Plot_Useable_Items	
+u_l_lens_04	{le 04}Beam Gem Lens	Plot_Useable_Items	
+u_l_lens_05	{le 05}Vibration Lens	Plot_Useable_Items	
+u_l_lens_06	{le 06}Pure Kunda Lens	Plot_Useable_Items	
+u_l_lens_07	{le 07}Adegan Lens	Plot_Useable_Items	
+u_l_lens_08	{le 08}Pure Byrothsis Lens	Plot_Useable_Items	
+u_l_lens_09	{le 09}Improved Beam Gem Lens	Plot_Useable_Items	
+u_l_lens_10	{le 10}Improved Vibration Lens	Plot_Useable_Items	
+u_l_lens_11	{le 11}Ossus Dueling Lens	Plot_Useable_Items	
+u_l_lens_12	{le 12}Pontite Lens	Plot_Useable_Items	
+u_l_lens_13	{le 13}Enhanced Byrothsis Lens	Plot_Useable_Items	
+u_m_cell_01	{mc 01}Ion Cell	Plot_Useable_Items	
+u_m_cell_02	{mc 02}Vibration Cell	Plot_Useable_Items	
+u_m_cell_03	{mc 03}Enhanced Energy Cell	Plot_Useable_Items	
+u_m_cell_04	{mc 04}Sonic Discharge Cell	Plot_Useable_Items	
+u_m_cell_05	{mc 05}Ion Cell Mark II	Plot_Useable_Items	
+u_m_cell_06	{mc 06}Vibration Cell Mark II	Plot_Useable_Items	
+u_m_cell_07	{mc 07}Enhanced Energy Cell Mark II	Plot_Useable_Items	
+u_m_cell_08	{mc 08}Sonic Discharge Cell Mark II	Plot_Useable_Items	
+u_m_cell_09	{mc 09}Ion Cell Mark III	Plot_Useable_Items	
+u_m_cell_10	{mc 10}Vibration Cell Mark III	Plot_Useable_Items	
+u_m_cell_11	{mc 11}Enhanced Energy Cell Mark III	Plot_Useable_Items	
+u_m_cell_12	{mc 12}Sonic Discharge Cell Mark III	Plot_Useable_Items	
+u_m_cell_13	{mc 13}Ion Cell Mark IV	Plot_Useable_Items	
+u_m_cell_14	{mc 14}Vibration Cell Mark IV	Plot_Useable_Items	
+u_m_cell_15	{mc 15}Enhanced Energy Cell Mark IV	Plot_Useable_Items	
+u_m_edge_01	{ed 01}Mild Devaronian Edge	Plot_Useable_Items	
+u_m_edge_02	{ed 02}Basic Ionite Edge	Plot_Useable_Items	
+u_m_edge_03	{ed 03}Basic Mullinine Edge	Plot_Useable_Items	
+u_m_edge_04	{ed 04}Basic Neutronium Edge	Plot_Useable_Items	
+u_m_edge_05	{ed 05}Moderate Devaronian Edge	Plot_Useable_Items	
+u_m_edge_06	{ed 06}Improved Ionite Edge	Plot_Useable_Items	
+u_m_edge_07	{ed 07}Improved Mullinine Edge	Plot_Useable_Items	
+u_m_edge_08	{ed 08}Improved Neutronium Edge	Plot_Useable_Items	
+u_m_edge_09	{ed 09}Severe Devaronian Edge	Plot_Useable_Items	
+u_m_edge_10	{ed 10}Superior Ionite Edge	Plot_Useable_Items	
+u_m_edge_11	{ed 11}Superior Mullinine Edge	Plot_Useable_Items	
+u_m_edge_12	{ed 12}Superior Neutronium Edge	Plot_Useable_Items	
+u_m_edge_13	{ed 13}Deadly Devaronian Edge	Plot_Useable_Items	
+u_m_edge_14	{ed 14}Quadranium Edge	Plot_Useable_Items	
+u_m_edge_15	{ed 15}Ostrine Edge	Plot_Useable_Items	
+u_m_grip_01	{gr 01}Agrinium Grip	Plot_Useable_Items	
+u_m_grip_02	{gr 02}Contoured Grip	Plot_Useable_Items	
+u_m_grip_03	{gr 03}Zabrak Grip	Plot_Useable_Items	
+u_m_grip_04	{gr 04}Basket Hilt	Plot_Useable_Items	
+u_m_grip_05	{gr 05}Nagai Grip	Plot_Useable_Items	
+u_m_grip_06	{gr 06}Advanced Agrinium Grip	Plot_Useable_Items	
+u_m_grip_07	{gr 07}Advanced Contoured Grip	Plot_Useable_Items	
+u_m_grip_08	{gr 08}Advanced Zabrak Grip	Plot_Useable_Items	
+u_m_grip_09	{gr 09}Advanced Basket Hilt	Plot_Useable_Items	
+u_m_grip_10	{gr 10}Advanced Nagai Grip	Plot_Useable_Items	
+u_m_grip_11	{gr 11}Superior Agrinium Grip	Plot_Useable_Items	
+u_m_grip_12	{gr 12}Superior Contoured Grip	Plot_Useable_Items	
+u_m_grip_13	{gr 13}Superior Zabrak Grip	Plot_Useable_Items	
+u_m_grip_14	{gr 14}Superior Basket Hilt	Plot_Useable_Items	
+u_m_grip_15	{gr 15}Superior Nagai Grip	Plot_Useable_Items	
+u_r_firi_01	{fc 01}Broadening Chamber Mark I	Plot_Useable_Items	
+u_r_firi_02	{fc 02}Amplifying Chamber Mark I	Plot_Useable_Items	
+u_r_firi_03	{fc 03}Precision Chamber Mark I	Plot_Useable_Items	
+u_r_firi_04	{fc 04}Beam Splitter Mark I	Plot_Useable_Items	
+u_r_firi_05	{fc 05}Mandalorian Chamber Mark I	Plot_Useable_Items	
+u_r_firi_06	{fc 06}Broadened Chamber Mark II	Plot_Useable_Items	
+u_r_firi_07	{fc 07}Amplifying Chamber Mark II	Plot_Useable_Items	
+u_r_firi_08	{fc 08}Precision Chamber Mark II	Plot_Useable_Items	
+u_r_firi_09	{fc 09}Beam Splitter Mark II	Plot_Useable_Items	
+u_r_firi_10	{fc 10}Mandalorian Chamber Mark II	Plot_Useable_Items	
+u_r_firi_11	{fc 11}Broadened Chamber Mark III	Plot_Useable_Items	
+u_r_firi_12	{fc 12}Amplifying Chamber Mark III	Plot_Useable_Items	
+u_r_firi_13	{fc 13}Precision Chamber Mark III	Plot_Useable_Items	
+u_r_firi_14	{fc 14}Beam Splitter Mark III	Plot_Useable_Items	
+u_r_firi_15	{fc 15}Mandalorian Chamber Mark III	Plot_Useable_Items	
+u_r_powe_01	{pp 01}Ion Charger Mark I	Plot_Useable_Items	
+u_r_powe_02	{pp 02}Power Pulsator Mark I	Plot_Useable_Items	
+u_r_powe_03	{pp 03}Basic Rylith Power Cell	Plot_Useable_Items	
+u_r_powe_04	{pp 04}Ion Charger Mark II	Plot_Useable_Items	
+u_r_powe_05	{pp 05}Power Pulsator Mark II	Plot_Useable_Items	
+u_r_powe_06	{pp 06}Standard Rylith Power Cell	Plot_Useable_Items	
+u_r_powe_07	{pp 07}Ion Charger Mark III	Plot_Useable_Items	
+u_r_powe_08	{pp 08}Power Pulsator Mark III	Plot_Useable_Items	
+u_r_powe_09	{pp 09}Advanced Rylith Power Cell	Plot_Useable_Items	
+u_r_powe_10	{pp 10}Ion Charger Mark IV	Plot_Useable_Items	
+u_r_powe_11	{pp 11}Power Pulsator Mark IV	Plot_Useable_Items	
+u_r_powe_12	{pp 12}Superior Rylith Power Cell	Plot_Useable_Items	
+u_r_powe_13	{pp 13}Ion Charger Mark V	Plot_Useable_Items	
+u_r_powe_14	{pp 14}Power Pulsator Mark V	Plot_Useable_Items	
+u_r_powe_15	{pp 15}Pure Rylith Power Cell	Plot_Useable_Items	
+u_r_targ_01	{sc 01}Pinpoint Scope Mark I	Plot_Useable_Items	
+u_r_targ_02	{sc 02}Accuracy Scope Mark I	Plot_Useable_Items	
+u_r_targ_03	{sc 03}Targeting Scope Mark I	Plot_Useable_Items	
+u_r_targ_04	{sc 04}Crippling Scope Mark I	Plot_Useable_Items	
+u_r_targ_05	{sc 05}Pinpoint Scope Mark II	Plot_Useable_Items	
+u_r_targ_06	{sc 06}Accuracy Scope Mark II	Plot_Useable_Items	
+u_r_targ_07	{sc 07}Targeting Scope Mark II	Plot_Useable_Items	
+u_r_targ_08	{sc 08}Crippling Scope Mark II	Plot_Useable_Items	
+u_r_targ_09	{sc 09}Pinpoint Scope Mark III	Plot_Useable_Items	
+u_r_targ_10	{sc 10}Accuracy Scope Mark III	Plot_Useable_Items	
+u_r_targ_11	{sc 11}Targeting Scope Mark III	Plot_Useable_Items	
+u_r_targ_12	{sc 12}Crippling Scope Mark III	Plot_Useable_Items	
+u_r_targ_13	{sc 13}Pinpoint Scope Mark IV	Plot_Useable_Items	
+u_r_targ_14	{sc 14}Accuracy Scope Mark IV	Plot_Useable_Items	
+u_r_targ_15	{sc 15}Targeting Scope Mark IV	Plot_Useable_Items	
+vibrocutter	Vibrocutter	Vibro_Blade	melee 5.53
+w_blaste_01	{01}Blaster Pistol	Blaster_Pistol	ranged 4.6
+w_blaste_02	{02}Ion Blaster	Ion_Blaster	ranged 3.43
+w_blaste_03	{03}Field Survival Pistol	Hold_Out_Blaster	ranged 2.51
+w_blaste_04	{04}Sonic Pistol	Sonic_Pistol	ranged 2.55
+w_blaste_05	{05}Disruptor Pistol	Disrupter_Pistol	ranged 3.57
+w_blaste_06	{06}Heavy Blaster	Heavy_Blaster	ranged 5.68
+w_blaste_07	{07}Scout Enforcer	Hold_Out_Blaster	ranged 2.45
+w_blaste_08	{08}Systech Aural Blaster	Sonic_Pistol	ranged 4.51
+w_blaste_09	{09}Republic Blaster	Blaster_Pistol	ranged 4.56
+w_blaste_10	{10}Aratech Droid Oxidizer	Ion_Blaster	ranged 5.5 +1
+w_blaste_11	{11}Arkanian Heavy Pistol	Heavy_Blaster	ranged 5.79
+w_blaste_12	{12}Mandalorian Blaster	Blaster_Pistol	ranged 4.56
+w_blaste_13	{13}Systech Static Blaster	Blaster_Pistol	ranged 9.33
+w_blaste_14	{14}Arkanian Sonic Blaster	Sonic_Pistol	ranged 3.55
+w_blaste_15	{15}Sith Disruptor	Disrupter_Pistol	ranged 4.41
+w_blaste_16	{16}Mandalorian Heavy Blaster	Heavy_Blaster	ranged 5.33
+w_blaste_17	{17}Heavy Sonic Blaster	Sonic_Pistol	ranged 6.79
+w_blaste_18	{18}Watchman Blaster	Hold_Out_Blaster	ranged 7
+w_blaste_19	{19}Zabrak Blaster Pistol	Blaster_Pistol	ranged 4.97
+w_blaste_20	{20}Mandalorian Ripper	Disrupter_Pistol	ranged 3.58
+w_blaste_21	{21}Aratech Ionmaster	Ion_Blaster	ranged 7.72 +2
+w_blaste_22	{22}Onasi Blaster	Blaster_Pistol	ranged 5.09
+w_blaste_23	{23}Dashade Sonic Blaster	Sonic_Pistol	ranged 4.57
+w_blaste_24	{24}Zabrak Heavy Blaster	Heavy_Blaster	ranged 7.46
+w_blaste_25	{25}Systech Electric Blaster	Blaster_Pistol	ranged 13.14 +1
+w_blaste_26	{26}Micro-Pulse Blaster	Blaster_Pistol	ranged 8.94
+w_blaste_27	{27}Elite Watchman Blaster	Hold_Out_Blaster	ranged 7.1
+w_blaste_28	{28}Mandalorian Disintegrator	Disrupter_Pistol	ranged 8.6
+w_blaste_29	{29}Dashade Sonic Disruptor	Sonic_Pistol	ranged 6.66
+w_blaste_30	{30}Freedon Nadd's Blaster	Heavy_Blaster	ranged 14.85
+w_blaste_x05	{x05}Luxa's Disruptor	Disrupter_Pistol	ranged 3.27 +1
+w_blaste_x20	{x20}Remote's Blaster	Blaster_Pistol	ranged 4.63 +5
+w_brifle_01	{01}Blaster Carbine	Blaster_Carbine	ranged 6.12
+w_brifle_02	{02}Ion Carbine	Ion_Rifle	ranged 5.11
+w_brifle_03	{03}Sonic Carbine	Sonic_Rifle	ranged 5.3
+w_brifle_04	{04}Blaster Rifle	Blaster_Rifle	ranged 6.96
+w_brifle_05	{05}Bowcaster	Bowcaster	ranged 6.35
+w_brifle_06	{06}Repeating Blaster Carbine	Repeating_Blaster	ranged 6.89
+w_brifle_07	{07}Ion Rifle	Ion_Rifle	ranged 5.9
+w_brifle_08	{08}Disruptor Carbine	Disrupter_Rifle	ranged 5.09
+w_brifle_09	{09}Sonic Rifle	Sonic_Rifle	ranged 9.95
+w_brifle_10	{10}Repeating Blaster Rifle	Repeating_Blaster	ranged 7.13
+w_brifle_11	{11}War Bowcaster	Bowcaster	ranged 6.21
+w_brifle_12	{12}Arkanian Blaster Rifle	Blaster_Rifle	ranged 8.15
+w_brifle_13	{13}Disruptor Rifle	Disrupter_Rifle	ranged 5.81
+w_brifle_14	{14}Argazdan Riot Buster	Sonic_Rifle	ranged 5.63
+w_brifle_15	{15}Bothan Droid Disruptor	Ion_Rifle	ranged 5.68
+w_brifle_16	{16}Combat Enforcer	Repeating_Blaster	ranged 6.99
+w_brifle_17	{17}Heavy Repeating Carbine	Heavy_Repeating_Blaster	ranged 13.77
+w_brifle_18	{18}Plasma Projector	Blaster_Rifle	ranged 11.05
+w_brifle_19	{19}Mandalorian Assault Rifle	Blaster_Rifle	ranged 6.27
+w_brifle_20	{20}Verpine Droid Disruptor	Ion_Rifle	ranged 5.77
+w_brifle_21	{21}Ceremonial Bowcaster	Bowcaster	ranged 5.42
+w_brifle_22	{22}Heavy Repeating Rifle	Heavy_Repeating_Blaster	ranged 12.9
+w_brifle_23	{23}Charric	Disrupter_Rifle	ranged 5.64 +4
+w_brifle_24	{24}Zabrak Blaster Carbine	Blaster_Carbine	ranged 10.82
+w_brifle_25	{25}Slavemaster Stun Carbine	Blaster_Carbine	ranged 6.5
+w_brifle_26	{26}Onderon Repeating Carbine	Repeating_Blaster	ranged 15.91
+w_brifle_27	{27}Sonic Disruptor	Sonic_Rifle	ranged 10.51
+w_brifle_28	{28}Mandalorian Heavy Repeater	Heavy_Repeating_Blaster	ranged 12.99
+w_brifle_29	{29}Verpine Droid Disintegrator	Ion_Rifle	ranged 9.25
+w_brifle_30	{30}Zersium Rifle	Blaster_Rifle	ranged 10.75
+w_drink_01	{Special}Drink In Hand	Blaster_Pistol	ranged 4.24
+w_emptyhnd_01	{Special}Empty Hand	Blaster_Pistol	ranged 4.5
+w_ls_x01	Visas Marr's Lightsaber	Lightsaber	melee 13.17 +1
+w_melee_01	{01}Short Sword	Short_Sword	melee 3.59
+w_melee_02	{02}Long Sword	Long_Sword	melee 6.18
+w_melee_03	{03}Energy Baton	Stun_Baton	melee 8.65
+w_melee_04	{04}Quarterstaff	Quarter_Staff	melee 3.29
+w_melee_05	{05}Vibroblade	Vibro_Blade	melee 5.36
+w_melee_06	{06}Vibrosword	Vibro_Sword	melee 6.53
+w_melee_07	{07}Double-Bladed Sword	Double_Bladed_Sword	melee 6.46
+w_melee_08	{08}Exchange Negotiator	Stun_Baton	melee 9.03
+w_melee_09	{09}Gamorrean War Axe	Gammorean_Battleaxe	melee 11.09
+w_melee_10	{10}Zabrak Vibroblade	Vibro_Blade	melee 7.95
+w_melee_11	{11}Rodian Blade	Short_Sword	melee 3.54 +1
+w_melee_12	{12}Sith War Sword	Vibro_Double_Blade	melee 8.22
+w_melee_13	{13}Trandoshan Sword	Long_Sword	melee 10.28 +1
+w_melee_14	{14}Force Pike	Force_Pike	melee 7.14
+w_melee_15	{15}Vibro Double-Blade	Vibro_Double_Blade	melee 9.11
+w_melee_16	{16}Gamorrean Cleaver	Gammorean_Battleaxe	melee 10.62
+w_melee_17	{17}Rodian Death Blade	Short_Sword	melee 4.11 +1
+w_melee_18	{18}Gand Silencer	Stun_Baton	melee 8.72 +1
+w_melee_19	{19}Ryyk Blade	Short_Sword	melee 6.99
+w_melee_20	{20}Trandoshan Double-Blade	Vibro_Double_Blade	melee 13.24 +2
+w_melee_21	{21}Echani Vibrosword	Vibro_Sword	melee 9.28
+w_melee_22	{22}Sith Tremor Sword	Vibro_Sword	melee 10.11
+w_melee_23	{23}Gand Shockstaff	Force_Pike	melee 7.01
+w_melee_24	{24}Shyarn	Long_Sword	melee 11.87 +1
+w_melee_25	{25}Arg'garok	Gammorean_Battleaxe	melee 10.58
+w_melee_26	{26}Geonosian Electro-Staff	Quarter_Staff	melee 8.27
+w_melee_27	{27}Tehk'la Blade	Vibro_Blade	melee 10.27 +1
+w_melee_28	{28}Zhaboka	Vibro_Double_Blade	melee 13.22
+w_melee_29	{29}Gand Discharger	Stun_Baton	melee 13.96 +1
+w_melee_30	{30}Freyyr's Warblade	Wookie_Warblade	melee 7.71 +1
+w_melee_x01	{x01}Handmaiden's Staff	Quarter_Staff	melee 7.89 +2
+w_melee_x02	{x02}Twi'lek Spinning Blade	Short_Sword	melee 3.41 +1
+w_melee_x03	{x03}Twi'lek Spinning Blade	Short_Sword	melee 5.79
+w_melee_x12	{x12}Ludo Kressh's War Sword	Vibro_Double_Blade	melee 11.08 +1
+w_pazaak_01	{Special}Pazaak Cards In Hand	Blaster_Pistol	ranged 4.13
+w_rocket_01	Explosive Rocket	Rocket	
+w_rocket_02	Tranquilizer Dart	Rocket	
+w_rocket_03	Buster Rocket	Rocket	
+w_rocket_04	Kyber Dart	Rocket	
+w_rocket_05	Plasma Rocket	Rocket	
+w_rocket_06	Poison Rocket	Rocket	
+w_rocket_07	Poison Dart	Rocket	
+w_rocket_08	Piercing Dart	Rocket	
+w_rocket_09	Paralysis Dart	Rocket	
+w_rocket_10	Ion Rocket	Rocket	
+w_rocket_11	Concussion Rocket	Rocket	
+w_sls_x02	Freedon Nadd's Short Lightsaber	Short_Lightsaber	melee 13.83 +2

@@ -19,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import layout  # noqa: E402
+import encounter  # noqa: E402
 
 CATALOG = Path(__file__).resolve().parent.parent / "reference" / "catalog"
 # The words a plan may use, as the game reads them: generated from its sources (src/tests/gmPlanVocab.test.ts)
@@ -30,6 +31,15 @@ ORDERS = VOCAB["orders"]
 ACTIONS = VOCAB["actions"]
 # Stance and gesture ids; a creature's model may not have every one
 STANCES = VOCAB["stances"]
+# Stances that sit in a chair: they need a seat prop under the actor
+SEATED = {"chair", "chair_drunk", "chair_pazaak"}
+
+
+def is_seat(prop, content):
+    """A chair or bench: one the catalog finds seats on (layout.is_seat)"""
+    return layout.is_seat(prop, content)
+
+
 GESTURES = VOCAB["gestures"]
 
 
@@ -187,6 +197,18 @@ def main():
         check_order(a.get("order"), where)
         if a.get("stance") and a["stance"] not in STANCES:
             warn(where, f'unknown stance "{a["stance"]}"')
+        if a.get("stance") in SEATED:
+            spot = str((a.get("at") or {}).get("spot", ""))
+            seat = next((p for p in props if spot == f'prop:{p.get("id")}'), None)
+            if not seat:
+                warn(where, f'stance "{a["stance"]}" sits on nothing: place a seat prop and put the actor on it ("at": {{"spot": "prop:<seat id>"}}; see "Seats" in format.md)')
+            elif not is_seat(seat, content):
+                warn(where, f'stance "{a["stance"]}" sits on prop "{seat.get("id")}", which isn\'t a chair or bench: give the actor a seat of its own (see "Seats" in format.md)')
+        custom = a.get("customize") or {}
+        if "level" in custom and not (isinstance(custom["level"], int) and 1 <= custom["level"] <= 50):
+            err(where, "customize.level is a whole number, 1 to 50")
+        if "class" in custom and encounter.Catalog(str(content)).class_id(custom["class"]) is None:
+            err(where, f'no class "{custom["class"]}" (see catalog/{content}/classes.tsv)')
         for item in a.get("loot", []) + [v for k, v in (a.get("customize") or {}).items() if k in ("rightHand", "leftHand", "armor") and v]:
             if items and str(item).lower() not in items:
                 err(where, f'no item "{item}" in {content}')
@@ -253,11 +275,21 @@ def main():
         for level, where, message in (scene.problems if scene else []):
             (err if level == "ERROR" else warn)(where, message)
 
+    # How hard the fights are for the party
+    fight_lines = []
+    if not errors:
+        fight_lines, fight_notes = encounter.report(plan)
+        for where, message in fight_notes:
+            warn(where, message)
+
     for line in errors + warnings:
         print(line)
     if scene and "--no-map" not in args:
         print()
         print(layout.text_map(scene))
+        print()
+    if fight_lines:
+        print("\n".join(fight_lines))
         print()
     if scene and opt("--map"):
         if layout.png_map(scene, opt("--map")):

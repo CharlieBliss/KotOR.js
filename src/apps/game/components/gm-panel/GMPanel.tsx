@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import {
-  GMManager, GMNetworkManager, GMMines, GMSpawner, GMViewport, GMHistory, GMEditTools,
+  GMManager, GMNetworkManager, GMMines, GMSetPieces, GMSpawner, GMViewport, GMHistory, GMEditTools,
   useGMStore, possessCandidate as findPossessCandidate, setPanelPolling,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { editShortcut } from "@/apps/game/components/gm-panel/controls/editShortcuts";
@@ -14,6 +14,13 @@ import { PromptCard } from "@/apps/game/components/gm-panel/overlays/PromptCard"
 import { CharacterSheet } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import { RollFeed } from "@/apps/game/components/gm-panel/overlays/RollFeed";
+import { AlignmentFeed } from "@/apps/game/components/gm-panel/overlays/AlignmentFeed";
+import { ContextMenu } from "@/apps/game/components/gm-panel/overlays/ContextMenu";
+import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
+import { CombatTracker, anyoneFighting } from "@/apps/game/components/gm-panel/overlays/CombatTracker";
+import { CutsceneOverlay } from "@/apps/game/components/gm-panel/overlays/CutsceneOverlay";
+import { PlayerHud } from "@/apps/game/components/gm-panel/overlays/PlayerHud";
+import { wireRecentPlacements } from "@/apps/game/components/gm-panel/controls/quickActions";
 import { installGameCursor } from "@/apps/game/components/gm-panel/gameCursor";
 import "@/apps/game/components/gm-panel/gm-cursor.scss";
 import { ScenesTab } from "@/apps/game/components/gm-panel/tabs/ScenesTab";
@@ -22,6 +29,7 @@ import { PlayersTab } from "@/apps/game/components/gm-panel/tabs/PlayersTab";
 import { InspectorTab } from "@/apps/game/components/gm-panel/tabs/InspectorTab";
 import { SessionTab } from "@/apps/game/components/gm-panel/tabs/SessionTab";
 import "@/apps/game/components/gm-panel/gm-panel.scss";
+import "@/apps/game/components/gm-panel/gm-quick-tools.scss";
 
 /**
  * The GM panel: the toolbar, the controls strip, overlays (conversations, a downed player, the GM's
@@ -36,6 +44,11 @@ export const GMPanel: React.FC = () => {
   const [sheet, setSheet] = useState<{ creature: KotOR.ModuleCreature | null; section: SheetSectionId; gmView: boolean } | null>(null);
   const [opened, setOpened] = useState<Set<Exclude<DrawerTab, null>>>(() => new Set());
   const [showQuickJoinOnMenu, setShowQuickJoinOnMenu] = useState(false);
+  // The quick-place palette (and the spot it places at, from the right-click menu's Search…)
+  const [palette, setPalette] = useState<{ open: boolean; point: any }>({ open: false, point: null });
+  // The combat tracker: null shows it while there's a fight; true / false is the GM's choice
+  const [trackerShown, setTrackerShown] = useState<boolean | null>(null);
+  const toggleTracker = useCallback(() => setTrackerShown((prev) => !(prev === null ? anyoneFighting() : prev)), []);
 
   const setDrawerTab = useCallback((tab: DrawerTab) => {
     setDrawerTabState(tab);
@@ -57,10 +70,15 @@ export const GMPanel: React.FC = () => {
 
   useEffect(() => {
     const onInspect = () => setDrawerTab('inspector');
+    wireRecentPlacements();
     // The game's cursor over the panel's layers, once its images can be read
     void installGameCursor();
     const onOpenJoin = () => setShowQuickJoinOnMenu(true);
-    const onOpenSheet = (section: string) => setSheet({ creature: null, section: section === 'abilities' ? 'skills' : 'overview', gmView: false });
+    const onOpenSheet = (section: string) => setSheet({
+      creature: null,
+      section: section === 'abilities' ? 'powers' : (['skills', 'feats', 'powers', 'effects'].includes(section) ? section as SheetSectionId : 'overview'),
+      gmView: false,
+    });
     const onOpenPlayerSheet = (creature: KotOR.ModuleCreature) => setSheet({ creature, section: 'overview', gmView: true });
     GMNetworkManager.events.addEventListener('open-character-sheet', onOpenSheet);
     GMManager.events.addEventListener('open-player-sheet', onOpenPlayerSheet);
@@ -69,6 +87,13 @@ export const GMPanel: React.FC = () => {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (!KotOR.GameState.gmMode || !GMManager.isGMUser()) return;
+      // With the right-click menu or the palette up, Esc only closes it (their own handlers do): it isn't also
+      // "select nothing", which left the menu's next order with nobody to give it to
+      if (e.key === 'Escape' && document.querySelector('.gm-context-menu, .gm-palette')) {
+        if (document.querySelector('.gm-palette')) setPalette({ open: false, point: null });
+        e.preventDefault();
+        return;
+      }
       // Esc puts down a placement or teleport tool, wherever focus is, and does nothing else
       // (this listener runs in the capture phase, before the game's own Esc handling opens Options)
       if (e.key === 'Escape' && GMManager.activeTool !== 'select') {
@@ -78,6 +103,39 @@ export const GMPanel: React.FC = () => {
         return;
       }
       if (KotOR.IngameControls.isTypingInPageField(e)) return;
+      // / or Ctrl+K: find something to place, or a command
+      if ((e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k')) {
+        e.preventDefault();
+        e.stopPropagation();
+        setPalette({ open: true, point: null });
+        return;
+      }
+      // T: the combat tracker, in the GM camera
+      if (e.code === 'KeyT' && !e.ctrlKey && !e.metaKey && !e.altKey && GMManager.controlMode !== 'POSSESS') {
+        e.preventDefault();
+        e.stopPropagation();
+        toggleTracker();
+        return;
+      }
+      // Shots: Ctrl+Shift+1-9 saves the view as one; in a cutscene 1-9 cuts to it, Shift+1-9 pans there
+      const shotKey = /^Digit([1-9])$/.exec(e.code);
+      if (shotKey && !e.altKey) {
+        const n = Number(shotKey[1]);
+        const ctrl = e.ctrlKey || e.metaKey;
+        if (ctrl && e.shiftKey) {
+          e.preventDefault();
+          e.stopPropagation();
+          KotOR.GMCutscene.saveShot(n);
+          KotOR.GameState.MenuManager.InGameBark?.barkFromString(`Shot ${n} saved: in a cutscene, ${n} cuts to it, Shift+${n} pans there`);
+          return;
+        }
+        if (!ctrl && KotOR.GMCutscene.active && KotOR.GMCutscene.getShot(n)) {
+          e.preventDefault();
+          e.stopPropagation();
+          KotOR.GMCutscene.goToShot(n, e.shiftKey);
+          return;
+        }
+      }
       if (editShortcut(e)) {
         e.preventDefault();
         e.stopPropagation();
@@ -173,8 +231,6 @@ export const GMPanel: React.FC = () => {
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
   const isPlayerView = !GMManager.isGMUser();
-  // A player's own sheet: their character, as the host last sent it
-  const canOpenSheet = isPlayerView && GMNetworkManager.role === 'client' && !!currentLeader;
   if (isPlayerView && drawerTab && drawerTab !== 'multiplayer') {
     queueMicrotask(() => setDrawerTab(null));
   }
@@ -184,7 +240,7 @@ export const GMPanel: React.FC = () => {
   const possessCandidateName = possessCandidate?.getName() || 'new character';
 
   const drawerTabs: { id: Exclude<DrawerTab, null>; label: string; title: string }[] = isPlayerView
-    ? [{ id: 'multiplayer', label: 'Session', title: 'Connection status and chat' }]
+    ? []
     : [
       { id: 'scenes', label: 'Scene', title: 'Load an area, or import a scene plan' },
       { id: 'actors', label: 'Place', title: 'Choose what the Place tool puts down: creatures, objects, mines or whole kits' },
@@ -199,19 +255,22 @@ export const GMPanel: React.FC = () => {
     tool === 'place_creature' ? GMManager.pendingCreatureConfig?.name :
     tool === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name :
     tool === 'place_player' ? GMManager.pendingPlayerConfig?.name :
-    tool === 'place_mine' ? `mine: ${GMMines.getMineTypes().find((m) => m.id === GMMines.pendingMineType)?.label || 'mine'}` : '';
+    tool === 'place_mine' ? `mine: ${GMMines.getMineTypes().find((m) => m.id === GMMines.pendingMineType)?.label || 'mine'}` :
+    tool === 'place_set' ? `set: ${GMSetPieces.describe(GMSetPieces.pending)}` : '';
   // What the toolbar's Place button puts down (the last kind of thing placed)
   const lastPlace = GMManager.lastPlacementTool;
   const placeButtonName =
     lastPlace === 'place_placeable' ? GMManager.pendingPlaceableConfig?.name || 'object' :
     lastPlace === 'place_player' ? GMManager.pendingPlayerConfig?.name || 'player' :
     lastPlace === 'place_mine' ? 'mine' :
+    lastPlace === 'place_set' ? 'set' :
     GMManager.pendingCreatureConfig?.name || 'creature';
   const teleportTarget = GMViewport.getTeleportTarget();
   let statusChip: string | null = null;
   let controlHints: [string, string][] = [];
   if (isPlayerView) {
-    controlHints = [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
+    // The player's HUD labels its own keys; before it's up (no character yet), the basics
+    controlHints = KotOR.GMPlayerHud.active() ? [] : [['WASD', 'move'], ['Click', 'doors, containers, enemies'], ['Esc', 'options']];
   } else if (GMViewport.isPlacementTool(tool)) {
     statusChip = `Placing: ${placingName || 'object'} · ${GMViewport.placementYawOffset}°`;
     controlHints = [['Click ground', 'place'], ['R / Shift+R or Wheel', 'rotate'], ['Esc / Right-click', 'done']];
@@ -241,8 +300,9 @@ export const GMPanel: React.FC = () => {
     controlHints = [['WASD', 'move'], ['Click', 'interact'], ['F2', 'back to GM camera']];
   } else {
     controlHints = [
-      ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Shift + drag', 'box'], ['Drag it', 'move'],
-      ['Ctrl + wheel', 'turn'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'], ['F2', `play as ${possessCandidateName}`],
+      ['WASD / QE', 'fly'], ['Drag', 'look'], ['Click', 'select'], ['Right-click', 'menu'], ['/', 'place or command'],
+      ['T', 'combat'], ['Shift + drag', 'box'], ['Drag it', 'move'], ['Ctrl + Z', 'undo'], ['Double-click', 'inspect (all keys)'],
+      ['F2', `play as ${possessCandidateName}`],
     ];
   }
 
@@ -255,7 +315,7 @@ export const GMPanel: React.FC = () => {
   const inConversation = KotOR.GameState.Mode === KotOR.EngineMode.DIALOG;
 
   return (
-    <div className={`gm-panel-root ${inConversation ? 'in-conversation' : ''}`}>
+    <div className={`gm-panel-root ${inConversation ? 'in-conversation' : ''} ${isPlayerView ? 'player-view' : ''}`}>
       {/* GM toolbar: status, drawer tabs, then viewport tools and mode controls */}
       <div className="gm-topbar">
         <div className="gm-topbar-group">
@@ -280,10 +340,23 @@ export const GMPanel: React.FC = () => {
               {tab.label}
             </button>
           ))}
-          {canOpenSheet && (
-            <button className={`gm-btn ${sheet && !sheet.gmView ? 'active' : ''}`} onClick={() => setSheet(sheet && !sheet.gmView ? null : { creature: null, section: 'overview', gmView: false })} title="Your character sheet: stats, skills to roll, feats, powers (P)">
-              Character
-            </button>
+          {isPlayerView && (
+            <>
+              <button
+                className="gm-btn small"
+                onClick={() => KotOR.GameState.MenuManager?.MenuMap?.open?.()}
+                title="Area map (M)"
+              >
+                Map
+              </button>
+              <button
+                className="gm-btn small"
+                onClick={() => KotOR.GameState.MenuManager?.MenuOptions?.open?.()}
+                title="Game options (O / Esc)"
+              >
+                Options
+              </button>
+            </>
           )}
         </div>
 
@@ -372,7 +445,7 @@ export const GMPanel: React.FC = () => {
               }}
               title="Freeze movement, combat and effects for everyone"
             >
-              {GMManager.worldPaused ? 'Paused' : 'Pause'}
+              {GMManager.worldPaused ? 'Paused' : GMManager.wheelHolds.size ? 'Held: power wheel' : 'Pause'}
             </button>
             <button
               className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
@@ -391,12 +464,48 @@ export const GMPanel: React.FC = () => {
             >
               {GMManager.playersFrozen ? 'Players watching' : 'Watch'}
             </button>
+            <button
+              className={`gm-btn small ${KotOR.GMCutscene.active ? 'danger active' : ''}`}
+              onClick={() => KotOR.GMCutscene.toggle()}
+              title={KotOR.GMCutscene.active
+                ? 'End the cutscene: players get their own camera back'
+                : 'Cutscene: players watch your camera in widescreen. Ctrl+Shift+1–9 saves shots; in a cutscene 1–9 cuts to one, Shift pans'}
+            >
+              {KotOR.GMCutscene.active ? 'End cutscene' : 'Cutscene'}
+            </button>
           </div>
         )}
       </div>
 
       {/* Conversations: the GM speaks for NPCs players are talking to */}
       {!isPlayerView && GMNetworkManager.role === 'host' && <ConversationsDock />}
+
+      {/* Quick tools: the right-click menu, the quick-place palette and the combat tracker */}
+      {!isPlayerView && <ContextMenu onOpenPalette={(point) => setPalette({ open: true, point })} />}
+      {!isPlayerView && (
+        <QuickPalette
+          open={palette.open}
+          point={palette.point}
+          onClose={() => setPalette({ open: false, point: null })}
+          onOpenTab={setDrawerTab}
+          onToggleTracker={toggleTracker}
+        />
+      )}
+      {!isPlayerView && <CombatTracker shown={trackerShown} onShownChange={setTrackerShown} />}
+
+      {/* A cutscene: widescreen bars and the caption (and, for the GM, the director's dock) */}
+      <CutsceneOverlay />
+
+      {/* A player's combat HUD: target frame, power bar (1–8), power wheel (Q), and their own vitality and Force */}
+      {isPlayerView && (
+        <PlayerHud
+          onOpenSheet={(section = 'overview') => setSheet(sheet && !sheet.gmView && sheet.section === section ? null : { creature: null, section, gmView: false })}
+          onOpenChat={() => {
+            setDrawerTab(drawerTab === 'multiplayer' ? null : 'multiplayer');
+            setTimeout(() => (document.querySelector('.gm-drawer input[placeholder="Say something to everyone"]') as HTMLInputElement | null)?.focus(), 50);
+          }}
+        />
+      )}
 
       {/* Our character is down: what happens next, by the session's rule */}
       {isPlayerView && <DownedBanner />}
@@ -407,6 +516,7 @@ export const GMPanel: React.FC = () => {
       {/* The character sheet; and everyone's rolls, for a few seconds */}
       {sheet && (sheet.gmView ? sheet.creature : currentLeader) && (
         <CharacterSheet
+          key={`${sheet.gmView ? "gm" : "me"}-${sheet.section}`}
           creature={sheet.gmView ? sheet.creature : currentLeader}
           initialSection={sheet.section}
           gmView={sheet.gmView}
@@ -414,9 +524,10 @@ export const GMPanel: React.FC = () => {
         />
       )}
       {GMNetworkManager.role !== 'offline' && <RollFeed />}
+      <AlignmentFeed />
 
-      {/* Bottom controls strip: what the current mode/tool does and its keys */}
-      <div className="gm-controls-strip">
+      {/* Bottom controls strip: what the current mode/tool does and its keys (the cutscene's dock takes its place) */}
+      <div className="gm-controls-strip" style={KotOR.GMCutscene.active || (!statusChip && !controlHints.length) ? { display: 'none' } : undefined}>
         {statusChip && <span className="gm-chip">{statusChip}</span>}
         {controlHints.map(([keys, label]) => (
           <span key={keys} className="gm-control-hint">

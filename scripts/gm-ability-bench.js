@@ -24,6 +24,7 @@ const path = require('path');
 
 const BASE_URL = (process.env.GM_E2E_URL || 'http://localhost:8080').replace(/\/$/, '');
 const SHOW = process.argv.includes('--show');
+const STRICT_RESTART = process.argv.includes('--strict-restart');
 const arg = (name) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || '').split('=').slice(1).join('=');
 const ONLY = (arg('only') || 'spells,items,feats').split(',').map((s) => s.trim()).filter(Boolean);
 const MATCH = arg('match') ? new RegExp(arg('match'), 'i') : null;
@@ -303,7 +304,8 @@ async function run() {
     log(`${String(i + 1).padStart(3)}/${abilities.length} ${mark} ${a.kind} ${a.label}${r.missing.length ? ` — missing ${r.missing.join(', ')}` : ''}${r.status === 'fails' && r.errors[0] ? ` — ${r.errors[0]}` : ''}`);
     // Keep the report current, so an interrupted run still leaves results
     if ((i + 1) % 10 === 0) writeReport(results, meta());
-    if ((r.errors.length || r.missing.length) && i + 1 < abilities.length) {
+    const fatalError = r.errors.some((e) => e.startsWith('bench:'));
+    if ((fatalError || (STRICT_RESTART && (r.errors.length || r.missing.length))) && i + 1 < abilities.length) {
       restarts++;
       await restart();
     }

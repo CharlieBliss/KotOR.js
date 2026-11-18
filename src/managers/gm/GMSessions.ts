@@ -20,6 +20,7 @@ import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 
 /** Saving GM work in this browser: whole sessions to pick back up later, and kits (saved layouts) to place again. */
 export class GMSessions {
@@ -166,6 +167,7 @@ export class GMSessions {
         barkText: cre.gmBarkText || '',
         stance: cre.heldStance || undefined,
         combatStyle: cre.gmCombatStyle && cre.gmCombatStyle !== 'all' ? cre.gmCombatStyle : undefined,
+        scripted: cre.gmScripted || undefined,
         pinned: cre.gmPinned || undefined,
       });
     }
@@ -200,6 +202,7 @@ export class GMSessions {
       if (group.objects.length || group.netIds.length) groups.push(group);
     }
 
+    const sets = GMSetPieces.serialize();
     const doors = area.doors
       .filter((d) => d.gmNetId)
       .map((d) => ({ netId: d.gmNetId, openState: d.openState, locked: !!d.isLocked() }));
@@ -222,6 +225,7 @@ export class GMSessions {
       pinnedNetIds: pinnedNetIds.length ? pinnedNetIds : undefined,
       groups: groups.length ? groups : undefined,
       atmosphere: Object.keys(GMAtmosphere.current).length ? { ...GMAtmosphere.current } : undefined,
+      sets: sets.length ? sets : undefined,
     };
   }
 
@@ -291,6 +295,7 @@ export class GMSessions {
   static async loadSession(save: GMSessionSave): Promise<boolean> {
     if (!save?.scene?.module) return false;
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
+    if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 
@@ -308,6 +313,9 @@ export class GMSessions {
     while (Date.now() < deadline && connected.some((p) => p.controlledNetId && !GMManager.netIdMap.has(p.controlledNetId))) {
       await new Promise((r) => setTimeout(r, 250));
     }
+
+    // The sets before anything that stands in them
+    if (save.sets?.length) await GMSetPieces.sync(save.sets);
 
     for (const door of save.doors || []) {
       const obj = GMManager.netIdMap.get(door.netId) as ModuleDoor;
@@ -331,6 +339,7 @@ export class GMSessions {
         );
         if (cre && typeof saved.hp === 'number') GMManager.setCreatureHP(cre, saved.hp, saved.maxHp);
         if (cre && saved.combatStyle) cre.gmCombatStyle = saved.combatStyle;
+        if (cre && saved.scripted) cre.gmScripted = true;
         obj = cre;
       } else {
         const cfg = saved.config as GMPlaceableSpawnConfig;

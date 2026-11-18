@@ -25,6 +25,14 @@ export class WalkmeshEdge {
   index: number = -1;
   exportable: boolean = true;
 
+  /**
+   * transition for a seam: an edge where one walkmesh's floor meets another's (a set piece's and its area's,
+   * AreaSetPiece), walkable across onto whichever floor is on the other side. Not a wall, and not a room index.
+   */
+  static SEAM = -2;
+  /** How far a seam may step up or down (metres) */
+  static SEAM_STEP = 0.6;
+
   constructor(transition = -1){
     this.transition = transition;
   }

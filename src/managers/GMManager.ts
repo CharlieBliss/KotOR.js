@@ -35,16 +35,22 @@ import { PLACEABLE_PRESETS, CATEGORIZED_PROPS, PLACEABLE_KEYWORD_LABELS } from "
 import { SCENE_BLUEPRINTS } from "@/managers/gm/data/sceneBlueprints";
 import { PLAYER_PRESETS } from "@/managers/gm/data/playerPresets";
 import { GMItems } from "@/managers/gm/GMItems";
+import { GMCutscene } from "@/managers/gm/GMCutscene";
+import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMHistory } from "@/managers/gm/GMHistory";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
 import { GMCombatAI } from "@/managers/gm/GMCombatAI";
 import { STANCES, GESTURES } from "@/managers/gm/data/animations";
 import { GMViewport } from "@/managers/gm/GMViewport";
+import { GMRouteMarkers } from "@/managers/gm/GMRouteMarkers";
+import { GMSeats } from "@/managers/gm/GMSeats";
+import type { GMRoute } from "@/managers/gm/GMRouteMarkers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
@@ -119,7 +125,65 @@ export class GMManager {
   static sceneStartPoint: THREE.Vector3 | null = null;
 
   static sessionRules(): GMSessionRules {
-    return { deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits };
+    return {
+      deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state(),
+      tacticalPause: { enabled: this.tacticalPause, by: [...this.wheelHolds.values()].map((h) => h.name) },
+    };
+  }
+
+  /** Session rule: a player opening their power wheel holds the world until they pick (or WHEEL_HOLD_SECONDS pass) */
+  static tacticalPause: boolean = false;
+
+  /** The longest one open wheel holds the world (seconds), so nobody can stall the table */
+  static WHEEL_HOLD_SECONDS: number = 12;
+
+  /** Host: players holding the world with an open power wheel (peer id -> who, and until when) */
+  static wheelHolds: Map<string, { name: string; until: number }> = new Map();
+
+  static setTacticalPause(on: boolean) {
+    this.tacticalPause = !!on;
+    if (!on) this.wheelHolds.clear();
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+  }
+
+  /** Host: a player opened or closed their power wheel. Under the tactical pause rule, an open wheel holds the world */
+  static holdForWheel(peerId: string, name: string, open: boolean) {
+    const had = this.wheelHolds.has(peerId);
+    if (open && this.tacticalPause) this.wheelHolds.set(peerId, { name, until: Date.now() + this.WHEEL_HOLD_SECONDS * 1000 });
+    else this.wheelHolds.delete(peerId);
+    if (had !== this.wheelHolds.has(peerId)) {
+      GMLog.info('host', open ? `${name} opened their power wheel: the world holds (tactical pause)` : `${name} closed their power wheel`);
+      GMNetworkManager.broadcastSessionRules(this.sessionRules());
+      this.notifyChange();
+    }
+  }
+
+  /**
+   * Whether the world holds still: the GM paused it, or (tactical pause) a player is choosing from their power wheel.
+   * On a player's machine, the host's word on wheels (the session rules).
+   */
+  static worldHeld(): boolean {
+    if (this.worldPaused) return true;
+    if (GMNetworkManager.role === 'client') return !!GMNetworkManager.sessionRules?.tacticalPause?.by?.length;
+    return this.wheelHolds.size > 0;
+  }
+
+  /** Host: let go of wheels held too long (or by players who left) */
+  static expireWheelHolds() {
+    if (!this.wheelHolds.size) return;
+    const now = Date.now();
+    let changed = false;
+    for (const [peerId, hold] of this.wheelHolds) {
+      if (hold.until <= now || !GMNetworkManager.peers.has(peerId)) {
+        this.wheelHolds.delete(peerId);
+        changed = true;
+      }
+    }
+    if (changed) {
+      GMNetworkManager.broadcastSessionRules(this.sessionRules());
+      this.notifyChange();
+    }
   }
 
   static setPlayersFrozen(on: boolean) {
@@ -575,6 +639,7 @@ export class GMManager {
 
     // The scene's own music, sound and look, before the GM changes any
     GMAtmosphere.onSceneLoaded();
+    GMSetPieces.onSceneLoaded();
 
     // Show all rooms so GM free camera can see the entire area
     for (const room of mod.area.rooms) {
@@ -753,6 +818,19 @@ export class GMManager {
     this.notifyChange();
   }
 
+  /** Take a share of a creature's (or object's) maximum health off it, never below 1 (Kill does that) */
+  static hurtObject(obj: ModuleObject, fraction: number = 0.25) {
+    if (!obj) return;
+    const max = obj.getMaxHP() || 100;
+    const hp = Math.max(1, (obj.getHP() || 0) - Math.round(max * fraction));
+    if (GMObjectKind.isCreature(obj)) this.setCreatureHP(obj as ModuleCreature, hp, max);
+    else obj.currentHP = hp;
+    if (GMNetworkManager.role !== 'offline') {
+      GMNetworkManager.broadcastActorUpdate(GMReplication.serializeSingleActor(obj));
+    }
+    this.notifyChange();
+  }
+
   static teleportObject(obj: ModuleObject, pos: THREE.Vector3) {
     if (!obj || !pos) return;
     this.placeAt(obj, pos);
@@ -784,6 +862,11 @@ export class GMManager {
       cre.force = 0;
       cre.speed = 0;
       cre.setAnimationState(ModuleCreatureAnimState.PAUSE);
+      // Put somewhere by the GM, a guard guards there: it doesn't walk back to where it was (a move order
+      // ends here too, or it would walk on to where it was heading)
+      const order = cre.gmOrder as GMNpcOrder | undefined;
+      if (order?.kind === 'guard') order.point = { x: pos.x, y: pos.y, z: pos.z };
+      else if (order?.kind === 'move') cre.gmOrder = { kind: 'guard', point: { x: pos.x, y: pos.y, z: pos.z }, radius: GMNpcOrders.GUARD_RADIUS };
     }
     obj.position.copy(pos);
     if (obj.container) {
@@ -798,6 +881,8 @@ export class GMManager {
       obj.position.z = pos.z;
       if (obj.container) obj.container.position.z = pos.z;
     }
+    // Its collision goes with it
+    if (!GMObjectKind.isCreature(obj)) (obj as ModulePlaceable).syncWalkmesh?.();
     obj.computeBoundingBox(true);
   }
 
@@ -809,6 +894,7 @@ export class GMManager {
     } else {
       obj.bearing = Utility.NormalizeRadian((obj.bearing || 0) + deltaRadians);
       obj.rotation.z = obj.bearing;
+      (obj as ModulePlaceable).syncWalkmesh?.();
     }
     obj.computeBoundingBox(true);
     if (GMNetworkManager.role !== 'offline') {
@@ -824,13 +910,23 @@ export class GMManager {
   /** The animation a creature would play for a choice, or '' when its model has none of them */
   static animationFor(cre: ModuleCreature, choice: GMAnimationChoice, looping: boolean): string {
     for (const name of choice.anims) {
-      if (!cre.hasModelAnimation?.(name)) continue;
-      const row = OdysseyModelAnimation.GetAnimation2DA(name);
+      // A pose ('kneel@2.9'): the animation behind it, any kind (it's held, not looped)
+      const { anim, holdAt } = ModuleCreature.parseStance(name);
+      if (!cre.hasModelAnimation?.(anim)) continue;
+      const row = OdysseyModelAnimation.GetAnimation2DA(anim);
       if (!row) continue;
-      if (looping && String(row.looping) !== '1') continue;
+      if (looping && holdAt == null && String(row.looping) !== '1') continue;
       return name;
     }
     return '';
+  }
+
+  /** A stance in words: its label, or for a pose the GM made, its animation and moment */
+  static stanceLabel(stance: string): string {
+    const choice = this.STANCES.find((c) => c.id === stance || c.anims.includes(stance));
+    if (choice) return choice.label;
+    const { anim, holdAt } = ModuleCreature.parseStance(stance);
+    return holdAt != null ? `Pose: ${anim} at ${holdAt.toFixed(2)} s` : anim;
   }
 
   /** The choices this creature's model can do */
@@ -858,6 +954,33 @@ export class GMManager {
    * Hold a creature in a stance until changed ('' to stand normally). Returns false when its model can't do it.
    * Takes a stance id, its label or an animations.2da name.
    */
+  /**
+   * The GM picks a stance for a creature. A seated one near a free chair or bench (2.5 m) sits it in that seat,
+   * on the seat's own spot and facing; any other gets it up out of the seat it was in.
+   */
+  static setStanceOrSit(obj: ModuleObject, stance: string): boolean {
+    if (!obj || !GMObjectKind.isCreature(obj)) return false;
+    const cre = obj as ModuleCreature;
+    if (GMSeats.SEATED_STANCES.includes(stance)) {
+      const area = GameState.module?.area;
+      const spot = area ? GMSeats.nearestFree(area.placeables as ModuleObject[], cre.position, 2.5, cre.getFacing(), cre) : null;
+      if (spot) {
+        GMSeats.sitAt(cre, spot, stance);
+        this.broadcastPlaced(cre);
+        return true;
+      }
+    } else if ((cre as any).gmSeat) {
+      GMSeats.stand(cre);
+    }
+    return this.setCreatureStance(cre, stance);
+  }
+
+  /** Tell players where a creature now is and which way it faces (after the GM put it somewhere) */
+  static broadcastPlaced(obj: ModuleObject) {
+    if (GMNetworkManager.role !== 'offline') GMNetworkManager.broadcastActorUpdate(GMReplication.serializeSingleActor(obj));
+    this.notifyChange();
+  }
+
   static setCreatureStance(obj: ModuleObject, stance: string): boolean {
     if (!obj || !GMObjectKind.isCreature(obj)) return false;
     const cre = obj as ModuleCreature;
@@ -1105,7 +1228,7 @@ export class GMManager {
 
     const everyone: ModuleCreature[] = [...area.creatures, ...GameState.PartyManager.party];
     for (const cre of area.creatures) {
-      if (!this.isAutonomousNpc(cre)) continue;
+      if (!this.isAutonomousNpc(cre) || cre.gmHidden) continue;
       // Walking on the spot towards someone it can't reach: think again (GMCombatAI)
       GMCombatAI.checkStuck(cre, everyone);
       if (GMNpcOrders.getOrder(cre)) {
@@ -1118,7 +1241,7 @@ export class GMManager {
       const incoming = this.approachingMelee(cre, everyone);
       if (incoming) {
         const current = this.attackTargetOf(cre);
-        const engaged = !!current && !current.isDead?.() && cre.position.distanceTo(current.position) <= this.MELEE_REACH;
+        const engaged = !!current && !current.isDead?.() && cre.position.distanceTo(current.position) <= this.meleeReach(cre, current);
         if (!engaged) {
           GMNpcOrders.stopFighting(cre);
           continue;
@@ -1133,8 +1256,31 @@ export class GMManager {
     }
   }
 
-  /** How close a melee attacker has to be to swing (ActionPhysicalAttacks uses 2 m), with a little slack */
-  static MELEE_REACH: number = 2.5;
+  /** Slack on top of how close a melee attacker has to be to swing */
+  static MELEE_REACH_SLACK: number = 0.5;
+
+  /** How close two creatures are when one can swing at the other (2.5 m for people; more for big monsters) */
+  static meleeReach(a: ModuleCreature, b: ModuleCreature): number {
+    return (a.getMeleeRange?.(b) ?? 2) + this.MELEE_REACH_SLACK;
+  }
+
+  /** The routes drawn on the ground: the patrol being placed, and where each selected NPC is patrolling or going */
+  static routesToShow(): GMRoute[] {
+    const routes: GMRoute[] = [];
+    if (this.activeTool === 'order_patrol' && GMViewport.patrolDraft.length) {
+      routes.push({ points: GMViewport.patrolDraft, loop: GMViewport.patrolDraft.length > 1, draft: true, numbered: true });
+    }
+    for (const obj of this.selectedObjects()) {
+      if (!GMObjectKind.isCreature(obj)) continue;
+      const order = GMNpcOrders.getOrder(obj as ModuleCreature);
+      if (order?.kind === 'patrol' && order.points.length) {
+        routes.push({ points: order.points, loop: true, next: order.index % order.points.length, numbered: true });
+      } else if (order?.kind === 'move') {
+        routes.push({ points: [order.point], loop: false });
+      }
+    }
+    return routes;
+  }
 
   /** Who a creature is attacking or about to attack, if anyone */
   static attackTargetOf(cre: ModuleCreature): ModuleCreature | undefined {
@@ -1158,7 +1304,7 @@ export class GMManager {
         : this.isAutonomousNpc(other) && this.attackTargetOf(other) === cre && other.id < cre.id;
       if (!coming) continue;
       const distance = cre.position.distanceTo(other.position);
-      if (distance > this.MELEE_REACH && distance <= this.NPC_AI_RETALIATE_RANGE) return other;
+      if (distance > this.meleeReach(other, cre) && distance <= this.NPC_AI_RETALIATE_RANGE) return other;
     }
     return null;
   }
@@ -1204,12 +1350,16 @@ export class GMManager {
     if (!GameState.gmMode) return;
     GMViewport.init3DIndicators();
     GMViewport.updateSelectionRings(this.selectedObjects());
+    GMSeats.update();
+    GMRouteMarkers.update(this.isGMUser() ? this.routesToShow() : []);
 
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);
+    GMCutscene.update(delta);
+    if (GMNetworkManager.role === 'host') this.expireWheelHolds();
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
-    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+    if (GMNetworkManager.role !== 'client' && !this.worldHeld() && !this.sceneLoading) {
       GMPlayers.downedTimer += delta;
       if (GMPlayers.downedTimer >= GMPlayers.DOWNED_CHECK_INTERVAL) {
         GMPlayers.updateDownedPlayers(GMPlayers.downedTimer);
@@ -1218,7 +1368,7 @@ export class GMManager {
     }
 
     // NPCs run on the GM's machine only; players see the result through the world updates
-    if (GMNetworkManager.role !== 'client' && !this.worldPaused && !this.sceneLoading) {
+    if (GMNetworkManager.role !== 'client' && !this.worldHeld() && !this.sceneLoading) {
       this.npcAiTimer += delta;
       if (this.npcAiTimer >= this.NPC_AI_INTERVAL) {
         this.npcAiTimer = 0;
@@ -1245,6 +1395,14 @@ export class GMManager {
     // A connected player's character can't be hidden: it would vanish from their own game
     if (!obj || obj.gmOwnerPeerId) return false;
     obj.gmHidden = !!hidden;
+    // Off the stage: it stops what it was doing. Hidden mid-fight, it went on fighting where players couldn't
+    // see it (a stun from nowhere); the GM's AI and its behaviour scripts leave it be until it's shown again
+    if (hidden && GMObjectKind.isCreature(obj)) {
+      const cre = obj as ModuleCreature;
+      cre.clearAllActions?.();
+      cre.combatRound?.clearActions?.();
+      cre.cancelCombat?.();
+    }
     const netId = obj.gmNetId;
     if (netId && GMNetworkManager.role === 'host') {
       if (hidden) {
@@ -1299,7 +1457,12 @@ export class GMManager {
     routeContainerOpen: (container, user) => GMPlayers.routeContainerOpen(container, user),
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
-    isWorldPaused: () => !!GMManager.worldPaused,
+    isWorldPaused: () => GMManager.worldHeld(),
+    ownsCombatHud: () => GMPlayerHud.active(),
+    padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),
+    sharedWorld: () => GMNetworkManager.role !== 'offline',
+    keepsModuleState: () => false,
+    cutsceneCamera: () => GMCutscene.renderCamera(),
     isPlayerFrozen: (creature) => GMManager.isPlayerFrozen(creature),
     isPlayerCharacter: (obj) => GMManager.isPlayerCharacter(obj),
     isNetworkContainer: (container) => GMPlayers.isNetworkContainer(container),
@@ -1310,10 +1473,11 @@ export class GMManager {
       if(kind === 'creatures') return !GMManager.keepDefaultCreatures;
       return !GMManager.keepDefaultTriggers;
     },
-    onHostTwoDAAnimation: (creature, animation) => GMReplication.onHostTwoDAAnimation(creature, animation),
-    onHostVisualEffectApplied: (effect) => GMReplication.onHostVisualEffectApplied(effect),
-    onHostVisualEffectRemoved: (effect) => GMReplication.onHostVisualEffectRemoved(effect),
-    onHostProjectile: (caster, target, ammunition, hit, delay) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay),
+    onHostTwoDAAnimation: (creature, animation, hold) => GMReplication.onHostTwoDAAnimation(creature, animation, hold),
+    onEffectApplied: (owner, effect) => GMReplication.onEffectApplied(owner, effect),
+    onEffectRemoved: (owner, effect) => GMReplication.onEffectRemoved(owner, effect),
+    onHostProjectile: (caster, target, ammunition, hit, delay, options) => GMReplication.onHostProjectile(caster, target, ammunition, hit, delay, options),
+    onHostSpellCast: (caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range) => GMReplication.onHostSpellCast(caster, target, spellId, casthandvisual, projmodel, castTime, conjureTime, range),
     onDoorOpened: (door, by) => {
       // Tell everyone, once this frame's state has settled, when a door opened for someone in a session
       if(by === door || GMNetworkManager.role === 'offline') return;
@@ -1330,6 +1494,10 @@ export class GMManager {
     requestNetworkLevelUp: (creature) => GMPlayers.requestNetworkLevelUp(creature),
     onCombatRoundEnd: (creature) => GMCombatAI.onRoundEnd(creature),
     holdsScriptAttack: (creature) => GMCombatAI.holdsScriptAttack(creature),
+    runsBehaviourScripts: (creature) => GMCombatAI.runsBehaviourScripts(creature),
+    walksThrough: (creature) => !!creature.gmHidden,
+    useSeat: (creature, target) => GameState.gmMode && GMObjectKind.isCreature(creature) && GMSeats.sitIn(creature as ModuleCreature, target),
+    isSeat: (object) => GameState.gmMode && GMSeats.seatsOf(object).length > 0,
     openCharacterSheet: (section) => {
       // A player gets their own sheet; the GM (even playing a character) keeps the game's screens
       if (!GameState.gmMode || GMManager.isGMUser()) return false;

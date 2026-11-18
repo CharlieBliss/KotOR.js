@@ -1,9 +1,56 @@
-// The character sheet: the creator's look (creator.scss), and what's its own
+// The character sheet: unified sleek dark-glass tabletop look matching the player HUD
 
 .sheet-backdrop {
-  // The sheet sits over the game, not over a menu: let the world show through a little
-  background: rgba(0, 0, 0, 0.55);
-  &[data-game="tsl"] { background: rgba(0, 0, 0, 0.6); }
+  // Subtle dimming so the game world stays legible behind the sheet
+  background: rgba(3, 8, 16, 0.62);
+  backdrop-filter: blur(4px);
+  --cc-panel: rgba(8, 18, 30, 0.94);
+  --cc-panel-2: rgba(14, 30, 48, 0.92);
+  --cc-line: rgba(82, 168, 236, 0.35);
+  --cc-line-bright: #5bc0ff;
+  --cc-text: #c7ddf2;
+  --cc-text-dim: #7da0c0;
+  --cc-text-strong: #eef6ff;
+  --cc-on: rgba(27, 94, 150, 0.72);
+  --cc-radius: 8px;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-variant: normal;
+  letter-spacing: normal;
+
+  &[data-game="tsl"] {
+    background: rgba(2, 10, 8, 0.65);
+    --cc-panel: rgba(6, 18, 15, 0.95);
+    --cc-panel-2: rgba(10, 28, 23, 0.92);
+    --cc-line: rgba(47, 195, 155, 0.35);
+    --cc-line-bright: #3ee0b2;
+    --cc-text: #bfe9dc;
+    --cc-text-dim: #6ca896;
+    --cc-text-strong: #ecfff8;
+    --cc-on: rgba(16, 82, 66, 0.78);
+  }
+}
+
+.sheet-frame {
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, rgba(11, 24, 38, 0.96) 0%, rgba(6, 14, 24, 0.98) 100%) !important;
+  border: 1px solid var(--cc-line) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.78), 0 0 0 1px rgba(255, 255, 255, 0.05) inset !important;
+  padding: 14px 16px !important;
+
+  [data-game="tsl"] & {
+    background: linear-gradient(180deg, rgba(7, 22, 18, 0.96) 0%, rgba(4, 13, 10, 0.98) 100%) !important;
+  }
+
+  .cc-titlebar {
+    margin: 0;
+    border-radius: 8px;
+    text-transform: none;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--cc-text-strong);
+  }
+  .cc-panel-title { text-transform: none; font-weight: 700; font-size: 12px; letter-spacing: 0.04em; color: var(--cc-text-strong); }
+  .cc-button, .cc-tab { text-transform: none; }
 }
 
 .sheet-stats dd { font-variant-numeric: tabular-nums; }
@@ -37,7 +84,12 @@
   border-radius: 2px;
 }
 
+.sheet-rolls-wrap { display: flex; flex-direction: column; gap: 10px; }
+.sheet-quick-rolls { display: flex; flex-direction: column; gap: 6px; }
+.sheet-quick-sub { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #8fb4d4; margin-top: 2px; }
 .sheet-rolls { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.sheet-quick-rolls .sheet-rolls { grid-template-columns: 1fr 1fr; }
+.sheet-rolls.saves-spaced { padding-top: 8px; border-top: 1px solid var(--cc-line); }
 .sheet-roll {
   display: flex;
   align-items: center;
@@ -51,12 +103,22 @@
   font: inherit;
   cursor: pointer;
   text-align: left;
-  &:hover { border-color: var(--cc-line-bright); color: var(--cc-text-strong); }
+  transition: border-color 0.12s, background 0.12s;
+  &:hover { border-color: var(--cc-line-bright); color: var(--cc-text-strong); background: var(--cc-on); }
   &:active { background: var(--cc-on); }
 }
-.sheet-roll-bonus { color: var(--cc-text-strong); font-size: 16px; font-variant: normal; font-variant-numeric: tabular-nums; }
+.sheet-roll-name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
+.sheet-roll-bonus { color: var(--cc-text-strong); font-size: 15px; font-weight: 700; font-variant: normal; font-variant-numeric: tabular-nums; }
+/* The latest result of this roll, for a few seconds */
+.sheet-roll.rolled { border-color: #ffe39a; }
+.sheet-roll-result { color: #ffe39a; font-size: 15px; font-weight: 700; font-variant: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sheet-roll-result.natural-20 { color: #7dffb0; }
+.sheet-roll-result.natural-1 { color: #ff8a8a; }
 
-.sheet-talents { display: flex; flex-direction: column; gap: 4px; }
+.sheet-talents-wrap { display: flex; flex-direction: column; gap: 6px; }
+.sheet-talent-toolbar { display: flex; justify-content: flex-end; }
+.sheet-inline-check { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--cc-text); cursor: pointer; }
+.sheet-talents { display: flex; flex-direction: column; gap: 6px; }
 .sheet-talent {
   border: 1px solid var(--cc-line);
   border-radius: 6px;
@@ -65,24 +127,51 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 3px 8px;
+    padding: 5px 10px;
     cursor: pointer;
     color: var(--cc-text-strong);
+    font-weight: 600;
+    font-size: 13px;
     list-style: none;
     &::-webkit-details-marker { display: none; }
+    &:hover { background: rgba(255, 255, 255, 0.04); }
   }
   &[open] summary { border-bottom: 1px solid var(--cc-line); }
+  &[open] .sheet-talent-chevron { transform: rotate(90deg); }
+}
+.sheet-talent-chevron { font-size: 10px; color: var(--cc-text-dim); transition: transform 0.12s; }
+.sheet-talent-title { flex: 1; min-width: 0; }
+.sheet-talent-meta { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.sheet-pill {
+  padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(0, 0, 0, 0.35); color: var(--cc-text);
+  &.fp { color: #8fc0ff; border-color: rgba(111, 182, 255, 0.45); }
+  &.pinned { color: #ffe39a; border-color: rgba(255, 215, 64, 0.5); }
 }
 .sheet-talent-icon { width: 28px; height: 28px; flex: none; border-radius: 4px; }
+.sheet-talent-body { display: flex; flex-direction: column; gap: 8px; padding: 8px 12px 10px; }
 .sheet-talent-text {
   margin: 0;
-  padding: 6px 10px 8px;
+  padding: 0;
   color: var(--cc-text);
-  font-size: 13px;
+  font-size: 12.5px;
+  line-height: 1.45;
   font-variant: normal;
   letter-spacing: normal;
   white-space: pre-line;
 }
+.sheet-talent-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.07); }
+.sheet-bind-label { font-size: 11px; color: var(--cc-text-dim); margin-left: 4px; }
+.sheet-bind-row { display: inline-flex; gap: 3px; }
+.sheet-mini-btn, .sheet-slot-chip {
+  padding: 3px 8px; border-radius: 4px; border: 1px solid var(--cc-line); background: rgba(16, 36, 58, 0.8);
+  color: var(--cc-text-strong); font: 600 11px 'Segoe UI', Tahoma, sans-serif; cursor: pointer;
+  &:hover:not(:disabled) { border-color: var(--cc-line-bright); background: var(--cc-on); }
+  &.primary { border-color: var(--cc-line-bright); background: var(--cc-on); }
+  &.on { border-color: #ffd740; color: #ffe39a; background: rgba(255, 215, 64, 0.18); }
+  &:disabled { opacity: 0.45; cursor: not-allowed; }
+}
+.sheet-slot-chip { padding: 2px 6px; min-width: 22px; }
 
 .sheet-effects { display: flex; flex-direction: column; gap: 4px; }
 .sheet-effect {

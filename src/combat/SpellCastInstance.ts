@@ -6,6 +6,7 @@ import { OdysseyModel3D } from "@/three/odyssey";
 import { OdysseyModel } from "@/odyssey";
 import { GameState } from "@/GameState";
 import { MDLLoader } from "@/loaders";
+import { Dice } from "@/utility/Dice";
 
 /**
  * SpellCastInstance class.
@@ -47,6 +48,9 @@ export class SpellCastInstance {
 
   impacted: boolean = false;
   completed: boolean = false;
+  disposed: boolean = false;
+  mirrored: boolean = false;
+  private castHandTimer: ReturnType<typeof setTimeout> | null = null;
   conjureTime = 3000;
   conjuring: boolean = false;
   castTime: number = 0;
@@ -95,34 +99,53 @@ export class SpellCastInstance {
 
     if(this.target && this.target.position){
       this.projectileTarget.copy(this.target.position);
-      this.projectileTarget.x += Math.random() * (0.25 - -0.25) + -0.25;
-      this.projectileTarget.y += Math.random() * (0.25 - -0.25) + -0.25;
+      this.projectileTarget.x += Dice.random() * 0.5 - 0.25;
+      this.projectileTarget.y += Dice.random() * 0.5 - 0.25;
       this.projectileCurve.v2.copy(this.projectileTarget);
+    }
+
+    if(!this.mirrored){
+      GameState.hooks.onHostSpellCast(
+        this.owner,
+        this.target,
+        this.spell?.id ?? -1,
+        this.casthandvisual,
+        this.spell?.projmodel || '',
+        this.castTime,
+        this.conjureTime,
+        this.spell?.range
+      );
     }
 
     if(this.spell && this.spell.projmodel != '' && this.spell.projmodel != '****'){
       console.log('projectile', this.spell.projmodel);
       MDLLoader.loader.load(this.spell.projmodel.toLowerCase())
-      .then((mdl: OdysseyModel) => { if(!mdl) return;
+      .then((mdl: OdysseyModel) => { if(!mdl || this.disposed || this.impacted) return;
         OdysseyModel3D.FromMDL(mdl, {
           context: this.owner?.context
         }).then((model: OdysseyModel3D) => {
+          if(this.disposed || this.impacted){
+            model.dispose();
+            return;
+          }
           this.projectile = model;
           console.log('projectile', model);
           if(this.owner?.model){
             if(this.owner.model.rhand){
-              this.owner.context.group.effects.add(model);
+              this.owner.context?.group?.effects?.add(model);
               this.projectileHook = this.owner.model.rhand;
               //TextureLoader.LoadQueue();
             }else{
               this.projectile.dispose();
+              this.projectile = undefined;
             }
           }else{
             this.projectile.dispose();
+            this.projectile = undefined;
           }
 
-        });
-      });
+        }).catch(() => {});
+      }).catch(() => {});
     }
   }
 
@@ -188,91 +211,108 @@ export class SpellCastInstance {
     if(this.impacted) return;
     this.impacted = true;
 
-    if(this.spell){
-      this.spell.oCaster = this.owner;
-      this.spell.oTarget = this.target;
-      if(this.item){
-        this.spell.setItem(this.item);
+    if(!this.mirrored){
+      if(this.spell){
+        this.spell.oCaster = this.owner;
+        this.spell.oTarget = this.target;
+        if(this.item){
+          this.spell.setItem(this.item);
+        }
+      }
+
+      if(this.owner?.combatData){
+        this.owner.combatData.lastSpellTarget = this.target;
+        this.owner.combatData.lastAttemptedSpellTarget = this.target;
+        this.owner.combatData.lastForcePowerUsed = this.spell;
+      }
+      if(this.target?.combatData){
+        this.target.combatData.lastSpellAttacker = this.owner;
+      }
+
+      // Deduct Force Points if cast as a Force Power (not from an item)
+      if(!this.item && this.spell && typeof (this.owner as any)?.subtractFP === 'function'){
+        const fpCost = this.spell.getForcePointCost(this.owner);
+        if(fpCost > 0){
+          (this.owner as any).subtractFP(fpCost);
+        }
+      }
+      
+      // An item's spell: the item pays for the use now that it has gone off (a stack or charges)
+      if(this.item && this.spell && typeof (this.item as any).spendUse === 'function'){
+        (this.item as any).spendUse(this.spell.id, this.owner);
+      }
+
+      if(this.impactscript != ''){
+        console.log('Casting spell', this.impactscript, this);
+        const instance = GameState.NWScript.Load(this.impactscript);
+        if(instance) {
+          //pass the talent to the script instance and run it
+          instance.talent = this.spell;
+          instance.spellTarget = this.target;
+          instance.spellItem = this.item;
+          instance.lastSpellCaster = this.owner;
+          instance.lastSpellAttacker = this.owner;
+          instance.lastSpell = this.spell;
+          instance.lastSpellHarmful = this.spell?.hostilesetting == 1;
+          instance.run(this.owner, 0);
+        }
       }
     }
 
-    if(this.owner?.combatData){
-      this.owner.combatData.lastSpellTarget = this.target;
-      this.owner.combatData.lastAttemptedSpellTarget = this.target;
-      this.owner.combatData.lastForcePowerUsed = this.spell;
-    }
-    if(this.target?.combatData){
-      this.target.combatData.lastSpellAttacker = this.owner;
-    }
-
-    // Deduct Force Points if cast as a Force Power (not from an item)
-    if(!this.item && this.spell && typeof (this.owner as any)?.subtractFP === 'function'){
-      const fpCost = this.spell.getForcePointCost(this.owner);
-      if(fpCost > 0){
-        (this.owner as any).subtractFP(fpCost);
-      }
-    }
-    
-    // An item's spell: the item pays for the use now that it has gone off (a stack or charges)
-    if(this.item && this.spell && typeof (this.item as any).spendUse === 'function'){
-      (this.item as any).spendUse(this.spell.id, this.owner);
-    }
-
-    if(this.impactscript != ''){
-      console.log('Casting spell', this.impactscript, this);
-      const instance = GameState.NWScript.Load(this.impactscript);
-      if(instance) {
-        //pass the talent to the script instance and run it
-        instance.talent = this.spell;
-        instance.spellTarget = this.target;
-        instance.spellItem = this.item;
-        instance.lastSpellCaster = this.owner;
-        instance.lastSpellAttacker = this.owner;
-        instance.lastSpell = this.spell;
-        instance.lastSpellHarmful = this.spell?.hostilesetting == 1;
-        instance.run(this.owner, 0);
-      }
-    }
-
-    if(this.casthandvisual != ''){
-      MDLLoader.loader.load(this.casthandvisual)
+    if(this.casthandvisual != '' && this.casthandvisual != '****'){
+      MDLLoader.loader.load(this.casthandvisual.toLowerCase())
       .then((mdl: OdysseyModel) => { if(!mdl) return;
         OdysseyModel3D.FromMDL(mdl, {
           context: this.owner?.context
         }).then((model: OdysseyModel3D) => {
-          this.casthandmodel = model;
-
-          if(this.owner?.model){
-            if(this.owner.model.lhand){
-              this.owner.model.lhand.add(this.casthandmodel);
-              //TextureLoader.LoadQueue();
-
-              const anim = this.casthandmodel.playAnimation('cast01', false);
-              setTimeout(() => {
-                //Clean up the impact effect
-                this.casthandmodel.dispose();
-              }, (anim ? anim.length * 1000 : 1500) )
-            }else{
+          if(this.owner?.model?.lhand && !(this.owner as any).destroyed){
+            if(this.casthandmodel){
+              this.casthandmodel.removeFromParent();
               this.casthandmodel.dispose();
             }
-          }else{
-            this.casthandmodel.dispose();
-          }
+            if(this.castHandTimer){
+              clearTimeout(this.castHandTimer);
+              this.castHandTimer = null;
+            }
+            this.casthandmodel = model;
+            this.owner.model.lhand.add(this.casthandmodel);
+            //TextureLoader.LoadQueue();
 
-        });
-      });
+            const anim = this.casthandmodel.playAnimation('cast01', false);
+            this.castHandTimer = setTimeout(() => {
+              //Clean up the impact effect (off the hand too: emptied, it stayed there)
+              model.removeFromParent();
+              model.dispose();
+              if(this.casthandmodel === model) this.casthandmodel = undefined;
+              this.castHandTimer = null;
+            }, (anim ? anim.length * 1000 : 1500));
+          }else{
+            model.dispose();
+          }
+        }).catch(() => {});
+      }).catch(() => {});
     }
 
     if(this.projectile){
+      this.projectile.removeFromParent();
       this.projectile.dispose();
+      this.projectile = undefined;
     }
 
   }
 
   dispose(){
-
-    if(this.casthandmodel) this.casthandmodel.dispose();
-    if(this.projectile) this.projectile.dispose();
+    this.disposed = true;
+    if(this.casthandmodel && !this.castHandTimer){
+      this.casthandmodel.removeFromParent();
+      this.casthandmodel.dispose();
+      this.casthandmodel = undefined;
+    }
+    if(this.projectile){
+      this.projectile.removeFromParent();
+      this.projectile.dispose();
+      this.projectile = undefined;
+    }
     if(this.container) this.container.removeFromParent();
   }
 

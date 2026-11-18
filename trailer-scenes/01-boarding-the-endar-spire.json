@@ -1,0 +1,366 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Boarding the Endar Spire",
+  "summary": "A Republic cruiser is boarded. Troopers blast through the bridge doors, the defenders fall back, and then a Dark Lord in a black mask walks in through the smoke.",
+  "gmNotes": "Trailer opener. Film the corridor fight from behind the Republic line, then cut to the doorway for Malak's entrance (beat 3). Hold beat 3 until most of the Sith troopers are down so the doorway is clear for his walk. Beat 4 hands the fight to the player.",
+  "content": "tsl",
+  "area": {
+    "game": "kotor",
+    "module": "end_m01aa",
+    "reason": "The Endar Spire's command module: white Republic corridors and a bridge with a single blast door, the same shape as the blockade-runner boarding that opens A New Hope and the attack that opens KotOR."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "room:m01aa_07a",
+      "offset": [
+        0,
+        8
+      ]
+    },
+    "facing": 180,
+    "note": "North end of the bridge, behind the Republic line, looking at the blast door."
+  },
+  "actors": [
+    {
+      "id": "captain",
+      "name": "Captain Onasi",
+      "template": "p_carth",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          3,
+          2
+        ]
+      },
+      "facing": 180,
+      "customize": {
+        "level": 12,
+        "class": "Soldier"
+      }
+    },
+    {
+      "id": "officer",
+      "name": "Bridge Officer",
+      "template": "n_repoff",
+      "faction": "friendly",
+      "at": {
+        "spot": "prop:console",
+        "offset": [
+          0,
+          -1
+        ]
+      },
+      "facing": 0,
+      "stance": "computer",
+      "customize": {
+        "level": 8,
+        "class": "Soldier"
+      }
+    },
+    {
+      "id": "troopers",
+      "name": "Republic Trooper",
+      "template": "n_repsold",
+      "faction": "friendly",
+      "count": 5,
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          -1,
+          -4
+        ],
+        "formation": "line",
+        "spacing": 2.5
+      },
+      "facing": 180,
+      "customize": {
+        "level": 10,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      }
+    },
+    {
+      "id": "boarders",
+      "name": "Sith Trooper",
+      "template": "g_sithtroop02",
+      "faction": "hostile",
+      "count": 7,
+      "hidden": true,
+      "at": {
+        "spot": "room:m01aa_06a",
+        "offset": [
+          2,
+          10
+        ],
+        "formation": "cluster",
+        "spacing": 2.5
+      },
+      "facing": 0,
+      "customize": {
+        "level": 13
+      }
+    },
+    {
+      "id": "heavies",
+      "name": "Sith Assault Trooper",
+      "template": "g_sithtroop07",
+      "faction": "hostile",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "room:m01aa_06a",
+        "offset": [
+          1,
+          4
+        ],
+        "formation": "line",
+        "spacing": 2
+      },
+      "facing": 0,
+      "customize": {
+        "level": 13
+      }
+    },
+    {
+      "id": "dark_lord",
+      "name": "Darth Malak",
+      "template": "n_darthmalak",
+      "faction": "hostile",
+      "hidden": true,
+      "at": {
+        "spot": "room:m01aa_06a",
+        "offset": [
+          0,
+          -6
+        ]
+      },
+      "facing": 0,
+      "customize": {
+        "level": 20,
+        "hp": 600
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "console",
+      "template": "plc_comppnl",
+      "name": "Helm console",
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          -3,
+          5
+        ]
+      },
+      "facing": 0
+    },
+    {
+      "id": "console2",
+      "template": "plc_comppnl",
+      "name": "Comms console",
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          2.5,
+          5
+        ]
+      },
+      "facing": 0
+    },
+    {
+      "id": "sparks",
+      "template": "plc_swireflr",
+      "name": "Sparking wires",
+      "count": 2,
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          -5,
+          -6
+        ],
+        "formation": "line",
+        "spacing": 10
+      }
+    },
+    {
+      "id": "breach_fire",
+      "template": "plc_burnjunk",
+      "name": "Blasted door frame",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:wp_end_bridgedoor",
+        "offset": [
+          0,
+          3
+        ],
+        "formation": "line",
+        "spacing": 5
+      }
+    },
+    {
+      "id": "breach_wreck",
+      "template": "plc_wreckage02",
+      "name": "Twisted bulkhead",
+      "hidden": true,
+      "at": {
+        "spot": "room:m01aa_07a",
+        "offset": [
+          6,
+          -9
+        ]
+      },
+      "facing": 30
+    },
+    {
+      "id": "fallen",
+      "template": "plc_rsldcrps",
+      "name": "Fallen trooper",
+      "count": 2,
+      "at": {
+        "spot": "room:m01aa_06a",
+        "offset": [
+          4,
+          2
+        ],
+        "formation": "line",
+        "spacing": 3
+      }
+    }
+  ],
+  "beats": [
+    {
+      "title": "Battle stations",
+      "narration": "Alarms howl through the Endar Spire. Something has latched onto the hull, and the bridge doors are glowing red.",
+      "notes": "Opening shot: the Republic line aiming at the door.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "captain",
+          "text": "They're cutting through! Hold this bridge, whatever comes through that door."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "troopers"
+          ],
+          "gesture": "look_right"
+        }
+      ]
+    },
+    {
+      "title": "The door blows",
+      "narration": "The blast door gives way in a shower of sparks. Sith troopers pour through the smoke.",
+      "notes": "Reveals eight Sith troopers. Let the exchange of fire run for a while; this is the money shot of the scene.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "boarders",
+            "heavies",
+            "breach_fire",
+            "breach_wreck"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "boarders",
+            "heavies"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "troopers"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "officer"
+          ],
+          "stance": ""
+        },
+        {
+          "do": "say",
+          "id": "officer",
+          "text": "Boarders on the bridge!"
+        }
+      ]
+    },
+    {
+      "title": "The Dark Lord",
+      "narration": "The firing stops. Heavy footsteps. A masked figure steps through the smoke, and the air goes cold.",
+      "notes": "Malak walks to the bridge door. Trigger once the doorway is mostly clear.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "dark_lord"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "dark_lord"
+          ],
+          "order": {
+            "kind": "move",
+            "to": {
+              "spot": "room:m01aa_07a",
+              "offset": [
+                -2,
+                -9
+              ]
+            }
+          }
+        },
+        {
+          "do": "say",
+          "id": "dark_lord",
+          "text": "The Republic's flagship. How fragile it looks from here."
+        }
+      ]
+    },
+    {
+      "title": "Face him",
+      "narration": "A red blade ignites.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "captain",
+          "text": "Jedi! He's yours. We'll cover you!"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "dark_lord"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "say",
+          "id": "dark_lord",
+          "text": "Then come, Jedi. Show me what the Council taught you."
+        }
+      ]
+    }
+  ]
+}

@@ -92,6 +92,13 @@ export class ActionItemCastSpell extends Action {
         if(combatRound.roundStarted){
           const spellTarget = combatRound.action?.target || this.target;
           const spellTalent = combatRound.action?.spell || this.spell;
+          // A grenade is thrown; a power from gear (a shield, a stim) is cast at the target or on itself
+          if(BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)){
+            const conjure = spellTalent?.getConjureAnimation?.() || '';
+            const names = /^throw/.test(conjure) ? [conjure, 'throwgren']
+              : spellTarget == this.owner ? ['castout2'] : [conjure, 'castout1'];
+            (this.owner as any).playCastAnimation?.(names, spellTalent?.getCastSeconds?.() || 0);
+          }
           const spellCastInstance = new SpellCastInstance(this.owner, spellTarget, spellTalent);
           spellCastInstance.item = item;
           if(this.owner.area && typeof this.owner.area.attachSpellInstance === 'function'){

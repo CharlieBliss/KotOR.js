@@ -14,11 +14,16 @@ const EDIT_LABELS: Record<string, string> = {
 };
 import { ItemOptions, PlayerOptions, SkillOptions } from "@/apps/game/components/gm-panel/controls/options";
 import { SelectionGroup } from "@/apps/game/components/gm-panel/tabs/SelectionGroup";
+import { GearEditor } from "@/apps/game/components/gm-panel/controls/GearEditor";
+import { PoseEditor } from "@/apps/game/components/gm-panel/controls/PoseEditor";
+import { StatusSection } from "@/apps/game/components/gm-panel/controls/StatusSection";
 
 /** Inspect tab: edit the selected object, or browse everything in the scene */
 export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active }) => {
   useGMStore(active);
   // Inspector tab states
+  // The pose editor, open for the creature selected (by its id)
+  const [posing, setPosing] = useState<number | null>(null);
   const [inspectorFilter, setInspectorFilter] = useState<'all' | 'creatures' | 'placeables' | 'doors'>('all');
   const [inspectorAddItemResRef, setInspectorAddItemResRef] = useState<string>('g_w_lghtsbr01');
   const [inspectorBarkInput, setInspectorBarkInput] = useState<string>('');
@@ -184,6 +189,28 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   </div>
                 )}
 
+                {!selectedObj.gmOwnerPeerId && !selectedObj.gmPlayerConfig && (
+                  <div className="gm-row" title="Who decides what it does moment to moment. Its death, conversations and powers always run its own scripts">
+                    <span style={{ minWidth: 40, fontSize: 11, color: "#8aa4bd" }}>Behaviour</span>
+                    <div className="gm-segmented" role="group" aria-label="Behaviour">
+                      <button
+                        className={`gm-btn small ${selectedObj.gmScripted ? '' : 'active'}`}
+                        title="The GM AI and your orders run it (its own AI scripts stay quiet, so they can't pull it another way)"
+                        onClick={() => edit('setScripted', () => KotOR.GMCombatAI.setScripted(selectedObj as KotOR.ModuleCreature, false))}
+                      >
+                        GM AI
+                      </button>
+                      <button
+                        className={`gm-btn small ${selectedObj.gmScripted ? 'active' : ''}`}
+                        title="Its own scripts run it, as in the game: for a boss with its own tactics, or a plot NPC"
+                        onClick={() => edit('setScripted', () => KotOR.GMCombatAI.setScripted(selectedObj as KotOR.ModuleCreature, true))}
+                      >
+                        Its own scripts
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {!selectedObj.gmOwnerPeerId && (() => {
                   const cre = selectedObj as KotOR.ModuleCreature;
                   const stances = GMManager.availableAnimations(cre, 'stance');
@@ -195,9 +222,9 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                     <div className="gm-grid-2" title="A stance holds whenever it would just stand: after walking, after a gesture, and after a fight">
                       <div className="gm-field">
                         <label>Stance</label>
-                        <select className="gm-select" value={current} onChange={(e) => edit('setCreatureStance', () => GMManager.setCreatureStance(cre, e.target.value))}>
+                        <select className="gm-select" value={current} onChange={(e) => edit('setCreatureStance', () => GMManager.setStanceOrSit(cre, e.target.value))}>
                           <option value="">Standing</option>
-                          {current && !stances.some((c) => c.id === current) && <option value={current}>{current}</option>}
+                          {current && !stances.some((c) => c.id === current) && <option value={current}>{GMManager.stanceLabel(current)}</option>}
                           {groups(stances).map((g) => (
                             <optgroup key={g} label={g}>
                               {stances.filter((c) => c.group === g).map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -220,42 +247,19 @@ export const InspectorTab: React.FC<{ active: boolean }> = React.memo(({ active 
                   );
                 })()}
 
-                <details className="gm-section">
+                {!selectedObj.gmOwnerPeerId && (posing === selectedObj.id
+                  ? <PoseEditor cre={selectedObj as KotOR.ModuleCreature} onDone={() => setPosing(null)} />
+                  : (
+                    <div className="gm-row">
+                      <button className="gm-btn small" onClick={() => setPosing(selectedObj.id)} title="Hold any moment of any of its animations as its stance">Make a pose…</button>
+                    </div>
+                  ))}
+
+                <StatusSection creature={selectedObj as KotOR.ModuleCreature} />
+
+                <details className="gm-section" open>
                   <summary>Gear</summary>
-                <div className="gm-grid-2">
-                  <div className="gm-field">
-                    <label>Weapon</label>
-                    <select
-                      className="gm-select"
-                      value={(selectedObj as KotOR.ModuleCreature).equipment?.RIGHTHAND?.getEquippedRes() || ''}
-                      onChange={e =>
-                        GMSpawner.equipWeaponOnCreature(
-                          selectedObj as KotOR.ModuleCreature,
-                          KotOR.ModuleCreatureArmorSlot.RIGHTHAND,
-                          e.target.value
-                        )
-                      }
-                    >
-                      <ItemOptions items={GMManager.WEAPON_OPTIONS} />
-                    </select>
-                  </div>
-                  <div className="gm-field">
-                    <label>Armor or robes</label>
-                    <select
-                      className="gm-select"
-                      value={(selectedObj as KotOR.ModuleCreature).equipment?.ARMOR?.getEquippedRes() || ''}
-                      onChange={e =>
-                        GMSpawner.equipWeaponOnCreature(
-                          selectedObj as KotOR.ModuleCreature,
-                          KotOR.ModuleCreatureArmorSlot.ARMOR,
-                          e.target.value
-                        )
-                      }
-                    >
-                      <ItemOptions items={GMManager.ARMOR_OPTIONS} />
-                    </select>
-                  </div>
-                </div>
+                  <GearEditor creatures={[selectedObj as KotOR.ModuleCreature]} id="inspector-gear" />
                 </details>
               </>
             )}

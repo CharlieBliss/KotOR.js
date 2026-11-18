@@ -11,6 +11,26 @@ import { DiceType } from "@/enums/combat/DiceType";
  */
 export class Dice {
 
+  private static rng: (() => number) | null = null;
+
+  /** Override the PRNG used by Dice rolls and combat checks (pass null to restore Math.random) */
+  static setRng(rng: (() => number) | null){
+    Dice.rng = rng;
+  }
+
+  /** Uniform random number in [0, 1) using the active Dice PRNG (or Math.random dynamically when unseeded) */
+  static random(): number {
+    return Dice.rng ? Dice.rng() : Math.random();
+  }
+
+  private static rollSides(sides: number, num: number = 0){
+    let total = 0;
+    for(let i = 0; i < num; i++){
+      total += Math.floor(Dice.random() * sides + 1);
+    }
+    return total;
+  }
+
   static roll(num: number = 0, die: DiceType, modifier: number = 0){
     if(num <= 0) return 0;
 
@@ -72,76 +92,14 @@ export class Dice {
     return type;
   }
 
-  static rollD2(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 2 + 1);
-    }
-    return total;
-  }
-  
-  static rollD3(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 3 + 1);
-    }
-    return total;
-  }
-  
-  static rollD4(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 4 + 1);
-    }
-    return total;
-  }
-  
-  static rollD6(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 6 + 1);
-    }
-    return total;
-  }
-  
-  static rollD8(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 8 + 1);
-    }
-    return total;
-  }
-  
-  static rollD10(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 10 + 1);
-    }
-    return total;
-  }
-  
-  static rollD12(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 12 + 1);
-    }
-    return total;
-  }
-  
-  static rollD20(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 20 + 1);
-    }
-    return total;
-  }
-  
-  static rollD100(num: number = 0){
-    let total = 0;
-    for(let i = 0; i < num; i++){
-      total += Math.floor(Math.random() * 100 + 1);
-    }
-    return total;
-  }
+  static rollD2(num: number = 0){ return Dice.rollSides(2, num); }
+  static rollD3(num: number = 0){ return Dice.rollSides(3, num); }
+  static rollD4(num: number = 0){ return Dice.rollSides(4, num); }
+  static rollD6(num: number = 0){ return Dice.rollSides(6, num); }
+  static rollD8(num: number = 0){ return Dice.rollSides(8, num); }
+  static rollD10(num: number = 0){ return Dice.rollSides(10, num); }
+  static rollD12(num: number = 0){ return Dice.rollSides(12, num); }
+  static rollD20(num: number = 0){ return Dice.rollSides(20, num); }
+  static rollD100(num: number = 0){ return Dice.rollSides(100, num); }
 
 }

@@ -1,5 +1,6 @@
 import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
+import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 import { GameState } from "@/GameState";
 
 export class GMEventEmitter {
@@ -44,7 +45,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -68,15 +69,40 @@ export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item';
  * A visual the host just showed on a networked object, replayed on clients
  * - anim: a 2DA animation (attack swings, hit/dodge/parry reactions, casting)
  * - text: floating combat text (damage numbers, miss, deflected)
- * - vfx.add / vfx.remove: a visualeffects.2da effect (Force power impacts, auras, shields)
+ * - effect.add / effect.remove: an effect that changes how something looks (GMReplication.MIRRORED_EFFECTS:
+ *   visuals and auras, beams, stun and hold poses), made on the copy and drawn only
+ * - vfx.at: a visual effect at a spot
  * - projectile: a blaster bolt (ammunitiontypes.2da row) from netId to targetNetId
  */
+/**
+ * An effect on the GM's machine as players get it (GMReplication.MIRRORED_EFFECTS): enough to make the same effect
+ * there, drawn only (GameEffect.mirrored)
+ */
+export interface GMEffectMirror {
+  fxId: string;
+  /** GameEffectType */
+  type: number;
+  spellId?: number;
+  ints: number[];
+  floats: number[];
+  durationType: number;
+  duration: number;
+  /** A beam's caster (its objectList[0]): the beam is drawn from them */
+  casterNetId?: string;
+}
+
 export type GMFxEvent =
-  | { kind: 'anim'; netId: string; anim: string; index: number }
+  | { kind: 'anim'; netId: string; anim: string; index: number; hold?: number }
   | { kind: 'text'; netId: string; text: string; style: number; timer: number }
-  | { kind: 'vfx.add'; netId: string; fxId: string; vfx: number; miss: number; durationType: number; duration: number }
-  | { kind: 'vfx.remove'; netId: string; fxId: string }
-  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number };
+  /** An effect that changes how something looks (a visual, a beam, a stun or hold pose), shown on players' copies */
+  | { kind: 'effect.add'; netId: string; effect: GMEffectMirror }
+  /** It came off (on an object; at: on a spot, a 'vfx.at' effect) */
+  | { kind: 'effect.remove'; netId?: string; fxId: string; at?: boolean }
+  /** A visual effect at a spot (an area power's burst, a grenade blast, a beam aimed at a spot) */
+  | { kind: 'vfx.at'; fxId: string; vfx: number; miss: number; durationType: number; duration: number; x: number; y: number; z: number;
+      beam?: { casterNetId: string; bodyPart: number } }
+  | { kind: 'projectile'; netId: string; targetNetId: string; ammunition: number; hit: boolean; delay: number; deflected?: boolean; powerShot?: boolean }
+  | { kind: 'cast.fx'; netId: string; targetNetId?: string; spellId: number; casthandvisual?: string; projmodel?: string; castTime: number; conjureTime: number; range?: string };
 
 /** A question the GM asks players, as an NPC or as the GM, with replies to pick from */
 export interface GMDmPrompt {
@@ -107,6 +133,8 @@ export interface GMPlayerSheet {
   maxForcePoints: number;
   currentForce: number;
   xp: number;
+  /** Alignment value (0 = Dark, 50 = Neutral, 100 = Light); older hosts don't send it */
+  goodEvil?: number;
   /** Natural armour (part of defense); older hosts don't send it */
   naturalAC?: number;
   /** equipment slot name (RIGHTHAND, ARMOR...) -> item resref */
@@ -130,6 +158,8 @@ export interface GMClientIntent {
   mine?: GMMineAction;
   /** roll: the skill or save (older players send abilityId, a skill) */
   check?: GMCheck;
+  /** wheel: the player opened (true) or closed their power wheel (the tactical pause rule holds the world meanwhile) */
+  open?: boolean;
 }
 
 export interface GMPeerInfo {
@@ -156,6 +186,10 @@ export interface GMSerializedActor {
   z: number;
   facing: number;
   animState?: number;
+  /** In combat on the host (its combat stance and powered weapons) */
+  combat?: boolean;
+  /** A player's character: the icons of its combat action and what's queued after it, for its player's HUD */
+  queue?: string[];
   /** Host is executing an intent for this player-owned actor, so the host owns its position */
   hostDriven?: boolean;
   /** Last client intent sequence number the host has applied to this actor */
@@ -164,6 +198,10 @@ export interface GMSerializedActor {
   hidden?: boolean;
   /** In stealth (shown see-through) */
   stealth?: boolean;
+  /** Movement speed multiplier from active speed effects (1 = normal) */
+  movementSpeed?: number;
+  /** True when the creature is a Force user on the host */
+  forceUser?: boolean;
   rightHandResRef?: string;
   leftHandResRef?: string;
   armorResRef?: string;
@@ -202,6 +240,10 @@ export interface GMSessionRules {
   frozen?: boolean;
   /** How far character creation may go beyond the game's rules (CharacterRules) */
   creation?: ICharacterLimits;
+  /** A cutscene is on: players watch the GM camera in widescreen (GMCutscene) */
+  cutscene?: { active: boolean; caption?: string };
+  /** Tactical pause: a player's open power wheel holds the world; by names who is choosing now */
+  tacticalPause?: { enabled: boolean; by?: string[] };
 }
 
 export interface GMWorldSnapshot {
@@ -213,6 +255,10 @@ export interface GMWorldSnapshot {
   actors: GMSerializedActor[];
   doors: GMSerializedDoorState[];
   mines?: GMSerializedMine[];
+  /** Rooms of other areas the GM placed in the scene (GMSetPieces); put in before the actors standing on them */
+  sets?: AreaSetPieceDef[];
+  /** Lasting effects on the scene's objects that change how they look (an aura, a stun), for a player joining now */
+  effects?: { netId: string; effect: GMEffectMirror }[];
   /** The music, sound and look the GM gave this scene */
   atmosphere?: GMAtmosphereSettings;
 }
@@ -237,6 +283,8 @@ export interface GMClientInput {
   animState: number;
   /** The last GM teleport this player has seen; older positions are dropped */
   teleportSeq: number;
+  /** Our character's held stance, sent when it changes (sitting down, standing up) */
+  stance?: string;
 }
 
 /**
@@ -258,6 +306,7 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   stealth: { hostDriven: false, interrupts: false },
   levelup: { hostDriven: false, interrupts: false },
   roll: { hostDriven: false, interrupts: false },
+  wheel: { hostDriven: false, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */
@@ -277,8 +326,12 @@ export interface GMPacketMap {
   'client.input': GMClientInput;
   'client.intent': GMClientIntent;
   'chat.message': { sender: string; text: string };
+  /** Host to one player: something about what they asked for (why a power didn't go off). Their HUD shows it */
+  'player.notice': { text: string };
   'mine.state': GMSerializedMine;
   'mine.remove': { netId: string };
+  'set.state': AreaSetPieceDef;
+  'set.remove': { id: string };
   'fx.event': GMFxEvent;
   'container.open': { containerNetId: string; items: GMLootItem[] };
   'container.loot': { items: GMLootItem[]; [key: string]: any };
@@ -293,8 +346,11 @@ export interface GMPacketMap {
   'talk.line': any;
   'talk.end': { convId?: string; [key: string]: any };
   'roll.result': { name: string; netId?: string; label: string; roll: number; bonus: number; total: number };
+  'alignment.shift': { targetName: string; targetNetId?: string; alignment: 'light' | 'dark'; points: number; total: number; soundResRef: string; text: string };
   'talk.camera': { convId?: string; camera?: { focus: string; shot: 'close' | 'shoulder' | 'both' } };
   'session.rules': GMSessionRules;
+  /** The GM camera during a cutscene (GMCutscene): cut jumps there instead of easing */
+  'cutscene.pose': { x: number; y: number; z: number; yaw: number; pitch: number; hfov: number; cut?: boolean };
   'scene.atmosphere': { atmosphere: GMAtmosphereSettings };
   'player.respawn': Record<string, never>;
 }
@@ -323,7 +379,7 @@ export interface GMWorldSource {
   buildWorldSnapshot(): GMWorldSnapshot;
   serializeActorsForTick(): GMSerializedActor[];
   /** A networked object, for streaming our own character's position */
-  getNetObject(netId: string): { position: { x: number; y: number; z: number }; getFacing?: () => number; animState?: number } | undefined;
+  getNetObject(netId: string): { position: { x: number; y: number; z: number }; getFacing?: () => number; animState?: number; animationState?: { index: number } } | undefined;
 }
 
 const PEER_ID_STORAGE_KEY = 'kotor_gm_peer_id';
@@ -372,6 +428,17 @@ export class GMNetworkManager {
   static assignedActorNetId: string | null = null;
   /** Client: the latest GM teleport of our character we've applied; our position reports carry it */
   static teleportSeq: number = 0;
+
+  /** The stance our character last told the host about */
+  static sentStance: string | undefined = undefined;
+
+  /** Our character's held stance, when it has changed since we last sent it */
+  static stanceToSend(controlled: any): { stance?: string } {
+    const stance = String(controlled?.heldStance || '');
+    if (stance === this.sentStance) return {};
+    this.sentStance = stance;
+    return { stance };
+  }
   static joinState: GMJoinState = 'idle';
   static joinError: string = '';
   static joinTimer: ReturnType<typeof setTimeout> | null = null;
@@ -749,7 +816,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {
@@ -868,8 +935,10 @@ export class GMNetworkManager {
             y: controlled.position.y,
             z: controlled.position.z,
             facing: typeof controlled.getFacing === 'function' ? controlled.getFacing() : 0,
-            animState: controlled.animState || 0,
-            teleportSeq: this.teleportSeq
+            animState: controlled.animationState?.index ?? controlled.animState ?? 0,
+            teleportSeq: this.teleportSeq,
+            // Our character sat down or stood up: the host's copy (and everyone's) does too
+            ...(this.stanceToSend(controlled))
           });
       }
     }

@@ -424,7 +424,7 @@ export class ShaderOdysseyModel extends Shader {
           outgoingLight += (envColor.xyz * specularStrength * reflectivity) * (1.0 - diffuseColor.a);
         #endif
       #endif
-      #ifdef SABER
+      #if defined( SABER ) && defined( USE_MAP )
         sampledDiffuseColor = texture2D( map, vUv );
         gl_FragColor = sampledDiffuseColor;
       #else

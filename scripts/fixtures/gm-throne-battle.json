@@ -1,0 +1,329 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Battle for the Throne",
+  "summary": "Ten against ten in Onderon's throne room: the player and nine allies against the Sith holding the throne.",
+  "content": "tsl",
+  "area": {
+    "game": "tsl",
+    "module": "506ond",
+    "reason": "Onderon's own throne room: a long hall with the throne at its north end."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "room:506ondd",
+      "offset": [
+        0,
+        -30
+      ]
+    },
+    "facing": 0,
+    "note": "South end of the throne room, behind the allies."
+  },
+  "actors": [
+    {
+      "id": "guardians",
+      "name": "Jedi Guardian",
+      "template": "n_jedimemm",
+      "faction": "friendly",
+      "count": 2,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          -4,
+          -26
+        ],
+        "formation": "line",
+        "spacing": 3
+      },
+      "facing": 0,
+      "customize": {
+        "level": 15,
+        "class": "Jedi Guardian",
+        "rightHand": "g_w_lghtsbr01",
+        "armor": "a_robe_13"
+      }
+    },
+    {
+      "id": "consular",
+      "name": "Jedi Consular",
+      "template": "n_jedicounf",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          6,
+          -27
+        ]
+      },
+      "facing": 0,
+      "customize": {
+        "level": 15,
+        "class": "Jedi Consular",
+        "rightHand": "g_w_lghtsbr03",
+        "armor": "a_robe_13"
+      }
+    },
+    {
+      "id": "security",
+      "name": "Telos Security",
+      "template": "n_tsfoff",
+      "faction": "friendly",
+      "count": 3,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          -29
+        ],
+        "formation": "line",
+        "spacing": 3
+      },
+      "facing": 0,
+      "customize": {
+        "level": 14,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04",
+        "armor": "a_medium_01"
+      },
+      "loot": [
+        "g_w_fraggren01",
+        "g_w_fraggren01",
+        "g_i_medeqpmnt02"
+      ]
+    },
+    {
+      "id": "mandalorian",
+      "name": "Mandalorian Captain",
+      "template": "g_mandalor03",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          -9,
+          -28
+        ]
+      },
+      "facing": 0,
+      "customize": {
+        "level": 15
+      },
+      "loot": [
+        "g_w_thermldet01",
+        "g_i_medeqpmnt02"
+      ]
+    },
+    {
+      "id": "hk47",
+      "name": "HK-47",
+      "template": "p_hk47",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          9,
+          -29
+        ]
+      },
+      "facing": 0,
+      "customize": {
+        "level": 15
+      },
+      "loot": [
+        "g_w_iongren01"
+      ]
+    },
+    {
+      "id": "baodur",
+      "name": "Bao-Dur",
+      "template": "p_baodur",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          4,
+          -31
+        ]
+      },
+      "facing": 0,
+      "customize": {
+        "level": 15
+      },
+      "loot": [
+        "g_i_medeqpmnt02"
+      ]
+    },
+    {
+      "id": "sithlord",
+      "name": "Sith Lord",
+      "template": "g_darkjedi04",
+      "faction": "hostile",
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          14
+        ]
+      },
+      "facing": 180,
+      "customize": {
+        "level": 14
+      }
+    },
+    {
+      "id": "masters",
+      "name": "Dark Jedi Master",
+      "template": "g_dark_mas01m",
+      "faction": "hostile",
+      "count": 2,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          11
+        ],
+        "formation": "line",
+        "spacing": 6
+      },
+      "facing": 180,
+      "customize": {
+        "level": 13
+      }
+    },
+    {
+      "id": "assassins",
+      "name": "Sith Assassin",
+      "template": "g_sithass01",
+      "faction": "hostile",
+      "count": 3,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          8
+        ],
+        "formation": "line",
+        "spacing": 4
+      },
+      "facing": 180,
+      "customize": {
+        "level": 11,
+        "class": "Scoundrel",
+        "rightHand": "g_w_dblsbr001"
+      }
+    },
+    {
+      "id": "droids",
+      "name": "Assault Droid",
+      "template": "c_drdmkone",
+      "faction": "hostile",
+      "count": 2,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          16
+        ],
+        "formation": "line",
+        "spacing": 10
+      },
+      "facing": 180,
+      "customize": {
+        "level": 9
+      }
+    },
+    {
+      "id": "troopers",
+      "name": "Sith Trooper",
+      "template": "g_sithtroop02",
+      "faction": "hostile",
+      "count": 2,
+      "at": {
+        "spot": "room:506ondd",
+        "offset": [
+          0,
+          18
+        ],
+        "formation": "line",
+        "spacing": 5
+      },
+      "facing": 180,
+      "customize": {
+        "level": 12,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      },
+      "loot": [
+        "g_w_fraggren01",
+        "g_w_fraggren01",
+        "g_i_medeqpmnt01"
+      ]
+    }
+  ],
+  "props": [],
+  "beats": [
+    {
+      "title": "Advance",
+      "narration": "Both sides advance across the throne room.",
+      "actions": [
+        {
+          "do": "order",
+          "ids": [
+            "guardians",
+            "consular",
+            "security",
+            "mandalorian",
+            "hk47",
+            "baodur"
+          ],
+          "order": {
+            "kind": "move",
+            "to": {
+              "spot": "room:506ondd",
+              "offset": [
+                0,
+                -6
+              ],
+              "formation": "line",
+              "spacing": 2.5
+            }
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "sithlord",
+            "masters",
+            "assassins",
+            "droids",
+            "troopers"
+          ],
+          "order": {
+            "kind": "move",
+            "to": {
+              "spot": "room:506ondd",
+              "offset": [
+                0,
+                2
+              ],
+              "formation": "line",
+              "spacing": 2.5
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

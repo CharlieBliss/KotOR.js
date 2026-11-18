@@ -27,6 +27,7 @@ export class ApplicationWindow {
         contextIsolation: true,
         sandbox: false,
         experimentalFeatures: true,
+        backgroundThrottling: false,
       }
     });
 

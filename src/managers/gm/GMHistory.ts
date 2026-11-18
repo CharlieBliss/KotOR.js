@@ -22,6 +22,7 @@ export interface GMObjectSnapshot {
   scale: number;
   stance?: string;
   combatStyle?: 'all' | 'weapons' | 'attack';
+  scripted?: boolean;
   order?: GMNpcOrder;
 }
 
@@ -95,6 +96,7 @@ export class GMHistory {
       scale: obj.gmScale || 1,
       stance: isCreature ? GMManager.stanceOf(cre) || undefined : undefined,
       combatStyle: isCreature ? cre.gmCombatStyle || 'all' : undefined,
+      scripted: isCreature ? !!cre.gmScripted : undefined,
       order: order ? JSON.parse(JSON.stringify(order)) : undefined,
     };
   }
@@ -227,6 +229,7 @@ export class GMHistory {
       if (typeof state.hp === 'number' && (cre.getHP() !== state.hp || cre.getMaxHP() !== state.maxHp)) GMManager.setCreatureHP(cre, state.hp, state.maxHp);
       if ((GMManager.stanceOf(cre) || '') !== (state.stance || '')) GMManager.setCreatureStance(cre, state.stance || '');
       if ((cre.gmCombatStyle || 'all') !== (state.combatStyle || 'all')) GMCombatAI.setStyle(cre, state.combatStyle || 'all');
+      if (!!cre.gmScripted !== !!state.scripted) GMCombatAI.setScripted(cre, !!state.scripted);
       const order = GMNpcOrders.getOrder(cre);
       if (JSON.stringify(order || null) !== JSON.stringify(state.order || null) && GMManager.canOrder(cre)) {
         GMManager.giveOrder(cre, state.order ? JSON.parse(JSON.stringify(state.order)) : undefined);

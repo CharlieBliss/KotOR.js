@@ -1,4 +1,6 @@
 import { CharacterRules, ABILITIES } from "@/engine/rules/CharacterRules";
+import { GMCombatAI } from "@/managers/gm/GMCombatAI";
+import { GMPlayerHud } from "@/managers/gm/GMPlayerHud";
 import { GMCharacters } from "@/managers/gm/GMCharacters";
 import type { GMCharacter, GMPlayerSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
@@ -37,8 +39,22 @@ import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSessions } from "@/managers/gm/GMSessions";
 import { GMLog } from "@/managers/gm/GMLog";
+import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayerRequests } from "@/managers/gm/GMPlayerRequests";
+import { UINotificationManager } from "@/managers/UINotificationManager";
+import { UIIconTimerType } from "@/enums/engine/UIIconTimerType";
+
+export interface GMAlignmentAlert {
+  id: string;
+  targetName: string;
+  targetNetId?: string;
+  alignment: 'light' | 'dark';
+  points: number;
+  total: number;
+  text: string;
+  at: number;
+}
 
 /** Players in a GM session: their characters' sheets and inventories (kept by the host), what they ask the host to do, looting, rewards, questions from the GM, and what happens when they fall. */
 export class GMPlayers {
@@ -317,6 +333,104 @@ export class GMPlayers {
     GMManager.notifyChange();
   }
 
+  /** Recent Light/Dark alignment shift banners shown to all connected players */
+  static alignmentAlerts: GMAlignmentAlert[] = [];
+  static ALIGNMENT_ALERT_MS = 6500;
+
+  static activeAlignmentAlerts(now: number = Date.now()): GMAlignmentAlert[] {
+    this.alignmentAlerts = this.alignmentAlerts.filter((a) => now - a.at < this.ALIGNMENT_ALERT_MS);
+    return this.alignmentAlerts;
+  }
+
+  /** Play Light/Dark Side shift stinger + record visible alert banner */
+  static notifyAlignmentShift(payload: GMPacketMap['alignment.shift']) {
+    if (!payload) return;
+    UINotificationManager.PlayAlignmentShiftSound?.(payload.alignment, payload.soundResRef);
+    const localPlayer = GameState.getCurrentPlayer?.();
+    if (!payload.targetNetId || (localPlayer as any)?.gmNetId === payload.targetNetId || GMManager.isGMUser?.()) {
+      if (payload.alignment === 'light') UINotificationManager.LightShiftTimer = 10;
+      else UINotificationManager.DarkShiftTimer = 10;
+    }
+    this.alignmentAlerts.push({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      targetName: payload.targetName,
+      targetNetId: payload.targetNetId,
+      alignment: payload.alignment,
+      points: payload.points,
+      total: payload.total,
+      text: payload.text,
+      at: Date.now(),
+    });
+    if (this.alignmentAlerts.length > 4) this.alignmentAlerts.shift();
+    GMManager.notifyChange();
+  }
+
+  /** Host: award Light Side or Dark Side points to one player (`peerId` or `netId` or creature), or `'all'`, and alert everyone */
+  static giveAlignment(target: string | ModuleCreature, alignment: 'light' | 'dark', amount: number = 5): boolean {
+    const points = Math.round(Number(amount));
+    if (!(points > 0)) return false;
+
+    const recipients: ModuleCreature[] = [];
+    const pushUnique = (cre: ModuleCreature | null | undefined) => {
+      if (cre && !recipients.includes(cre)) recipients.push(cre);
+    };
+
+    if (typeof target === 'string') {
+      if (target === 'all') {
+        for (const peer of GMNetworkManager.peers.values()) pushUnique(this.getPeerActor(peer.peerId));
+        for (const pc of GMManager.getPlayerCharacters()) pushUnique(pc);
+      } else {
+        pushUnique(this.getPeerActor(target) || (GMManager.netIdMap.get(target) as ModuleCreature | undefined));
+      }
+    } else if (target) {
+      pushUnique(target);
+    }
+
+    if (!recipients.length) return false;
+
+    const label = alignment === 'light' ? 'Light Side' : 'Dark Side';
+    const soundResRef = UINotificationManager.GetAlignmentShiftSound?.(alignment) || (alignment === 'light' ? 'mus_s_lightshort' : 'mus_s_darkshort');
+
+    for (const actor of recipients) {
+      const before = Number(actor.getGoodEvil?.() ?? actor.goodEvil ?? 50);
+      if (typeof actor.adjustAlignment === 'function') {
+        // 2 = ALIGNMENT_LIGHT, 3 = ALIGNMENT_DARK
+        actor.adjustAlignment(points, alignment === 'light' ? 2 : 3);
+      } else {
+        const delta = alignment === 'light' ? points : -points;
+        actor.goodEvil = Math.max(0, Math.min(100, before + delta));
+      }
+    }
+
+    const primary = recipients[0];
+    const total = Math.round(Number(primary.getGoodEvil?.() ?? primary.goodEvil ?? 50));
+    const targetName = recipients.length > 1
+      ? `All players (${recipients.length})`
+      : (primary.getName?.() || 'Player');
+    const text = recipients.length > 1
+      ? `The GM awarded ${targetName} ${points} ${label} point${points === 1 ? '' : 's'}!`
+      : `${targetName} gained ${points} ${label} point${points === 1 ? '' : 's'}! (${total}/100)`;
+
+    const payload: GMPacketMap['alignment.shift'] = {
+      targetName,
+      targetNetId: recipients.length === 1 ? primary.gmNetId : undefined,
+      alignment,
+      points,
+      total,
+      soundResRef,
+      text,
+    };
+
+    GMNetworkManager.appendChat('GM', text);
+    if (GMNetworkManager.role === 'host') {
+      GMNetworkManager.send('alignment.shift', payload);
+      this.updatePlayerSheets();
+    }
+    this.notifyAlignmentShift(payload);
+    GMManager.notifyChange();
+    return true;
+  }
+
   /** Host: award XP to one connected player; it reaches them with their next character sheet */
   static giveXP(peerId: string, amount: number): boolean {
     const actor = this.getPeerActor(peerId);
@@ -367,7 +481,7 @@ export class GMPlayers {
   static buildPlayerSheet(cre: ModuleCreature): GMPlayerSheet {
     const equipment: Record<string, string> = {};
     for (const slot of this.PLAYER_EQUIP_SLOTS) {
-      const item: ModuleItem | undefined = (cre.equipment as any)[slot];
+      const item: ModuleItem | undefined = (cre.equipment as any)?.[slot];
       const resRef = gmItemResRef(item);
       if (resRef) equipment[slot] = resRef;
     }
@@ -377,12 +491,13 @@ export class GMPlayers {
       attributes: { str: cre.str, dex: cre.dex, con: cre.con, int: cre.int, wis: cre.wis, cha: cre.cha },
       feats: (cre.feats || []).map((f) => f.id),
       skills: (cre.skills || []).map((s) => s?.rank ?? 0),
-      hp: cre.getHP(),
-      maxHp: cre.getMaxHP(),
+      hp: cre.getHP?.() ?? (cre.currentHitPoints || 0),
+      maxHp: cre.getMaxHP?.() ?? (cre.maxHitPoints || 0),
       forcePoints: cre.forcePoints || 0,
       maxForcePoints: cre.maxForcePoints || 0,
       currentForce: cre.currentForce || 0,
       xp: cre.experience || 0,
+      goodEvil: cre.getGoodEvil?.() ?? cre.goodEvil ?? 50,
       naturalAC: cre.naturalAC || 0,
       equipment,
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
@@ -405,14 +520,23 @@ export class GMPlayers {
     }
   }
 
+  /**
+   * Host: tell a player why something they asked for didn't happen. It was only written in the GM's chat, so to
+   * the player a power, item or action that the host refused simply never went off. Shown on their HUD
+   */
+  static tellPlayer(peerId: string | undefined, text: string) {
+    GMNetworkManager.appendChat('System', text);
+    if (peerId && GMNetworkManager.role === 'host') GMNetworkManager.send('player.notice', { text }, peerId);
+  }
+
   /** Host: put an item from the player's inventory into an equipment slot */
-  static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string) {
+  static async equipOnHost(actor: ModuleCreature, slot: number, resRef: string, peerId?: string) {
     const slotName = ModuleCreatureArmorSlot[slot];
     if (!slotName || !this.PLAYER_EQUIP_SLOTS.includes(slotName) || !resRef) return;
     if (!this.getPlayerInventory(actor).some((e) => e.resRef === resRef)) return;
     const wanted = await GMSpawner.createItemFromResRefAsync(resRef);
     if (wanted && actor.canUseItem?.(wanted) === false) {
-      GMNetworkManager.appendChat('System', `${actor.getName()} can't use that: it needs a feat they don't have.`);
+      this.tellPlayer(peerId, `${actor.getName()} can't use that: it needs a feat they don't have.`);
       return;
     }
     if (!this.removeFromPlayerInventory(actor, resRef)) return;
@@ -498,6 +622,9 @@ export class GMPlayers {
     cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
     sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
     cre.experience = sheet.xp;
+    // Set, not setGoodEvil: that queues KotOR's own shift icon and stinger, and the GM's alignment.shift has
+    // already played it (it played twice for the player who got the points)
+    if (typeof sheet.goodEvil === 'number') cre.goodEvil = Math.max(0, Math.min(100, sheet.goodEvil));
     if (typeof sheet.naturalAC === "number") cre.naturalAC = sheet.naturalAC;
     cre.forcePoints = sheet.forcePoints;
     cre.maxForcePoints = sheet.maxForcePoints;
@@ -552,6 +679,7 @@ export class GMPlayers {
     peerInfo.controlledNetId = spawnedNetId;
     net.sendWorldSnapshot(peerId);
     if (spawnedNetId) assign(spawnedNetId);
+    this.updatePlayerSheets();
     net.notifyChange();
   }
 
@@ -561,25 +689,26 @@ export class GMPlayers {
    */
   static INTENT_HANDLERS: Record<GMIntentKind, (actor: ModuleCreature, intent: GMClientIntent, peerId: string) => void | boolean | Promise<boolean>> = {
     loot: (actor, intent, peerId) => GMPlayers.grantLootOnHost(peerId, actor, intent.targetNetId),
-    equip: (actor, intent) => {
-      GMPlayers.equipOnHost(actor, intent.slot, intent.resRef).catch((e) => console.warn('[GMPlayers] equip failed', e));
+    equip: (actor, intent, peerId) => {
+      GMPlayers.equipOnHost(actor, intent.slot, intent.resRef, peerId).catch((e) => console.warn('[GMPlayers] equip failed', e));
     },
     unequip: (actor, intent) => GMPlayers.unequipOnHost(actor, intent.slot),
     stealth: (actor) => actor.setStealthMode(!actor.stealthMode),
     levelup: (actor) => GMPlayers.levelUpOnHost(actor),
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
-    cancel: () => false,
-    mine: (actor, intent) => {
+    cancel: (actor) => { actor.gmFightTarget = undefined; return false; },
+    wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
+    mine: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMMines.useMineOnHost(actor, intent).then((ok) => {
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't do that right now.`);
+        if (!ok) GMPlayers.tellPlayer(peerId, `${actor.getName()} can't do that right now.`);
         return ok;
       });
     },
-    ability: (actor, intent) => {
+    ability: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMPlayers.useAbilityOnHost(actor, intent).then((ok) => {
-        if (!ok) GMNetworkManager.appendChat('System', `${actor.getName()} can't use that right now.`);
+        if (!ok) GMPlayers.tellPlayer(peerId, GMPlayers.whyNot(actor, intent));
         return ok;
       });
     },
@@ -587,6 +716,44 @@ export class GMPlayers {
     attack: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
     use: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
   };
+
+  /** Host: why a power, feat, skill or item a player asked for couldn't be used, in words they can act on */
+  static whyNot(actor: ModuleCreature, intent: GMClientIntent): string {
+    const name = actor.getName() || 'You';
+    const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
+    if (actor.isDead?.()) return `${name} is down.`;
+    if (!target || target.gmHidden) return "That target isn't there any more.";
+    const id = Number(intent.abilityId);
+    if (intent.ability === 'spell') {
+      const spell = actor.getSpells().find((s: any) => s.id === id);
+      if (!spell) return `${name} doesn't know that power.`;
+      const rule = GMCombatAI.powerTargetRule(spell.forcehostile);
+      if (target !== actor && !GMCombatAI.worksOn(rule, target)) return `That power only works on ${GMCombatAI.ruleText(rule)}.`;
+      const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
+      if (cost > actor.getFP()) return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
+    }
+    if (intent.ability === 'feat' && !actor.getFeats().some((f: any) => f.id === id)) return `${name} doesn't have that feat.`;
+    if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
+    if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
+    return `${name} can't use that right now.`;
+  }
+
+  /**
+   * Host: a player's character finished a combat round with nothing more queued: it goes on attacking the enemy its
+   * player chose, as the character you control does in KotOR, until that enemy is down or the player moves away
+   * (a cancel). KotOR's AI scripts used to do this for it, and picked their own attacks over the player's powers
+   */
+  static keepFighting(actor: ModuleCreature) {
+    const round = actor.combatRound;
+    if (!round || round.action || round.scheduledActionList.length || actor.isDead()) return;
+    const target = actor.gmFightTarget as ModuleCreature | undefined;
+    if (!target || target.isDead?.() || target.gmHidden || !GMObjectKind.isCreature(target) || !target.isHostile?.(actor)) {
+      actor.gmFightTarget = undefined;
+      return;
+    }
+    if (GMManager.isPlayerFrozen(actor) || actor.isDebilitated?.()) return;
+    actor.attackCreature(target, undefined);
+  }
 
   /** Open a door, attack a creature or use an object: the host walks the character there and does it */
   static actOnTarget(actor: ModuleCreature, intent: GMClientIntent): boolean {
@@ -597,7 +764,10 @@ export class GMPlayers {
     if (intent.kind === 'open' && !GMObjectKind.isDoor(target)) return false;
     if (intent.kind === 'attack' && !GMObjectKind.isCreature(target)) return false;
     if (intent.kind === 'open') actor.actionOpenDoor(target);
-    else if (intent.kind === 'attack') actor.attackCreature(target, undefined);
+    else if (intent.kind === 'attack') {
+      actor.attackCreature(target, undefined);
+      actor.gmFightTarget = target;
+    }
     else actor.actionUseObject(target);
     return true;
   }
@@ -616,6 +786,7 @@ export class GMPlayers {
     // A watching player can't act (a late request from before the freeze is dropped too)
     if (GMManager.playersFrozen && intent.kind !== 'cancel') {
       GMLog.info('host', `${request}: ignored, players are watching (frozen)`);
+      if (intent.kind !== 'wheel') this.tellPlayer(peerId, 'The GM has everyone watching for now.');
       return;
     }
     const meta = GM_INTENTS[intent.kind];
@@ -625,7 +796,21 @@ export class GMPlayers {
       return;
     }
 
-    if (meta.interrupts) actor.clearAllActions();
+    // Already attacking the enemy they clicked: the attack carries on (restarting it cost the swing in progress)
+    if (intent.kind === 'attack' && target && GMObjectKind.isCreature(target) && this.isAttackingTarget(actor, target as ModuleCreature)) {
+      actor.gmNetTarget = undefined;
+      actor.gmHostDriven = true;
+      GMLog.info('host', `${request}: already on it`);
+      return;
+    }
+    // A power, combat feat or item joins the combat queue behind what's there, as in KotOR (each one cleared
+    // the queue: it never filled, and a power waiting for its round was dropped by the next click)
+    const queues = intent.kind === 'ability' && this.QUEUED_ABILITIES.includes(String(intent.ability));
+    if (queues && (actor.combatRound?.scheduledActionList?.length || 0) >= this.QUEUE_LIMIT) {
+      this.tellPlayer(peerId, `${actor.getName()}'s queue is full: wait for what's queued, or Stop.`);
+      return;
+    }
+    if (meta.interrupts && !queues) actor.clearAllActions();
     const result = handler(actor, intent, peerId);
     if (!meta.interrupts) {
       GMLog.info('host', request);
@@ -643,6 +828,18 @@ export class GMPlayers {
     }
   }
 
+  /** Abilities that queue in combat rather than interrupt */
+  static QUEUED_ABILITIES = ['spell', 'feat', 'item'];
+  /** Actions waiting behind the current one, at most (KotOR's HUD shows the current one and three more) */
+  static QUEUE_LIMIT = 3;
+
+  /** Host: this character's attack (queued, or its combat round's) is on that target */
+  static isAttackingTarget(actor: ModuleCreature, target: ModuleCreature): boolean {
+    const round = actor.combatRound;
+    const attack = (a: any) => a && a.target === target && (a.actionType === CombatActionType.ATTACK || a.actionType === CombatActionType.ATTACK_USE_FEAT);
+    return attack(round?.action) || !!round?.scheduledActionList?.some(attack);
+  }
+
   /**
    * Host: use a Force power, feat, skill or item a player picked from KotOR's action menu, through the same
    * engine path as anyone else. It must be theirs: a power or feat their character knows, a skill they have
@@ -652,12 +849,16 @@ export class GMPlayers {
     if (!actor || actor.isDead()) return false;
     const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
     if (!target || target.gmHidden) return false;
+    // Aimed at an enemy: that's who they're fighting now (they go back to attacking it after)
+    if (target !== actor && GMObjectKind.isCreature(target) && (target as ModuleCreature).isHostile?.(actor)) actor.gmFightTarget = target;
     const id = Number(intent.abilityId);
 
     switch (intent.ability) {
       case 'spell': {
         const spell = actor.getSpells().find((s: any) => s.id === id);
         if (!spell) return false;
+        // Disable Droid on a person, and the like: it does nothing, so it isn't cast
+        if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }
@@ -757,6 +958,7 @@ export class GMPlayers {
       return send('skill', SkillType.SECURITY, tool && typeof tool === 'object' ? tool.getItemResRef?.() : undefined);
     }
     GMNetworkManager.appendChat('System', "That can't be done in a GM session yet.");
+    GMPlayerHud.notice("That can't be done in a GM session yet.");
     return true;
   }
 
@@ -976,3 +1178,22 @@ GMNetworkManager.on('player.sheet', 'client', async (packet) => {
 GMNetworkManager.on('container.loot', 'client', async (packet) => {
   if (packet.payload) await GMPlayers.receiveNetworkLoot(packet.payload.items || []);
 }, 'to-me');
+
+// A notice from the host about something this player asked for: their HUD shows it (and it goes in their chat)
+GMNetworkManager.on('player.notice', 'client', (packet) => {
+  const text = packet.payload?.text;
+  if (!text) return;
+  GMNetworkManager.appendChat('System', text);
+  GMPlayerHud.notice(text);
+}, 'to-me-or-all');
+
+
+// Broadcast to all connected players when the GM awards Light Side or Dark Side points
+GMNetworkManager.on('alignment.shift', 'client', (packet) => {
+  const payload = packet.payload;
+  if (!payload) return;
+  GMNetworkManager.appendChat('GM', payload.text);
+  GMPlayers.notifyAlignmentShift(payload);
+  const characterMenu = GameState.MenuManager?.MenuCharacter;
+  if (characterMenu?.bVisible) characterMenu.updateCharacterStats?.(GameState.getCurrentPlayer());
+});

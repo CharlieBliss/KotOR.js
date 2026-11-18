@@ -9,6 +9,7 @@ import { GameState } from "@/GameState";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { GMNpcOrders } from "@/managers/GMNpcOrders";
+import { GMViewport } from "@/managers/gm/GMViewport";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { ActionType } from "@/enums/actions/ActionType";
 
@@ -122,6 +123,55 @@ describe("GM orders for NPCs", () => {
     npc.position.set(6, 0, 0);
     GMNpcOrders.think(npc, [npc, far]);
     expect(moves(npc)[0].target.x).toBe(0);
+  });
+
+  test("a guard (or someone moving) put somewhere by the GM stays there instead of walking back", () => {
+    const placeable = { setAnimationState: jest.fn(), getCurrentRoom: jest.fn(), computeBoundingBox: jest.fn() };
+    const guard = creature("cre_0", 0, placeable);
+    GMManager.giveOrder(guard, { kind: "guard", point: { x: 0, y: 0, z: 0 }, radius: 8 });
+    GMManager.placeAt(guard, new THREE.Vector3(6, 2, 0));
+    expect((guard.gmOrder as any).point).toEqual({ x: 6, y: 2, z: 0 });
+    GMNpcOrders.think(guard, [guard]);
+    expect(moves(guard)).toEqual([]);
+
+    const walker = creature("cre_1", 0, placeable);
+    GMManager.giveOrder(walker, { kind: "move", point: { x: 10, y: 0, z: 0 } });
+    GMManager.placeAt(walker, new THREE.Vector3(3, 0, 0));
+    expect(walker.gmOrder).toMatchObject({ kind: "guard", point: { x: 3, y: 0, z: 0 } });
+    GMNpcOrders.think(walker, [walker]);
+    expect(moves(walker)).toEqual([]);
+  });
+
+  test("a selected NPC's patrol is drawn numbered, in order, with the point it's heading for; so is one being placed", () => {
+    const npc = creature("cre_0", 0);
+    const points = [{ x: 0, y: 0, z: 0 }, { x: 5, y: 0, z: 0 }, { x: 5, y: 5, z: 0 }];
+    GMManager.giveOrder(npc, { kind: "patrol", points, index: 2 });
+    GMManager.selection = [npc];
+    expect(GMManager.routesToShow()).toEqual([{ points, loop: true, next: 2, numbered: true }]);
+
+    GMManager.activeTool = "order_patrol";
+    GMViewport.patrolDraft = [{ x: 1, y: 1, z: 0 }, { x: 2, y: 2, z: 0 }];
+    expect(GMManager.routesToShow()[0]).toMatchObject({ points: GMViewport.patrolDraft, draft: true, numbered: true });
+    GMManager.activeTool = "select";
+    GMViewport.patrolDraft = [];
+    GMManager.selection = [];
+  });
+
+  test("melee reach: 2 m between people, more when bodies are too big to get that close", () => {
+    const { ModuleCreature } = jest.requireActual("@/module/ModuleCreature") as any;
+    const size = (creperspace: number) => Object.assign(Object.create(ModuleCreature.prototype), {
+      objectType: ModuleObjectType.ModuleObject | ModuleObjectType.ModuleCreature,
+      creatureAppearance: { creperspace, hitdist: creperspace > 2 ? 7 : 1 },
+      getAppearance() { return this.creatureAppearance; },
+    });
+    const person = size(0.4), hound = size(1.2), rancor = size(3.06);
+    expect(person.getMeleeRange(person)).toBe(2);
+    // Collision keeps a rancor and a hound 4.26 m apart: it has to reach further than that
+    expect(rancor.getMeleeRange(hound)).toBeGreaterThan(3.06 + 1.2);
+    expect(hound.getMeleeRange(rancor)).toBe(rancor.getMeleeRange(hound));
+    // Its size for steering is its body, not appearance.2da's hitdist of 7
+    expect(rancor.getHitDistance()).toBeCloseTo(3.06);
+    expect(person.getHitDistance()).toBe(1);
   });
 
   test("patrol: walks from point to point in a loop", () => {

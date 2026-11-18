@@ -168,6 +168,27 @@ export class CombatAttackData {
   }
 
   /**
+   * Highest Precise Shot rank (1..5) known by creature, per TSL `feat.2da`.
+   */
+  static GetPreciseShotRank(creature?: ModuleCreature): number {
+    if(!creature?.getHasFeat) return 0;
+    if(creature.getHasFeat(CombatFeatType.PRECISE_SHOT_V) || creature.getHasFeat(CombatFeatType.XXXPRECISE_SHOT_V)) return 5;
+    if(creature.getHasFeat(CombatFeatType.PRECISE_SHOT_IV) || creature.getHasFeat(CombatFeatType.XXXPRECISE_SHOT_IV)) return 4;
+    if(creature.getHasFeat(CombatFeatType.PRECISE_SHOT_III) || creature.getHasFeat(CombatFeatType.XXXPRECISE_SHOT_III)) return 3;
+    if(creature.getHasFeat(CombatFeatType.PRECISE_SHOT_II) || creature.getHasFeat(CombatFeatType.XXXPRECISE_SHOT_II)) return 2;
+    if(creature.getHasFeat(CombatFeatType.PRECISE_SHOT_I) || creature.getHasFeat(CombatFeatType.XXXPRECISE_SHOT_I)) return 1;
+    return 0;
+  }
+
+  /**
+   * Precise Shot I–V passive ranged damage bonus (+1 / +2 / +4 / +6 / +8).
+   */
+  static CalculatePreciseShotBonus(creature?: ModuleCreature): number {
+    const table = [0, 1, 2, 4, 6, 8];
+    return table[this.GetPreciseShotRank(creature)] || 0;
+  }
+
+  /**
    * Roll or resolve an NWScript DAMAGE_BONUS_* constant or flat bonus
    */
   static RollDamageBonusValue(bonusConst: number): number {
@@ -303,6 +324,13 @@ export class CombatAttackData {
       const specBonus = this.calculateWeaponSpecBonus(creature, this.attackWeapon);
       if(specBonus > 0){
         this.damageList[DamageType.BASE].addDamage(specBonus * damageMultiplier);
+      }
+
+      if(this.attackWeapon.isRangedWeapon()){
+        const preciseBonus = CombatAttackData.CalculatePreciseShotBonus(creature);
+        if(preciseBonus > 0){
+          this.damageList[baseDamageType].addDamage(preciseBonus);
+        }
       }
     }else{
       this.damageList[baseDamageType].addDamage(this.attackWeapon.getMonsterDamage() * damageMultiplier);

@@ -70,6 +70,11 @@ export class ActionUseObject extends Action {
       this.owner.speed = 0;
       //console.log(this.target);
 
+      // Something to sit on: sit in it (GM mode), instead of using it
+      if(GameState.hooks.useSeat(this.owner, this.target)){
+        return ActionStatus.COMPLETE;
+      }
+
       this.owner.setFacingObject( this.target );
 
       if(this.target != GameState.PartyManager.Player){

@@ -1,3 +1,4 @@
+import * as THREE from "three";
 import type { GMPlaceableSpawnConfig } from "@/managers/gm/GMTypes";
 import type { ModuleRoom } from "@/module/ModuleRoom";
 import { AudioEmitter } from "@/audio/AudioEmitter";
@@ -170,6 +171,46 @@ export class ModulePlaceable extends ModuleLockable {
     GameState.getCurrentPlayer().actionUseObject( this );
   }
 
+  static #wmTarget = new THREE.Matrix4();
+  static #wmDelta = new THREE.Matrix4();
+  static #wmEuler = new THREE.Euler();
+
+  /**
+   * Keep the collision walkmesh where the placeable is. It's put in world space once, when loaded, so a
+   * placeable moved or turned afterwards (by the GM, a script or a network update) would otherwise leave
+   * its collision behind: an invisible obstacle where it was, and nothing where it is.
+   */
+  syncWalkmesh(): void {
+    const wm = this.collisionManager.walkmesh;
+    if(!wm?.mesh?.geometry || !wm.mat4 || !wm._vertices?.length) return;
+    // A walkmesh parented to the model moves with it already
+    for(let p = wm.mesh.parent; p; p = p.parent){
+      if(p === this.container || p === this.model) return;
+    }
+    const target = ModulePlaceable.#wmTarget;
+    ModulePlaceable.#wmEuler.set(0, 0, this.rotation.z);
+    target.makeRotationFromEuler(ModulePlaceable.#wmEuler);
+    target.setPosition(this.position.x, this.position.y, this.position.z + .01);
+    const a = target.elements, b = wm.mat4.elements;
+    let same = true;
+    for(let i = 0; i < 16; i++){
+      if(Math.abs(a[i] - b[i]) > 1e-5){ same = false; break; }
+    }
+    if(same) return;
+    // The rendered and ray-tested mesh: undo where it was, then put it where it is
+    const delta = ModulePlaceable.#wmDelta.copy(wm.mat4).invert().premultiply(target);
+    wm.mesh.geometry.applyMatrix4(delta);
+    wm.mat4.copy(target);
+    // The collision data (vertices, normals, edges, face triangles share the vertices)
+    wm.updateMatrix();
+    for(const face of wm.faces){
+      const v1 = wm.vertices[face.a], v2 = wm.vertices[face.b], v3 = wm.vertices[face.c];
+      if(!face.normal || !v1 || !v2 || !v3) continue;
+      face.normal.copy(v3).sub(v2).cross(new THREE.Vector3().copy(v1).sub(v2)).normalize();
+      face.coeff = -((v1.x * face.normal.x) + (v1.y * face.normal.y) + (v1.z * face.normal.z));
+    }
+  }
+
   detachFromRoom(room: ModuleRoom): void {
     if(!room) return;
     const index = room.placeables.indexOf(this);
@@ -184,6 +225,7 @@ export class ModulePlaceable extends ModuleLockable {
 
     if(this.collisionManager.walkmesh && this.model){
       this.collisionManager.walkmesh.matrixWorld.copy(this.model.matrix);
+      this.syncWalkmesh();
     }
 
     if(this.model instanceof OdysseyModel3D){
@@ -307,7 +349,8 @@ export class ModulePlaceable extends ModuleLockable {
   }
 
   isUseable(){
-    return this.useable;
+    // In GM mode a chair or bench is there to sit on, whatever its template says
+    return this.useable || !!GameState.hooks?.isSeat?.(this);
   }
 
   isOpen(){

@@ -98,4 +98,16 @@ describe("GM selection", () => {
     // A creature put down by a drag stops what it was doing
     expect(a.clearAllActions).toHaveBeenCalled();
   });
+
+  test("a click on the floor under something picks it; a click on the floor beside it doesn't", () => {
+    const cre = mockObject('creature', { getHitDistance: () => 0.5 });
+    const crate = mockObject('placeable', { box: new THREE.Box3(new THREE.Vector3(4, -0.5, 0), new THREE.Vector3(6, 0.5, 1)) });
+    crate.position.set(5, 0, 0);
+    const at = (x: number, y: number, obj: any) => GMViewport.standsOn(obj, new THREE.Vector3(x, y, 0), Math.hypot(obj.position.x - x, obj.position.y - y));
+    expect(at(0.6, 0, cre)).toBe(true);
+    expect(at(1.2, 0, cre)).toBe(false);
+    // A prop counts by its outline, however long it is
+    expect(at(5.9, 0.4, crate)).toBe(true);
+    expect(at(5, 1, crate)).toBe(false);
+  });
 });

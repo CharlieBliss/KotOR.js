@@ -29,12 +29,19 @@ export class ModuleObjectManager {
   static module: Module;
 
   static ObjectList: Map<any, ModuleObject> = new Map();
-  static COUNT: number = 1;
+  /** The next object id. 1 is KotOR scripts' OBJECT_INVALID, so no object gets it (see SCRIPT_OBJECT_INVALID) */
+  static COUNT: number = 2;
+  /**
+   * KotOR's compiled scripts use 1 for OBJECT_INVALID (nwscript.nss: object OBJECT_INVALID = 1). An object
+   * holding id 1 (the first one loaded: Onderon palace's exit trigger) was found by scripts meaning "nobody",
+   * and area powers put their effects on it
+   */
+  static SCRIPT_OBJECT_INVALID = 1;
   static PLAYER_ID = ModuleObjectConstant.PLAYER_ID;
 
   static GetObjectById(id: ModuleObject|number = -1){
 
-    if(id == ModuleObjectConstant.OBJECT_INVALID)
+    if(id == ModuleObjectConstant.OBJECT_INVALID || id === this.SCRIPT_OBJECT_INVALID)
       return undefined;
 
     if(typeof id === 'object'){
@@ -89,7 +96,7 @@ export class ModuleObjectManager {
   }
 
   static Reset(){
-    this.COUNT = 1;
+    this.COUNT = 2;
     this.PLAYER_ID = ModuleObjectConstant.PLAYER_ID;
     this.ObjectList.clear();
   }
@@ -613,8 +620,18 @@ export class ModuleObjectManager {
 
     //console.log('GetObjectsInShape', objectFilter, shape);
 
+    // Nowhere to look around (a location with no position)
+    if(!target?.position){
+      return idx == -1 ? results : undefined;
+    }
+
     if((oType & NWModuleObjectType.CREATURE) == NWModuleObjectType.CREATURE){ //CREATURE
       object_pool = object_pool.concat(this.module.area.creatures);
+      // The party isn't in the area's creature list: area powers and grenades passed over it (in GM mode, every
+      // player's character)
+      for(const member of GameState.PartyManager?.party || []){
+        if(member && !object_pool.includes(member)) object_pool.push(member);
+      }
     }
 
     if((oType & NWModuleObjectType.ITEM) == NWModuleObjectType.ITEM){ //ITEM
@@ -697,6 +714,23 @@ export class ModuleObjectManager {
       this.#currentVisibleObjectIndex = 0;
       this.#currentVisibleObject = this.playerSelectableObjects[0];
     }
+  }
+
+  /**
+   * Tab targeting: the next (or previous, step -1) thing the player can use or fight, after the current one.
+   * They're in order of distance from the player, nearest first, and only ones on screen: the order the player
+   * sees, which doesn't reshuffle as the list is rebuilt each frame.
+   */
+  static CycleTarget(current: ModuleObject | undefined, step: 1 | -1 = 1): ModuleObject | undefined {
+    const player = GameState.getCurrentPlayer();
+    if(!player) return undefined;
+    const list = (this.playerSelectableObjects.length ? this.playerSelectableObjects : this.playerHoverableObjects)
+      .filter((o) => o && o !== player && !(o as any).destroyed && (typeof o.isOnScreen !== 'function' || o.isOnScreen()))
+      .sort((a, b) => a.position.distanceToSquared(player.position) - b.position.distanceToSquared(player.position));
+    if(!list.length) return undefined;
+    const at = current ? list.indexOf(current) : -1;
+    if(at < 0) return step > 0 ? list[0] : list[list.length - 1];
+    return list[(at + step + list.length) % list.length];
   }
 
   static GetNextPlayerVisibleObject(){

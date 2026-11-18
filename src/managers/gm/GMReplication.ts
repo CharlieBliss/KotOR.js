@@ -11,18 +11,22 @@ import { TextSprite3D } from "@/engine/TextSprite3D";
 import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import type { GameEffect } from "@/effects/GameEffect";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
+import { GameEffectType } from "@/enums/effects/GameEffectType";
 import {
   GMNetworkManager,
   GMSerializedActor,
   GMSerializedDoorState,
   GMWorldSnapshot,
   GMFxEvent,
+  GMEffectMirror,
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMAtmosphere } from "@/managers/gm/GMAtmosphere";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
+import { SpellCastInstance } from "@/combat/SpellCastInstance";
 
 /** Keeping players' games in step with the GM's: serializing the world, applying it on clients, smoothing replica motion and mirroring the host's visuals. */
 export class GMReplication {
@@ -34,12 +38,20 @@ export class GMReplication {
 
   static NET_SNAP_DISTANCE: number = 6;
 
+  /** How long a replayed swing, shot or reaction keeps its replica from going back to walking or running */
+  static FX_HOLD_MS: number = 900;
+
   // Animation states set alongside a replayed 2DA animation (see applyFxEventOnClient)
   static FX_DRIVEN_ANIM_STATES: number[] = [
     ModuleCreatureAnimState.ATTACK,
     ModuleCreatureAnimState.DAMAGE,
     ModuleCreatureAnimState.DODGE,
     ModuleCreatureAnimState.PARRY,
+    ModuleCreatureAnimState.CASTOUT1,
+    ModuleCreatureAnimState.CASTOUT2,
+    ModuleCreatureAnimState.CASTOUT3,
+    ModuleCreatureAnimState.THROW_HIGH,
+    ModuleCreatureAnimState.THROW_LOW,
   ];
 
   /**
@@ -88,8 +100,17 @@ export class GMReplication {
       facing: isPlaceable ? (obj.bearing || 0) : (obj as ModuleCreature).getFacing(),
       scale: obj.gmScale || 1.0,
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
+      combat: isPlaceable ? undefined : !!(obj as ModuleCreature).combatData?.combatState,
+      queue: obj.gmOwnerPeerId && !isPlaceable ? this.queueOf(obj as ModuleCreature) : undefined,
       hidden: !!obj.gmHidden,
       stealth: !!(obj as any).stealthMode,
+      movementSpeed: isPlaceable ? undefined : (obj as ModuleCreature).movementSpeed,
+      forceUser: isPlaceable ? undefined : (
+        ((obj as ModuleCreature).getMaxFP?.() || 0) > 0 ||
+        ((obj as ModuleCreature).getFP?.() || 0) > 0 ||
+        !!((obj as ModuleCreature).classes || []).some((c: any) => !!c?.spellcaster) ||
+        ((obj as ModuleCreature).getSpells?.() || []).length > 0
+      ) || undefined,
       hostDriven: !!obj.gmHostDriven,
       intentSeq: obj.gmIntentSeq || 0,
       rightHandResRef,
@@ -102,6 +123,15 @@ export class GMReplication {
       openState: isPlaceable ? (obj as ModulePlaceable).state : 0,
       lootResRefs: isPlaceable ? GMSpawner.lootOf(obj) : []
     };
+  }
+
+  /** Host: a player character's combat action and queue, as icons (what the HUD's queue shows) */
+  static queueOf(cre: ModuleCreature): string[] {
+    const round = cre.combatRound;
+    if (!round) return [];
+    const icons = [round.action?.iconResRef || '', ...round.scheduledActionList.slice(0, 3).map((a) => a?.iconResRef || '')];
+    while (icons.length && !icons[icons.length - 1]) icons.pop();
+    return icons;
   }
 
   static serializeActorsForTick(): GMSerializedActor[] {
@@ -149,7 +179,9 @@ export class GMReplication {
       actors: this.serializeActorsForTick(),
       doors,
       mines: GMMines.getMines().map((m) => GMMines.serializeMine(m)),
+      sets: GMSetPieces.serialize(),
       atmosphere: Object.keys(GMAtmosphere.current).length ? GMAtmosphere.current : undefined,
+      effects: this.lastingMirrors(),
     };
   }
 
@@ -206,11 +238,15 @@ export class GMReplication {
         this.applyDoorStateOnClient(ds);
       }
     }
+    // Sets first: characters stand on their floors
+    if (Array.isArray(snapshot.sets)) await GMSetPieces.sync(snapshot.sets);
     if (Array.isArray(snapshot.actors)) {
       for (const actor of snapshot.actors) {
         await this.spawnOrUpdateFromSerialized(actor);
       }
     }
+    // Auras, stuns and holds already on when we joined
+    for (const entry of snapshot.effects || []) this.applyEffectMirrorOnClient(entry.netId, entry.effect);
   }
 
   static applyWorldTickOnClient(actors: GMSerializedActor[]) {
@@ -225,6 +261,9 @@ export class GMReplication {
         ) {
           GMNetworkManager.awaitingHost = false;
         }
+        // What it's doing and has queued on the host, for our HUD (host-driven or not: in a fight it is)
+        const ownForQueue = GMManager.netIdMap.get(actor.netId) as ModuleCreature | undefined;
+        if (ownForQueue) ownForQueue.gmNetQueue = actor.queue || [];
         // While the host drives our actor, follow it like any other replica
         if (GMNetworkManager.awaitingHost) {
           this.spawnOrUpdateFromSerialized(actor);
@@ -237,6 +276,17 @@ export class GMReplication {
             GMManager.setCreatureHP(localObj as ModuleCreature, actor.hp, actor.maxHp);
             const own = localObj as ModuleCreature;
             if (!!own.stealthMode !== !!actor.stealth) own.setStealthMode(!!actor.stealth, true);
+            if (own.isForcePushed?.()) {
+              this.setNetTarget(own, actor.x, actor.y, actor.z);
+            } else if (own.gmNetTarget && !actor.hostDriven) {
+              own.gmNetTarget = undefined;
+            }
+            // Fights happen on the host: under attack there, our character takes its combat stance here too
+            if (actor.combat) own.resetExcitedDuration();
+            // What it's doing and has queued there, for our HUD
+            own.gmNetQueue = actor.queue || [];
+            // Our character fights on the host: its weapons light up here when it does
+            if (actor.combat !== undefined) this.syncWeaponPower(own, !!actor.combat || !!own.combatData?.combatState);
           } else {
             localObj.setMaxHP(actor.maxHp);
             localObj.currentHP = actor.hp;
@@ -253,7 +303,11 @@ export class GMReplication {
     const existing = GMManager.netIdMap.get(actor.netId);
     if (existing) {
       if (actor.kind === 'placeable') {
-        existing.position.set(actor.x, actor.y, actor.z);
+        if (existing.position.x !== actor.x || existing.position.y !== actor.y || existing.position.z !== actor.z) {
+          existing.position.set(actor.x, actor.y, actor.z);
+          if (existing.container) existing.container.position.copy(existing.position);
+          existing.computeBoundingBox?.(true);
+        }
       } else {
         this.setNetTarget(existing, actor.x, actor.y, actor.z);
         existing.gmNetAnim = actor.animState;
@@ -281,7 +335,10 @@ export class GMReplication {
       } else {
         const cre = existing as ModuleCreature;
         cre.setFacing(actor.facing, false);
+        this.syncCombatState(cre, actor.combat);
         if (!!cre.stealthMode !== !!actor.stealth) cre.setStealthMode(!!actor.stealth, true);
+        if (typeof actor.movementSpeed === 'number') cre.movementSpeed = actor.movementSpeed;
+        if (actor.forceUser !== undefined) (cre as any).gmForceUser = !!actor.forceUser;
         if (actor.stance !== undefined && (cre.heldStance || '') !== actor.stance) cre.setHeldStance(actor.stance);
         if (cre.factionId !== actor.factionId) {
           GMManager.assignFaction(cre, actor.factionId);
@@ -306,8 +363,12 @@ export class GMReplication {
 
   static async spawnFromSerialized(actor: GMSerializedActor): Promise<ModuleObject | null> {
     const spawned = await this.spawnFromSerializedInner(actor);
-    if (spawned && GMPlayers.pendingPlayerSheet?.netId === actor.netId) {
-      await GMPlayers.applyPlayerSheetOnClient(GMPlayers.pendingPlayerSheet);
+    if (spawned) {
+      if (actor.forceUser !== undefined) (spawned as any).gmForceUser = !!actor.forceUser;
+      if (typeof actor.movementSpeed === 'number') (spawned as any).movementSpeed = actor.movementSpeed;
+      if (GMPlayers.pendingPlayerSheet?.netId === actor.netId) {
+        await GMPlayers.applyPlayerSheetOnClient(GMPlayers.pendingPlayerSheet);
+      }
     }
     return spawned;
   }
@@ -447,11 +508,15 @@ export class GMReplication {
     if (!actor || actor.gmHostDriven) return;
     // Sent before the player's game had moved their character to where the GM teleported it
     if ((payload.teleportSeq ?? 0) < (actor.gmTeleportSeq || 0)) return;
-    if (typeof payload.x === 'number' && typeof payload.y === 'number') {
+    // Do not let client WASD override host-driven Force Push or debilitation positions
+    if (typeof payload.x === 'number' && typeof payload.y === 'number' && !actor.isDebilitated?.() && !actor.isDead?.()) {
       this.setNetTarget(actor, payload.x, payload.y, payload.z);
       if (typeof payload.facing === 'number') {
         actor.setFacing(payload.facing, false);
       }
+    }
+    if (typeof payload.stance === 'string' && (actor.heldStance || '') !== payload.stance) {
+      actor.setHeldStance(payload.stance);
     }
   }
 
@@ -465,12 +530,12 @@ export class GMReplication {
    * Host: a creature started a 2DA animation. Callers set the animation state index right after
    * (ATTACK, DAMAGE, DODGE...), so read it once the current call stack has finished.
    */
-  static onHostTwoDAAnimation(cre: ModuleCreature, animation: ITwoDAAnimation) {
+  static onHostTwoDAAnimation(cre: ModuleCreature, animation: ITwoDAAnimation, hold: number = 0) {
     const netId = this.getHostFxNetId(cre);
     if (!netId || !animation?.name) return;
     queueMicrotask(() => {
       if (cre.animationState?.animation !== animation) return;
-      GMNetworkManager.broadcastFx({ kind: 'anim', netId, anim: animation.name, index: cre.animationState.index });
+      GMNetworkManager.broadcastFx({ kind: 'anim', netId, anim: animation.name, index: cre.animationState.index, ...(hold > 0 ? { hold } : {}) });
     });
   }
 
@@ -481,41 +546,204 @@ export class GMReplication {
   }
 
   /** Host: a ranged attack fired a bolt; players draw it too */
-  static onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number) {
+  static onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number, options?: { deflected?: boolean; powerShot?: boolean }) {
     const netId = this.getHostFxNetId(caster);
     const targetNetId = this.getHostFxNetId(target);
     if (!netId || !targetNetId) return;
-    GMNetworkManager.broadcastFx({ kind: 'projectile', netId, targetNetId, ammunition, hit, delay });
-  }
-
-  static onHostVisualEffectApplied(effect: GameEffect) {
-    const netId = this.getHostFxNetId(effect.object);
-    if (!netId) return;
-    const fxId = GMManager.getNextNetId('fx');
-    (effect as any).gmFxId = fxId;
     GMNetworkManager.broadcastFx({
-      kind: 'vfx.add',
-      netId,
-      fxId,
-      vfx: effect.getInt(0),
-      miss: effect.getInt(2),
-      durationType: effect.getDurationType(),
-      duration: effect.getDuration(),
+      kind: 'projectile', netId, targetNetId, ammunition, hit, delay,
+      ...(options?.deflected ? { deflected: true } : {}),
+      ...(options?.powerShot ? { powerShot: true } : {}),
     });
   }
 
-  static onHostVisualEffectRemoved(effect: GameEffect) {
+  /** Host: a spell/power started casting; players replay its cast hand visual & projectile */
+  static onHostSpellCast(
+    caster: ModuleObject,
+    target: ModuleObject | undefined,
+    spellId: number,
+    casthandvisual: string,
+    projmodel: string,
+    castTime: number,
+    conjureTime: number,
+    range?: string,
+  ) {
+    const netId = this.getHostFxNetId(caster);
+    if (!netId) return;
+    const validStr = (s?: string) => (s && s !== '****' ? s : undefined);
+    const hand = validStr(casthandvisual);
+    const proj = validStr(projmodel);
+    if (!hand && !proj) return;
+    const targetNetId = target ? (this.getHostFxNetId(target) ?? undefined) : undefined;
+    GMNetworkManager.broadcastFx({
+      kind: 'cast.fx',
+      netId,
+      ...(targetNetId ? { targetNetId } : {}),
+      spellId,
+      ...(hand ? { casthandvisual: hand } : {}),
+      ...(proj ? { projmodel: proj } : {}),
+      castTime,
+      conjureTime,
+      ...(range ? { range } : {}),
+    });
+  }
+
+  /**
+   * Effects players see: those that change how something looks. Applied on players' copies too, drawn only
+   * (GameEffect.mirrored): a visual or aura, a beam, a stun / hold / sleep / choke / push pose. Gameplay (damage,
+   * healing, stats) stays on the GM's machine. A new effect type that changes how creatures look goes here, and
+   * players see it with nothing else to write
+   */
+  static MIRRORED_EFFECTS: ReadonlySet<number> = new Set([
+    GameEffectType.EffectVisualEffect,
+    GameEffectType.EffectBeam,
+    GameEffectType.EffectSetState,
+    // Speed: players' copies move (and animate) at the GM's speed, worked out from these as on the GM's machine
+    GameEffectType.EffectMovementSpeedIncrease,
+    GameEffectType.EffectMovementSpeedDecrease,
+  ]);
+
+  /** Host: an effect as players get it, or null when they don't need it (or can't be told who it's from) */
+  static mirrorOf(effect: GameEffect): GMEffectMirror | null {
+    if (!this.MIRRORED_EFFECTS.has(effect.type) || effect.mirrored) return null;
+    let casterNetId: string | undefined;
+    if (effect.type === GameEffectType.EffectBeam) {
+      casterNetId = this.getHostFxNetId(effect.getObject?.(0) as ModuleObject);
+      if (!casterNetId) return null;
+    }
+    const fxId = (effect as any).gmFxId || ((effect as any).gmFxId = GMManager.getNextNetId('fx'));
+    const spellId = typeof effect.spellId === 'number' && effect.spellId >= 0 ? effect.spellId : undefined;
+    return {
+      fxId, type: effect.type, ...(spellId !== undefined ? { spellId } : {}),
+      ints: [...(effect.intList || [])], floats: [...(effect.floatList || [])],
+      durationType: effect.getDurationType(), duration: effect.getDuration(), ...(casterNetId ? { casterNetId } : {}),
+    };
+  }
+
+  /** Host: an effect went on an object or a spot; players get the ones that change how things look */
+  static onEffectApplied(owner: any, effect: GameEffect) {
+    if (GMNetworkManager.role !== 'host' || !this.MIRRORED_EFFECTS.has(effect.type) || effect.mirrored) return;
+    // At a spot: scripts apply area bursts, grenade blasts and some beams at a location (Module.addEffect), on a
+    // marker with no network id. Players replay them at the same spot
+    if (owner === GameState.module) {
+      const marker = (effect as any).creator;
+      if (!marker?.position || effect.type === GameEffectType.EffectSetState) return;
+      const mirror = this.mirrorOf(effect);
+      if (!mirror) return;
+      const beam = mirror.casterNetId ? { casterNetId: mirror.casterNetId, bodyPart: effect.getInt(1) } : undefined;
+      GMNetworkManager.broadcastFx({
+        kind: 'vfx.at', fxId: mirror.fxId, vfx: effect.getInt(0), miss: effect.getInt(2),
+        durationType: effect.getDurationType(), duration: effect.getDuration(),
+        x: marker.position.x, y: marker.position.y, z: marker.position.z, ...(beam ? { beam } : {}),
+      });
+      return;
+    }
+    const netId = this.getHostFxNetId(owner);
+    const mirror = netId ? this.mirrorOf(effect) : null;
+    if (!netId || !mirror) return;
+    GMNetworkManager.broadcastFx({ kind: 'effect.add', netId, effect: mirror });
+  }
+
+  /** Host: an effect came off; players take theirs off too (instant ones finish on their own everywhere) */
+  static onEffectRemoved(owner: any, effect: GameEffect) {
+    if (GMNetworkManager.role !== 'host') return;
     const fxId = (effect as any).gmFxId;
-    const netId = this.getHostFxNetId(effect.object);
-    // Instant effects finish on their own on every machine
-    if (!fxId || !netId || effect.getDurationType() === GameEffectDurationType.INSTANT) return;
-    GMNetworkManager.broadcastFx({ kind: 'vfx.remove', netId, fxId });
+    if (!fxId || effect.getDurationType() === GameEffectDurationType.INSTANT) return;
+    if (owner === GameState.module) {
+      GMNetworkManager.broadcastFx({ kind: 'effect.remove', fxId, at: true });
+      return;
+    }
+    const netId = this.getHostFxNetId(owner);
+    if (netId) GMNetworkManager.broadcastFx({ kind: 'effect.remove', netId, fxId });
+  }
+
+  /** Host: the lasting mirrored effects on the scene's objects now, for a player joining */
+  static lastingMirrors(): { netId: string; effect: GMEffectMirror }[] {
+    const out: { netId: string; effect: GMEffectMirror }[] = [];
+    for (const obj of GMManager.netIdMap.values()) {
+      const netId = (obj as any)?.gmNetId;
+      if (!netId || !Array.isArray((obj as any).effects) || (obj as any).gmHidden) continue;
+      for (const effect of (obj as any).effects as GameEffect[]) {
+        if (!effect || effect.getDurationType() === GameEffectDurationType.INSTANT) continue;
+        const mirror = this.mirrorOf(effect);
+        if (mirror) out.push({ netId, effect: mirror });
+      }
+    }
+    return out;
+  }
+
+  /** Client: make the effect the host has, drawn only */
+  static effectFromMirror(mirror: GMEffectMirror): GameEffect | null {
+    const F: any = GameState.GameEffectFactory;
+    const make: Record<number, () => GameEffect> = {
+      [GameEffectType.EffectVisualEffect]: () => new F.EffectVisualEffect(),
+      [GameEffectType.EffectBeam]: () => new F.EffectBeam(),
+      [GameEffectType.EffectSetState]: () => new F.EffectSetState(),
+      [GameEffectType.EffectMovementSpeedIncrease]: () => new F.EffectMovementSpeedIncrease(),
+      [GameEffectType.EffectMovementSpeedDecrease]: () => new F.EffectMovementSpeedDecrease(),
+    };
+    const effect = make[mirror.type]?.();
+    if (!effect) return null;
+    if (typeof mirror.spellId === 'number' && mirror.spellId >= 0) {
+      effect.setSpellId(mirror.spellId);
+    }
+    if (mirror.casterNetId) {
+      const caster = GMManager.netIdMap.get(mirror.casterNetId);
+      if (!caster) return null;
+      effect.setObject(0, caster);
+    }
+    (mirror.ints || []).forEach((v, i) => effect.setInt(i, v));
+    (mirror.floats || []).forEach((v, i) => effect.setFloat(i, v));
+    effect.setDurationType(mirror.durationType);
+    effect.setDuration(mirror.duration);
+    effect.mirrored = true;
+    (effect as any).gmFxId = mirror.fxId;
+    effect.initialize();
+    return effect;
+  }
+
+  /** Client: put a host effect on our copy of the object (once: a snapshot and an event may both bring it) */
+  static applyEffectMirrorOnClient(netId: string, mirror: GMEffectMirror) {
+    const obj = GMManager.netIdMap.get(netId);
+    if (!obj || !mirror) return;
+    if ((obj.effects || []).some((e) => (e as any).gmFxId === mirror.fxId)) return;
+    const effect = this.effectFromMirror(mirror);
+    if (effect) obj.addEffect(effect);
+  }
+
+  /** Client: a visual effect the host put at a spot (an area burst, a grenade blast, a beam at a spot) */
+  static applyFxAtOnClient(event: Extract<GMFxEvent, { kind: 'vfx.at' }>) {
+    if (!GameState.module) return;
+    let effect: GameEffect;
+    if (event.beam) {
+      const caster = GMManager.netIdMap.get(event.beam.casterNetId);
+      if (!caster) return;
+      effect = new GameState.GameEffectFactory.EffectBeam();
+      effect.setInt(1, event.beam.bodyPart);
+      effect.setObject(0, caster);
+    } else {
+      effect = new GameState.GameEffectFactory.EffectVisualEffect();
+    }
+    effect.setInt(0, event.vfx);
+    effect.setInt(2, event.miss);
+    effect.setDurationType(event.durationType);
+    effect.setDuration(event.duration);
+    effect.mirrored = true;
+    (effect as any).gmFxId = event.fxId;
+    effect.initialize();
+    GameState.module.addEffect(effect, { position: new THREE.Vector3(event.x, event.y, event.z) } as any);
   }
 
   /**
    * Client: replay a host visual on our copy of the object
    */
   static applyFxEventOnClient(event: GMFxEvent) {
+    if (event?.kind === 'vfx.at') { this.applyFxAtOnClient(event); return; }
+    if (event?.kind === 'effect.remove' && event.at) {
+      const effect = (GameState.module?.effects || []).find((e: any) => e.gmFxId === event.fxId);
+      if (effect) GameState.module.removeEffect(effect);
+      return;
+    }
     const obj = GMManager.netIdMap.get(event?.netId);
     if (!obj) return;
     switch (event.kind) {
@@ -523,34 +751,58 @@ export class GMReplication {
         if (!GMObjectKind.isCreature(obj)) return;
         const cre = obj as ModuleCreature;
         const animation = OdysseyModelAnimation.GetAnimation2DA(event.anim);
-        if (!animation || cre.isDead()) return;
-        cre.playTwoDAAnimation(animation);
-        cre.animationState.index = event.index;
+        if (!animation || !cre.playTwoDAAnimation(animation, event.index, event.hold || 0)) return;
         cre.gmFxAnimation = cre.animationState.animation;
+        cre.gmFxUntil = performance.now() + this.FX_HOLD_MS;
+        // The same swing or shot again: the model still has the last one as its animation (a replica isn't put
+        // back to its ready stance between them, as the host's fighters are), so it wouldn't start over. Start it
+        const name = String(animation.name || '').toLowerCase();
+        if (cre.model && String(cre.model.getAnimationName?.() || '').toLowerCase() === name) {
+          cre.model.playAnimation(name, false);
+          cre.animationState.started = true;
+        }
         break;
       }
       case 'text':
         TextSprite3D.CreateOnObject(obj, event.text, event.style, event.timer);
         break;
-      case 'vfx.add': {
-        const effect = new GameState.GameEffectFactory.EffectVisualEffect();
-        effect.setInt(0, event.vfx);
-        effect.setInt(2, event.miss);
-        effect.setDurationType(event.durationType);
-        effect.setDuration(event.duration);
-        effect.initialize();
-        (effect as any).gmFxId = event.fxId;
-        obj.addEffect(effect);
+      case 'effect.add':
+        this.applyEffectMirrorOnClient(event.netId, event.effect);
         break;
-      }
-      case 'vfx.remove': {
+      case 'effect.remove': {
         const effect = obj.effects.find((e) => (e as any).gmFxId === event.fxId);
         if (effect) obj.removeEffect(effect);
         break;
       }
       case 'projectile': {
         const target = GMManager.netIdMap.get(event.targetNetId);
-        if (target) GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay);
+        if (target) {
+          const opts = (event.deflected || event.powerShot)
+            ? { ...(event.deflected ? { deflected: true } : {}), ...(event.powerShot ? { powerShot: true } : {}) }
+            : undefined;
+          if (opts) GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay, opts);
+          else GameState.ProjectileManager?.Launch(obj, target, event.ammunition, event.hit, event.delay);
+        }
+        break;
+      }
+      case 'cast.fx': {
+        const area = GameState.module?.area;
+        if (!area || typeof area.attachSpellInstance !== 'function') return;
+        const target = event.targetNetId ? GMManager.netIdMap.get(event.targetNetId) : obj;
+        const mirrorSpell: any = {
+          id: event.spellId,
+          impactscript: '',
+          casthandvisual: event.casthandvisual || '',
+          projmodel: event.projmodel || '',
+          range: event.range || '',
+          getConjureTime: () => event.conjureTime,
+          getCastTime: () => event.castTime,
+        };
+        const inst = new SpellCastInstance(obj, target || obj, mirrorSpell);
+        inst.mirrored = true;
+        inst.impactscript = '';
+        area.attachSpellInstance(inst);
+        inst.init();
         break;
       }
     }
@@ -612,7 +864,10 @@ export class GMReplication {
    */
   static isNetMotionDriven(cre: ModuleCreature): boolean {
     if (this.isNetReplica(cre)) return true;
-    return GMNetworkManager.role === 'host' && !!cre.gmOwnerPeerId && !cre.gmHostDriven;
+    if (GMNetworkManager.role === 'client' && cre.gmNetId === GMNetworkManager.assignedActorNetId && cre.isForcePushed?.()) {
+      return true;
+    }
+    return GMNetworkManager.role === 'host' && !!cre.gmOwnerPeerId && !cre.gmHostDriven && !cre.isDebilitated?.();
   }
 
   static setNetTarget(obj: ModuleObject, x: number, y: number, z: number) {
@@ -624,10 +879,46 @@ export class GMReplication {
     target.set(x, y, z);
     // Snap on first sync or teleports instead of sliding across the map
     if (obj.position.distanceTo(target) > this.NET_SNAP_DISTANCE) {
+      this.moveBox(obj, target.x - obj.position.x, target.y - obj.position.y, target.z - obj.position.z);
       obj.position.copy(target);
       obj.getCurrentRoom();
     }
   }
+
+  /** A replica fights in step with the host's copy: its combat stance and powered weapons come and go with it */
+  static syncCombatState(cre: ModuleCreature, combat: boolean | undefined) {
+    if (combat === undefined || !cre.combatData) return;
+    if (combat) cre.resetExcitedDuration();
+    else if (cre.combatData.combatState) cre.cancelExcitedDuration();
+    this.syncWeaponPower(cre, combat);
+  }
+
+  /**
+   * Weapons light up (a lightsaber ignites) when their owner fights: the combat round powers them when it works
+   * out an attack, and that runs only on the host. Here they power up and down with the host's combat state,
+   * once each way (powering again restarts the "powered" loop).
+   */
+  static syncWeaponPower(cre: ModuleCreature, combat: boolean) {
+    // While fighting, keep asking (the weapon goes from igniting to its lit loop); powering down, once
+    const lit = !!(cre.gmNetPowered || cre.equipment?.RIGHTHAND?.isPowered || cre.equipment?.LEFTHAND?.isPowered);
+    if (!combat && !lit) return;
+    cre.gmNetPowered = combat;
+    cre.weaponPowered?.(combat);
+  }
+
+  /**
+   * Keep a replica's bounding box with it. Its box is set where it spawned, and only the engine's own movement
+   * (collision) moves it; a replica moves by network updates instead. The box decides whether its model is on
+   * screen, so a stale one hid creatures that had walked away from their spawn whenever that spot was off camera.
+   */
+  static moveBox(obj: ModuleObject, dx: number, dy: number, dz: number) {
+    const box = obj.box as THREE.Box3 | undefined;
+    if (!box || box.isEmpty() || (!dx && !dy && !dz)) return;
+    this.boxShift.set(dx, dy, dz);
+    box.translate(this.boxShift);
+  }
+
+  static boxShift = new THREE.Vector3();
 
   /**
    * Smooth a network-driven creature toward its latest synced position and pick a locomotion animation from its speed
@@ -643,6 +934,7 @@ export class GMReplication {
       cre.position.x += dx;
       cre.position.y += dy;
       cre.position.z += dz;
+      this.moveBox(cre, dx, dy, dz);
       speed = Math.sqrt(dx * dx + dy * dy) / delta;
       if (speed > 0.05) {
         cre.getCurrentRoom();
@@ -651,20 +943,35 @@ export class GMReplication {
 
     if (cre.isDead()) return;
     const anim = cre.animationState.index;
-    const isLocomotion = anim === ModuleCreatureAnimState.RUNNING || anim === ModuleCreatureAnimState.WALKING;
-    if (speed > cre.getWalkSpeed() * 1.25) {
-      if (anim !== ModuleCreatureAnimState.RUNNING) cre.setAnimationState(ModuleCreatureAnimState.RUNNING);
+    const isLocomotionState = (s: number | undefined) => (
+      s === ModuleCreatureAnimState.RUNNING ||
+      s === ModuleCreatureAnimState.WALKING ||
+      s === ModuleCreatureAnimState.WALK_STEALTH ||
+      s === ModuleCreatureAnimState.WALK_INJ ||
+      s === ModuleCreatureAnimState.RUN_INJ
+    );
+    const isLocomotion = isLocomotionState(anim);
+    const hostAnim = cre.gmNetAnim as number | undefined;
+    const hostIsLocomotion = isLocomotionState(hostAnim);
+    // A swing, shot or reaction the host just played: it plays out, though the replica is still gliding the last
+    // of the way to where the host stopped (the run put straight back over it was most of what players missed)
+    const fxActive = !!cre.gmFxAnimation && cre.animationState.animation === cre.gmFxAnimation && performance.now() < (cre.gmFxUntil || 0);
+    if (fxActive) {
+      // keep it
     } else if (speed > 0.4) {
-      if (anim !== ModuleCreatureAnimState.WALKING) cre.setAnimationState(ModuleCreatureAnimState.WALKING);
+      // Walking or running is the host's call (smoothing slows the replica's apparent speed, so a running rancor
+      // looked like it walked); from speed only when the host's state isn't locomotion yet
+      const want = hostIsLocomotion ? hostAnim! : (speed > cre.getWalkSpeed() * 1.25 ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);
+      if (anim !== want) cre.setAnimationState(want);
     } else {
-      const hostAnim = cre.gmNetAnim as number | undefined;
-      const hostIsLocomotion = hostAnim === ModuleCreatureAnimState.RUNNING || hostAnim === ModuleCreatureAnimState.WALKING;
       const hostIsFxDriven = this.FX_DRIVEN_ANIM_STATES.includes(hostAnim);
       // Let a replayed attack/reaction animation finish before applying the tick's state
       const fxPlaying = !!cre.gmFxAnimation && cre.animationState.animation === cre.gmFxAnimation;
       if (hostAnim && !hostIsLocomotion && !hostIsFxDriven && !fxPlaying && hostAnim !== anim) {
         cre.setAnimationState(hostAnim);
-      } else if (isLocomotion) {
+      } else if (isLocomotion && !hostIsLocomotion) {
+        // Stopped here and there. While the host says it's still on the move, it is: between updates the
+        // smoothing catches up with the last position and the replica pauses a moment, which isn't stopping
         cre.setAnimationState(cre.combatData.combatState ? ModuleCreatureAnimState.READY : ModuleCreatureAnimState.PAUSE);
       }
     }

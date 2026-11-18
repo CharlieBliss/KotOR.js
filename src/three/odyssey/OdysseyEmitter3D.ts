@@ -33,6 +33,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
   private static _v3D = new THREE.Vector3();
   private static _quat = new THREE.Quaternion();
   private static _mat4 = new THREE.Matrix4();
+  private static _mat3 = new THREE.Matrix3();
+  /** How fast area wind carries particles that it affects, per level of the area's wind power (m/s) */
+  static WIND_SPEED_PER_LEVEL = 0.01;
 
   static BirthTime: number = 1;
   static PlaneGeometry: THREE.PlaneGeometry = new THREE.PlaneGeometry(1, 1, 1, 1);
@@ -172,7 +175,6 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
     switch(this.node.renderMode){
       case 'Normal':
-      case 'Motion_Blur':
       case 'Linked':
         this.geometry = new THREE.BufferGeometry();
       break;
@@ -434,7 +436,7 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
         break;
         case 'Lighten':
           this.material.blending = THREE.AdditiveBlending;
-          this.material.transparent = false;
+          this.material.transparent = true;
           this.material.depthWrite = false;
           this.material.needsUpdate = true;
         break;
@@ -467,13 +469,12 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
       switch(this.node.renderMode){
         case 'Normal':
-        case 'Motion_Blur':
           this.material.defines.POINTS = '';
 
           this.offsets = new THREE.BufferAttribute( new Float32Array( offsets ), 3 ).setUsage( THREE.DynamicDrawUsage );
           this.velocities = new THREE.BufferAttribute( new Float32Array( velocities ), 4 ).setUsage( THREE.DynamicDrawUsage );
           this.props = new THREE.BufferAttribute( new Float32Array( props ), 4 ).setUsage( THREE.DynamicDrawUsage );
-          this.ids = new THREE.InstancedBufferAttribute( new Float32Array( ids ), 1 ).setUsage( THREE.DynamicDrawUsage );
+          this.ids = new THREE.BufferAttribute( new Float32Array( ids ), 1 ).setUsage( THREE.DynamicDrawUsage );
           this.geometry.setAttribute( 'position', this.offsets );
           this.geometry.setAttribute( 'velocity', this.velocities );
           this.geometry.setAttribute( 'props', this.props );
@@ -537,6 +538,11 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     }else{
       return (Math.ceil( (this.lifeExp >= 0 ? this.lifeExp : 1) ) * Math.ceil(this.birthRate));
     }
+  }
+
+  /** Normal and Motion_Blur particles live in world space: they're born at the emitter's world position (getRandomPosition) */
+  particlesInWorld(): boolean {
+    return this.node.renderMode == 'Normal' || this.node.renderMode == 'Motion_Blur';
   }
 
   getRandomPosition(){
@@ -691,6 +697,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     this._lastWorldPos.copy(currentWorldPos);
     this._hasLastWorldPos = true;
 
+    // Gravity points at the world's floor, so it's worked out again as the emitter turns
+    this.updateGravity();
+
     // Tinting: update tint color from scene ambient if isTinted
     if(this.node.flags.isTinted && this.context){
       const ambient = this.context?.module?.area?.sun?.ambientColor || this.context?.ambientColor;
@@ -728,11 +737,10 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
       switch(this.node.renderMode){
         case 'Normal':
-        case 'Motion_Blur':
           this.offsets = new THREE.BufferAttribute( offsets, 3 ).setUsage( THREE.DynamicDrawUsage );
           this.velocities = new THREE.BufferAttribute( velocities, 4 ).setUsage( THREE.DynamicDrawUsage );
           this.props = new THREE.BufferAttribute( props, 4 ).setUsage( THREE.DynamicDrawUsage );
-          this.ids = new THREE.InstancedBufferAttribute( ids, 1 ).setUsage( THREE.DynamicDrawUsage );
+          this.ids = new THREE.BufferAttribute( ids, 1 ).setUsage( THREE.DynamicDrawUsage );
           this.geometry.setAttribute( 'position', this.offsets );
           this.geometry.setAttribute( 'velocity', this.velocities );
           this.geometry.setAttribute( 'props', this.props );
@@ -784,8 +792,19 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     // P2P: attractor / Bezier paths (per-particle indices). Linked ribbons use main tick below
     // (trail + ring + strip); P2PGravity indexes every *vertex* and moves offsets — wrong for L/R pairs.
     // KotOR MDL can set P2P flags on Linked trail emitters (e.g. v_heal_imp); those must not early-return here.
-    if(this.node.flags.isP2P && this.node.renderMode !== 'Linked' && this.node.renderMode !== 'Fountain'){
+    if((this.node.flags.isP2PSel || (this.node.flags.isP2P && this.gravity !== 0)) && this.updateType !== 'Explosion' && this.updateType !== 'Fountain' && this.node.renderMode !== 'Linked'){
       this.emitterLog('tick:earlyReturn', { reason: this.node.flags.isP2PSel ? 'P2PBezier' : 'P2PGravity', delta });
+      // Inherit moves live particles with the emitter, here as on the main path: a blaster bolt is a P2P emitter
+      // in flight, and without it its particles stayed where they were born, by the gun, until they died
+      if(this.particlesInWorld() && this.node.flags.canInherit && this._hasLastWorldPos && this._worldPosDelta.lengthSq() > 0){
+        for(let i = 0; i < this.offsets.count; i++){
+          if(this.props.getZ(i) !== 1) continue;
+          this.offsets.setX(i, this.offsets.getX(i) + this._worldPosDelta.x);
+          this.offsets.setY(i, this.offsets.getY(i) + this._worldPosDelta.y);
+          this.offsets.setZ(i, this.offsets.getZ(i) + this._worldPosDelta.z);
+        }
+        this.offsets.needsUpdate = true;
+      }
       if(this.node.flags.isP2PSel){
         this.tickP2PBezier(delta);
       }else{
@@ -998,8 +1017,8 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
     }
 
-    // Inherit: move POINTS-mode particles with emitter
-    if(this.node.renderMode === 'Normal' && this.node.flags.canInherit && this._hasLastWorldPos){
+    // Inherit: move POINTS / Motion_Blur world-space particles with emitter
+    if((this.node.renderMode === 'Normal' || this.node.renderMode === 'Motion_Blur') && this.node.flags.canInherit && this._hasLastWorldPos){
       for(let i = 0; i < spawnableParticleCount; i++){
         if(this.props.getZ(i) === 1){
           this.offsets.setX(i, this.offsets.getX(i) + this._worldPosDelta.x);
@@ -1235,8 +1254,9 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
         const py = this.offsets.getY(i);
         const pz = this.offsets.getZ(i);
 
+        const inWorld = this.particlesInWorld();
         pW.set(px, py, pz);
-        this.localToWorld(pW);
+        if(!inWorld) this.localToWorld(pW);
 
         toRef.copy(refW).sub(pW);
         const dist = toRef.length();
@@ -1269,7 +1289,7 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
           this.velocities.setZ(i, velW.z);
 
           pW.addScaledVector(velW, delta);
-          this.worldToLocal(pW);
+          if(!inWorld) this.worldToLocal(pW);
 
           this.offsets.setX(i, pW.x);
           this.offsets.setY(i, pW.y);
@@ -1639,25 +1659,32 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
 
   /**
    * Blast impulses (emitter-generated) plus area wind using {@link resolveDanglyWindPower}
-   * and the same world wind axis as dangly (`ODYSSEY_AREA_WIND_DIRECTION`), transformed to
-   * emitter-local offsets.
+   * and the same world wind axis as dangly (`ODYSSEY_AREA_WIND_DIRECTION`). Particles kept in world space
+   * (Normal, Motion_Blur) take the wind as it is; the others take it in the emitter's own space, scaled with it.
+   *
+   * It used Vector3.transformDirection, which also makes the vector one long: every particle was pushed a full
+   * unit a frame (40-60 m/s), whatever the wind, so fog shot across Dantooine and sparks flew off as they appeared
    */
   private applyWindForces(delta: number): void {
-    const windStrength = resolveDanglyWindPower(this.context) * 0.01;
+    const windSpeed = resolveDanglyWindPower(this.context) * OdysseyEmitter3D.WIND_SPEED_PER_LEVEL;
     const wm = GameState.windManager;
     const hasImpulses = wm && wm.pointSourceWinds.length > 0;
-    if(!hasImpulses && windStrength <= 1e-6){
+    if(!hasImpulses && windSpeed <= 1e-6){
       return;
     }
+
+    const inWorld = this.particlesInWorld();
+    // World displacement to the offsets' space: as is in world space; through the inverse world matrix's 3x3
+    // otherwise (rotation and scale, no translation, and its length kept)
+    const toOffsets = OdysseyEmitter3D._mat3;
+    if(!inWorld) toOffsets.setFromMatrix4(OdysseyEmitter3D._mat4.copy(this.matrixWorld).invert());
 
     let ax = 0;
     let ay = 0;
     let az = 0;
-    if(windStrength > 1e-6){
-      const w = OdysseyEmitter3D._v3A;
-      w.copy(ODYSSEY_AREA_WIND_DIRECTION).multiplyScalar(windStrength * delta);
-      OdysseyEmitter3D._mat4.copy(this.matrixWorld).invert();
-      w.transformDirection(OdysseyEmitter3D._mat4);
+    if(windSpeed > 1e-6){
+      const w = OdysseyEmitter3D._v3A.copy(ODYSSEY_AREA_WIND_DIRECTION).normalize().multiplyScalar(windSpeed * delta);
+      if(!inWorld) w.applyMatrix3(toOffsets);
       ax = w.x;
       ay = w.y;
       az = w.z;
@@ -1671,19 +1698,20 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
       const py = this.offsets.getY(i);
       const pz = this.offsets.getZ(i);
 
-      if(wm && wm.pointSourceWinds.length > 0){
-        const worldPos = OdysseyEmitter3D._v3B.set(px, py, pz).applyMatrix4(this.matrixWorld);
+      if(hasImpulses){
+        const worldPos = OdysseyEmitter3D._v3B.set(px, py, pz);
+        if(!inWorld) worldPos.applyMatrix4(this.matrixWorld);
         const gust = wm.getGlobalPointWind(worldPos);
         if(gust.lengthSq() > 1e-12){
-          const localGust = OdysseyEmitter3D._v3C.copy(gust);
-          localGust.transformDirection(OdysseyEmitter3D._mat4);
-          this.offsets.setX(i, px + localGust.x);
-          this.offsets.setY(i, py + localGust.y);
-          this.offsets.setZ(i, pz + localGust.z);
+          const push = OdysseyEmitter3D._v3C.copy(gust);
+          if(!inWorld) push.applyMatrix3(toOffsets);
+          this.offsets.setX(i, px + push.x);
+          this.offsets.setY(i, py + push.y);
+          this.offsets.setZ(i, pz + push.z);
         }
       }
 
-      if(windStrength > 1e-6){
+      if(windSpeed > 1e-6){
         this.offsets.setX(i, this.offsets.getX(i) + ax);
         this.offsets.setY(i, this.offsets.getY(i) + ay);
         this.offsets.setZ(i, this.offsets.getZ(i) + az);
@@ -1815,14 +1843,34 @@ export class OdysseyEmitter3D extends OdysseyObject3D {
     }
   }
 
+  /** Gravity: metres a second squared, a unit of mass (KotOR's: positive mass falls, negative rises) */
+  static GRAVITY = 9.8;
+
+  /**
+   * The shader's gravity (its mass uniform): down in the world, mass x GRAVITY. Particles kept in world space
+   * (Normal, Motion_Blur) take it as is; the others in the emitter's own space. It was the emitter's local up
+   */
+  updateGravity(){
+    const uniform = this.material?.uniforms?.mass;
+    if(!uniform) return;
+    const g = OdysseyEmitter3D._v3D.set(0, 0, -this.mass * OdysseyEmitter3D.GRAVITY);
+    if(!this.particlesInWorld()){
+      const quat = OdysseyEmitter3D._quat;
+      this.getWorldQuaternion(quat);
+      g.applyQuaternion(quat.invert());
+    }
+    if(!uniform.value.equals(g)){
+      uniform.value.copy(g);
+      this.material.uniformsNeedUpdate = true;
+    }
+  }
+
   attributeChanged(attr: string){
     const quat = OdysseyEmitter3D._quat;
     switch(attr){
       case 'mass':
         if(!this.parent) return;
-        this.parent.getWorldQuaternion(quat);
-        this.vec3.set(0, 0, this.mass).applyQuaternion(this.quaternion);
-        this.material.uniforms.mass.value.copy(this.vec3);
+        this.updateGravity();
         this.material.uniformsNeedUpdate = true;
       break;
     }

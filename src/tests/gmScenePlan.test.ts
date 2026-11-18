@@ -80,6 +80,51 @@ describe("scene plans", () => {
     ]));
   });
 
+  test("sets: rooms of another area, placed before anyone, and spots others can stand on", () => {
+    const withSets = plan({
+      sets: [
+        { id: "hawk", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "entry" }, turn: 90 },
+        { id: "council", area: { game: "kotor", module: "danm13" }, rooms: ["m13aa_06a"], at: { spot: "set:hawk", offset: [30, 0] } },
+      ],
+      players: { at: { spot: "set:hawk" } },
+    });
+    expect(GMScenePlan.validate(withSets).filter((p) => p.level === "error")).toEqual([]);
+
+    const broken = plan({
+      sets: [
+        // A set goes in before the actors, so it can't stand on one; nor on a set placed after it
+        { id: "a", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "actor:jedi" } },
+        { id: "b", area: { game: "kotor", module: "ebo_m12aa" }, at: { spot: "set:c" } },
+        { id: "c", area: { game: "wars" as any, module: "x" }, rooms: [], at: { spot: "entry" } },
+      ],
+      players: { at: { spot: "set:nowhere" } },
+    });
+    const errors = GMScenePlan.validate(broken).filter((p) => p.level === "error").map((p) => p.message);
+    expect(errors).toEqual(expect.arrayContaining([
+      'A set\'s spot is "entry", a waypoint, a room or an earlier set, not "actor:jedi".',
+      'A set\'s spot is "entry", a waypoint, a room or an earlier set, not "set:c".',
+      'The area\'s game is "kotor" or "tsl".',
+      '"rooms" is a list of room names (leave it out for all of them).',
+      'No set "nowhere".',
+    ]));
+  });
+
+  test("customize.level restats an actor: a whole level 1 to 50, and a class by name or number", () => {
+    const at = (customize: any) => GMScenePlan.validate(plan({ actors: [{ id: "a", template: "x", faction: "hostile", at: { spot: "entry" }, customize }], props: [], beats: [] }))
+      .filter((p) => p.level === "error").map((p) => p.message);
+    expect(at({ level: 8 })).toEqual([]);
+    expect(at({ level: 0 })).toContain("customize.level is a whole number, 1 to 50.");
+    expect(at({ level: 7.5 })).toContain("customize.level is a whole number, 1 to 50.");
+
+    (GameState as any).TwoDAManager = { datatables: new Map([["classes", { rows: { 0: { label: "Soldier", name: "****" }, 3: { label: "JediGuardian", name: "****" }, 8: { label: "Minion", name: "****" } } }]]) };
+    (GameState as any).TLKManager = { GetStringById: () => ({ Value: "" }) };
+    expect(GMScenePlan.classIdOf("jedi guardian")).toBe(3);
+    expect(GMScenePlan.classIdOf("Jedi_Guardian")).toBe(3);
+    expect(GMScenePlan.classIdOf("minion")).toBe(8);
+    expect(GMScenePlan.classIdOf(0)).toBe(0);
+    expect(GMScenePlan.classIdOf("Bounty Hunter")).toBeUndefined();
+  });
+
   test("content from the other game is only a warning; the area of the other game is borrowed", () => {
     const problems = GMScenePlan.validate(plan({ content: "kotor" }));
     expect(problems.find((p) => p.where === "content")?.level).toBe("warning");
@@ -104,7 +149,9 @@ describe("scene plans", () => {
     runner.playerStart = new THREE.Vector3(0, 10, 0);
     // Due north of the actor: facing 0
     expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), undefined)).toBeCloseTo(0);
-    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(Math.PI / 2);
+    // 90 is east, as a target due east is (the engine turns the other way: east is -90 degrees to it)
+    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(-Math.PI / 2);
+    expect(runner.facingFrom(new THREE.Vector3(0, 0, 0), 90)).toBeCloseTo(Math.atan2(-1, 0));
     expect(Math.abs(runner.facingFrom(new THREE.Vector3(0, 0, 0), "toward:waypoint:door"))).toBeCloseTo(Math.PI / 2);
   });
 
@@ -160,5 +207,42 @@ describe("players watching a scene", () => {
     expect(GMManager.isPlayerFrozen({ gmNetId: "pc_2" } as any)).toBe(false);
     GMNetworkManager.sessionRules = { deathRule: "kotor" };
     GMNetworkManager.role = "offline";
+  });
+});
+
+describe("Scene plans: nobody stands inside a prop", () => {
+  const table = { id: "table", box: new THREE.Box3(new THREE.Vector3(-2, -1, -1), new THREE.Vector3(2, 1, 1)) };
+
+  test("an actor on a table's spot is moved just clear of it, to the nearest side", () => {
+    const runner = new GMScenePlan(plan());
+    runner.footprints = [table];
+    jest.spyOn(GMViewport, "getGroundZAt").mockImplementation((_x: number, _y: number, z: number = 0) => z);
+    const clear = runner.clearOfProps(new THREE.Vector3(0, 0.3, 0));
+    expect(clear?.from).toBe("table");
+    // The long side it's nearest: just past the table's edge plus an actor's room
+    expect(clear!.point.y).toBeGreaterThanOrEqual(1 + GMScenePlan.ACTOR_CLEARANCE);
+    expect(runner.footprintAt(clear!.point)).toBeNull();
+  });
+
+  test("someone already beside it stays put", () => {
+    const runner = new GMScenePlan(plan());
+    runner.footprints = [table];
+    expect(runner.footprintAt(new THREE.Vector3(0, 2, 0))).toBeNull();
+  });
+
+  test("a seated actor on a chair belongs in it; on a table it doesn't", () => {
+    const runner = new GMScenePlan(plan({
+      props: [
+        { id: "seat", template: "plc_chair_mil_01", at: { spot: "entry" } },
+        { id: "table", template: "plc_gentable", at: { spot: "entry" } },
+        { id: "food", template: "plc_chair1", at: { spot: "entry" } },
+      ],
+    }));
+    const actor = (spot: string, stance?: string) => ({ id: "a", template: "n_rodian", faction: "neutral" as const, at: { spot }, stance });
+    expect(runner.seatFor(actor("prop:seat", "chair_pazaak"))).toBe("seat");
+    expect(runner.seatFor(actor("prop:table", "chair_pazaak"))).toBeUndefined();
+    expect(runner.seatFor(actor("prop:seat"))).toBeUndefined();
+    // KotOR II's plc_chair1 is a food pile
+    expect(runner.seatFor(actor("prop:food", "chair"))).toBeUndefined();
   });
 });

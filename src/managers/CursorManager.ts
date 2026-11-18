@@ -523,14 +523,17 @@ export class CursorManager {
 			CursorManager.pointGeomerty.attributes.position = new THREE.Float32BufferAttribute(points, 3);
 			CursorManager.pointGeomerty.attributes.size = new THREE.Float32BufferAttribute(sizes, 1);
 		}else{
+			// One point per object (setXYZ takes the point's index, not a float offset: i*3 here wrote other
+			// objects' points and left the rest where they first were, so clicks and the reticle went to the
+			// wrong things once anything moved)
 			const positionAttribute = CursorManager.pointGeomerty.attributes.position as THREE.BufferAttribute;
 			const sizeAttribute = CursorManager.pointGeomerty.attributes.size as THREE.BufferAttribute;
 			for(let i = 0; i < objCount; i++){
-				positionAttribute.setX(i*3, objects[i].position.x);
-				positionAttribute.setY(i*3, objects[i].position.y);
-				positionAttribute.setZ(i*3, objects[i].position.z + losZ);
+				positionAttribute.setXYZ(i, objects[i].position.x, objects[i].position.y, objects[i].position.z + losZ);
 				sizeAttribute.setX(i, CursorManager.pointSize);
 			}
+			positionAttribute.needsUpdate = true;
+			sizeAttribute.needsUpdate = true;
 		}
 
 		CursorManager.pointGeomerty.computeBoundingBox();
@@ -542,7 +545,12 @@ export class CursorManager {
 		CursorManager.raycaster.params.Points.threshold = CursorManager.pointThreshold;
 		CursorManager.raycaster.setFromCamera( Mouse.position, GameState.currentCamera );
 		const intersectsT = CursorManager.raycaster.intersectObject( CursorManager.testPoints, false );
-		const intersect = intersectsT[0];
+		// The one nearest the cursor, not the one nearest the camera: in a crowd, whatever stood in front took
+		// every click within a metre of it. Near ties go to the nearer one.
+		let intersect = intersectsT[0];
+		for(const hit of intersectsT){
+			if((hit.distanceToRay ?? 0) < (intersect.distanceToRay ?? 0) - 0.15) intersect = hit;
+		}
 		CursorManager.raycaster.params.Points.threshold = pThresholdCache;
 		CursorManager.raycaster.far = farCache;
 		if(intersect && intersect.object == CursorManager.testPoints){

@@ -1,4 +1,5 @@
 import { GameState } from "@/GameState";
+import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { gmItemResRef } from "@/managers/gm/GMVocab";
@@ -7,10 +8,15 @@ import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot"
 import { ActionType } from "@/enums/actions/ActionType";
 import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import type { ModuleCreature } from "@/module/ModuleCreature";
+import type { ModuleObject } from "@/module/ModuleObject";
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import type { TalentSpell } from "@/talents/TalentSpell";
 import type { TalentFeat } from "@/talents/TalentFeat";
 
 /** How an NPC may fight (GM's choice per NPC, in the Inspector) */
+/** Who a power works on at all (GMCombatAI.powerTargetRule) */
+export type GMPowerTargetRule = 'droids' | 'forceUsers';
+
 export type GMCombatStyle = 'all' | 'weapons' | 'attack';
 
 /** A power, combat feat or usable item, sorted by what it's for */
@@ -79,9 +85,11 @@ export interface GMCombatTactic {
 const HEAL_BELOW = 0.4;
 const SPELL_ROW = (id: number) => GameState.TwoDAManager.datatables.get('spells')?.rows?.[id] || {};
 const isSet = (v: any) => v !== undefined && v !== null && v !== '' && v !== '****';
+const rand = () => (typeof GameState.random === 'function' ? GameState.random() : Math.random());
+const clockNow = () => ((GameState as any).simTimeMs > 0 ? (GameState as any).simTimeMs : performance.now());
 // A plain function: the dev build reads .ts as TSX, where a generic arrow would parse as JSX
 function pick<T>(list: T[]): T | undefined {
-  return list[Math.floor(Math.random() * list.length)];
+  return list[Math.floor(rand() * list.length)];
 }
 
 /**
@@ -125,7 +133,13 @@ export class GMCombatAI {
     // The AI closing a round itself (startFresh) isn't a round to decide on
     if (npc.gmCombatClosingRound) return;
     const GM = GameState.GMManager;
-    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldPaused) return;
+    if (!GameState.gmMode || !GM || GameState.GMNetworkManager?.role === 'client' || GM.worldHeld()) return;
+    if (npc.gmHidden) return;
+    // A player's character: back to the enemy its player chose, once what they queued has gone off
+    if (GM.isPlayerCharacter?.(npc)) {
+      GMPlayers.keepFighting(npc);
+      return;
+    }
     if (!GM.isAutonomousNpc(npc)) return;
     // With the GM's NPC AI off, only NPCs under an order fight on
     if (!GM.npcAiEnabled && !GMNpcOrders.getOrder(npc)) return;
@@ -144,14 +158,47 @@ export class GMCombatAI {
    * swap. Deciding again now would start an attack, which clears what it was about to do.
    */
   static isActing(npc: ModuleCreature): boolean {
-    if ((npc.gmCombatActingUntil || 0) > performance.now()) return true;
+    if ((npc.gmCombatActingUntil || 0) > clockNow()) return true;
     return (npc.actionQueue || []).some((a: any) => a?.type === ActionType.ActionCastSpell || a?.type === ActionType.ActionItemCastSpell);
   }
 
   /** The NPC's own AI scripts asking it to attack wait while it uses a power or an item the GM AI chose */
   static holdsScriptAttack(npc: ModuleCreature): boolean {
     if (!GameState.gmMode || !GameState.GMManager?.isAutonomousNpc?.(npc)) return false;
+    // Told to stand down or run: its scripts don't send it back into the fight
+    const order = npc.gmOrder?.kind;
+    if (order === 'standDown' || order === 'flee') return true;
+    if ((npc.gmCombatHoldUntil || 0) > clockNow()) return true;
     return this.isActing(npc);
+  }
+
+  /**
+   * Who runs a creature's behaviour: the GM's AI, or its own scripts (ScriptControl). The GM's AI does for an NPC
+   * while the NPC AI is on or it has a GM order, unless the GM left it to its own scripts (a boss or plot NPC);
+   * its story and rules scripts run either way. The two used to run side by side and pull it different ways
+   * (k_ai_master turning it about after every fight, attacking someone else mid-power). On a player's machine
+   * the GM's machine runs every copied creature, scripts and all
+   */
+  static runsBehaviourScripts(npc: ModuleCreature): boolean {
+    const GM = GameState.GMManager;
+    if (!GameState.gmMode || !GM) return true;
+    if (GameState.hooks.isNetReplica(npc)) return false;
+    if (GameState.GMNetworkManager?.role === 'client') return true;
+    // A player's character is theirs to run. On the GM's machine it isn't the party leader, so KotOR's AI scripts
+    // (which leave the leader alone) ran it like an NPC: at the end of every combat round k_ai_master cleared the
+    // player's queued powers and picked its own attack
+    if (npc.gmOwnerPeerId || npc.gmPlayerConfig || GM.isPlayerCharacter?.(npc)) return false;
+    // Hidden by the GM: off the stage, it does nothing of its own (its story scripts still run)
+    if (npc.gmHidden) return false;
+    if (!GM.isAutonomousNpc(npc) || npc.gmScripted) return true;
+    return !(GM.npcAiEnabled || npc.gmOrder);
+  }
+
+  /** The GM leaves an NPC's behaviour to its own scripts (true), or to the GM's AI (the default) */
+  static setScripted(npc: ModuleCreature, scripted: boolean) {
+    if (!npc) return;
+    npc.gmScripted = scripted ? true : undefined;
+    GameState.GMManager?.notifyChange?.();
   }
 
   /** Seconds walking towards a target without getting closer before an NPC gives up on reaching it */
@@ -165,7 +212,7 @@ export class GMCombatAI {
    * or someone else to fight. Without this it walks on the spot, and its combat rounds never start.
    */
   static checkStuck(npc: ModuleCreature, everyone: ModuleCreature[]) {
-    const now = performance.now();
+    const now = clockNow();
     // A combat round holding an action that never started, with nothing queued to start it: nothing will.
     // (It counts as busy, so the NPC would never decide again.)
     const round = npc.combatRound;
@@ -201,10 +248,37 @@ export class GMCombatAI {
     this.engage(npc, target, everyone);
   }
 
+  /** Seconds a melee NPC with no way through stands ready before looking again */
+  static HOLD_SECONDS = 1.5;
+  /** Someone this close to the straight line between them is in the way */
+  static IN_THE_WAY = 0.75;
+
+  /**
+   * Nobody stands in the straight line from the NPC to that creature (within melee reach of it, someone close to
+   * it doesn't count: they're fighting it, there may be room beside them)
+   */
+  static clearWay(npc: ModuleCreature, to: ModuleCreature, everyone: ModuleCreature[]): boolean {
+    const ax = npc.position.x, ay = npc.position.y;
+    const dx = to.position.x - ax, dy = to.position.y - ay;
+    const len2 = dx * dx + dy * dy;
+    if (len2 < 0.01) return true;
+    const len = Math.sqrt(len2);
+    for (const c of everyone) {
+      if (!c || c === npc || c === to || c.isDead?.()) continue;
+      const t = ((c.position.x - ax) * dx + (c.position.y - ay) * dy) / len2;
+      if (t <= 0 || t >= 1) continue;
+      // Beside the target, within reach of it: not in the way
+      if ((1 - t) * len < 1.5) continue;
+      const px = ax + t * dx - c.position.x, py = ay + t * dy - c.position.y;
+      if (px * px + py * py < this.IN_THE_WAY * this.IN_THE_WAY) return false;
+    }
+    return true;
+  }
+
   /** It couldn't get to this target lately (checkStuck) */
   static isUnreachable(npc: ModuleCreature, target: ModuleCreature): boolean {
     const u = npc.gmCombatUnreachable;
-    return !!u && u.targetId === target.id && u.until > performance.now();
+    return !!u && u.targetId === target.id && u.until > clockNow();
   }
 
   /** Attacking this target already (an attack action in its queue, or one in its combat round) */
@@ -215,8 +289,11 @@ export class GMCombatAI {
 
   /** Fight with what it has: decide one round's action against this target and start it */
   static engage(npc: ModuleCreature, target: ModuleCreature, everyone: ModuleCreature[]): string {
-    if (!npc || !target) return '';
+    // Nobody fights a body
+    if (!npc || !target || target.isDead?.()) return '';
     if (this.isActing(npc)) return 'acting';
+    // Standing ready for an opening (no way through to anyone it could swing at)
+    if ((npc.gmCombatHoldUntil || 0) > clockNow()) return 'hold';
     const style: GMCombatStyle = npc.gmCombatStyle || 'all';
     const attack = () => {
       // Already swinging at them: let the attack carry on
@@ -226,16 +303,23 @@ export class GMCombatAI {
     if (style === 'attack') return attack();
     const s = this.situation(npc, target, everyone);
     let choice = this.choose(s, style);
-    // Can't get to them to swing: fight someone it can reach (powers and shots still go to the target)
+    // Can't get to them to swing: fight someone it has a clear way to (powers and shots still go to the target).
+    // With nobody, it stands ready for an opening: walking at the back of a melee, it slid from side to side
+    // behind its own front line and ran in circles
     const melee = !npc.isRangedEquipped?.();
     if (melee && this.isUnreachable(npc, target) && (!choice || choice.tactic.id === 'attack' || choice.tactic.id === 'feat')) {
       const other = everyone
-        .filter((c) => c && c !== target && c !== npc && !c.isDead?.() && !c.gmHidden && npc.isHostile(c))
+        .filter((c) => c && c !== target && c !== npc && !c.isDead?.() && !c.gmHidden && npc.isHostile(c) && !this.isUnreachable(npc, c))
+        .filter((c) => this.clearWay(npc, c, everyone))
         .sort((a, b) => a.position.distanceTo(npc.position) - b.position.distanceTo(npc.position))[0];
       if (other) {
         GMLog.info('ai', `${npc.getName()} turns on ${other.getName()} instead`);
         return this.engage(npc, other, everyone);
       }
+      npc.clearAllActions();
+      npc.gmCombatHoldUntil = s.now + this.HOLD_SECONDS * 1000;
+      GMLog.info('ai', `${npc.getName()} waits for an opening at ${target.getName()}`);
+      return 'hold';
     }
     if (!choice || choice.tactic.id === 'attack') return attack();
     const cooldowns: Record<string, number> = npc.gmCombatCooldowns || (npc.gmCombatCooldowns = {});
@@ -285,9 +369,9 @@ export class GMCombatAI {
       hurtAlly: hurt,
       hpRatio: hpRatio(npc),
       fp: Number(npc.getFP?.()) || 0,
-      enemyInMelee: enemies.some((c) => c.position.distanceTo(npc.position) <= this.MELEE_DISTANCE),
+      enemyInMelee: enemies.some((c) => c.position.distanceTo(npc.position) <= (c.getMeleeRange?.(npc) ?? 2) + this.MELEE_DISTANCE - 2),
       kit: this.kitOf(npc),
-      now: performance.now(),
+      now: clockNow(),
     };
   }
 
@@ -303,10 +387,7 @@ export class GMCombatAI {
     }
 
     // Combat feats: the highest of each chain (Power Attack -> Improved -> Master)
-    const feats = (npc.getFeats?.() || []) as TalentFeat[];
-    const ids = new Set(feats.map((f) => f.id));
-    for (const feat of feats) {
-      if (feat.successor >= 0 && ids.has(feat.successor)) continue;
+    for (const feat of this.bestRanks((npc.getFeats?.() || []) as TalentFeat[])) {
       if (feat.category === 0x1104) kit.meleeFeats.push(feat);
       else if (feat.category === 0x1111) kit.rangedFeats.push(feat);
     }
@@ -345,8 +426,8 @@ export class GMCombatAI {
       // Grenades hit everyone; area Force powers in KotOR pick out the caster's enemies
       discriminate: !grenade,
       // Droid powers, and ion grenades (GRENADE_ION, not every name with ION in it, like FRAGMENTATION)
-      droidsOnly: String(row.forcehostile) === '1' || /(^|_)ION($|_)/.test(label),
-      forceUsersOnly: String(row.forcehostile) === '8',
+      droidsOnly: this.powerTargetRule(row.forcehostile) === 'droids' || /(^|_)ION($|_)/.test(label),
+      forceUsersOnly: this.powerTargetRule(row.forcehostile) === 'forceUsers',
     };
   }
 
@@ -372,12 +453,49 @@ export class GMCombatAI {
     return (cre?.effects || []).some((e: any) => e && e.spellId === spellId);
   }
 
+  /**
+   * Who a power works on at all, from spells.2da's forcehostile: 1 droids only (Disable Droid, Destroy Droid), 8
+   * Force users only. NPCs aim by it, players' HUDs offer by it, and the GM's machine refuses anything else
+   */
+  static powerTargetRule(forcehostile: any): GMPowerTargetRule | undefined {
+    const v = String(forcehostile ?? '').trim();
+    return v === '1' ? 'droids' : v === '8' ? 'forceUsers' : undefined;
+  }
+
+  /** Whether a power with this rule works on cre (no rule: anyone) */
+  static worksOn(rule: GMPowerTargetRule | undefined, cre: ModuleObject | undefined): boolean {
+    if (!rule) return true;
+    if (!cre || !GMObjectKind.isCreature(cre)) return false;
+    return rule === 'droids' ? this.isDroid(cre as ModuleCreature) : this.isForceUser(cre as ModuleCreature);
+  }
+
+  /** The rule in words, for a player */
+  static ruleText(rule: GMPowerTargetRule | undefined): string {
+    return rule === 'droids' ? 'droids' : rule === 'forceUsers' ? 'Force users' : 'anyone';
+  }
+
+  /**
+   * Of a character's feats, the best rank of each chain: Master Flurry, not also Flurry and Improved Flurry, which
+   * it has as prerequisites (feat.2da's successor column names the next rank; blank is -1)
+   */
+  static bestRanks<T extends { id?: any; successor?: any }>(feats: T[]): T[] {
+    const ids = new Set(feats.map((f) => Number(f?.id)));
+    return feats.filter((f) => {
+      const next = Number(f?.successor);
+      return !(Number.isFinite(next) && next >= 0 && ids.has(next));
+    });
+  }
+
   static isDroid(cre: ModuleCreature): boolean {
     return Number(cre?.getRace?.()) === 5;
   }
 
   static isForceUser(cre: ModuleCreature): boolean {
-    return (Number(cre?.getMaxFP?.()) || 0) > 0;
+    if (!cre) return false;
+    if ((cre as any).gmForceUser) return true;
+    return (Number(cre.getMaxFP?.()) || 0) > 0
+      || (cre.classes || []).some((c: any) => !!c?.spellcaster)
+      || (cre.getSpells?.() || []).length > 0;
   }
 
   /** It can use this on that target now: affordable, in reach, on a target it works on */
@@ -414,13 +532,31 @@ export class GMCombatAI {
     return `casts ${t.label} on ${on === s.npc ? 'itself' : on.getName()}`;
   }
 
-  /** Swap the weapon in its hand for one it carries (the one it puts away goes back in its pack) */
-  static async equipWeapon(npc: ModuleCreature, weapon: ModuleItem): Promise<void> {
+  /**
+   * Swap the weapon in its hand for one it carries (the one it puts away goes back in its pack). One swap at a time:
+   * a second one decided while the first was still loading items worked from the wrong weapon in hand, and lost
+   * or doubled weapons (a body dropped two rifles and no sword)
+   */
+  static equipWeapon(npc: ModuleCreature, weapon: ModuleItem): Promise<void> {
+    if (npc.gmWeaponSwap) return npc.gmWeaponSwap;
+    npc.gmWeaponSwap = this.swapWeapon(npc, weapon).finally(() => { npc.gmWeaponSwap = undefined; });
+    return npc.gmWeaponSwap;
+  }
+
+  private static async swapWeapon(npc: ModuleCreature, wanted: ModuleItem): Promise<void> {
     const old = npc.equipment?.RIGHTHAND;
     const oldResRef = old ? gmItemResRef(old) : '';
     const list = npc.inventory || [];
-    const i = list.indexOf(weapon);
-    if (i >= 0) list.splice(i, 1);
+    // The one in its pack now: the kit may hold an item that was put away and came back as a fresh one. Equipping
+    // the old object left the fresh one in the pack too
+    let i = list.indexOf(wanted);
+    if (i < 0) {
+      const resRef = gmItemResRef(wanted);
+      i = list.findIndex((item) => gmItemResRef(item) === resRef);
+      if (i < 0) return;
+    }
+    const weapon = list[i];
+    list.splice(i, 1);
     // A two-handed or paired setup: the left hand's weapon goes away too when switching to ranged
     if (weapon.isRangedWeapon() && npc.equipment?.LEFTHAND?.getWeaponType?.()) {
       const leftResRef = gmItemResRef(npc.equipment.LEFTHAND);
@@ -458,7 +594,10 @@ export class GMCombatAI {
         if (!ally) return null;
         // Items heal their user; powers reach others
         const heal = s.kit.heals.find((t) => t.spell && GMCombatAI.usableOn(s, t, ally));
-        return heal ? { score: 75, choice: { heal, ally } } : null;
+        // Worth more the closer they are to dropping: a caster with someone a little hurt nearby (most of a big
+        // fight) kept healing instead of using its attack powers
+        const ratio = (Number(ally.getHP?.()) || 0) / Math.max(1, Number(ally.getMaxHP?.()) || 1);
+        return heal ? { score: 55 + (HEAL_BELOW - ratio) * 100, choice: { heal, ally } } : null;
       },
       act: (s, c: { heal: GMCombatTalent; ally: ModuleCreature }) => GMCombatAI.use(s, c.heal, c.ally),
     },
@@ -502,7 +641,7 @@ export class GMCombatAI {
           // Not again on a target still under it (stun, slow, fear...)
           .filter((t) => !GMCombatAI.hasEffectFrom(s.target, t.spellId));
         const choice = pick(options);
-        return choice ? { score: 60 + Math.random() * 10, choice } : null;
+        return choice ? { score: 64 + rand() * 12, choice } : null;
       },
       act: (s, t: GMCombatTalent) => GMCombatAI.use(s, t, s.target),
     },
@@ -534,7 +673,7 @@ export class GMCombatAI {
       score: (s) => {
         const feats = s.npc.isRangedEquipped?.() ? s.kit.rangedFeats : s.kit.meleeFeats;
         const feat = pick(feats);
-        return feat ? { score: 45 + Math.random() * 15, choice: feat } : null;
+        return feat ? { score: 45 + rand() * 15, choice: feat } : null;
       },
       act: (s, feat: TalentFeat) => {
         feat.useTalentOnObject(s.target, s.npc);

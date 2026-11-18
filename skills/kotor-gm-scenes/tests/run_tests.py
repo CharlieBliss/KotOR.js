@@ -62,7 +62,65 @@ def unreachable_patrol(_):
     }
 
 
+def fight(enemy, party=None):
+    """A small KotOR fight on Dantooine's grassland: the players against one group"""
+    plan = {
+        "format": "kotorjs-gm-scene", "version": 1, "title": "Fight test", "content": "kotor",
+        "area": {"game": "kotor", "module": "danm14aa"},
+        "players": {"at": {"spot": "entry"}},
+        "actors": [{"id": "foe", "faction": "hostile", "at": {"spot": "entry", "offset": [8, 0]}, **enemy}],
+        "props": [], "beats": [],
+    }
+    if party:
+        plan["party"] = party
+    return plan
+
+
+def fight_without_party(_):
+    return fight({"template": "n_sithsoldier", "count": 3})
+
+
+def rancor_for_low_levels(_):
+    return fight({"template": "g_rancor01"}, {"size": 4, "level": 3, "difficulty": "medium"})
+
+
+def soldiers_for_their_level(_):
+    return fight({"template": "n_sithsoldier", "count": 3}, {"size": 4, "level": 1})
+
+
+def restatted(_):
+    return fight({"template": "g_darkjedi01", "customize": {"level": 12}}, {"size": 4, "level": 10})
+
+
+def unknown_class(_):
+    return fight({"template": "n_sithsoldier", "customize": {"level": 5, "class": "Bounty Hunter"}}, {"size": 4, "level": 5})
+
+
+def inside_a_prop(plan):
+    # A footlocker is 0.6 x 1.2 m: standing on its spot is standing in it
+    plan["props"].append({"id": "locker", "template": "g_trescivil001", "at": {"spot": "room:m13aa_02a"}})
+    actor(plan, "master")["at"] = {"spot": "prop:locker"}
+
+
+def chair_without_seat(plan):
+    actor(plan, "master")["stance"] = "chair"
+
+
+def chair_on_a_table(plan):
+    plan["props"].append({"id": "table", "template": "plc_gentable", "at": {"spot": "room:m13aa_02a"}})
+    actor(plan, "master")["stance"] = "chair_pazaak"
+    actor(plan, "master")["at"] = {"spot": "prop:table"}
+
+
 CASES = [
+    ("a fight without a party", fight_without_party, 'add "party"'),
+    ("a rancor for level 3 players", rancor_for_low_levels, "is deadly"),
+    ("three Sith soldiers for level 1 players", soldiers_for_their_level, "TRIVIAL"),
+    ("a restatted actor fights at its new level", restatted, "level 12, 1"),
+    ("a class the game doesn't have", unknown_class, 'no class "Bounty Hunter"'),
+    ("an actor standing inside a prop", inside_a_prop, 'stands inside prop "locker"'),
+    ("a seated actor without a seat", chair_without_seat, "sits on nothing"),
+    ("a seated actor on a table", chair_on_a_table, "isn't a chair or bench"),
     ("the example passes", None, "OK: Massacre at the Onderon Temple"),
     ("an offset into a wall", into_a_wall, "from any floor"),
     ("15 actors in a 7x24 corridor", crowded_corridor, "crowded"),

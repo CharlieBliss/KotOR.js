@@ -11,7 +11,11 @@
     "webpack:prod": "cross-env NODE_ENV=production webpack",
     "dev": "cross-env NODE_ENV=development webpack serve",
     "gm:server": "node scripts/gm-server.js",
+    "gm:play": "electron scripts/gm-play.js",
     "test:gm-e2e": "electron scripts/gm-e2e.js",
+    "test:gm-duel": "electron scripts/gm-duel-check.js",
+    "test:gm-regress": "electron scripts/gm-regress.js",
+    "test:gm-regress:fast": "electron scripts/gm-regress.js --speed 4",
     "bench:abilities": "electron scripts/gm-ability-bench.js",
     "catalog:scenes": "electron scripts/gm-scene-catalog.js",
     "scene:check": "electron scripts/gm-scene-check.js",
@@ -23,7 +27,9 @@
     "electron:icon": "npx --yes electron-icon-builder --input=src/assets/icon-256.png --output=src/assets/icons",
     "generate-manifest": "node scripts/generate-manifest.js",
     "typedoc": "typedoc --out ./wiki ./src/KotOR.ts",
-    "test": "jest --verbose --coverage --no-cache ./src/tests"
+    "test": "jest --verbose --coverage --no-cache ./src/tests",
+    "test:unit": "jest --no-cache ./src/tests",
+    "test:gm": "jest --no-cache src/tests/gm src/tests/character src/tests/effectRules.test.ts src/tests/featRules.test.ts src/tests/idleStance.test.ts src/tests/scriptControl.test.ts src/tests/sharedEffects.test.ts src/tests/freeLookCamera.test.ts src/tests/otherGame.test.ts src/tests/animationPriority.test.ts"
   },
   "author": "KobaltBlu",
   "license": "GPL-3.0",

@@ -10,6 +10,7 @@ import { BIFObject } from "@/resource/BIFObject";
 import { RIMObject } from "@/resource/RIMObject";
 import { ERFObject } from "@/resource/ERFObject";
 import { TwoDAObject } from "@/resource/TwoDAObject";
+import { TLKObject } from "@/resource/TLKObject";
 import { ResourceTypes } from "@/resource/ResourceTypes";
 import { isUsableDirectoryHandle } from "@/utility/gameDirectoryAccess";
 import { ResourceLoader } from "@/loaders/ResourceLoader";
@@ -62,6 +63,36 @@ export class OtherGameManager {
     });
     Module.IsBorrowedModule = (modName) => this.isForeignModule(modName);
     ModuleArea.BorrowedTables = (name) => this.twoDA.get(String(name).toLowerCase());
+  }
+
+  /** The other game's talk table (its text by string id), read the first time something of it needs naming */
+  static tlk: TLKObject | null = null;
+  static tlkLoading: Promise<TLKObject | null> | null = null;
+
+  static loadTalkTable(): Promise<TLKObject | null> {
+    if (this.tlk) return Promise.resolve(this.tlk);
+    if (!this.tlkLoading) {
+      this.tlkLoading = (async () => {
+        if (!(await this.mount())) return null;
+        try {
+          const tlk = new TLKObject();
+          tlk.loadFromBuffer(await GameFileSystem.readFile(`${GameFileSystem.OTHER_GAME_PREFIX}/dialog.tlk`));
+          this.tlk = tlk;
+          return tlk;
+        } catch (e) {
+          console.warn('[OtherGameManager] dialog.tlk unreadable', e);
+          return null;
+        } finally {
+          this.tlkLoading = null;
+        }
+      })();
+    }
+    return this.tlkLoading;
+  }
+
+  /** One of the other game's strings by id (loadTalkTable first); '' when unknown */
+  static text(strRef: number): string {
+    return strRef >= 0 ? (this.tlk?.GetStringById(strRef) || '') : '';
   }
 
   /** The game that isn't running */

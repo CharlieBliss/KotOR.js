@@ -104,7 +104,11 @@ export class EffectBeam extends GameEffect {
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
           onComplete: (model: OdysseyModel3D) => {
+            // Taken away with the effect (thrown away if the beam ended while it loaded)
+            if(!this.adoptModel(model)) return resolve();
             this.model = model;
+            // Applied while the model was loading (addEffect applies at once): attach it now
+            if(this.applied) this.attachBeam();
             resolve();
           }
         });
@@ -119,15 +123,27 @@ export class EffectBeam extends GameEffect {
       return;
       
     super.onApply();
-    
-    if(this.model instanceof OdysseyModel3D){
-      if(this.getCaster().model instanceof OdysseyModel3D){
-        //Add the effect to the casters model
-        this.getCaster().model.add(this.model);
-        //Set the target node of the BeamEffect emitter
-        this.model.setEmitterTarget(this.object.model);
-      }
+    this.attachBeam();
+  }
+
+  /** Hang the beam on its caster's model, its emitters aimed at the target (once both models are there) */
+  attachBeam(){
+    if(!(this.model instanceof OdysseyModel3D) || this.model.parent) return;
+    const caster = this.getCaster();
+    // Aimed at a creature, its model; aimed at a spot (Module.addEffect), the marker made for it there
+    const target = this.object?.model || this.creator?.model;
+    if(caster?.model instanceof OdysseyModel3D && target){
+      //Add the effect to the casters model
+      caster.model.add(this.model);
+      //Set the target node of the BeamEffect emitter
+      this.model.setEmitterTarget(target);
     }
+  }
+
+  /** The beam's model is the base effect's to take away (GameEffect.retire): off the caster's model with it */
+  onRemove(){
+    this.model = undefined;
+    super.onRemove();
   }
 
   update(delta = 0){

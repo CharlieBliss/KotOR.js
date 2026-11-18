@@ -1,0 +1,354 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "The Council Convenes",
+  "summary": "The last Jedi Masters meditate in a circle around a hologram of a dead world, with a small, ancient master at its heart. A grey-robed old woman walks in, and one by one the Masters fall silent.",
+  "gmNotes": "The quiet scene: mostly faces, robes and slow camera moves. Players are frozen and only watch until the last beat. Beat 1: the circle. Beat 2: the old master speaks and the circle rises. Beat 3: Kreia walks in. Beat 4: the Masters choke and fall. Beat 5 (optional) frees the players for a duel with her; skip it for a purely quiet scene.",
+  "content": "tsl",
+  "area": {
+    "game": "kotor",
+    "module": "danm13",
+    "reason": "KotOR's Jedi Enclave on Dantooine: the round, sunlit council chamber where the Council judged Revan, a stone-and-wood Jedi sanctum that reads like the films' council and teaching scenes."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "waypoint:dan13_wp_bastila7"
+    },
+    "facing": "toward:room:m13aa_04a",
+    "frozen": true,
+    "note": "At the council chamber's north entrance, watching the circle. Frozen until beat 5."
+  },
+  "actors": [
+    {
+      "id": "elder",
+      "name": "Master Vandar",
+      "template": "n_yoda",
+      "faction": "friendly",
+      "at": {
+        "spot": "prop:holo",
+        "offset": [
+          0,
+          -2.2
+        ]
+      },
+      "facing": 0,
+      "stance": "meditate",
+      "customize": {
+        "level": 18,
+        "class": "Jedi Consular",
+        "rightHand": "g_w_lghtsbr03"
+      },
+      "bark": "Patience. The Force will show us the way, if we let it."
+    },
+    {
+      "id": "masters",
+      "name": "Jedi Master",
+      "template": "n_jedimemm",
+      "faction": "friendly",
+      "count": 2,
+      "at": {
+        "spot": "prop:holo",
+        "offset": [
+          0,
+          0.5
+        ],
+        "formation": "line",
+        "spacing": 9
+      },
+      "facing": "toward:prop:holo",
+      "stance": "meditate",
+      "customize": {
+        "level": 16,
+        "class": "Jedi Guardian",
+        "armor": "a_robe_17"
+      }
+    },
+    {
+      "id": "master_f",
+      "name": "Jedi Master",
+      "template": "n_jedimemf",
+      "faction": "friendly",
+      "at": {
+        "spot": "prop:holo",
+        "offset": [
+          0,
+          4.5
+        ]
+      },
+      "facing": 180,
+      "stance": "meditate",
+      "customize": {
+        "level": 16,
+        "class": "Jedi Consular",
+        "armor": "a_robe_17"
+      }
+    },
+    {
+      "id": "knights",
+      "name": "Jedi Knight",
+      "template": "n_jedicounm",
+      "faction": "friendly",
+      "count": 2,
+      "at": {
+        "spot": "prop:holo",
+        "offset": [
+          0,
+          3.5
+        ],
+        "formation": "line",
+        "spacing": 7
+      },
+      "facing": "toward:prop:holo",
+      "stance": "meditate",
+      "customize": {
+        "level": 14,
+        "class": "Jedi Sentinel",
+        "armor": "a_robe_13"
+      }
+    },
+    {
+      "id": "kreia",
+      "name": "Kreia",
+      "template": "p_kreia_evil",
+      "faction": "neutral",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:dan13_wp_carth7"
+      },
+      "facing": 180,
+      "order": {
+        "kind": "standDown"
+      },
+      "customize": {
+        "level": 12,
+        "hp": 200
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "holo",
+      "template": "plc_holomal",
+      "name": "Hologram of Malachor V",
+      "at": {
+        "spot": "room:m13aa_04a"
+      }
+    },
+    {
+      "id": "statues",
+      "appearance": "Statue2_heroic_Jedi",
+      "name": "Statue of a Jedi Master",
+      "count": 2,
+      "at": {
+        "spot": "room:m13aa_04a",
+        "offset": [
+          0,
+          -10
+        ],
+        "formation": "line",
+        "spacing": 12
+      },
+      "facing": 0
+    },
+    {
+      "id": "braziers",
+      "template": "plc_brazier01",
+      "name": "Brazier",
+      "count": 2,
+      "at": {
+        "spot": "room:m13aa_04a",
+        "offset": [
+          0,
+          -5
+        ],
+        "formation": "line",
+        "spacing": 14
+      }
+    }
+  ],
+  "beats": [
+    {
+      "title": "The circle",
+      "narration": "The last Masters of the Jedi Order sit in silence around the image of a dead world. At the centre, the smallest and oldest of them does not move at all.",
+      "notes": "Slow shots around the circle. Nobody speaks."
+    },
+    {
+      "title": "The elder speaks",
+      "narration": "The old master opens his eyes.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "elder",
+          "text": "Clouded, the future is. But hiding from it, the Jedi can no longer be."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "masters",
+            "master_f",
+            "knights"
+          ],
+          "stance": "listen"
+        },
+        {
+          "do": "say",
+          "id": "master_f",
+          "text": "Then we go to Malachor, Master. All of us."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "elder"
+          ],
+          "stance": "",
+          "gesture": "nod"
+        }
+      ]
+    },
+    {
+      "title": "The grey woman",
+      "narration": "Footsteps in the corridor. An old woman in a grey hood walks into the chamber as if she has always belonged there.",
+      "notes": "Kreia walks to the edge of the circle.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "kreia"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "kreia"
+          ],
+          "order": {
+            "kind": "move",
+            "to": {
+              "spot": "room:m13aa_04a",
+              "offset": [
+                -1.5,
+                7
+              ]
+            }
+          }
+        },
+        {
+          "do": "say",
+          "id": "kreia",
+          "text": "So the Council sits once more, and talks of war as if it understood it."
+        }
+      ]
+    },
+    {
+      "title": "Silence",
+      "narration": "Kreia lifts one hand. The Masters clutch at their throats, and the Force goes out of the room.",
+      "notes": "The Masters choke and collapse; they turn neutral and stand down, so they stay down if the duel in beat 5 runs. Hold on the old master last.",
+      "actions": [
+        {
+          "do": "animate",
+          "ids": [
+            "kreia"
+          ],
+          "gesture": "power"
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "masters",
+            "master_f",
+            "knights"
+          ],
+          "stance": "choke"
+        },
+        {
+          "do": "say",
+          "id": "kreia",
+          "text": "You cut me from the Force. Let me return the lesson."
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "masters",
+            "master_f",
+            "knights"
+          ],
+          "stance": "dead"
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "elder"
+          ],
+          "stance": "kneel_sad"
+        },
+        {
+          "do": "faction",
+          "ids": [
+            "masters",
+            "master_f",
+            "knights",
+            "elder"
+          ],
+          "faction": "neutral"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "masters",
+            "master_f",
+            "knights",
+            "elder"
+          ],
+          "order": {
+            "kind": "standDown"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Face her (optional)",
+      "narration": "Only you are left standing.",
+      "notes": "Frees the players and turns Kreia on them. Skip for a quiet ending.",
+      "actions": [
+        {
+          "do": "freezePlayers",
+          "on": false
+        },
+        {
+          "do": "faction",
+          "ids": [
+            "kreia"
+          ],
+          "faction": "hostile"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "kreia"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "say",
+          "id": "kreia",
+          "text": "And you, my student. Show me what you have learned."
+        }
+      ]
+    }
+  ]
+}

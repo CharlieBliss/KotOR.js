@@ -65,6 +65,8 @@ export class AutoPauseManager {
 
   static SignalAutoPauseEvent(type: AutoPauseState){
     if(!this.GetAutoPauseTypeEnabled(type)) return false;
+    // Others play in the same world: one machine can't stop it
+    if(GameState.hooks.sharedWorld()) return false;
 
     GameState.State = EngineState.PAUSED;
     GameState.MenuManager.InGamePause.LBL_PAUSEREASON.setText(this.AutoPauseReason.get(type));

@@ -1,0 +1,391 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Fire in the Treetops",
+  "summary": "Czerka slavers and their Trandoshan hunters storm the Wookiee village of Rwookrrorro. The Wookiees, and the Jedi among them, meet them on the walkways high above the forest floor.",
+  "gmNotes": "Big set-piece battle in an outdoor, green location, the trailer's contrast to the ship and the desert. Beat 1 is the village at peace (the warriors around the fire). Beat 2 brings the slavers in from the lift platform to the north, with their cages. Beat 3 is the Wookiee roar and counter-charge; beat 4 frees the captives. Let the fight run between beats 2 and 3 so the slavers get a foothold.",
+  "content": "tsl",
+  "area": {
+    "game": "kotor",
+    "module": "kas_m23aa",
+    "reason": "KotOR's Rwookrrorro: wide wooden platforms in giant wroshyr trees, the Wookiee homeworld of Revenge of the Sith's last battle and Chewbacca's people, and where KotOR's Czerka slavers worked."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "room:m23aa_03a",
+      "offset": [
+        -2,
+        4
+      ]
+    },
+    "facing": 340,
+    "note": "With the Wookiee warriors on the main platform, looking north toward the lift where the slavers come up."
+  },
+  "actors": [
+    {
+      "id": "chieftain",
+      "name": "Wookiee Chieftain",
+      "template": "p_zaalbar",
+      "faction": "friendly",
+      "at": {
+        "spot": "room:m23aa_03a",
+        "offset": [
+          3,
+          0
+        ]
+      },
+      "facing": 330,
+      "stance": "talk_forceful",
+      "customize": {
+        "level": 14,
+        "class": "Soldier"
+      }
+    },
+    {
+      "id": "warriors",
+      "name": "Wookiee Warrior",
+      "template": "g_wookiemale02",
+      "faction": "friendly",
+      "count": 3,
+      "at": {
+        "spot": "prop:fire",
+        "formation": "ring",
+        "spacing": 3
+      },
+      "stance": "listen",
+      "customize": {
+        "level": 11
+      }
+    },
+    {
+      "id": "huntresses",
+      "name": "Wookiee Huntress",
+      "template": "g_wookiefemale02",
+      "faction": "friendly",
+      "count": 2,
+      "at": {
+        "spot": "room:m23aa_03a",
+        "offset": [
+          8,
+          6
+        ],
+        "formation": "line",
+        "spacing": 2.5
+      },
+      "facing": 330,
+      "customize": {
+        "level": 11
+      }
+    },
+    {
+      "id": "slavers",
+      "name": "Czerka Slaver",
+      "template": "n_czerkaoff",
+      "faction": "hostile",
+      "count": 3,
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          -3,
+          6
+        ],
+        "formation": "line",
+        "spacing": 3
+      },
+      "facing": 160,
+      "customize": {
+        "level": 10,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      }
+    },
+    {
+      "id": "hunters",
+      "name": "Trandoshan Hunter",
+      "template": "n_trandogrn",
+      "faction": "hostile",
+      "count": 6,
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          -1.5,
+          0
+        ],
+        "formation": "line",
+        "spacing": 2
+      },
+      "facing": 160,
+      "customize": {
+        "level": 11,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      }
+    },
+    {
+      "id": "merc_captain",
+      "name": "Mandalorian Mercenary",
+      "template": "g_mandalor03",
+      "faction": "hostile",
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          -2,
+          8
+        ]
+      },
+      "facing": 160,
+      "customize": {
+        "level": 15
+      }
+    },
+    {
+      "id": "captives",
+      "name": "Captive Wookiee",
+      "template": "n_wookiem",
+      "faction": "neutral",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "prop:cages",
+        "offset": [
+          0,
+          -1.6
+        ],
+        "formation": "line",
+        "spacing": 3.5
+      },
+      "stance": "injured",
+      "order": {
+        "kind": "standDown"
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "fire",
+      "template": "plc_firpitlg",
+      "name": "Village fire",
+      "at": {
+        "spot": "room:m23aa_03a",
+        "offset": [
+          -2,
+          -4
+        ]
+      }
+    },
+    {
+      "id": "cages",
+      "template": "plc_cagelg",
+      "name": "Slaver cage",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          2,
+          4
+        ],
+        "formation": "line",
+        "spacing": 3.5
+      },
+      "facing": 180
+    },
+    {
+      "id": "slaver_crates",
+      "template": "plc_plstccrt",
+      "name": "Czerka cargo",
+      "count": 3,
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          -4,
+          9
+        ],
+        "formation": "line",
+        "spacing": 1.5
+      }
+    },
+    {
+      "id": "burning",
+      "template": "plc_burnjunk",
+      "name": "Burning hut wall",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          8,
+          -2
+        ],
+        "formation": "line",
+        "spacing": 6
+      }
+    },
+    {
+      "id": "fallen_wookiee",
+      "template": "plc_wookcrps",
+      "name": "Fallen Wookiee",
+      "hidden": true,
+      "at": {
+        "spot": "room:m23aa_02a",
+        "offset": [
+          0,
+          -4
+        ]
+      }
+    }
+  ],
+  "beats": [
+    {
+      "title": "The village at dusk",
+      "narration": "Rwookrrorro, high in the wroshyr trees. Smoke rises from the village fire; the warriors listen to their chieftain.",
+      "notes": "Quiet establishing shots: the platforms, the forest below, the warriors at the fire.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "chieftain",
+          "text": "[Growl] The Czerka ships are circling again. We will not be taken like our fathers were."
+        }
+      ]
+    },
+    {
+      "title": "Slavers on the lift",
+      "narration": "Blaster fire from the north platform. Czerka slavers and Trandoshan hunters spill off the lift, dragging cages behind them.",
+      "notes": "The slavers attack the Wookiees. Let them gain ground before beat 3.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "slavers",
+            "hunters",
+            "merc_captain",
+            "captives",
+            "cages",
+            "slaver_crates",
+            "burning",
+            "fallen_wookiee"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "slavers",
+            "hunters"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "warriors"
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "merc_captain"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "warriors",
+            "chieftain"
+          ],
+          "stance": ""
+        },
+        {
+          "do": "say",
+          "id": "merc_captain",
+          "text": "Stun the big ones, kill the rest. And bring me that Jedi."
+        }
+      ]
+    },
+    {
+      "title": "The roar",
+      "narration": "The chieftain throws back his head and roars. Every Wookiee on the platform answers.",
+      "notes": "The Wookiees counter-charge.",
+      "actions": [
+        {
+          "do": "animate",
+          "ids": [
+            "chieftain",
+            "warriors",
+            "huntresses"
+          ],
+          "gesture": "cheer"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "chieftain",
+            "warriors",
+            "huntresses"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "hunters"
+          }
+        },
+        {
+          "do": "say",
+          "id": "chieftain",
+          "text": "[Roar] For Kashyyyk!"
+        }
+      ]
+    },
+    {
+      "title": "Free them",
+      "narration": "The last slaver falls. The cage doors swing open.",
+      "notes": "Aftermath. Run once the hostiles are down.",
+      "actions": [
+        {
+          "do": "hide",
+          "ids": [
+            "cages"
+          ]
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "captives"
+          ],
+          "stance": "",
+          "gesture": "cheer"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "captives"
+          ],
+          "order": {
+            "kind": "follow",
+            "target": "chieftain"
+          }
+        },
+        {
+          "do": "say",
+          "id": "chieftain",
+          "text": "[Growl] Today the trees are ours again."
+        }
+      ]
+    }
+  ]
+}

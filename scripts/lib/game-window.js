@@ -12,6 +12,9 @@ const os = require('os');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** How long one poll of waitFor may take before it's asked again */
+const POLL_LIMIT_MS = 5000;
+
 /** Keep hidden windows running at full speed. Call before app is ready. */
 function configureApp(app, profileName) {
   if (profileName) app.setPath('userData', path.join(os.tmpdir(), profileName));
@@ -35,10 +38,14 @@ function createGameWindow({ show = false, title = 'KotOR.js check', width = 1280
   });
   if (show) win.show(); else win.showInactive();
   win.pageErrors = [];
+  win.consoleErrors = [];
   win.webContents.on('console-message', (event) => {
     const message = String(event.message || '');
     const isError = event.level === 'error' || event.level === 3;
-    if (isError && /Uncaught|Unhandled/i.test(message)) win.pageErrors.push(message.split('\n')[0].slice(0, 240));
+    if (!isError) return;
+    const summary = message.split('\n')[0].slice(0, 240);
+    win.consoleErrors.push(summary);
+    if (/Uncaught|Unhandled/i.test(message)) win.pageErrors.push(summary);
   });
   return win;
 }
@@ -59,7 +66,9 @@ async function waitFor(win, description, fn, timeout, ...args) {
   const errorsBefore = (win.pageErrors || []).length;
   while (Date.now() < deadline) {
     try {
-      last = await evalIn(win, fn, ...args);
+      // A poll sent while the page is navigating (it reloads itself once, early on) can go unanswered: give each
+      // one a few seconds, then ask again, rather than letting it hold the whole wait
+      last = await Promise.race([evalIn(win, fn, ...args), sleep(POLL_LIMIT_MS).then(() => undefined)]);
       if (last) return last;
     } catch (e) {
       last = e.message;
@@ -76,7 +85,7 @@ async function waitFor(win, description, fn, timeout, ...args) {
  * game's own licence entry (?key=tsl is KotOR II): the other game's may already be there, accepted.
  */
 async function bootToMenu(win, url, { timeout = 60000 } = {}) {
-  const licence = /[?&]key=tsl/i.test(url) ? 'TSL' : 'KOTOR';
+  const licence = /[?&]key=tsl\b/i.test(url) ? 'TSL' : 'KOTOR';
   await win.loadURL(url);
   const accepted = await waitFor(win, 'the licence state', (KotOR, game) => {
     const raw = localStorage.getItem('acceptEULA');
@@ -99,4 +108,97 @@ async function setGameSpeed(win, scale) {
   await evalIn(win, (KotOR, s) => { KotOR.GameState.setTimeScale(s); return true; }, scale);
 }
 
-module.exports = { sleep, configureApp, createGameWindow, evalIn, waitFor, bootToMenu, setGameSpeed };
+/** Advance simulation deterministically by `seconds` in fixed `stepSize` increments without wall-clock sleeps */
+async function stepSimulation(win, seconds, stepSize = 1 / 30, options = {}) {
+  return evalIn(win, (KotOR, sec, dt, opts) => {
+    if (typeof KotOR.GameState.stepFixed !== 'function') return 0;
+    return KotOR.GameState.stepFixed(sec, dt, opts);
+  }, seconds, stepSize, options);
+}
+
+/** Check rendered canvas + visible GM/Player UI layout bounds inside a window */
+async function checkLayoutInvariants(win) {
+  return evalIn(win, (KotOR) => {
+    const problems = [];
+    const gl = KotOR.GameState.renderer?.getContext?.();
+    if (gl && gl.isContextLost && gl.isContextLost()) {
+      problems.push('WebGL context lost');
+    }
+    const canvas = KotOR.GameState.canvas;
+    if (canvas) {
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width < 100 || rect.height < 100) problems.push(`canvas collapsed (${rect.width}x${rect.height})`);
+    }
+    const checkBox = (selector, label) => {
+      const el = document.querySelector(selector);
+      if (!el) return;
+      const st = getComputedStyle(el);
+      if (st.display === 'none' || st.visibility === 'hidden') return;
+      const r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0) problems.push(`${label} has zero bounds`);
+      if (r.right < 0 || r.bottom < 0 || r.left > window.innerWidth || r.top > window.innerHeight) {
+        problems.push(`${label} clipped completely off-screen`);
+      }
+    };
+    checkBox('.gm-topbar', 'GM topbar');
+    checkBox('.gm-player-hud', 'Player HUD');
+    checkBox('.gm-hud-target', 'Player target frame');
+    return problems;
+  });
+}
+
+/** Verify host vs client netIdMap, pending spawns, and error state agree */
+async function checkWorldInvariants(gmWin, clientWindows = []) {
+  const read = (w) => evalIn(w, (KotOR) => {
+    const G = KotOR.GMManager;
+    const actors = {};
+    for (const [id, obj] of G.netIdMap.entries()) {
+      if (!obj || obj.destroyed || obj.gmHidden) continue;
+      const isCre = KotOR.GMObjectKind?.isCreature?.(obj);
+      actors[id] = {
+        name: obj.getName?.() || id,
+        hp: obj.getHP?.(),
+        dead: isCre ? !!obj.isDead?.() : false,
+        hasModel: !!(obj.model && (obj.model.children?.length || obj.model.isObject3D)),
+      };
+    }
+    return {
+      pending: KotOR.GMReplication ? [...KotOR.GMReplication.pendingNetSpawns] : [],
+      actors,
+    };
+  });
+
+  const problems = [];
+  const host = await read(gmWin);
+  if (host.pending.length) problems.push(`GM has stuck pendingNetSpawns: ${host.pending.join(', ')}`);
+
+  for (let i = 0; i < clientWindows.length; i++) {
+    const cli = await read(clientWindows[i]);
+    const label = `client[${i}]`;
+    if (cli.pending.length) problems.push(`${label} has stuck pendingNetSpawns: ${cli.pending.join(', ')}`);
+    for (const [id, h] of Object.entries(host.actors)) {
+      const c = cli.actors[id];
+      if (!c) {
+        problems.push(`${label} missing actor ${h.name} (${id})`);
+        continue;
+      }
+      if (h.dead !== c.dead) {
+        problems.push(`${label} ${h.name} (${id}) dead mismatch: host=${h.dead}, client=${c.dead}`);
+      }
+    }
+  }
+  return problems;
+}
+
+module.exports = {
+  sleep,
+  configureApp,
+  createGameWindow,
+  evalIn,
+  waitFor,
+  bootToMenu,
+  setGameSpeed,
+  stepSimulation,
+  checkLayoutInvariants,
+  checkWorldInvariants,
+};

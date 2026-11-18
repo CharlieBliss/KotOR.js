@@ -25,6 +25,7 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
    - **`content`:** the game the GM runs. Actors and props must be its templates (templates from the other game get the wrong models).
    - **The area:** it can come from either game. KotOR.js borrows the other game's areas.
    - If you don't know which game the GM runs, ask once. Don't guess.
+   - **Know the party, for any scene with a fight:** how many players and their level, and how hard the fight should be. Ask once if you don't know. It goes in the plan's `party`.
 2. **Talk the scene through first.** Help with the story: stakes, mood, what the players see and can do, how it turns, how it ends. Write the plan once the scene is clear enough, or when asked.
 3. **Pick the area for its look, not its canon location.** A Jedi temple on Onderon is best played in Dantooine's Jedi Enclave (KotOR `danm13`), not whatever area carries the Onderon name. Use `area-guide.md`, then grep `areas.md` for the module's block to see its rooms and waypoints. Say why the area fits in `area.reason`.
 4. **Block the scene.**
@@ -39,7 +40,18 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
    - **Factions:** set the faction the scene needs; it overrides the template's.
    - **Numbers:** keep them sane. 25 or fewer creatures on screen plays well.
    - **Body language:** give actors a `stance` that sells the moment (meditating Jedi, a prisoner kneeling, the wounded lying down, a technician at a console). Change it, or add a gesture, in a beat with `animate`. The ids are in `reference/format.md`; some exist only in KotOR II.
-6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
+   - **Make fights fit the party.** Pick templates near the party's level (`creatures.tsv` has each one's `level`, `hp`, `ac`, `attacks` and `powers`). Then adjust until the checker rates each fight as wanted ("Encounters" in `reference/format.md`):
+     - **numbers** first;
+     - then **restat** with `customize.level` (and `class`) to bring a template that looks right to the party's level;
+     - then **gear** or `hp`;
+     - then another template.
+
+     Reskin with `customize.appearance` when the look you want only comes on the wrong creature.
+   - **Seated actors need a seat.** `chair`, `chair_drunk` and `chair_pazaak` sit on nothing unless the plan places a chair or bench there. Put each seated actor on a seat prop (`"at": { "spot": "prop:<seat id>" }`): the game sits it in the nearest free seat, at the seat's own spot and facing, so turn the *seat* the way the sitter should look (a chair's facing isn't its sitter's: see "Seats" in `reference/format.md`). `sit` and `meditate_sit` are on the floor and need none.
+6. **Dress the set.** Grep `placeables.tsv` and `models.tsv` for the mood: debris, wreckage, crates, consoles, bodies, fire, banners, chairs and benches. Use containers with `loot` for things to find. Use `skill`-gated props for terminals and repairs.
+   - **Search by model as well as name.** A template's name can be wrong (KotOR II's `plc_chair1` is a food pile); its `model` column says what it really is.
+   - **Props are obstacles.** Tables, crates and chairs block the way. Leave walkways a couple of metres wide between them, especially on routes NPCs are ordered along.
+   - **Nobody stands inside a prop.** The catalogs give each solid prop's `footprint` (its size on the floor). Place actors around a table or crate at least half its size plus 0.5 m from its spot ("Footprints" in `reference/format.md`). The checker reports anyone inside one and where the game would move them.
 7. **Script it as beats.**
    - **Arrivals:** place them up front with `"hidden": true`, then reveal them in a beat, with orders.
    - **Watching only:** to keep players out of the action, set `"players": { "frozen": true }` and free them in a later beat (`freezePlayers`).
@@ -54,6 +66,7 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
         - places nobody can walk to;
         - arrivals on top of the players;
         - beats that order, hide or reveal the wrong things.
+      - It **rates every fight** for the plan's `party`: trivial, easy, medium, hard or deadly. It also says how much of their strength the players are expected to lose, and it notes when the hardest fight misses `party.difficulty`.
       - It ends with a **text map** of the scene: `@` players, a letter per actor group (lower case while hidden), digits for props, `*` order destinations.
    3. **Fix every ERROR.** NOTEs are advice: fix the ones that hurt the scene.
    4. **Read the map** against the scene as discussed:
@@ -73,7 +86,8 @@ The user runs a game-master mode in KotOR.js, a remake of the KotOR engine. They
    - the area and why it fits;
    - the cast and the props;
    - where the players start;
-   - the beats, in one line each.
+   - the beats, in one line each;
+   - each fight's rating, and any actor you restatted or re-equipped to get there.
 
    Remind the GM how to import it: Scenes → Scene plan → Open file → Import and set the scene. Then run the beats from that panel.
 

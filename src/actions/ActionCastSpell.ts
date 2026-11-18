@@ -87,6 +87,11 @@ export class ActionCastSpell extends Action {
             if(combatRound.roundStarted){
               const spellTarget = combatRound.action?.target || this.target;
               const spellTalent = combatRound.action?.spell || this.spell;
+              if(BitWise.InstanceOfObject(this.owner, ModuleObjectType.ModuleCreature)){
+                const conjure = spellTalent?.getConjureAnimation?.() || 'castout1';
+                const own = spellTarget == this.owner && conjure != 'castout3' ? ['castout2'] : [];
+                (this.owner as any).playCastAnimation?.([...own, conjure, 'castout1'], spellTalent?.getCastSeconds?.() || 0);
+              }
               const spellCastInstance = new SpellCastInstance(this.owner, spellTarget, spellTalent);
               if(this.owner.area && typeof this.owner.area.attachSpellInstance === 'function'){
                 this.owner.area.attachSpellInstance(spellCastInstance);

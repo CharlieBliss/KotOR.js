@@ -5,6 +5,7 @@ import type { ModuleArea } from "@/module/ModuleArea";
 import type { GFFStruct } from "@/resource/GFFStruct";
 import type { WalkmeshEdge } from "@/odyssey/WalkmeshEdge";
 import type { ModuleObject } from "@/module/ModuleObject";
+import type { AreaSetPiece } from "@/module/AreaSetPiece";
 
 /**
  * PathPoint class.
@@ -75,19 +76,47 @@ export class PathPoint {
     return false;
   }
 
-  hasLOS(point_b: PathPoint, owner?: ModuleObject): boolean {
+  /**
+   * Can a creature walk straight from here to point_b without crossing the walkmesh's edge? With
+   * withCreatures, creatures standing on the line block it too. Route planning leaves creatures out: they move,
+   * and walking around them is creature avoidance's job (a crowd counted as walls leaves no route at all).
+   */
+  /** How far above or below a line a wall still stands in its way (metres) */
+  static EDGE_HEIGHT_REACH = 2.5;
+
+  /** The set piece whose floor this point is on (undefined: not looked for yet; null: the area's own floor) */
+  setPiece?: AreaSetPiece | null;
+
+  floorSet(): AreaSetPiece | null {
+    if(this.setPiece === undefined){
+      const floor = this.area?.floorAt ? this.area.floorAt(this.vector, this.vector.z, 1.5) : null;
+      this.setPiece = floor?.room?.setPiece || null;
+    }
+    return this.setPiece;
+  }
+
+  hasLOS(point_b: PathPoint, owner?: ModuleObject, withCreatures: boolean = false): boolean {
     if(!this.area)
       return true;
 
     const path_line = new THREE.Line3(this.vector, point_b.vector);
     /**
-     * Check line intersects walkable edges
+     * Check line intersects walkable edges: on one set piece's floor, only the set's own (the area's walls under
+     * or over it aren't in its way); elsewhere every room's, at about the line's height
      */
-    for(let j = 0, len = this.area.walkEdges.length; j < len; j++){
-      const edge = this.area.walkEdges[j];
+    const set = this.floorSet();
+    const edges = set && set === point_b.floorSet() ? set.edges : this.area.walkEdges;
+    const zLow = Math.min(this.vector.z, point_b.vector.z) - PathPoint.EDGE_HEIGHT_REACH;
+    const zHigh = Math.max(this.vector.z, point_b.vector.z) + PathPoint.EDGE_HEIGHT_REACH;
+    for(let j = 0, len = edges.length; j < len; j++){
+      const edge = edges[j];
 
       //Ignore transition edges
       if(edge.transition != -1)
+        continue;
+
+      // A wall on another level (a floor above, a courtyard below) isn't in the way
+      if(Math.max(edge.line.start.z, edge.line.end.z) < zLow || Math.min(edge.line.start.z, edge.line.end.z) > zHigh)
         continue;
       
       if(Utility.LineLineIntersection(path_line.start.x, path_line.start.y, path_line.end.x, path_line.end.y, edge.line.start.x, edge.line.start.y, edge.line.end.x, edge.line.end.y)){
@@ -96,13 +125,22 @@ export class PathPoint {
     }
 
     /**
+     * Check line crosses a placeable that can't be walked through (a table, a crate): they're not part of
+     * the area's walkmesh, and one put down after the area loaded sits across its path points' links
+     */
+    if(PathPoint.crossesProps(this.area, path_line, PathPoint.clearanceFor(owner)))
+      return false;
+
+    if(!withCreatures) return true;
+
+    /**
      * Check line intersects creatures
      */
     for(let j = 0, len = this.area.creatures.length; j < len; j++){
       const obj = this.area.creatures[j];
 
-      //Ignore the owner if found in this list
-      if(obj == owner)
+      //Ignore the owner if found in this list, and what nobody walks around (the dead)
+      if(obj == owner || obj.isDead?.())
         continue;
 
       // Creatures right at either end don't block the way: the mover's neighbours (a group setting off
@@ -114,6 +152,45 @@ export class PathPoint {
         return false;
     }
     return true;
+  }
+
+  /** How far around a placeable's bounds a path keeps, beyond the walker's own size (metres) */
+  static PROP_CLEARANCE = 0.2;
+
+  /** The room a walker needs beside a placeable: its own size and a little more */
+  static clearanceFor(owner?: ModuleObject): number {
+    const size = Number((owner as any)?.getHitDistance?.()) || 0.5;
+    return size + PathPoint.PROP_CLEARANCE;
+  }
+
+  static #ray = new THREE.Ray();
+  static #box = new THREE.Box3();
+  static #hit = new THREE.Vector3();
+
+  /**
+   * Does a straight walk along this line run into a placeable with collision? Walking out of one's
+   * surroundings is fine (a creature standing by a table); walking to a point inside them isn't (a path point
+   * a prop now sits on)
+   */
+  static crossesProps(area: ModuleArea, line: THREE.Line3, clearance: number = PathPoint.PROP_CLEARANCE + 0.5): boolean {
+    const placeables = area?.placeables || [];
+    if(!placeables.length) return false;
+    const length = line.distance();
+    if(length < 0.01) return false;
+    PathPoint.#ray.origin.set(line.start.x, line.start.y, 0);
+    PathPoint.#ray.direction.set(line.end.x - line.start.x, line.end.y - line.start.y, 0).normalize();
+    const end2 = new THREE.Vector3(line.end.x, line.end.y, 0);
+    for(let i = 0, len = placeables.length; i < len; i++){
+      const plc = placeables[i];
+      if(!plc || plc.destroyed || !plc.collisionManager?.walkmesh || !plc.box || plc.box.isEmpty()) continue;
+      const box = PathPoint.#box.copy(plc.box).expandByScalar(clearance);
+      box.min.z = -1; box.max.z = 1;
+      if(box.containsPoint(PathPoint.#ray.origin)) continue;
+      if(box.containsPoint(end2)) return true;
+      const hit = PathPoint.#ray.intersectBox(box, PathPoint.#hit);
+      if(hit && hit.distanceTo(PathPoint.#ray.origin) <= length) return true;
+    }
+    return false;
   }
 
   addConnection(node: PathPoint) {

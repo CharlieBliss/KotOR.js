@@ -567,7 +567,7 @@ export class ModuleMGPlayer extends ModuleObject {
                 edge.line.end.y
               )
             ){
-              this.attachToRoom(GameState.module.area.rooms[edge.transition]);
+              this.attachToRoom(this.room?.transitionRoom(edge.transition) || GameState.module.area.rooms[edge.transition]);
               break;
             }
           }

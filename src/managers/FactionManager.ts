@@ -269,7 +269,8 @@ export class FactionManager {
           console.log('ReputationLoader: loaded', 'default faction data');
         }
       }else{
-        console.error('ReputationLoader: failed', `couldn't locate repute.fac`);
+        // A new game has none saved yet: the defaults are what it should have
+        console.log('ReputationLoader: no repute.fac in the game in progress');
         FactionManager.Load2DA();
         console.log('ReputationLoader: loaded', 'default faction data');
       }

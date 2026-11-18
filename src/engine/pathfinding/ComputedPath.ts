@@ -76,7 +76,12 @@ export class ComputedPath {
       const neighbors = currentNode.connections;
       for(let i = 0, il = neighbors.length; i < il; i++) {
         let neighbor = neighbors[i];
-        if(neighbor.closed || !neighbor.hasLOS(currentNode, this.owner)) {
+        // A link can be walked: no wall (checked when the area loaded) and no placeable put across it since.
+        // The links to the start and the end were chosen for this walk (ModulePath.traverseToPoint)
+        if(neighbor.closed) {
+          continue;
+        }
+        if(neighbor !== this.destination && currentNode !== this.origin && !currentNode.hasLOS(neighbor, this.owner)) {
           continue;
         }
         let gScore = currentNode.g + neighbor.cost;

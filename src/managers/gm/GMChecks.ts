@@ -5,6 +5,7 @@ import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import type { GMCheck, GMCheckResult, GMPlaceableSpawnConfig, GMRollResult, GMSkillGate } from "@/managers/gm/GMTypes";
 import { GMLog } from "@/managers/gm/GMLog";
 import { GMManager } from "@/managers/GMManager";
+import { Dice } from "@/utility/Dice";
 
 /** GM checks: skills and saving throws rolled on the GM's machine, and skill checks that stand between a player and an object. */
 export class GMChecks {
@@ -21,7 +22,7 @@ export class GMChecks {
    * and its ability, against a difficulty. Saves succeed on a natural 20 and fail on a 1; skills don't.
    */
   static rollCheck(cre: ModuleCreature, check: GMCheck, dc: number): GMCheckResult {
-    const roll = 1 + Math.floor(Math.random() * 20);
+    const roll = Dice.rollD20(1);
     const bonus = this.checkBonus(cre, check);
     const total = roll + bonus;
     let success = total >= dc;

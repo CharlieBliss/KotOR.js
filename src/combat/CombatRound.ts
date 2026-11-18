@@ -18,7 +18,8 @@ import { DiceType } from "@/enums/combat/DiceType";
 import { TextSprite3D } from "@/engine/TextSprite3D";
 import { BitWise } from "@/utility/BitWise";
 import { CombatAttackData } from "@/combat/CombatAttackData";
-import type { CombatRoundAction } from "@/combat/CombatRoundAction";
+import { CombatRoundAction } from "@/combat/CombatRoundAction";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 import type { TalentFeat } from "@/talents/TalentFeat";
 import { GameState } from "@/GameState";
 import { FeedbackMessageEntry } from "@/engine/FeedbackMessageEntry";
@@ -508,23 +509,35 @@ export class CombatRound {
           attack.attackResult == AttackResult.AUTOMATIC_HIT;
 
         // Ranged weapons show their shot: a blaster bolt that reaches the target, or flies past on a miss
+        const isDeflected = attack.attackResult == AttackResult.DEFLECTED;
+        const isRangedShot = !!attack.attackWeapon?.isRangedWeapon?.();
         if(targetCreature){
-          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || attack.attackResult == AttackResult.DEFLECTED, attackDamageDelay);
+          GameState.ProjectileManager?.FireWeapon(creature, targetCreature, attack.attackWeapon, landed || isDeflected, attackDamageDelay, {
+            deflected: isDeflected,
+            powerShot: CombatRoundAction.isPowerBlastFeat(combatAction.featId),
+          });
         }
 
         if(landed){
           attack.applyDamageEffectToCreature(creature, targetCreature);
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, attack.getTotalDamage().toString(), TextSprite3DType.HOSTILE, 1500);
+            if(!isRangedShot){
+              const sparkLabel = CombatVisualEffects.getMeleeSparkLabel('hit', attack.attackWeapon, (targetCreature as any).equipment?.RIGHTHAND);
+              if(sparkLabel) CombatVisualEffects.applyFirstVisualEffect(targetCreature, [sparkLabel], creature);
+            }
           }
         }else if(attack.attackResult == AttackResult.MISS){
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, 'miss', TextSprite3DType.NEUTRAL, 1500);
           }
-        }else if(attack.attackResult == AttackResult.DEFLECTED){
+        }else if(isDeflected){
           if(targetCreature){
             TextSprite3D.CreateOnObject(targetCreature, 'deflected', TextSprite3DType.NEUTRAL, 1500);
           }
+        }else if(attack.attackResult == AttackResult.PARRIED && targetCreature && !isRangedShot){
+          const sparkLabel = CombatVisualEffects.getMeleeSparkLabel('parry', attack.attackWeapon, (targetCreature as any).equipment?.RIGHTHAND);
+          if(sparkLabel) CombatVisualEffects.applyFirstVisualEffect(targetCreature, [sparkLabel], creature);
         }
       }
     }
@@ -780,9 +793,10 @@ export class CombatRound {
       targetCreature.combatRound.deflectArrow = false;
     }
 
-    // An opposed roll with the lightsaber against the attack roll
+    // An opposed roll with the lightsaber against the attack roll (Precise Shot penalizes deflection)
+    const precisePenalty = CombatAttackData.GetPreciseShotRank(this.owner as ModuleCreature) * 2;
     const deflectRoll = Dice.roll(1, DiceType.d20,
-      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus);
+      targetCreature.getBaseAttackBonus() + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus) - precisePenalty;
     if(deflectRoll < attackRoll) return false;
     // "If the attack is beaten by 10 or more, the bolt is deflected back at the enemy"
     if(deflectRoll >= attackRoll + 10) this.reflectBolt(targetCreature, weapon);
@@ -793,6 +807,7 @@ export class CombatRound {
   reflectBolt(deflector: ModuleCreature, weapon: ModuleItem){
     const shooter = this.owner as ModuleCreature;
     if(!shooter || shooter === deflector || shooter.isDead?.()) return;
+    GameState.ProjectileManager?.FireWeapon(deflector, shooter, weapon, true, 0);
     const amount = Math.max(1, (weapon.getBaseDamage?.() || 0) + (weapon.getDamageBonus?.() || 0));
     const type = weapon.getBaseDamageType?.() ?? 0;
     const index = type >= 0 && type <= 15 ? type : 14;
@@ -804,6 +819,7 @@ export class CombatRound {
     damage.setInt(17, 1 << index);
     damage.initialize();
     shooter.addEffect(damage);
+    TextSprite3D.CreateOnObject(shooter, amount.toString(), TextSprite3DType.HOSTILE, 1500);
   }
 
   /**
@@ -839,7 +855,7 @@ export class CombatRound {
     if(isHit && !hasAssuredHit){
       const target = combatAction.target as ModuleCreature;
       const missChance = Math.max(target?.getConcealment?.() || 0, creature.getMissChance?.() || 0);
-      if(missChance > 0 && Math.floor(Math.random() * 100) < missChance) isHit = false;
+      if(missChance > 0 && Math.floor(Dice.random() * 100) < missChance) isHit = false;
     }
 
     if(isHit){
@@ -879,6 +895,10 @@ export class CombatRound {
 
     if(combatAction.actionType === CombatActionType.ATTACK_USE_FEAT){
       combatAction.calculateAttackAnimation();
+      const featVfx = CombatVisualEffects.getFeatVisualEffectLabels(combatAction.featId, creature.getWeapon?.());
+      if(featVfx.length){
+        CombatVisualEffects.applyFirstVisualEffect(creature, featVfx, creature);
+      }
     }
 
     if(!combatAction.animationName){
@@ -890,12 +910,13 @@ export class CombatRound {
       if(attackKey == 'm'){
         if(this.engaged && !this.attacksIncludeKillingBlow()){
           attackKey = 'c';
-          attackType = Math.round(Math.random()*4)+1;
+          attackType = Math.round(Dice.random()*4)+1;
         }
       }
 
-      combatAction.animationName = attackKey+weaponWield+'a'+attackType;
-      combatAction.twoDAAnimation = OdysseyModelAnimation.GetAnimation2DA(combatAction.animationName);
+      const picked = CombatRoundAction.pickAttackAnimation(creature, attackKey+weaponWield+'a'+attackType);
+      combatAction.animationName = picked.name;
+      combatAction.twoDAAnimation = picked.animation;
     }
 
     if(this.action && this.action !== combatAction){
@@ -906,8 +927,7 @@ export class CombatRound {
     if(combatAction.isCutsceneAttack){
 
       if(creature){
-        creature.playTwoDAAnimation(combatAction.twoDAAnimation);
-        creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+        creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
       }
 
       if(combatAction.target){
@@ -916,16 +936,13 @@ export class CombatRound {
           case AttackResult.HIT_SUCCESSFUL:
           case AttackResult.CRITICAL_HIT:
           case AttackResult.AUTOMATIC_HIT:
-            target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+            target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
           break;
           case AttackResult.PARRIED:
-            target.playTwoDAAnimation( target.getParryAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.PARRY;
+            target.playTwoDAAnimation(target.getParryAnimation( combatAction.animationName ), ModuleCreatureAnimState.PARRY);
           break;
           default:
-            target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-            target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+            target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
           break;
         }
       }
@@ -938,8 +955,7 @@ export class CombatRound {
       ){
 
         if(creature){
-          creature.playTwoDAAnimation( combatAction.twoDAAnimation );
-          creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+          creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
         }
 
         if(combatAction.target && BitWise.InstanceOfObject(combatAction.target, ModuleObjectType.ModuleCreature)){
@@ -950,8 +966,7 @@ export class CombatRound {
           ){
             if(target.combatData.lastAttackTarget == creature){
               if(!this.attacksIncludeKillingBlow()){
-                target.playTwoDAAnimation( target.getDamageAnimation( combatAction.animationName ) );
-                target.animationState.index = ModuleCreatureAnimState.DAMAGE;
+                target.playTwoDAAnimation(target.getDamageAnimation( combatAction.animationName ), ModuleCreatureAnimState.DAMAGE);
               }
             }
           }
@@ -960,8 +975,7 @@ export class CombatRound {
       }else{
 
         if(creature){
-          creature.playTwoDAAnimation( combatAction.twoDAAnimation );
-          creature.animationState.index = ModuleCreatureAnimState.ATTACK;
+          creature.playTwoDAAnimation(combatAction.twoDAAnimation, ModuleCreatureAnimState.ATTACK);
         }
 
         if(combatAction.target && BitWise.InstanceOfObject(combatAction.target, ModuleObjectType.ModuleCreature)){
@@ -972,8 +986,7 @@ export class CombatRound {
           ){
             if(combatAction.target.combatData.lastAttackTarget == creature){
               if(!this.attacksIncludeKillingBlow()){
-                target.playTwoDAAnimation( target.getDodgeAnimation( combatAction.animationName ) );
-                target.animationState.index = ModuleCreatureAnimState.DODGE;
+                target.playTwoDAAnimation(target.getDodgeAnimation( combatAction.animationName ), ModuleCreatureAnimState.DODGE);
               }
             }
           }

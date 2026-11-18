@@ -18,6 +18,55 @@ export function gameTextureUrl(name: string): Promise<string | null> {
   return pending;
 }
 
+/** A game texture's pixels: RGBA, top row first (as it's drawn), with its TXI text (a font's glyph table) */
+export interface GameTexturePixels {
+  width: number;
+  height: number;
+  data: Uint8ClampedArray;
+  txi: string;
+}
+
+const pixelCache = new Map<string, Promise<GameTexturePixels | null>>();
+
+/** One of the game's textures as pixels (each read once): what the HUD builds KotOR's frames and font from */
+export function gameTexturePixels(name: string): Promise<GameTexturePixels | null> {
+  const key = String(name || '').trim().toLowerCase();
+  if (!key) return Promise.resolve<GameTexturePixels | null>(null);
+  let pending = pixelCache.get(key);
+  if (!pending) {
+    pending = readPixels(key).catch((): GameTexturePixels | null => null);
+    pixelCache.set(key, pending);
+  }
+  return pending;
+}
+
+async function readPixels(name: string): Promise<GameTexturePixels | null> {
+  const found = await KotOR.TextureLoader.tpcLoader.findTPC(name);
+  if (!found?.buffer) return null;
+  const tpc = new KotOR.TPCObject({ file: found.buffer, filename: `${name}.tpc`, pack: found.pack } as any);
+  const width = tpc.header.width;
+  const height = tpc.header.height;
+  if (!width || !height) return null;
+  const dds = tpc.getDDS(false);
+  const source: Uint8Array = dds.mipmaps[0].data;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  if (tpc.header.bitsPerPixel === 8) {
+    for (let i = 0; i < width * height; i++) {
+      rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = source[i];
+      rgba[i * 4 + 3] = 255;
+    }
+  } else {
+    rgba.set(source.subarray(0, rgba.length));
+  }
+  // Stored bottom row first
+  const data = new Uint8ClampedArray(rgba.length);
+  const row = width * 4;
+  for (let y = 0; y < height; y++) data.set(rgba.subarray((height - 1 - y) * row, (height - y) * row), y * row);
+  let txi = '';
+  try { txi = tpc.getTXIData?.() || ''; } catch (e) { txi = ''; }
+  return { width, height, data, txi };
+}
+
 async function load(name: string): Promise<string | null> {
   const found = await KotOR.TextureLoader.tpcLoader.findTPC(name);
   if (!found?.buffer) return null;

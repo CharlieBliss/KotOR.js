@@ -26,6 +26,11 @@ export class EffectSetState extends GameEffect {
       
     super.onApply();
     this.elapsed = 0;
+    if(this.getInt(0) === GameEffectSetStateType.FORCEPUSH && this.object){
+      this.object.fp_push_played = false;
+      this.object.fp_land_played = false;
+      this.object.fp_getup_played = false;
+    }
 
   }
 
@@ -85,15 +90,18 @@ export class EffectSetState extends GameEffect {
 
     if(this.elapsed < anim_push_length){
       const f_push_move_delta = (this.elapsed / anim_push_length);
-      this.object.position.copy(v1.lerp(v2, f_push_move_delta));
-      this.object.box.setFromObject(this.object.model);
+      // Shown for one on the GM's machine: the creature's position comes from there
+      if(!this.mirrored) this.object.position.copy(v1.lerp(v2, f_push_move_delta));
+      if(this.object.model && this.object.box) this.object.box.setFromObject(this.object.model);
     }else if(this.elapsed < anim_push_length + anim_land_length){
-      this.object.position.set(
-        this.getFloat(3),
-        this.getFloat(4),
-        this.getFloat(5)
-      );
-      this.object.box.setFromObject(this.object.model);
+      if(!this.mirrored){
+        this.object.position.set(
+          this.getFloat(3),
+          this.getFloat(4),
+          this.getFloat(5)
+        );
+      }
+      if(this.object.model && this.object.box) this.object.box.setFromObject(this.object.model);
       this.object.fp_push_played = true;
     }else if(this.elapsed < anim_push_length + anim_land_length + anim_getup_length){
       this.object.fp_land_played = true;
@@ -103,4 +111,3 @@ export class EffectSetState extends GameEffect {
   }
 
 }
-

@@ -1,8 +1,9 @@
 import type { GMAnimationChoice } from "@/managers/gm/GMTypes";
 
 /**
- * Stances a creature can hold: looping animations.2da names. A model offers those it has; several names
- * mean "the first one it has" (droids and beasts name theirs differently).
+ * Stances a creature can hold: looping animations.2da names, or poses: an animation frozen at a moment
+ * ('kneel@2.9', seconds in). A model offers those it has; several names mean "the first one it has" (droids and
+ * beasts name theirs differently). The GM's pose editor makes any other pose from any animation the model has.
  */
 export const STANCES: GMAnimationChoice[] = [
   { id: 'listen', label: 'Listening', group: 'Talking', anims: ['listen'] },
@@ -14,14 +15,36 @@ export const STANCES: GMAnimationChoice[] = [
   { id: 'kneel_angry', label: 'Kneeling, angry', group: 'Talking', anims: ['kdtlkangry'] },
   { id: 'kneel_sad', label: 'Kneeling, sad', group: 'Talking', anims: ['kdtlksad'] },
   { id: 'attention', label: 'At attention', group: 'Standing', anims: ['standstill'] },
+  // The character-select screen's stances
+  { id: 'align_good', label: 'Proud (light side)', group: 'Standing', anims: ['good'] },
+  { id: 'align_neutral', label: 'At ease (neutral)', group: 'Standing', anims: ['neutral'] },
+  { id: 'align_evil', label: 'Menacing (dark side)', group: 'Standing', anims: ['evil'] },
+  { id: 'scanning', label: 'Scanning the area', group: 'Standing', anims: ['scanning@2.5'] },
   { id: 'pointing', label: 'Pointing', group: 'Standing', anims: ['pointloop'] },
   { id: 'injured', label: 'Injured', group: 'Standing', anims: ['pauseinj'] },
+  { id: 'listen_injured', label: 'Injured, listening', group: 'Talking', anims: ['listeninj'] },
+  { id: 'talk_injured', label: 'Injured, talking', group: 'Talking', anims: ['talkinj'] },
   { id: 'tired', label: 'Tired', group: 'Standing', anims: ['pausetrd'] },
   { id: 'sick', label: 'Sick or poisoned', group: 'Standing', anims: ['pausepsn'] },
   { id: 'crouched', label: 'Crouched (sneaking)', group: 'Standing', anims: ['pausestl'] },
   { id: 'meditate', label: 'Meditating', group: 'Jedi', anims: ['meditate'] },
   { id: 'meditate_sit', label: 'Meditating, seated', group: 'Jedi', anims: ['meditatesit'] },
   { id: 'meditate_stand', label: 'Meditating, standing', group: 'Jedi', anims: ['meditatestand'] },
+  { id: 'channel', label: 'Channeling the Force', group: 'Jedi', anims: ['castoutlp1'] },
+  { id: 'channel_self', label: 'Channeling the Force, inward', group: 'Jedi', anims: ['castoutlp2'] },
+  { id: 'channel_up', label: 'Channeling the Force, arms raised', group: 'Jedi', anims: ['castoutlp3'] },
+  { id: 'force_rage', label: 'Force Rage', group: 'Jedi', anims: ['forcerage@0.9'] },
+  { id: 'mind_trick', label: 'Mind trick (hand raised)', group: 'Jedi', anims: ['persuade@0.6'] },
+  { id: 'kneel', label: 'Kneeling', group: 'Poses', anims: ['kneel@2.9'] },
+  { id: 'kneel_low', label: 'Going down on one knee', group: 'Poses', anims: ['kneel@1.4'] },
+  { id: 'crouch_pickup', label: 'Crouching to pick something up', group: 'Poses', anims: ['getfromgnd@1.0'] },
+  { id: 'crouch_floor', label: 'Crouched over the floor', group: 'Poses', anims: ['setmine@1.0'] },
+  { id: 'triumph', label: 'Arm raised in triumph', group: 'Poses', anims: ['victory@0.7'] },
+  { id: 'taunting', label: 'Taunting', group: 'Poses', anims: ['taunt@0.7'] },
+  { id: 'saluting', label: 'Saluting', group: 'Poses', anims: ['salute@0.8'] },
+  { id: 'hand_heart', label: 'Hand on heart', group: 'Poses', anims: ['touchheart@1.4'] },
+  { id: 'pointing_up', label: 'Pointing up', group: 'Poses', anims: ['uppoint@0.8'] },
+  { id: 'throw_windup', label: 'About to throw', group: 'Poses', anims: ['throwgren@0.55'] },
   { id: 'sit', label: 'Sitting on the ground', group: 'Sitting', anims: ['sit'] },
   { id: 'chair', label: 'Sitting in a chair', group: 'Sitting', anims: ['animloop01'] },
   { id: 'chair_drunk', label: 'Slumped in a chair', group: 'Sitting', anims: ['animloop02'] },
@@ -39,6 +62,7 @@ export const STANCES: GMAnimationChoice[] = [
   { id: 'choke', label: 'Choking', group: 'Distress', anims: ['choke'] },
   { id: 'spasm', label: 'Convulsing', group: 'Distress', anims: ['spasm', 'cspasm'] },
   { id: 'paralyzed', label: 'Paralyzed', group: 'Distress', anims: ['paralyzed'] },
+  { id: 'whirlwind', label: 'Caught in a Force whirlwind', group: 'Distress', anims: ['whirlwind'] },
   { id: 'collapsed', label: 'Collapsed', group: 'Distress', anims: ['collapselp'] },
   { id: 'sleep', label: 'Asleep', group: 'Lying down', anims: ['sleep'] },
   { id: 'prone', label: 'Lying down', group: 'Lying down', anims: ['prone'] },

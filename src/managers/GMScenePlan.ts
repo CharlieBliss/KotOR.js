@@ -15,6 +15,10 @@ import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMViewport } from "@/managers/gm/GMViewport";
+import { GMSeats } from "@/managers/gm/GMSeats";
+import { GMObjectKind } from "@/managers/gm/GMObjectKind";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
+import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 
 /*
  * A scene plan: a whole GM scene written as data, so it can be drafted outside the game (by Claude, from a
@@ -31,6 +35,7 @@ export type GMPlanGame = 'kotor' | 'tsl';
  * - "waypoint:<tag>": one of the area's waypoints
  * - "room:<name>": the middle of a room (layout room name, e.g. "m13aa_02a")
  * - "actor:<id>" / "prop:<id>": something this plan placed
+ * - "set:<id>": the middle of the floor of a set this plan placed (its rooms are "room:<name>" spots too)
  * - "players": where the plan puts the players
  */
 export type GMPlanSpot = string;
@@ -74,8 +79,32 @@ export interface GMPlanActor {
   /** A stance they hold (a GMManager.STANCES id, e.g. "meditate", "kneel_sad", "dead") */
   stance?: string;
   order?: GMPlanOrder;
-  customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string };
+  customize?: { appearance?: string; hp?: number; rightHand?: string; leftHand?: string; armor?: string; level?: number; class?: string | number };
   loot?: string[];
+}
+
+/**
+ * A set: rooms of another area (either game) built into this one, to walk around in (GMSetPieces). Sets go in
+ * first, so the players, actors and props can stand in them.
+ * Not part of the kotor-gm-scenes skill's format on purpose: a set usually needs lining up by hand (raised or lowered
+ * until its floor joins the area's), which a plan written without seeing the area can't do. Plans the GM writes or
+ * saves may have them.
+ */
+export interface GMPlanSet {
+  id: string;
+  /** The area whose rooms these are */
+  area: { game: GMPlanGame; module: string };
+  /** Rooms of its layout (e.g. "m12aa_01a"); all of them when left out */
+  rooms?: string[];
+  /** Where the middle of its floor goes: a spot of this area, or of a set placed before it */
+  at: GMPlanPlacement;
+  /** Degrees it is turned clockwise from how it lies in its own area */
+  turn?: number;
+  /** Metres it is raised (or lowered, negative) from the floor at its spot */
+  raise?: number;
+  /** What the GM sees it called (otherwise its area's name), and names for its rooms (otherwise guessed) */
+  name?: string;
+  roomNames?: Record<string, string>;
 }
 
 export interface GMPlanProp {
@@ -131,6 +160,7 @@ export interface GMScenePlanData {
   players: { at: GMPlanPlacement; facing?: GMPlanFacing; frozen?: boolean; note?: string };
   actors?: GMPlanActor[];
   props?: GMPlanProp[];
+  sets?: GMPlanSet[];
   beats?: GMPlanBeat[];
 }
 
@@ -164,8 +194,40 @@ export class GMScenePlan {
   static active: GMScenePlan | null = null;
   plan: GMScenePlanData;
   objects: Map<string, ModuleObject[]> = new Map();
+  /** The sets this plan placed: plan id -> set id */
+  sets: Map<string, string> = new Map();
   /** Orders actors had when placed hidden, given when they're revealed */
   pendingOrders: Map<string, GMPlanOrder> = new Map();
+
+  /** Stances that sit in a chair: an actor with one, put on a seat prop, belongs inside it */
+  static SEATED_STANCES = ['chair', 'chair_drunk', 'chair_pazaak'];
+
+  /**
+   * The seat an actor is meant to sit in: its spot is a prop that's a chair or bench, and its stance sits.
+   * (KotOR II's plc_chair1 is a food pile; KotOR's is a chair the game calls "Food pile".)
+   */
+  seatFor(actor: GMPlanActor): string | undefined {
+    const spot = String(actor.at?.spot || '');
+    if (!spot.startsWith('prop:') || !GMScenePlan.SEATED_STANCES.includes(String(actor.stance || ''))) return undefined;
+    const id = spot.slice(5);
+    const prop = (this.plan.props || []).find((p) => p.id === id);
+    if (!prop) return undefined;
+    const template = String(prop.template || '').toLowerCase();
+    if (template === 'plc_chair1') return this.plan.content === 'tsl' ? undefined : id;
+    return /chair|bench|stool|seat|couch|sofa/.test(`${template} ${String(prop.appearance || '').toLowerCase()}`) ? id : undefined;
+  }
+
+  /** How far from where the plan puts a seated actor its seat may be (it sits in the nearest free one) */
+  static SEAT_REACH = 1.6;
+
+  /** Room an actor needs beside a prop (metres, about a creature's half-width) */
+  static ACTOR_CLEARANCE = 0.45;
+
+  /** How far an actor may be moved to get it out of a prop, before it's left where it is */
+  static MAX_CLEARING_MOVE = 4;
+
+  /** The solid props' footprints (their collision walkmesh, on the floor), by plan prop id */
+  footprints: { id: string; box: THREE.Box3 }[] = [];
   beatsRun: Set<number> = new Set();
   log: string[] = [];
 
@@ -228,6 +290,8 @@ export class GMScenePlan {
         if (kind === 'actor') {
           if (!entry.template) error(where, 'Needs a creature "template".');
           if (!this.FACTIONS[entry.faction as GMPlanFaction]) error(where, 'Faction is "hostile", "friendly" or "neutral".');
+          const level = entry.customize?.level;
+          if (level !== undefined && !(Number.isInteger(level) && level >= 1 && level <= 50)) error(where, 'customize.level is a whole number, 1 to 50.');
         } else if (!entry.template && !entry.appearance) {
           error(where, 'Needs a placeable "template" or an "appearance".');
         }
@@ -236,9 +300,25 @@ export class GMScenePlan {
       });
     }
 
+    const setIds = new Set<string>();
+    (plan.sets || []).forEach((set: any, i: number) => {
+      const where = `sets[${i}]`;
+      if (!set?.id) { error(where, 'Needs an id.'); return; }
+      if (setIds.has(set.id)) error(where, `Duplicate set id "${set.id}".`);
+      if (!set.area?.module) error(where, 'Needs "area": { "game": ..., "module": ... }: whose rooms to bring.');
+      else if (!['kotor', 'tsl'].includes(set.area.game)) error(where, 'The area\'s game is "kotor" or "tsl".');
+      if (set.rooms !== undefined && !(Array.isArray(set.rooms) && set.rooms.length)) error(where, '"rooms" is a list of room names (leave it out for all of them).');
+      const [kind, name] = String(set.at?.spot || '').split(':');
+      if (!set.at?.spot) error(where, 'Needs "at": { "spot": ... }.');
+      // Sets go in before anyone: their spot is the area's, or an earlier set's
+      else if (!(set.at.spot === 'entry' || ['waypoint', 'room'].includes(kind) || (kind === 'set' && setIds.has(name)))) error(where, `A set's spot is "entry", a waypoint, a room or an earlier set, not "${set.at.spot}".`);
+      setIds.add(set.id);
+    });
+
     const spotOk = (spot: string, where: string) => {
       const [kind, name] = String(spot || '').split(':');
       if (['entry', 'players'].includes(spot)) return;
+      if (kind === 'set') { if (!setIds.has(name)) error(where, `No set "${name}".`); return; }
       if (kind === 'actor' && !actorIds.has(name)) error(where, `No actor "${name}".`);
       else if (kind === 'prop' && !propIds.has(name)) error(where, `No prop "${name}".`);
       else if (!['actor', 'prop', 'waypoint', 'room'].includes(kind) || !name) error(where, `Unknown spot "${spot}".`);
@@ -301,6 +381,10 @@ export class GMScenePlan {
       const room = area.rooms.find((r: any) => String(r.roomName || '').toLowerCase() === name);
       return room ? GMScenePlan.roomPoint(room) : null;
     }
+    if (kind === 'set') {
+      const set = GMSetPieces.get(this.sets.get(rest.join(':')));
+      return set ? set.position.clone() : null;
+    }
     if (kind === 'actor' || kind === 'prop') {
       const obj = this.objects.get(name)?.[0] || this.objects.get(rest.join(':'))?.[0];
       return obj ? obj.position.clone() : null;
@@ -326,6 +410,18 @@ export class GMScenePlan {
     let best = centroids[0];
     for (const c of centroids) if (c.distanceToSquared(centre) < best.distanceToSquared(centre)) best = c;
     return best.clone();
+  }
+
+  /** A classes.2da row by its label or name ("Soldier", "jedi guardian", "Combat_Droid"), or its number */
+  static classIdOf(name: string | number): number | undefined {
+    if (typeof name === 'number' || /^\d+$/.test(String(name))) return Number(name);
+    const norm = (s: any) => String(s || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const key = norm(name);
+    const rows = GameState.TwoDAManager?.datatables.get('classes')?.rows || {};
+    for (const [id, row] of Object.entries(rows) as [string, any][]) {
+      if (norm(row.label) === key || norm(CharacterRules.text(row.name, '')) === key) return Number(id);
+    }
+    return undefined;
   }
 
   /** Points for count copies at a placement: offset from the spot, in a formation, on walkable ground */
@@ -361,14 +457,19 @@ export class GMScenePlan {
   walkable(p: THREE.Vector3): THREE.Vector3 {
     const area = GameState.module?.area;
     const snapped = area?.getNearestWalkablePoint ? area.getNearestWalkablePoint(p, 0.5).clone() : p.clone();
-    snapped.z = GMViewport.getGroundZAt(snapped.x, snapped.y, snapped.z);
+    // The floor there nearest the spot's height: where floors are stacked (a set over another, a gallery), the
+    // one the spot is on, not the topmost
+    const floor = area?.floorAt ? area.floorAt(snapped, snapped.z, 1.5) : null;
+    snapped.z = floor ? floor.z : GMViewport.getGroundZAt(snapped.x, snapped.y, snapped.z);
     return snapped;
   }
 
   /** Engine facing (radians) for a plan facing, seen from a point; default: toward the players */
   facingFrom(from: THREE.Vector3, facing: GMPlanFacing | undefined): number {
     let target: THREE.Vector3 | null = null;
-    if (typeof facing === 'number') return (facing * Math.PI) / 180;
+    // Degrees clockwise from north (90 = east); the engine's facing turns the other way (a creature at f looks
+    // along (-sin f, cos f)), so 90 must be -90 to it
+    if (typeof facing === 'number') return -(facing * Math.PI) / 180;
     if (typeof facing === 'string' && facing.startsWith('toward:')) target = this.resolveSpot(facing.slice(7));
     if (!target) target = this.resolveSpot('players');
     if (!target || target.distanceTo(from) < 0.1) return 0;
@@ -405,13 +506,17 @@ export class GMScenePlan {
     if (plan.settings?.deathRule) GMPlayers.setDeathRule(plan.settings.deathRule);
     if (typeof plan.settings?.npcAi === 'boolean') GMManager.npcAiEnabled = plan.settings.npcAi;
 
-    // Players first: other spots may be "players"
+    // Sets first: everyone else may stand in them
+    for (const set of plan.sets || []) await this.placeSet(set);
+
+    // Players next: other spots may be "players"
     const start = this.placementPoints({ ...plan.players.at, formation: undefined }, 1)?.[0];
     if (!start) this.note(`Players' spot "${plan.players.at.spot}" isn't in this area; they start at its entry.`);
     this.playerStart = start || GMPlayers.getRespawnPoint();
     GMManager.sceneStartPoint = this.playerStart ? this.playerStart.clone() : null;
 
     for (const prop of plan.props || []) await this.placeProp(prop);
+    this.footprints = this.propFootprints();
     for (const actor of plan.actors || []) await this.placeActor(actor);
     // Orders last, once everyone they mention exists
     for (const actor of plan.actors || []) {
@@ -426,22 +531,122 @@ export class GMScenePlan {
     GMManager.notifyChange();
   }
 
+  /** Where each placed prop can't be walked through: its collision walkmesh's bounds, on the floor plan */
+  propFootprints(): { id: string; box: THREE.Box3 }[] {
+    const out: { id: string; box: THREE.Box3 }[] = [];
+    for (const prop of this.plan.props || []) {
+      for (const obj of this.objects.get(prop.id) || []) {
+        // The walkmesh's vertices are where the prop stands, turned as it's turned (as in the scene catalog)
+        const vertices = obj.collisionManager?.walkmesh?.vertices || [];
+        if (!vertices.length) continue;
+        const box = new THREE.Box3().setFromPoints(vertices);
+        if (box.isEmpty() || box.max.x - box.min.x < 0.05 || box.max.y - box.min.y < 0.05) continue;
+        out.push({ id: prop.id, box });
+      }
+    }
+    return out;
+  }
+
+  /** The footprint a floor point stands in (with room for an actor), if any; exempt: a seat it's meant to be on */
+  footprintAt(p: THREE.Vector3, exempt?: string): { id: string; box: THREE.Box3 } | null {
+    const c = GMScenePlan.ACTOR_CLEARANCE;
+    return this.footprints.find((f) => f.id !== exempt &&
+      p.x > f.box.min.x - c && p.x < f.box.max.x + c && p.y > f.box.min.y - c && p.y < f.box.max.y + c) || null;
+  }
+
+  /**
+   * An actor's point moved just clear of any prop it stands in: to the nearest side of the prop that's floor
+   * and not inside another prop. Null when it's clear already, or there's nowhere close to go.
+   */
+  clearOfProps(p: THREE.Vector3, exempt?: string): { point: THREE.Vector3; from: string } | null {
+    const first = this.footprintAt(p, exempt);
+    if (!first) return null;
+    const c = GMScenePlan.ACTOR_CLEARANCE + 0.05;
+    let best: THREE.Vector3 | null = null;
+    let bestDistance = Infinity;
+    // The sides of every prop it touches, and a ring of points around it, nearest first
+    const candidates: THREE.Vector3[] = [];
+    for (const f of this.footprints) {
+      const k = GMScenePlan.ACTOR_CLEARANCE;
+      if (f.id === exempt || !(p.x > f.box.min.x - k && p.x < f.box.max.x + k && p.y > f.box.min.y - k && p.y < f.box.max.y + k)) continue;
+      candidates.push(
+        new THREE.Vector3(f.box.min.x - c, p.y, p.z), new THREE.Vector3(f.box.max.x + c, p.y, p.z),
+        new THREE.Vector3(p.x, f.box.min.y - c, p.z), new THREE.Vector3(p.x, f.box.max.y + c, p.z),
+      );
+    }
+    for (let r = 0.5; r <= GMScenePlan.MAX_CLEARING_MOVE; r += 0.5) {
+      for (let a = 0; a < 12; a++) candidates.push(new THREE.Vector3(p.x + Math.cos((a / 12) * Math.PI * 2) * r, p.y + Math.sin((a / 12) * Math.PI * 2) * r, p.z));
+    }
+    for (const candidate of candidates) {
+      const d = Math.hypot(candidate.x - p.x, candidate.y - p.y);
+      if (d >= bestDistance || d > GMScenePlan.MAX_CLEARING_MOVE) continue;
+      const onFloor = this.walkable(candidate);
+      // Snapping to the floor mustn't carry it far, or back into a prop
+      if (Math.hypot(onFloor.x - candidate.x, onFloor.y - candidate.y) > 0.3 || this.footprintAt(onFloor, exempt)) continue;
+      best = onFloor;
+      bestDistance = d;
+    }
+    return best ? { point: best, from: first.id } : null;
+  }
+
+  async placeSet(planSet: GMPlanSet) {
+    const point = this.placementPoints({ ...planSet.at, formation: undefined }, 1)?.[0];
+    if (!point) { this.note(`Set "${planSet.id}": spot "${planSet.at.spot}" isn't in this area.`); return; }
+    point.z += Number(planSet.raise) || 0;
+    const module = planSet.area.game !== GMScenePlan.runningGame() ? OtherGameManager.foreignModuleName(planSet.area.module) : String(planSet.area.module).toLowerCase();
+    const set = await GMSetPieces.place({ module, rooms: planSet.rooms, name: planSet.name, roomNames: planSet.roomNames }, point, -((Number(planSet.turn) || 0) * Math.PI) / 180);
+    if (!set) { this.note(`Set "${planSet.id}": couldn't build ${module}${planSet.rooms?.length ? ` (${planSet.rooms.join(', ')})` : ''}.`); return; }
+    const missing = (planSet.rooms || []).filter((r) => !set.rooms.some((room) => room.roomName === String(r).toLowerCase()));
+    if (missing.length) this.note(`Set "${planSet.id}": no room ${missing.join(', ')} in ${module}.`);
+    this.sets.set(planSet.id, set.id);
+  }
+
   async placeActor(actor: GMPlanActor) {
     const count = Math.max(1, Math.min(20, actor.count || 1));
     const points = this.placementPoints(actor.at, count);
     if (!points) { this.note(`Actor "${actor.id}": spot "${actor.at.spot}" isn't in this area.`); return; }
+    // Nobody stands inside a table or a crate: a copy that would is moved just clear of it. A seated actor put on
+    // a seat prop is meant to be in it
+    const seat = this.seatFor(actor);
+    const moved: string[] = [];
+    let stuck = 0;
+    // A sitter with a free seat within reach sits in it (below): it isn't moved clear of that seat's prop first
+    const seated = !!actor.stance && GMScenePlan.SEATED_STANCES.includes(actor.stance);
+    const seatProps = seated ? [...this.objects.values()].flat().filter((o) => GMObjectKind.isPlaceable(o)) : [];
+    for (let i = 0; i < points.length; i++) {
+      if (seated && GMSeats.nearestFree(seatProps, points[i], GMScenePlan.SEAT_REACH)) continue;
+      if (!this.footprintAt(points[i], seat)) continue;
+      const clear = this.clearOfProps(points[i], seat);
+      if (clear) {
+        moved.push(`${clear.from} (${Math.hypot(clear.point.x - points[i].x, clear.point.y - points[i].y).toFixed(1)} m)`);
+        points[i] = clear.point;
+      } else {
+        stuck++;
+      }
+    }
+    if (moved.length) this.note(`Actor "${actor.id}": ${moved.length} of ${points.length} stood inside a prop (${[...new Set(moved)].join(', ')}); moved just clear of it. Place it beside the prop, not on it.`);
+    if (stuck) this.note(`Actor "${actor.id}": ${stuck} of ${points.length} stand inside a prop with no clear floor within ${GMScenePlan.MAX_CLEARING_MOVE} m; left there.`);
     const info = await GMSpawner.describeCreatureTemplate(String(actor.template || ''));
     if (!info) { this.note(`Actor "${actor.id}": no creature template "${actor.template}".`); return; }
     const base = GMSpawner.creatureConfigFromTemplate(info);
     const custom = actor.customize;
+    // Level and class rebuild its stats; the rest of customize replaces its look and gear
+    const restyled = !!custom && ['appearance', 'hp', 'rightHand', 'leftHand', 'armor'].some((k) => (custom as any)[k] !== undefined);
+    let restat: GMCreatureSpawnConfig['restat'];
+    if (custom && (custom.level !== undefined || custom.class !== undefined)) {
+      const classId = custom.class !== undefined ? GMScenePlan.classIdOf(custom.class) : undefined;
+      if (custom.class !== undefined && classId === undefined) this.note(`Actor "${actor.id}": no class "${custom.class}"; it keeps its own.`);
+      restat = { level: Number(custom.level) || base.level || 1, classId, hp: custom.hp };
+    }
     const config: GMCreatureSpawnConfig = {
       ...base,
       name: actor.name || base.name,
       factionId: GMScenePlan.FACTIONS[actor.faction] ?? base.factionId,
       barkText: actor.bark,
       lootResRefs: actor.loot,
-      customized: !!custom,
-      ...(custom ? {
+      customized: restyled,
+      restat,
+      ...(restyled && custom ? {
         appearanceLabel: custom.appearance,
         hp: custom.hp ?? base.hp,
         rightHandResRef: custom.rightHand,
@@ -456,6 +661,14 @@ export class GMScenePlan {
       if (!cre) continue;
       // Each model picks its own take on the stance (a droid lies dead differently)
       if (actor.stance && !GMManager.setCreatureStance(cre, actor.stance)) this.note(`Actor "${actor.id}": its model can't take the stance "${actor.stance}".`);
+      // Sitting: into the free seat nearest where the plan put it, at the seat's own spot and facing (each chair
+      // model faces its own way, and the sitter's hips sit behind its origin)
+      if (actor.stance && GMScenePlan.SEATED_STANCES.includes(actor.stance)) {
+        const props = [...this.objects.values()].flat().filter((o) => GMObjectKind.isPlaceable(o));
+        const spot = GMSeats.nearestFree(props, points[i], GMScenePlan.SEAT_REACH, this.facingFrom(points[i], actor.facing));
+        if (spot) GMSeats.sitAt(cre, spot, actor.stance);
+        else this.note(`Actor "${actor.id}": ${name} sits with no free seat within ${GMScenePlan.SEAT_REACH} m; give it a chair or bench of its own.`);
+      }
       if (actor.hidden) this.setHidden(cre, true);
       placed.push(cre);
     }

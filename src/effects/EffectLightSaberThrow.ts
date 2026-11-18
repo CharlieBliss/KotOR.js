@@ -1,8 +1,11 @@
 import { GameEffect } from "@/effects/GameEffect";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { TextSprite3DType } from "@/enums/engine/TextSprite3DType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { TextSprite3D } from "@/engine/TextSprite3D";
 import { GameState } from "@/GameState";
 import { BitWise } from "@/utility/BitWise";
+import { Dice } from "@/utility/Dice";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 
 /**
@@ -50,9 +53,12 @@ export class EffectLightSaberThrow extends GameEffect {
     const mod = (score: number) => Math.floor(((score || 10) - 10) / 2);
     const strMod = mod(thrower.getSTR?.());
     const attackMod = (thrower.getBaseAttackBonus?.() || 0) + (thrower.getAttackAbilityModifier?.(saber) ?? strMod);
-    const roll = 1 + Math.floor(Math.random() * 20);
+    const roll = Dice.rollD20(1);
     const hit = roll === 20 || (roll !== 1 && roll + attackMod >= (target.getAC?.() || 10));
-    if(!hit) return false;
+    if(!hit){
+      TextSprite3D.CreateOnObject(target, 'miss', TextSprite3DType.NEUTRAL, 1500);
+      return false;
+    }
 
     const amount = Math.max(1, (saber.getBaseDamage?.() || 0) + (saber.getDamageBonus?.() || 0) + Math.max(0, strMod));
     const damage = new GameState.GameEffectFactory.EffectDamage();
@@ -64,6 +70,7 @@ export class EffectLightSaberThrow extends GameEffect {
     damage.setInt(17, 1 << (type >= 0 && type <= 15 ? type : 14));
     damage.initialize();
     target.addEffect(damage);
+    TextSprite3D.CreateOnObject(target, amount.toString(), TextSprite3DType.HOSTILE, 1500);
     return true;
   }
 

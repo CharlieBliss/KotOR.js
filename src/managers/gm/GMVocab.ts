@@ -21,5 +21,5 @@ export const GM_SKILL_NAMES = ['Computer Use', 'Demolitions', 'Stealth', 'Awaren
 
 /** The template an item was made from: its equipped or inventory resref */
 export function gmItemResRef(item: ModuleItem | null | undefined): string {
-  return item?.getEquippedRes() || item?.getInventoryRes() || '';
+  return item?.getEquippedRes() || item?.getInventoryRes() || item?.getTemplateResRef?.() || '';
 }

@@ -1,3 +1,4 @@
+import type * as THREE from "three";
 import type { ModuleObject } from "@/module/ModuleObject";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleDoor } from "@/module/ModuleDoor";
@@ -58,15 +59,39 @@ export interface EngineHooks {
   skillGatePasses(obj: ModuleObject, user: ModuleObject): boolean;
   /** The player controls only their own character: the party leader can't be switched */
   isLeaderLocked(): boolean;
+  /** A camera to draw the world with instead of the game's own (a GM cutscene on a player's machine), or null */
+  cutsceneCamera(): THREE.Camera | null;
+  /**
+   * The world is shared with other machines (a GM session): one player's menu (a loot window), auto-pause or
+   * Space doesn't stop it. Only the mode pauses it (isWorldPaused)
+   */
+  sharedWorld(): boolean;
+  /**
+   * A module left is saved to the game in progress and comes back as it was left (KotOR's own play). Not in a
+   * GM session: its world is the GM's (sessions save it), and an area saved with what the GM spawned in it came
+   * back with those as the area's own on the GM's machine only, so players' screens were missing them
+   */
+  keepsModuleState(): boolean;
+  /** The mode draws its own combat HUD (a GM session's player): KotOR's target, action, queue and party panels hide */
+  ownsCombatHud(): boolean;
+  /**
+   * Gamepad inputs the mode handles itself this frame, by GamePad field name ('button_x', 'trigger_r'...), or
+   * 'all' while its own interface has the pad (a GM session player's open menu): the engine doesn't see them
+   */
+  padClaims(): readonly string[] | 'all' | null;
   /** The area leaves out its own placeables, creatures or triggers */
   skipsModuleObjects(kind: 'placeables' | 'creatures' | 'triggers'): boolean;
 
   // --- Things that happened on this machine
   /** A creature played an animations.2da animation */
-  onHostTwoDAAnimation(creature: ModuleCreature, animation: ITwoDAAnimation): void;
-  onHostVisualEffectApplied(effect: GameEffect): void;
-  onHostVisualEffectRemoved(effect: GameEffect): void;
-  onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number): void;
+  /** hold: a cast held this many seconds (ModuleCreature.playCastAnimation), so players' copies hold it too */
+  onHostTwoDAAnimation(creature: ModuleCreature, animation: ITwoDAAnimation, hold?: number): void;
+  /** An effect went on an object (or on a spot: owner is the module). Every effect, whatever its type */
+  onEffectApplied(owner: any, effect: GameEffect): void;
+  /** An effect came off an object, or a spot (GameEffect.retire has run) */
+  onEffectRemoved(owner: any, effect: GameEffect): void;
+  onHostProjectile(caster: ModuleObject, target: ModuleObject, ammunition: number, hit: boolean, delay: number, options?: { deflected?: boolean; powerShot?: boolean }): void;
+  onHostSpellCast(caster: ModuleObject, target: ModuleObject | undefined, spellId: number, casthandvisual: string, projmodel: string, castTime: number, conjureTime: number, range?: string): void;
   /** by opened door (by is the door itself when it opened on its own) */
   onDoorOpened(door: ModuleDoor, by: ModuleObject): void;
   onMineChanged(mine: ModuleTrigger): void;
@@ -87,6 +112,17 @@ export interface EngineHooks {
   onCombatRoundEnd(creature: ModuleCreature): void;
   /** A creature's own script asks it to attack: true when the mode has it busy with something else */
   holdsScriptAttack(creature: ModuleCreature): boolean;
+  /**
+   * Whether a creature's own behaviour scripts run (ScriptControl: heartbeat, perception, combat rounds, being hit).
+   * False while the mode runs its behaviour (a GM session's AI); its story and rules scripts run regardless
+   */
+  runsBehaviourScripts(creature: ModuleCreature): boolean;
+  /** Creatures walk through this one rather than around it (it isn't there for them, e.g. hidden by the GM) */
+  walksThrough(creature: ModuleObject): boolean;
+  /** A creature uses something it can sit on: sit in it. True when that's what happened (no other use) */
+  useSeat(creature: ModuleObject, target: ModuleObject): boolean;
+  /** Something to sit on (players can use it to sit) */
+  isSeat(object: ModuleObject): boolean;
 }
 
 /** The engine on its own: nothing is taken over, nothing is simulated elsewhere */
@@ -110,11 +146,17 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isNetworkContainer: () => false,
   skillGatePasses: () => true,
   isLeaderLocked: () => false,
+  cutsceneCamera: () => null,
+  ownsCombatHud: () => false,
+  padClaims: () => null,
+  sharedWorld: () => false,
+  keepsModuleState: () => true,
   skipsModuleObjects: () => false,
   onHostTwoDAAnimation: () => {},
-  onHostVisualEffectApplied: () => {},
-  onHostVisualEffectRemoved: () => {},
+  onEffectApplied: () => {},
+  onEffectRemoved: () => {},
   onHostProjectile: () => {},
+  onHostSpellCast: () => {},
   onDoorOpened: () => {},
   onMineChanged: () => {},
   onMineRemoved: () => {},
@@ -126,4 +168,8 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   openCharacterSheet: () => false,
   onCombatRoundEnd: () => {},
   holdsScriptAttack: () => false,
+  runsBehaviourScripts: () => true,
+  walksThrough: () => false,
+  useSeat: () => false,
+  isSeat: () => false,
 };

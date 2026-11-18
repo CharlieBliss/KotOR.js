@@ -1,8 +1,9 @@
 import type { GMPlayerSheet, GMSessionRules } from "@/managers/GMNetworkManager";
 import type { ICharacterAttributes } from "@/engine/rules/CharacterBuilder";
+import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
-export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine'
+export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine' | 'place_set'
   // Ordering an NPC (GMNpcOrders): click the ground to move it, a creature to attack or follow, points to patrol
   | 'order_move' | 'order_attack' | 'order_follow' | 'order_patrol'
   // Turning the selection to face a clicked point or creature
@@ -51,6 +52,12 @@ export interface GMCreatureSpawnConfig {
   onlyIn?: 'kotor' | 'tsl';
   /** Items the creature carries, lootable from its body once it dies */
   lootResRefs?: string[];
+  /**
+   * Rebuild a template at another level (and optionally class), as levelling up would: its class levels, feats,
+   * Force powers, skills, vitality and Force points. Its look, gear and its own special feats stay. hp, when
+   * given, is its vitality instead of the class's.
+   */
+  restat?: { level: number; classId?: number; hp?: number };
 }
 
 /** A check the GM calls for: a skill (SKILL_*) or a saving throw */
@@ -213,6 +220,8 @@ export interface GMSavedObject {
   stance?: string;
   /** What it fights with (GMCombatAI), when not everything */
   combatStyle?: 'weapons' | 'attack';
+  /** Its behaviour left to its own scripts (GMCombatAI.runsBehaviourScripts) */
+  scripted?: boolean;
   /** Pinned: can't be clicked or dragged in the scene */
   pinned?: boolean;
 }
@@ -279,6 +288,8 @@ export interface GMSessionSave {
   groups?: GMSavedGroup[];
   /** The music, sound and look the GM gave the scene */
   atmosphere?: GMAtmosphereSettings;
+  /** Rooms of other areas placed in the scene (GMSetPieces) */
+  sets?: AreaSetPieceDef[];
 }
 
 /**

@@ -1,0 +1,444 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Battle of the Ice Plateau",
+  "summary": "Telos security troopers and the academy's handmaidens dig in on a frozen plateau in front of a hidden Jedi academy. A probe droid finds them; then the droid army marches out of the snow, a heavy tank droid at its head.",
+  "gmNotes": "The snow battle. Beat 1: a probe droid drifts over the trench line (it's neutral until beat 2, so nobody shoots yet). Beat 2: the troopers destroy it. Beat 3: the droid column walks in from the north; let it close across the open snow for the long lens. Beat 4: the tank droid arrives and the commander orders the shuttle evacuated. Film low behind the cover line looking north.",
+  "content": "tsl",
+  "area": {
+    "game": "tsl",
+    "module": "261tel",
+    "reason": "KotOR II's Telos polar plateau: a wide white ice field in front of Atris's hidden academy, the closest thing either game has to The Empire Strikes Back's battle of Hoth."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "hard"
+  },
+  "players": {
+    "at": {
+      "spot": "waypoint:from_262tel",
+      "offset": [
+        6,
+        11
+      ]
+    },
+    "facing": 0,
+    "note": "Just behind the trench line, in front of the academy doors, looking north into the snow."
+  },
+  "actors": [
+    {
+      "id": "commander",
+      "name": "Security Commander",
+      "template": "n_tsfcmdr",
+      "faction": "friendly",
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          -4,
+          16
+        ]
+      },
+      "facing": 0,
+      "stance": "pointing",
+      "customize": {
+        "level": 12,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      }
+    },
+    {
+      "id": "troopers",
+      "name": "Telos Trooper",
+      "template": "n_tsfoff",
+      "faction": "friendly",
+      "count": 6,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          18
+        ],
+        "formation": "line",
+        "spacing": 3
+      },
+      "facing": 0,
+      "stance": "crouched",
+      "customize": {
+        "level": 10,
+        "class": "Soldier",
+        "rightHand": "w_brifle_04"
+      }
+    },
+    {
+      "id": "handmaidens",
+      "name": "Handmaiden",
+      "template": "p_handmaiden",
+      "faction": "friendly",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          10,
+          15
+        ],
+        "formation": "line",
+        "spacing": 2
+      },
+      "facing": 0,
+      "customize": {
+        "level": 11
+      }
+    },
+    {
+      "id": "probe",
+      "name": "Probe Droid",
+      "template": "g_probedroid01",
+      "faction": "neutral",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          10,
+          30
+        ]
+      },
+      "facing": 180,
+      "order": {
+        "kind": "standDown"
+      }
+    },
+    {
+      "id": "war_droids",
+      "name": "War Droid",
+      "template": "g_wardroid04",
+      "faction": "hostile",
+      "count": 4,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          -4,
+          55
+        ],
+        "formation": "line",
+        "spacing": 4
+      },
+      "facing": 180,
+      "customize": {
+        "level": 12
+      }
+    },
+    {
+      "id": "assault_droids",
+      "name": "Telos Military Droid",
+      "template": "g_drdtelmil",
+      "faction": "hostile",
+      "count": 4,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          6,
+          60
+        ],
+        "formation": "line",
+        "spacing": 4
+      },
+      "facing": 180,
+      "customize": {
+        "level": 10
+      }
+    },
+    {
+      "id": "tank",
+      "name": "Heavy Tank Droid",
+      "template": "g_droid_tank",
+      "faction": "hostile",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          70
+        ]
+      },
+      "facing": 180,
+      "customize": {
+        "level": 18,
+        "class": "Combat Droid",
+        "hp": 700,
+        "rightHand": "w_brifle_29"
+      }
+    },
+    {
+      "id": "escorts",
+      "name": "Assault Droid",
+      "template": "g_assaultdroid03",
+      "faction": "hostile",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          66
+        ],
+        "formation": "line",
+        "spacing": 9
+      },
+      "facing": 180,
+      "customize": {
+        "level": 14
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "cover",
+      "template": "plc_shipparts02",
+      "name": "Ice-crusted barricade",
+      "count": 3,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          21
+        ],
+        "formation": "line",
+        "spacing": 7
+      }
+    },
+    {
+      "id": "cover_crates",
+      "template": "g_tresmilhig005",
+      "name": "Supply cylinder",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          3.5,
+          21.5
+        ],
+        "formation": "line",
+        "spacing": 7
+      }
+    },
+    {
+      "id": "shuttle",
+      "template": "plc_tel_shuttle",
+      "name": "Evacuation shuttle",
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          -22,
+          6
+        ]
+      },
+      "facing": 20
+    },
+    {
+      "id": "sensor",
+      "template": "plc_comppnl",
+      "name": "Sensor console",
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          -7,
+          13.5
+        ]
+      },
+      "facing": 0
+    },
+    {
+      "id": "wreck_far",
+      "template": "plc_wreckage01",
+      "name": "Downed snowspeeder",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          32
+        ],
+        "formation": "line",
+        "spacing": 14
+      },
+      "facing": 40
+    },
+    {
+      "id": "smoke",
+      "template": "plc_burnjunk",
+      "name": "Burning wreck",
+      "count": 2,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:from_262tel",
+        "offset": [
+          0,
+          30
+        ],
+        "formation": "line",
+        "spacing": 14
+      }
+    }
+  ],
+  "beats": [
+    {
+      "title": "Something in the snow",
+      "narration": "Wind howls over the ice. A black shape drifts out of the white, antennae twitching, and hangs over the trench.",
+      "notes": "The probe droid appears. Nobody fires yet.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "probe"
+          ]
+        },
+        {
+          "do": "say",
+          "id": "commander",
+          "text": "Sensors have something. Small. Not one of ours."
+        }
+      ]
+    },
+    {
+      "title": "Shoot it down",
+      "narration": "The droid's lens swings toward the academy doors and starts transmitting.",
+      "actions": [
+        {
+          "do": "faction",
+          "ids": [
+            "probe"
+          ],
+          "faction": "hostile"
+        },
+        {
+          "do": "order",
+          "ids": [
+            "probe"
+          ],
+          "order": {
+            "kind": "guard",
+            "radius": 10
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "troopers"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "probe"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "troopers"
+          ],
+          "stance": ""
+        },
+        {
+          "do": "say",
+          "id": "commander",
+          "text": "It's a scout droid! Take it down before it signals!"
+        }
+      ]
+    },
+    {
+      "title": "The column",
+      "narration": "Too late. Out of the blizzard, a line of droids walks toward the trench, weapons already raised.",
+      "notes": "The droid column advances on the trench line. Let it close across the open ice before you trigger the tank.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "war_droids",
+            "assault_droids",
+            "wreck_far",
+            "smoke"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "war_droids"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "troopers"
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "assault_droids"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "handmaidens"
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "troopers"
+          ],
+          "order": null
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "commander"
+          ],
+          "stance": "",
+          "gesture": "point"
+        },
+        {
+          "do": "say",
+          "id": "commander",
+          "text": "Here they come! Hold the line, protect the academy!"
+        }
+      ]
+    },
+    {
+      "title": "The walker",
+      "narration": "The ice shakes. A heavy tank droid lumbers out of the storm, cannons turning.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "tank",
+            "escorts"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "tank",
+            "escorts"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "troopers"
+          }
+        },
+        {
+          "do": "say",
+          "id": "commander",
+          "text": "Get the shuttle off the ground! Jedi, we need you on that thing!"
+        }
+      ]
+    }
+  ]
+}

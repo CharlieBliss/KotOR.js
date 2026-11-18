@@ -158,6 +158,11 @@ export class TalentSpell extends TalentObject {
     return this.catchtime;
   }
 
+  /** How long casting it takes, in seconds: its conjure and cast times (spells.2da, in ms; 1.5 s for most) */
+  getCastSeconds(): number {
+    return ((Number(this.getConjureTime()) || 0) + (Number(this.getCastTime()) || 0)) / 1000;
+  }
+
   getConjureAnimation(){
     if(this.conjanim == 'throw'){
       if(this.id == 4 || this.id == 46){

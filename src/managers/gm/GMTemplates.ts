@@ -1,4 +1,5 @@
 import { GFFDataType } from "@/enums/resource/GFFDataType";
+import { GMItems } from "@/managers/gm/GMItems";
 import { ModuleCreatureArmorSlot } from "@/enums/module/ModuleCreatureArmorSlot";
 import { CExoLocString } from "@/resource/CExoLocString";
 import { GFFField } from "@/resource/GFFField";
@@ -132,7 +133,7 @@ export class GMTemplates {
       }
       if (!resRef) continue;
       const st = new GFFStruct(slot);
-      st.addRESREF('EquippedRes', resRef);
+      st.addRESREF('EquippedRes', GMItems.forThisGame(resRef));
       list.addChildStruct(st);
     }
   }

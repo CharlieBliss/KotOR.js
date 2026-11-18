@@ -1,0 +1,386 @@
+{
+  "format": "kotorjs-gm-scene",
+  "version": 1,
+  "title": "Twin Suns over the Dune Sea",
+  "summary": "A moisture farmer's camp in the open desert. Sand People rise out of the dunes; an old hermit in a brown robe walks out of the haze to drive them off, and something far bigger answers from the dunes.",
+  "gmNotes": "The quiet one with a sting. Beat 1 is for wide, empty desert shots. Beat 2 is a short skirmish. Beat 3 is the hermit's entrance: film him walking in from the east. Beat 4 reveals a krayt dragon standing on a far dune as a set piece (it stands down and nobody fights it); the Sand People flee. If you want a boss fight, turn the dragon hostile and give it an attack order yourself: it is deadly for this party.",
+  "content": "tsl",
+  "area": {
+    "game": "kotor",
+    "module": "tat_m18aa",
+    "reason": "KotOR's Dune Sea on Tatooine: open sand under two suns, the Sand People's hunting ground in both A New Hope and KotOR, with room on the horizon for a krayt dragon."
+  },
+  "settings": {
+    "npcAi": true
+  },
+  "party": {
+    "members": [
+      {
+        "level": 15,
+        "class": "Jedi Guardian"
+      }
+    ],
+    "difficulty": "medium"
+  },
+  "players": {
+    "at": {
+      "spot": "waypoint:tat18_wp_tuskam1",
+      "offset": [
+        12,
+        28
+      ]
+    },
+    "facing": 200,
+    "note": "At the farmer's camp, looking south over the dunes the Sand People come from."
+  },
+  "actors": [
+    {
+      "id": "farmer",
+      "name": "Moisture Farmer",
+      "template": "n_commm",
+      "faction": "friendly",
+      "at": {
+        "spot": "prop:vaporator",
+        "offset": [
+          0,
+          -1.6
+        ]
+      },
+      "facing": 0,
+      "stance": "computer",
+      "bark": "The vaporators don't fix themselves. Not out here.",
+      "customize": {
+        "level": 4
+      }
+    },
+    {
+      "id": "farmer_wife",
+      "name": "Farmer's Wife",
+      "template": "n_commf",
+      "faction": "friendly",
+      "at": {
+        "spot": "prop:campfire",
+        "offset": [
+          1.5,
+          1
+        ]
+      },
+      "facing": 240,
+      "stance": "listen",
+      "customize": {
+        "level": 4
+      }
+    },
+    {
+      "id": "bantha",
+      "name": "Bantha",
+      "template": "g_bantha01",
+      "faction": "neutral",
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          4,
+          33
+        ]
+      },
+      "facing": 270
+    },
+    {
+      "id": "raiders",
+      "name": "Sand People Warrior",
+      "template": "g_tuskenmale02",
+      "faction": "hostile",
+      "count": 5,
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          0,
+          0
+        ],
+        "formation": "line",
+        "spacing": 3
+      },
+      "facing": 20,
+      "customize": {
+        "level": 7
+      }
+    },
+    {
+      "id": "raid_chief",
+      "name": "Sand People Holy Warrior",
+      "template": "g_tuskenmale03",
+      "faction": "hostile",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam5"
+      },
+      "facing": 20,
+      "customize": {
+        "level": 9
+      }
+    },
+    {
+      "id": "hermit",
+      "name": "Old Hermit",
+      "template": "p_jolee",
+      "faction": "friendly",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          34,
+          22
+        ]
+      },
+      "facing": 270,
+      "customize": {
+        "level": 16,
+        "class": "Jedi Consular",
+        "armor": "a_robe_27",
+        "rightHand": "g_w_lghtsbr03"
+      }
+    },
+    {
+      "id": "krayt",
+      "name": "Krayt Dragon",
+      "template": "g_kraytdragon01",
+      "faction": "neutral",
+      "hidden": true,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          -10,
+          -35
+        ]
+      },
+      "facing": 20,
+      "order": {
+        "kind": "standDown"
+      }
+    }
+  ],
+  "props": [
+    {
+      "id": "vaporator",
+      "template": "plc_mstrevap",
+      "name": "Moisture vaporator",
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          16,
+          32
+        ]
+      }
+    },
+    {
+      "id": "vaporators",
+      "template": "plc_mstrevap",
+      "name": "Moisture vaporator",
+      "count": 2,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          20,
+          38
+        ],
+        "formation": "line",
+        "spacing": 7
+      }
+    },
+    {
+      "id": "speeder",
+      "template": "plc_lndspdr1",
+      "name": "Landspeeder",
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          6,
+          24
+        ]
+      },
+      "facing": 70
+    },
+    {
+      "id": "campfire",
+      "template": "plc_firepit2",
+      "name": "Campfire",
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          12,
+          33
+        ]
+      }
+    },
+    {
+      "id": "crates",
+      "template": "plc_crate",
+      "name": "Supply crate",
+      "count": 3,
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          8,
+          34
+        ],
+        "formation": "line",
+        "spacing": 1.2
+      }
+    },
+    {
+      "id": "bones",
+      "template": "plc_bnthcrps",
+      "name": "Bleached bantha bones",
+      "at": {
+        "spot": "waypoint:tat18_wp_tuskam1",
+        "offset": [
+          -4,
+          12
+        ]
+      },
+      "facing": 60
+    }
+  ],
+  "beats": [
+    {
+      "title": "Twin suns",
+      "narration": "Two suns hang low over the Dune Sea. Wind hisses across the sand. The vaporators hum.",
+      "notes": "Quiet establishing shots: the camp, the farmer at work, the empty dunes to the south.",
+      "actions": [
+        {
+          "do": "say",
+          "id": "farmer_wife",
+          "text": "Sand People were seen near the ridge last night."
+        },
+        {
+          "do": "say",
+          "id": "farmer",
+          "text": "They won't come this far. They never do."
+        }
+      ]
+    },
+    {
+      "title": "Raiders on the ridge",
+      "narration": "A howl rises from the dunes. Robed figures with gaffi sticks crest the ridge, running.",
+      "notes": "The Sand People charge the camp: the warriors go for the farmers, the chief for the players. The farmers run.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "raiders",
+            "raid_chief"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "raiders"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "farmer"
+          }
+        },
+        {
+          "do": "order",
+          "ids": [
+            "raid_chief"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "players"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "farmer",
+            "farmer_wife"
+          ],
+          "stance": ""
+        },
+        {
+          "do": "order",
+          "ids": [
+            "farmer",
+            "farmer_wife"
+          ],
+          "order": {
+            "kind": "flee"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "raid_chief"
+          ],
+          "gesture": "taunt"
+        }
+      ]
+    },
+    {
+      "title": "The old hermit",
+      "narration": "A hooded figure walks out of the heat haze, unhurried, a walking stick in one hand.",
+      "notes": "The hermit walks in from the east and joins the fight.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "hermit"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "hermit"
+          ],
+          "order": {
+            "kind": "attack",
+            "target": "raid_chief"
+          }
+        },
+        {
+          "do": "say",
+          "id": "hermit",
+          "text": "Easy now. The Sand People are easily startled, but they'll soon be back, and in greater numbers."
+        }
+      ]
+    },
+    {
+      "title": "Something bigger",
+      "narration": "The ground shudders. On the far dune, a krayt dragon lifts its head and roars.",
+      "notes": "Set piece: the dragon only stands and watches. The Sand People flee.",
+      "actions": [
+        {
+          "do": "reveal",
+          "ids": [
+            "krayt"
+          ]
+        },
+        {
+          "do": "order",
+          "ids": [
+            "raiders",
+            "raid_chief"
+          ],
+          "order": {
+            "kind": "flee"
+          }
+        },
+        {
+          "do": "animate",
+          "ids": [
+            "krayt"
+          ],
+          "gesture": "taunt"
+        },
+        {
+          "do": "say",
+          "id": "hermit",
+          "text": "That's no Sand People call. Back to the speeder. Slowly."
+        }
+      ]
+    }
+  ]
+}

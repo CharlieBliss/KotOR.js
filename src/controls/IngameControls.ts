@@ -63,6 +63,16 @@ export class IngameControls {
     window.addEventListener('keydown', (e: KeyboardEvent) => {
       // Typing into a page text field (e.g. the GM panel) must not also move the camera or character
       if(IngameControls.isTypingInPageField(e)) return;
+      // Tab / Shift + Tab: the next or previous thing to use or fight, instead of moving the page's focus
+      if(e.code === 'Tab' && GameState.Mode == EngineMode.INGAME && GameState.getCurrentPlayer()){
+        e.preventDefault();
+        const target = GameState.ModuleObjectManager.CycleTarget(GameState.CursorManager.selectedObject, e.shiftKey ? -1 : 1);
+        if(target){
+          GameState.CursorManager.setReticleSelectedObject(target);
+          GameState.CursorManager.setReticleHoveredObject(target);
+        }
+        return;
+      }
       this.keyboard.onKeyDown(e);
 
       if(GameState.MenuManager.activeGUIElement){
@@ -927,6 +937,13 @@ export class IngameControls {
       KeyMapper.BindGamepad(this.gamePad);
     }
     this.gamePad.updateState(delta);
+    // What the active mode's own interface handles: the game doesn't act on it as well
+    const claims = GameState.hooks.padClaims();
+    if(claims){
+      for(const name of GamePad.INPUT_NAMES){
+        if(claims === 'all' || claims.includes(name)) (this.gamePad as any)[name]?.suppress?.();
+      }
+    }
 
     if(currentMenu){
       if(this.gamePad.button_a.pressed){

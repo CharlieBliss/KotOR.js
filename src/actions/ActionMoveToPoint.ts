@@ -9,7 +9,8 @@ import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import type { ModuleObject } from "@/module/ModuleObject";
-import type { ComputedPath } from "@/engine/pathfinding/ComputedPath";
+import { ComputedPath } from "@/engine/pathfinding/ComputedPath";
+import { PathPoint } from "@/engine/pathfinding/PathPoint";
 import { TURN_SPEED_FAST } from "@/engine/TurnSpeeds";
 
 /**
@@ -30,6 +31,23 @@ export class ActionMoveToPoint extends Action {
 
   target_position: THREE.Vector3 = new THREE.Vector3();
   real_target_position: THREE.Vector3 = new THREE.Vector3();
+
+  /** Seconds walking without getting anywhere before stepping aside and finding another way */
+  static STUCK_SECONDS = 1.2;
+  /** Metres it must cover to count as getting somewhere */
+  static PROGRESS_DISTANCE = 0.4;
+
+  /**
+   * Stuck this close to where it's going (someone stands on the spot, or right next to it): it's there. It
+   * sidestepped and turned on the spot until the move timed out and it was teleported onto the spot
+   */
+  static CLOSE_ENOUGH_WHEN_STUCK = 1.1;
+  /** How far it steps aside when stuck */
+  static SIDESTEP_DISTANCE = 1.5;
+
+  progressFrom: THREE.Vector3 | undefined;
+  stuckTime = 0;
+  sidestepLeft = false;
 
   constructor( actionId: number = -1, groupId: number = -1 ){
     super(actionId, groupId);
@@ -76,6 +94,15 @@ export class ActionMoveToPoint extends Action {
       if( distanceRT <= range ){
         return ActionStatus.COMPLETE;
       }
+
+      // Closing to melee with a creature others already surround: as close as it gets is close enough
+      if(this.closeAsItGets(delta, range)){
+        this.owner.force = 0;
+        this.owner.speed = 0;
+        this.setComputedPath(undefined);
+        if(this.owner.combatData) this.owner.combatData.meleeContact = this.target;
+        return ActionStatus.COMPLETE;
+      }
     }
 
     if(!this.computedPath){
@@ -109,6 +136,13 @@ export class ActionMoveToPoint extends Action {
           this.owner.force = 1;//Math.min( 1, Math.max( 0.5, ( ( distanceToTarget - arrivalDistance ) / 1 ) ) );
           // this.owner.walk = !run;
           this.owner.setAnimationState(run ? ModuleCreatureAnimState.RUNNING : ModuleCreatureAnimState.WALKING);
+          if(this.watchProgress(delta)){
+            this.owner.force = 0;
+            this.owner.speed = 0;
+            this.setComputedPath(undefined);
+            this.owner.setAnimationState(ModuleCreatureAnimState.IDLE);
+            return ActionStatus.COMPLETE;
+          }
         }else{
           this.computedPath.pop();
         }
@@ -149,6 +183,96 @@ export class ActionMoveToPoint extends Action {
 
     this.setComputedPath(undefined);
     return ActionStatus.FAILED;
+  }
+
+  /**
+   * Walking to melee reach of a creature (a short range) and, within a little more than that, not getting any
+   * closer for a moment: the spots around it are taken. Without this it slid round the crowd for good (and
+   * everyone after a target in a melee did, the whole fight)
+   */
+  closeAsItGets(delta: number, range: number): boolean {
+    if(!BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature) || range > ActionMoveToPoint.MELEE_RANGE_MAX){
+      return false;
+    }
+    const toTarget = Utility.Distance2D(this.owner.position, this.target.position);
+    if(toTarget > range + ActionMoveToPoint.CROWD_SLACK){
+      this.closestToTarget = undefined;
+      return false;
+    }
+    if(this.closestToTarget === undefined || toTarget < this.closestToTarget - ActionMoveToPoint.CLOSING_DISTANCE){
+      this.closestToTarget = toTarget;
+      this.closingTime = 0;
+      return false;
+    }
+    this.closingTime += delta;
+    return this.closingTime >= ActionMoveToPoint.CLOSING_SECONDS;
+  }
+
+  /** Moves this short are closing to melee */
+  static MELEE_RANGE_MAX = 3;
+  /** Metres past the range a crowded approach may stop at */
+  static CROWD_SLACK = 1.2;
+  /** Closer by this... */
+  static CLOSING_DISTANCE = 0.3;
+  /** ...within this many seconds, or it's as close as it gets */
+  static CLOSING_SECONDS = 0.8;
+  closestToTarget: number | undefined;
+  closingTime = 0;
+
+  /**
+   * Walking into something the path didn't know about (a prop, a crowd) and getting nowhere: step aside,
+   * alternating sides, and find the way from there
+   */
+  /** Notices a walk getting nowhere: sidesteps, or (true) gives up as arrived when it's nearly there */
+  watchProgress(delta: number): boolean {
+    if(!this.progressFrom){
+      this.progressFrom = this.owner.position.clone();
+      this.stuckTime = 0;
+      return false;
+    }
+    if(Utility.Distance2D(this.owner.position, this.progressFrom) >= ActionMoveToPoint.PROGRESS_DISTANCE){
+      this.progressFrom.copy(this.owner.position);
+      this.stuckTime = 0;
+      return false;
+    }
+    this.stuckTime += delta;
+    if(this.stuckTime < ActionMoveToPoint.STUCK_SECONDS) return false;
+    this.stuckTime = 0;
+    this.progressFrom.copy(this.owner.position);
+    if(Utility.Distance2D(this.owner.position, this.real_target_position || this.target_position) <= ActionMoveToPoint.CLOSE_ENOUGH_WHEN_STUCK) return true;
+    this.sidestep();
+    return false;
+  }
+
+  sidestep(){
+    const owner = this.owner;
+    const area = owner?.area;
+    if(!area) return;
+    const next = this.computedPath?.points[0]?.vector || this.target_position;
+    const ahead = new THREE.Vector3(next.x - owner.position.x, next.y - owner.position.y, 0);
+    if(ahead.lengthSq() < 1e-6) ahead.set(0, 1, 0);
+    ahead.normalize();
+    const sides = this.sidestepLeft ? [1, -1] : [-1, 1];
+    this.sidestepLeft = !this.sidestepLeft;
+    for(const side of sides){
+      // Sideways and a little back, away from what it walked into
+      const step = new THREE.Vector3(-ahead.y * side, ahead.x * side, 0).multiplyScalar(ActionMoveToPoint.SIDESTEP_DISTANCE).addScaledVector(ahead, -0.5);
+      const aside = area.getNearestWalkablePoint(owner.position.clone().add(step), owner.getHitDistance());
+      if(Utility.Distance2D(aside, owner.position) < 0.5) continue;
+      const from = PathPoint.FromVector3(owner.position); from.setArea(area);
+      const to = PathPoint.FromVector3(aside); to.setArea(area);
+      if(!from.hasLOS(to, owner)) continue;
+      const path = ComputedPath.FromVector3List([owner.position.clone(), aside]);
+      const onward = area.path.traverseToPoint(owner, aside, this.target_position);
+      path.merge(onward);
+      path.fixWalkEdges(owner.getHitDistance());
+      path.setOwner?.(owner);
+      path.setColor(owner.helperColor);
+      if(BitWise.InstanceOfObject(this.target, ModuleObjectType.ModuleCreature)) path.realtime = true;
+      path.timer = 20;
+      this.setComputedPath(path);
+      return;
+    }
   }
 
   calculatePath(){

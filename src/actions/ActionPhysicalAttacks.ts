@@ -24,6 +24,9 @@ import { TURN_SPEED_FAST } from "@/engine/TurnSpeeds";
  */
 export class ActionPhysicalAttacks extends Action {
 
+  /** Metres past melee reach a creature it's already fighting can drift before it chases */
+  static MELEE_CONTACT_SLACK = 1.2;
+
   constructor( actionId: number = -1, groupId: number = -1 ){
     super(actionId, groupId);
     this.type = ActionType.ActionPhysicalAttacks;
@@ -57,14 +60,20 @@ export class ActionPhysicalAttacks extends Action {
     const target: ModuleCreature = this.target as any;
 
     owner.resetExcitedDuration();
-    let range = ( owner.isRangedEquipped() ? 15.0 : 2.0 );
+    const ranged = owner.isRangedEquipped();
+    let range = ( ranged ? 15.0 : (owner.getMeleeRange?.(this.target) ?? 2.0) );
+    // Already toe to toe with it: the target stepping back a little (to swing at someone else, or pushed by the
+    // crowd) doesn't send it chasing. Every fighter chasing a target that chased its own ran the melee in circles
+    const contact = !ranged && owner.combatData?.meleeContact === target;
+    const reach = contact ? range + ActionPhysicalAttacks.MELEE_CONTACT_SLACK : range;
 
     if(target.isDead()){
       //todo: we may need to end combatround early here if it has already started
       return ActionStatus.FAILED;
     }else{
       let distance = Utility.Distance2D(owner.position, target.position);
-      if( distance > range ){
+      if( distance > reach ){
+        if(owner.combatData) owner.combatData.meleeContact = undefined;
 
         // owner.openSpot = undefined;
         let target_position = target.position.clone();
@@ -92,6 +101,7 @@ export class ActionPhysicalAttacks extends Action {
       }else{
         owner.force = 0;
         owner.speed = 0;
+        if(!ranged && owner.combatData) owner.combatData.meleeContact = target;
 
         if(!owner.combatRound){
           return ActionStatus.FAILED;

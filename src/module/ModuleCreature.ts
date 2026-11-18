@@ -1,4 +1,5 @@
 import type { GMCreatureSpawnConfig } from "@/managers/gm/GMTypes";
+import { bodyOwner, resolveStateRequest, allowsOneOffAnimation } from "@/module/creature/AnimationPriority";
 import { GFFObject } from "@/resource/GFFObject";
 import * as THREE from "three";
 import { ModuleObject } from "@/module/ModuleObject";
@@ -55,6 +56,7 @@ import { AudioEmitterType } from "@/enums/audio/AudioEmitterType";
 import { AudioPriorityGroup } from "@/enums/audio/AudioPriorityGroup";
 import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { CombatRoundAction } from "@/combat";
+import { CombatVisualEffects } from "@/combat/CombatVisualEffects";
 import { GameEffectFactory } from "@/effects/GameEffectFactory";
 import type { Action } from "@/actions/Action";
 import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
@@ -154,12 +156,16 @@ export class ModuleCreature extends ModuleObject {
   // appearance: any;
 
   animationState: ICreatureAnimationState;
+  /** Stunned, held or paralyzed last frame (let go, it goes back to its stance) */
+  wasHeld: boolean = false;
   overlayAnimationState: IOverlayAnimationState;
   
   equipment: CreatureEquipment;
   regenTimer: number;
   regenTimerMax: number;
   excitedDuration: number;
+  /** Excited only from drawing its weapon (flourish): the ready stance, not a fight (no battle music) */
+  excitedForShow: boolean = false;
   turning: number;
   deathAnimationPlayed: boolean;
   deathStarted: boolean;
@@ -327,7 +333,10 @@ export class ModuleCreature extends ModuleObject {
 
     this.perceptionList = [];
 
-    this.setAnimationState(ModuleCreatureAnimState.IDLE);
+    // HP is still 0 before load() / setCreatureHP(); calling setAnimationState(IDLE) here would trigger BodyOwner.DEAD
+    // (10006) and force every newly spawned creature/player through GET_UP_DEAD (10223) on frame 1.
+    this.resetAnimationState();
+    this.animationState.animation = this.animationConstantToAnimation(ModuleCreatureAnimState.IDLE);
     this.combatData.combatActionTimer = 3; 
     this.combatData.combatState = false;
     this.combatData.lastAttackAction = ActionType.ActionInvalid;
@@ -437,11 +446,19 @@ export class ModuleCreature extends ModuleObject {
 
       this.updateLifeState(delta, netReplica);
 
-      if(this.isDebilitated()){
+      // Stunned, held or paralyzed: it stands there. Not once dead: killed while held, it was put back on its feet
+      // every frame and never fell (only where the stun is, the GM's machine; players' copies fell)
+      const held = !this.isDead() && this.isDebilitated();
+      if(held){
         this.force = 0;
         this.speed = 0;
         this.setAnimationState(ModuleCreatureAnimState.IDLE);
+      }else if(this.wasHeld && !this.isDead()){
+        // Let go: back to its stance. Its idle had become the looping stun or hold pose, which nothing replaced
+        // until something else happened to play (a held creature stayed frozen on players' screens)
+        this.setAnimationState(ModuleCreatureAnimState.PAUSE);
       }
+      this.wasHeld = held;
 
       this.updateMoveForce(delta, netMotion);
 
@@ -458,7 +475,7 @@ export class ModuleCreature extends ModuleObject {
         this.updateCombat(delta);
         this.updateCasting(delta);
       }
-      this.updateAnimationState();
+      this.updateAnimationState(delta);
       this.updateItems(delta);
       
       this.updateModelAnimation(delta);
@@ -523,11 +540,13 @@ export class ModuleCreature extends ModuleObject {
 
   /** Get up when revived, apply queued damage, and play the dialog or death animations */
   private updateLifeState(delta: number, netReplica: boolean){
+    // From lying dead (or still falling) only: getting up was in the list too, so a creature getting up started
+    // getting up again every frame, never finished, and couldn't move or act until something else played
     if(!this.isDead() && (
         this.animationState.index == ModuleCreatureAnimState.DEAD ||
         this.animationState.index == ModuleCreatureAnimState.DEAD1 ||
-        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD || 
-        this.animationState.index == ModuleCreatureAnimState.GET_UP_DEAD1
+        this.animationState.index == ModuleCreatureAnimState.DIE ||
+        this.animationState.index == ModuleCreatureAnimState.DIE1
       )
     ){
       this.deathAnimationPlayed = false;
@@ -895,7 +914,7 @@ export class ModuleCreature extends ModuleObject {
         continue;
       }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
-        if(GameState.PartyManager.party.indexOf(this) == -1){
+        if(GameState.PartyManager.party.indexOf(this) == -1 && !(this as any).isPlayer){
           if(this.isHostile(creature)){
             this.resetExcitedDuration();
             if(this == GameState.getCurrentPlayer() && !this.combatData.combatState){
@@ -930,7 +949,7 @@ export class ModuleCreature extends ModuleObject {
         continue;
       }
       if(distance < this.getPerceptionRangePrimary() && this.hasLineOfSight(creature)){
-        if(GameState.PartyManager.party.indexOf(this) == -1){
+        if(GameState.PartyManager.party.indexOf(this) == -1 && !(this as any).isPlayer){
           if(this.isHostile(creature)){
             this.resetExcitedDuration();
           }
@@ -1070,7 +1089,7 @@ export class ModuleCreature extends ModuleObject {
     return {x: 0, y: 0, z: 0};
   }
 
-  updateAnimationState(){
+  updateAnimationState(delta: number = 0){
 
     if(!(this.model instanceof OdysseyModel3D))
       return;
@@ -1103,12 +1122,23 @@ export class ModuleCreature extends ModuleObject {
     this.refreshIdleStance();
 
     if(this.animationState.animation){
+      // A held cast: the hands stay up its whole length, then come down
+      if(this.animationState.phase === 'hold' && this.animationState.started){
+        this.animationState.hold = (this.animationState.hold || 0) - delta;
+        if(this.animationState.hold <= 0) this.nextCastPhase();
+      }
+      // The same animation held at another moment (a pose moved by the GM's slider), or no longer held: the one
+      // playing follows, as it isn't started again for a name it already has
+      if(currentAnimation == this.animationState.animation.name?.toLowerCase()){
+        const playing = (this.model as any).animationManager?.currentAnimationState;
+        if(playing && playing.holdAt !== this.animationState.holdAt) playing.holdAt = this.animationState.holdAt;
+      }
       if(currentAnimation != this.animationState.animation.name?.toLowerCase()){
         if(!this.animationState.started){
           this.animationState.started = true;
           let aLooping = (!parseInt(this.animationState.animation.fireforget) && parseInt(this.animationState.animation.looping) == 1);
-          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping);
-        }else{
+          this.model.playAnimation(this.animationState.animation.name?.toLowerCase(), aLooping || this.animationState.holdAt != null, !!this.animationState.reverse, this.animationState.holdAt);
+        }else if(!this.nextCastPhase()){
           this.setAnimationState(ModuleCreatureAnimState.PAUSE);
         }
       }
@@ -1295,8 +1325,15 @@ export class ModuleCreature extends ModuleObject {
 
   }
 
-  resetExcitedDuration(){
+  /** Into its ready stance for a while: a fight (or forShow, its weapon drawn: the stance only, no battle music) */
+  resetExcitedDuration(forShow: boolean = false){
     this.excitedDuration = 10000;
+    this.excitedForShow = forShow;
+  }
+
+  /** In a fight, as its music and anything else that means combat reads it: excited by one, not by a flourish */
+  isExcitedByCombat(): boolean {
+    return this.excitedDuration > 0 && !this.excitedForShow;
   }
 
   cancelExcitedDuration(){
@@ -1445,10 +1482,21 @@ export class ModuleCreature extends ModuleObject {
    */
   heldStance: string = '';
 
+  /**
+   * A stance's animation and, for a pose, the moment it's held at: 'kneel@0.8' is kneel frozen 0.8 s in (the GM's
+   * poses: any moment of any animation the model has); 'sit' is sit, looping
+   */
+  static parseStance(stance: string = ''): { anim: string; holdAt?: number } {
+    const m = /^([^@]+)@(\d+(?:\.\d+)?)$/.exec(String(stance || '').trim().toLowerCase());
+    if(m) return { anim: m[1], holdAt: Number(m[2]) };
+    return { anim: String(stance || '').trim().toLowerCase() };
+  }
+
   setHeldStance(name: string = ''){
     const previous = this.heldStance;
     this.heldStance = String(name || '').trim().toLowerCase();
-    if(previous && previous !== this.heldStance && this.animationState.animation?.name?.toLowerCase() === previous){
+    const playing = this.animationState.animation?.name?.toLowerCase();
+    if(previous && previous !== this.heldStance && (playing === ModuleCreature.parseStance(previous).anim)){
       // Back to standing (or straight into the new stance)
       this.setAnimationState(ModuleCreatureAnimState.PAUSE);
     }
@@ -1460,15 +1508,74 @@ export class ModuleCreature extends ModuleObject {
     if(!this.heldStance || this.isDead() || this.combatData?.combatState) return;
     const state = this.animationState;
     if(state.index !== ModuleCreatureAnimState.PAUSE) return;
+    const { anim: name, holdAt } = ModuleCreature.parseStance(this.heldStance);
     const current = state.animation?.name?.toLowerCase();
-    if(current === this.heldStance) return;
+    if(current === name && state.holdAt === holdAt) return;
     // Let a gesture or scripted animation finish first
-    if(state.animation && !this.isIdleStanceAnimation(state.animation)) return;
+    if(state.animation && !this.isIdleStanceAnimation(state.animation) && current !== name) return;
     // A model without it would fall straight back to idle and try again every frame
-    if(!this.hasModelAnimation(this.heldStance)) return;
-    const anim = OdysseyModelAnimation.GetAnimation2DA(this.heldStance);
+    if(!this.hasModelAnimation(name)) return;
+    const anim = OdysseyModelAnimation.GetAnimation2DA(name);
     if(!anim) return;
-    this.playTwoDAAnimation(anim);
+    if(holdAt == null){ this.playTwoDAAnimation(anim); return; }
+    // A pose: the animation frozen at its moment. Not sent to players as an animation (it would play through on
+    // their screens first): their copy holds it from the stance itself, as this one does
+    if(!allowsOneOffAnimation(bodyOwner(this))) return;
+    this.resetAnimationState();
+    this.animationState = { index: ModuleCreatureAnimState.PAUSE, animation: anim, started: false, speed: 1, holdAt };
+  }
+
+  /**
+   * Plays the first of these animations its model has: a power's cast, a grenade's throw. Goes through
+   * playTwoDAAnimation, so in GM sessions players see it too. Nothing played a cast animation before: casters
+   * stood still while their powers went off.
+   */
+  playCastAnimation(names: string[] = [], seconds: number = 0): boolean {
+    for(const name of names){
+      if(!name || !this.hasModelAnimation(name)) continue;
+      const anim = OdysseyModelAnimation.GetAnimation2DA(name);
+      if(!anim) continue;
+      // Its own state, as a swing's is ATTACK: left at PAUSE, the combat stance (and the turn to face the
+      // target) took over before the cast was drawn
+      return this.playTwoDAAnimation(anim, /^throw/.test(name) ? ModuleCreatureAnimState.THROW_HIGH : ModuleCreatureAnimState.CASTOUT1, this.castHoldFor(name, seconds));
+    }
+    return false;
+  }
+
+  /**
+   * A cast's raise and the loop that holds it. KotOR plays the raise, holds the loop for the rest of the power's
+   * conjure and cast time (spells.2da, 1.5 s for most), then plays the raise backwards to lower the hands: there
+   * is no animation for that. Played alone, the 0.33 s raise ended a fifth of the way into the cast
+   */
+  static CAST_HOLDS: Record<string, string> = { castout1: 'castoutlp1', castout2: 'castoutlp2', castout3: 'castoutlp3' };
+
+  /** How long a cast of this length holds its loop: what's left once the raise and the lowering are played */
+  castHoldFor(name: string, seconds: number): number {
+    const loop = ModuleCreature.CAST_HOLDS[String(name).toLowerCase()];
+    if(!loop || !(seconds > 0) || !this.hasModelAnimation(loop)) return 0;
+    const raise = (this.model as any)?.odysseyAnimationMap?.get(String(name).toLowerCase())?.length || 0;
+    return Math.max(0, seconds - 2 * raise);
+  }
+
+  /** A held cast's next part: the raise to its loop, the loop to the lowering. False once it's over */
+  private nextCastPhase(): boolean {
+    const state = this.animationState;
+    if(!state.phase || state.phase === 'out') return false;
+    const name = String(state.animation?.name || '').toLowerCase();
+    if(state.phase === 'in'){
+      const loop = OdysseyModelAnimation.GetAnimation2DA(ModuleCreature.CAST_HOLDS[name]);
+      if(!loop || !((state.hold || 0) > 0)) return this.lowerCast(state.animation);
+      this.animationState = { ...state, animation: loop, started: false, phase: 'hold' };
+      return true;
+    }
+    const raise = Object.keys(ModuleCreature.CAST_HOLDS).find((k) => ModuleCreature.CAST_HOLDS[k] === name);
+    return this.lowerCast(raise ? OdysseyModelAnimation.GetAnimation2DA(raise) : undefined);
+  }
+
+  private lowerCast(raise: ITwoDAAnimation | undefined): boolean {
+    if(!raise) return false;
+    this.animationState = { ...this.animationState, animation: raise, started: false, phase: 'out', reverse: true, hold: 0 };
+    return true;
   }
 
   /** Whether the creature's loaded model has an animation of this name */
@@ -1477,12 +1584,19 @@ export class ModuleCreature extends ModuleObject {
     return !!model?.odysseyAnimationMap?.has?.(String(name).toLowerCase().trim());
   }
 
+  /** Set its animation state, as far as whoever owns its body allows (AnimationPriority) */
   setAnimationState(animState: ModuleCreatureAnimState){
     if(!animState){ return; }
-    
+    animState = resolveStateRequest(bodyOwner(this), animState);
+
     this.animationState.index = animState;
     this.animationState.animation = this.animationConstantToAnimation(animState);
     this.animationState.started = false;
+    // A held cast is over once anything else plays: its phase, hold and backwards playing don't carry over
+    this.animationState.phase = undefined;
+    this.animationState.hold = 0;
+    this.animationState.reverse = false;
+    this.animationState.holdAt = undefined;
   }
   
   resetAnimationState(){
@@ -1494,17 +1608,28 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
-  playTwoDAAnimation(animation: ITwoDAAnimation){
-    if(animation){
-      this.resetAnimationState();
-      this.animationState = {
-        index: ModuleCreatureAnimState.PAUSE,
-        animation: animation,
-        started: false,
-        speed: 1,
-      }
-      GameState.hooks.onHostTwoDAAnimation(this, animation);
+  /**
+   * Play a one-off animation (a swing, a flinch, a cast, a gesture), under the state it counts as (a swing is
+   * ATTACK, so the combat stance doesn't take over before it's drawn). Refused while something owns the body:
+   * dying, getting up, held (AnimationPriority). Returns whether it plays.
+   */
+  playTwoDAAnimation(animation: ITwoDAAnimation, index: ModuleCreatureAnimState = ModuleCreatureAnimState.PAUSE, hold: number = 0): boolean {
+    if(!animation) return false;
+    if(!allowsOneOffAnimation(bodyOwner(this))) return false;
+    this.resetAnimationState();
+    this.animationState = {
+      index,
+      animation: animation,
+      started: false,
+      speed: 1,
     }
+    // A cast held for its length (playCastAnimation): its raise, loop and lowering
+    if(hold > 0 && ModuleCreature.CAST_HOLDS[String(animation.name || '').toLowerCase()]){
+      this.animationState.phase = 'in';
+      this.animationState.hold = hold;
+    }
+    GameState.hooks.onHostTwoDAAnimation(this, animation, hold);
+    return true;
   }
 
   playOverlayAnimation(NWScriptAnimId = -1){
@@ -1681,13 +1806,7 @@ export class ModuleCreature extends ModuleObject {
       return 'g';
     }
 
-    /*if(weaponWield == 0)//this.isSimpleCreature())
-      return 'm';
-
-    if(weaponWield == 5 || weaponWield == 6 || weaponWield == 7 || weaponWield == 8 || weaponWield == 9){
-      return 'b';
-    }
-    return 'c';*/
+    return weaponType === 4 ? 'b' : 'm';
   }
 
   //Return the WeaponType ID for the current equipped items
@@ -1749,16 +1868,18 @@ export class ModuleCreature extends ModuleObject {
   }
 
   updateItems(delta = 0){
-
-    if(this.equipment.RIGHTHAND){
-      if(this.equipment.RIGHTHAND.model instanceof OdysseyModel3D){
-        this.equipment.RIGHTHAND.model.update(delta)
-      }
+    const keepLit = !GameState.hooks.isNetReplica(this) && !this.isDead() && !!this.combatData?.combatState;
+    if(keepLit){
+      this.weaponPowered(true);
     }
 
-    if(this.equipment.LEFTHAND){
-      if(this.equipment.LEFTHAND.model instanceof OdysseyModel3D){
-        this.equipment.LEFTHAND.model.update(delta)
+    for(const item of [this.equipment.RIGHTHAND, this.equipment.LEFTHAND]){
+      if(item?.model instanceof OdysseyModel3D){
+        item.model.update(delta);
+        // Once a one-shot 'powerup' finishes, transition immediately into the looping 'powered' blade state.
+        if(item.isPowered && !item.model.animationManager?.currentAnimation){
+          item.setPowered(true);
+        }
       }
     }
 
@@ -1821,12 +1942,15 @@ export class ModuleCreature extends ModuleObject {
       break;
       case 'HitParry':
         rhWeaponSoundResRef = rhSounds?.getHitParryResRef() || '';
+        this.spawnCombatEventSparks('parry');
       break;
       case 'Contact':
         rhWeaponSoundResRef = rhSounds?.getClashResRef() || '';
+        this.spawnCombatEventSparks('clash');
       break;
       case 'Clash':
         rhWeaponSoundResRef = rhSounds?.getClashResRef() || '';
+        this.spawnCombatEventSparks('clash');
       break;
       case 'Hit':
         if(this.combatData.combatAction && this.combatData.combatAction.hits && this.combatData.combatAction.damage){
@@ -1850,6 +1974,38 @@ export class ModuleCreature extends ModuleObject {
     }
   }
 
+  /** Spawn visible clash / parry spark bursts at weapon contact during melee animations */
+  spawnCombatEventSparks(kind: 'clash' | 'parry'): void {
+    const target = this.combatData?.combatAction?.target || this.combatData?.lastAttackTarget || this.combatRound?.action?.target;
+    const defenderWeapon = (target as any)?.equipment?.RIGHTHAND;
+    const label = CombatVisualEffects.getMeleeSparkLabel(kind, this.equipment?.RIGHTHAND, defenderWeapon);
+    if(!label) return;
+    const resRef = CombatVisualEffects.lookupImpactModel(
+      label,
+      label === 'VFX_COM_SPARKS_LIGHTSABER' ? 'v_spkb_imp' : 'v_parrspr_imp'
+    );
+    if(!resRef) return;
+
+    const pos = new THREE.Vector3();
+    if(this.model?.impact){
+      this.model.impact.updateWorldMatrix(true, false);
+      this.model.impact.getWorldPosition(pos);
+    }else{
+      pos.copy(this.position).setZ(this.position.z + 1.15);
+    }
+    if(target?.position){
+      const tPos = new THREE.Vector3();
+      if(target.model?.impact){
+        target.model.impact.updateWorldMatrix(true, false);
+        target.model.impact.getWorldPosition(tPos);
+      }else{
+        tPos.copy(target.position).setZ(target.position.z + 1.15);
+      }
+      pos.lerp(tPos, 0.5);
+    }
+    GameState.ProjectileManager?.SpawnBurst?.(resRef, pos, this.context, 1.5);
+  }
+
   /** The weapon in use: in the right hand, else the left, else a natural weapon (undefined when unarmed) */
   getWeapon(): ModuleItem | undefined {
     for(const key of EquipmentSlots.WEAPONS){
@@ -1863,7 +2019,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   flourish(){
-    this.resetExcitedDuration();
+    // Ready stance, lightsaber lit: not combat, so no battle music (Y on a pad, X on the keyboard played it)
+    this.resetExcitedDuration(this.excitedDuration > 0 && !this.excitedForShow ? false : true);
     let isSimple = this.isSimpleCreature();
     let weaponType = this.getCombatAnimationWeaponType();
     
@@ -2115,7 +2272,7 @@ export class ModuleCreature extends ModuleObject {
     GameState.hooks.onCombatRoundEnd(this);
 
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnEndRound];
-    if(!nwscript){ return true; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnEndRound)){ return true; }
     const instance = nwscript.newInstance();
     instance.run(this);
   }
@@ -2141,7 +2298,7 @@ export class ModuleCreature extends ModuleObject {
 
   onAttacked(attackType: CombatActionType){
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnAttacked];
-    if(!nwscript){ return; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnAttacked)){ return; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2005 : 1005;
     instance.run(this, script_num);
@@ -2154,7 +2311,7 @@ export class ModuleCreature extends ModuleObject {
     this.resetExcitedDuration();
     
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnDamaged];
-    if(!nwscript){ return true; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnDamaged)){ return true; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2006 : 1006;
     instance.run(this, script_num);
@@ -2165,7 +2322,7 @@ export class ModuleCreature extends ModuleObject {
       return;
 
     const nwscript = this.scripts[ModuleObjectScript.CreatureOnBlocked];
-    if(!nwscript){ return; }
+    if(!nwscript || !this.runsScript(ModuleObjectScript.CreatureOnBlocked)){ return; }
     const instance = nwscript.newInstance();
     const script_num = (GameState.PartyManager.party.indexOf(this) > -1) ? 2009 : 1009;
     instance.run(this, script_num);
@@ -2249,7 +2406,7 @@ export class ModuleCreature extends ModuleObject {
   }
 
   isDebilitated(){
-    return this.isConfused() || this.isStunned() || this.isDroidStunned() || this.isParalyzed() || this.isFrightened() || this.isChoking() || this.isForcePushed() || this.isHorrified();
+    return this.isConfused() || this.isStunned() || this.isDroidStunned() || this.isParalyzed() || this.isFrightened() || this.isChoking() || this.isForcePushed() || this.isWhirlwind() || this.isHorrified();
   }
 
   setCommadable(bCommandable = 0){
@@ -2471,11 +2628,11 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getMaxFP(){
-    return this.maxForcePoints;
+    return Number.isFinite(Number(this.maxForcePoints)) ? Number(this.maxForcePoints) : (Number(this.forcePoints) || 0);
   }
 
   setFP(nAmount = 0){
-    let bonus = this.maxForcePoints - this.forcePoints;
+    const bonus = this.getMaxFP() - (Number(this.forcePoints) || 0);
     this.currentForce = nAmount - bonus;
   }
 
@@ -2710,8 +2867,36 @@ export class ModuleCreature extends ModuleObject {
     return ((this.isWalking() || this.stealthMode) ? this.getWalkSpeed() : this.getRunSpeed()) * this.movementSpeed;
   }
 
+  /**
+   * How much room it takes up, for steering and pathing round it. appearance.2da's hitdist (1 for nearly
+   * everything) is the reach of a big monster's attacks, not its size: a rancor's is 7. So it's hitdist up to 1,
+   * or its body (creperspace, what collision keeps clear) when that's bigger: a rancor is 3.06 m.
+   */
   getHitDistance(){
-    return this.creatureAppearance?.hitdist ?? 1;
+    const hitdist = this.creatureAppearance?.hitdist ?? 1;
+    const body = this.creatureAppearance?.creperspace ?? 0.4;
+    return Math.max(body, Math.min(hitdist, 1));
+  }
+
+  /**
+   * Its body's radius: what collision keeps clear around it (appearance.2da creperspace), for walking past
+   * people. getHitDistance (1 m for a person) is twice that, and stepping round others by it sent NPCs metres
+   * out of their way
+   */
+  getBodyRadius(): number {
+    return Math.max(0.3, Number(this.creatureAppearance?.creperspace) || 0.4);
+  }
+
+  /**
+   * How close it has to be to hit something in melee: 2 m between two people, more when bodies are big enough
+   * that collision keeps them further apart than that (a rancor can't get within 3.5 m of anyone)
+   */
+  getMeleeRange(target?: ModuleObject): number {
+    const own = this.creatureAppearance?.creperspace ?? 0.4;
+    const other = target && BitWise.InstanceOfObject(target, ModuleObjectType.ModuleCreature)
+      ? ((target as ModuleCreature).getAppearance?.()?.creperspace ?? 0.4)
+      : 0.4;
+    return Math.max(2.0, own + other + 1.2);
   }
 
   getMainClass(){
@@ -3389,7 +3574,7 @@ export class ModuleCreature extends ModuleObject {
       this.model = model;
       this.model.userData.moduleObject = this;
       this.container.add(this.model);
-      this.box.setFromObject(this.container);
+      if(this.box) this.box.setFromObject(this.container);
 
       try{
         if(this.model.lhand instanceof OdysseyObject3D){

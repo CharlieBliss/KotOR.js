@@ -44,7 +44,8 @@ export class EffectVisualEffect extends GameEffect {
 
     const visualeffects2DA = GameState.TwoDAManager.datatables.get('visualeffects');
     if(visualeffects2DA){
-      this.visualEffect = visualeffects2DA.getByID(this.getInt(0));
+      const id = this.getInt(0);
+      this.visualEffect = visualeffects2DA.getByID(id) || visualeffects2DA.rows?.[id];
     }
 
     return this;
@@ -57,67 +58,16 @@ export class EffectVisualEffect extends GameEffect {
       return;
     }
 
-    //Impact Node
-    if(this.impact_model){
-      if(this.impactTimer == undefined){
-        this.impactTimer = 3000;
-        if(this.visualEffect.type_fd == 'D'){
-          this.impact_model.playAnimation('duration', true);
-        }else if(this.visualEffect.type_fd == 'F'){
-          this.impact_model.playAnimation('impact');
-        }
-      }
-
-      if(this.impactTimer <= 0){
-        //this.impact_model.dispose();
-        //this.impact_model = undefined;
-      }else{
-        this.impact_model.update(delta);
-      }
-
-      this.impactTimer -= 1000 * delta;
-    }
-
-    //Root Node
-    if(this.impact_root_model){
-      if(this.impactRootTimer == undefined){
-        this.impactRootTimer = 3000;
-        if(this.visualEffect.type_fd == 'D'){
-          this.impact_root_model.playAnimation('duration', true);
-        }else if(this.visualEffect.type_fd == 'F'){
-          this.impact_root_model.playAnimation('impact');
-        }
-      }
-
-      if(this.impactRootTimer <= 0){
-        //this.impact_root_model.dispose();
-        //this.impact_root_model = undefined;
-      }else{
-        this.impact_root_model.update(delta);
-      }
-
-      this.impactRootTimer -= 1000 * delta;
-    }
-
-    //Head Conjure
-    if(this.impact_head_model){
-      if(this.impactHeadTimer == undefined){
-        this.impactHeadTimer = 3000;
-        if(this.visualEffect.type_fd == 'D'){
-          this.impact_head_model.playAnimation('duration', true);
-        }else if(this.visualEffect.type_fd == 'F'){
-          this.impact_head_model.playAnimation('impact');
-        }
-      }
-
-      if(this.impactHeadTimer <= 0){
-        //this.impact_head_model.dispose();
-        //this.impact_head_model = undefined;
-      }else{
-        this.impact_head_model.update(delta);
-      }
-
-      this.impactHeadTimer -= 1000 * delta;
+    // The impact, root and head models: a lasting effect's loop for as long as it lasts; a one-time one plays once,
+    // then the effect is done (its models stayed on the creature for good, their particles frozen in the air)
+    const lasting = this.isLasting();
+    this.impactTimer = this.updateImpactModel(this.impact_model, this.impactTimer, delta, lasting);
+    this.impactRootTimer = this.updateImpactModel(this.impact_root_model, this.impactRootTimer, delta, lasting);
+    this.impactHeadTimer = this.updateImpactModel(this.impact_head_model, this.impactHeadTimer, delta, lasting);
+    this.age += delta;
+    if(!lasting && this.playedOut()){
+      this.finish();
+      return;
     }
 
     if(this.model){
@@ -144,12 +94,63 @@ export class EffectVisualEffect extends GameEffect {
 
   }
 
+  /** Seconds since it was applied */
+  age: number = 0;
+
+  /** How long a one-time impact plays before it's taken away (ms) */
+  static IMPACT_MS = 3000;
+
+  /** The longest a one-time effect waits for its models to load (seconds) */
+  static MAX_ONE_TIME_SECONDS = 8;
+
+  /** It stays on: a duration visual (an aura, a shield) applied for a time or for good */
+  isLasting(): boolean {
+    const type = this.getDurationType();
+    return this.visualEffect?.type_fd == 'D' && (type == GameEffectDurationType.TEMPORARY || type == GameEffectDurationType.PERMANENT);
+  }
+
+  /** Start, run and end one impact model's animation; returns its timer */
+  updateImpactModel(model: OdysseyModel3D, timer: number, delta: number, lasting: boolean): number {
+    if(!model) return timer;
+    if(timer == undefined){
+      timer = EffectVisualEffect.IMPACT_MS;
+      if(this.visualEffect.type_fd == 'D'){
+        model.playAnimation('duration', true);
+      }else if(this.visualEffect.type_fd == 'F'){
+        model.playAnimation('impact');
+      }
+    }
+    if(lasting || timer > 0) model.update(delta);
+    return timer - 1000 * delta;
+  }
+
+  /** A one-time effect has shown everything it loaded (or waited long enough for models that never came) */
+  playedOut(): boolean {
+    if(this.age >= EffectVisualEffect.MAX_ONE_TIME_SECONDS) return true;
+    if(this.age * 1000 < EffectVisualEffect.IMPACT_MS) return false;
+    const timers = [this.impactTimer, this.impactRootTimer, this.impactHeadTimer];
+    return timers.every((t) => t == undefined || t <= 0);
+  }
+
+  /** Take the effect off its object, which takes its models away */
+  finish(){
+    if(this.object && this.object.effects?.includes(this)){
+      this.object.removeEffect(this);
+    }else{
+      this.retire();
+    }
+  }
+
   onApply(){
     if(this.applied)
       return;
 
     super.onApply();
-    GameState.hooks.onHostVisualEffectApplied(this);
+
+    if(!this.visualEffect){
+      this.applied = true;
+      return;
+    }
 
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
 
@@ -208,30 +209,23 @@ export class EffectVisualEffect extends GameEffect {
             context: this.object.context
           }).then(
             (model: OdysseyModel3D) => {
+              // Hung on the object's impact node; the effect takes it away (thrown away if it's already over)
+              if(!this.object.model){ model.dispose(); return; }
+              if(!this.adoptModel(model, this.object.model.impact || this.object.model)) return;
               this.impact_model = model;
-              if(this.object.model){
-                if(this.object.model.impact){
-                  this.object.model.impact.add(this.impact_model);
-                  TextureLoader.LoadQueue();
-                }else{
-                  this.object.model.add(this.impact_model);
-                  TextureLoader.LoadQueue();
-                }
-              }else{
-                this.impact_model.dispose();
-              }
+              TextureLoader.LoadQueue();
             }
-          )
+          ).catch(() => {});
         }
-      );
+      ).catch(() => {});
     }
 
     this.impactRoot();
     this.impactHead();
 
-    if(this.visualEffect.soundimpact != '***'){
+    if(this.visualEffect.soundimpact && this.visualEffect.soundimpact != '***' && this.visualEffect.soundimpact != '****'){
       if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature) || this.object?.audioEmitter instanceof AudioEmitter){
-        this.object.audioEmitter.playSound(this.visualEffect.soundimpact);
+        this.object.audioEmitter.playSound(this.visualEffect.soundimpact)?.catch?.(() => {});
       }
     }
   }
@@ -243,15 +237,12 @@ export class EffectVisualEffect extends GameEffect {
         OdysseyModel3D.FromMDL(mdl, {
           context: this.object.context,
         }).then((model: OdysseyModel3D) => {
+          if(!this.object.model){ model.dispose(); return; }
+          if(!this.adoptModel(model, this.object.model)) return;
           this.impact_root_model = model;
-          if(this.object.model){
-            this.object.model.add(this.impact_root_model);
-            TextureLoader.LoadQueue();
-          }else{
-            this.impact_root_model.dispose();
-          }
-        });
-      });
+          TextureLoader.LoadQueue();
+        }).catch(() => {});
+      }).catch(() => {});
     }
   }
 
@@ -262,21 +253,15 @@ export class EffectVisualEffect extends GameEffect {
           OdysseyModel3D.FromMDL(mdl, {
             context: this.object.context,
           }).then((model: OdysseyModel3D) => {
+            // No head to attach it to (droids and some creatures): not shown
+            const head = this.object?.model?.headconjure || this.object?.model?.headhook;
+            if(!head){ model.dispose(); return; }
+            if(!this.adoptModel(model, head)) return;
             this.impact_head_model = model;
-            if(this.object?.model?.headconjure){
-              this.object.model.headconjure.add(this.impact_head_model);
-              TextureLoader.LoadQueue();
-            }else if(this.object?.model?.headhook){
-              this.object.model.headhook.add(this.impact_head_model);
-              TextureLoader.LoadQueue();
-            }else{
-              // No head to attach it to (droids and some creatures)
-              this.impact_head_model.dispose();
-              this.impact_head_model = undefined;
-            }
-          })
+            TextureLoader.LoadQueue();
+          }).catch(() => {});
         }
-      );
+      ).catch(() => {});
     }
   }
 
@@ -313,8 +298,8 @@ export class EffectVisualEffect extends GameEffect {
               isForceShield: true,
               context: this.object.context
             }).then((model: OdysseyModel3D) => {
+              if(!this.adoptModel(model, GameState.scene)) return;
               this.model = model;
-              GameState.scene.add(model);
               model.position.copy(this.object.position);
               model.rotation.copy(this.object.rotation);
               model.quaternion.copy(this.object.quaternion);
@@ -328,17 +313,17 @@ export class EffectVisualEffect extends GameEffect {
                     context: this.object.context,
                     isForceShield: true,
                   }).then((head: OdysseyModel3D) => {
-                    this.model.attachHead(head);
+                    this.model?.attachHead(head);
                     //head.disableMatrixUpdate();
                     TextureLoader.LoadQueue();
-                  })
-                })
+                  }).catch(() => { TextureLoader.LoadQueue(); });
+                }).catch(() => { TextureLoader.LoadQueue(); });
               }else{
                 TextureLoader.LoadQueue();
               }
-            })
+            }).catch(() => {});
           }
-        );
+        ).catch(() => {});
       }
 
     }
@@ -356,13 +341,14 @@ export class EffectVisualEffect extends GameEffect {
       if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleCreature)){
         const creature = this.object as ModuleCreature;
         MDLLoader.loader.load(creature.bodyModel).then((mdl: OdysseyModel) => {
+          if(!mdl) return;
           OdysseyModel3D.FromMDL(mdl, {
             textureVar: fx_tex,
             isForceShield: true,
             context: this.object.context,
             onComplete: (model: OdysseyModel3D) => {
+              if(!this.adoptModel(model, GameState.scene)) return;
               this.model = model;
-              GameState.scene.add(model);
               model.position.copy(this.object.position);
               model.rotation.copy(this.object.rotation);
               model.quaternion.copy(this.object.quaternion);
@@ -375,7 +361,7 @@ export class EffectVisualEffect extends GameEffect {
                     context: this.object.context,
                     isForceShield: true,
                   }).then((head: OdysseyModel3D) => {
-                    this.model.attachHead(head);
+                    this.model?.attachHead(head);
                     //head.disableMatrixUpdate();
                     TextureLoader.LoadQueue();
                   }).catch(() => {
@@ -388,30 +374,17 @@ export class EffectVisualEffect extends GameEffect {
                 TextureLoader.LoadQueue();
               }
             }
-          });
-        });
+          }).catch(() => {});
+        }).catch(() => {});
       }
 
     }
   }
 
+  /** Its models are the base effect's to take away (GameEffect.retire); it only lets go of them */
   onRemove(){
-    GameState.hooks.onHostVisualEffectRemoved(this);
-    if(this.model instanceof OdysseyModel3D){
-      this.model.dispose();
-    }
-
-    if(this.impact_model instanceof OdysseyModel3D){
-      this.impact_model.dispose();
-    }
-
-    if(this.impact_root_model instanceof OdysseyModel3D){
-      this.impact_root_model.dispose();
-    }
-
-    if(this.impact_head_model instanceof OdysseyModel3D){
-      this.impact_head_model.dispose();
-    }
+    super.onRemove();
+    this.model = this.impact_model = this.impact_root_model = this.impact_head_model = undefined;
   }
 
 }

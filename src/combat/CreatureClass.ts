@@ -110,12 +110,18 @@ export class CreatureClass {
     return this.spells;
   }
 
+  /** A class table's row for its level: row 0 is level 1, and a level past the table's end uses its last row */
+  levelRow<T>(rows: T[]): T | undefined {
+    if(!rows?.length) return undefined;
+    return rows[Math.max(0, Math.min(rows.length - 1, this.level - 1))];
+  }
+
   getBaseAttackBonus(){
-    return this.attackBonuses[this.level].bab;
+    return this.levelRow(this.attackBonuses)?.bab ?? 0;
   }
 
   getACBonus(){
-    return this.acbonuses[this.level];
+    return this.levelRow(this.acbonuses) ?? 0;
   }
 
   isFeatAvailable( feat: any ){

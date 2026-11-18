@@ -1,4 +1,5 @@
 import { GMFaction, gmItemResRef } from "@/managers/gm/GMVocab";
+import { GMItems } from "@/managers/gm/GMItems";
 import { GMTemplates } from "@/managers/gm/GMTemplates";
 import type { GMGear } from "@/managers/gm/GMTemplates";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
@@ -11,6 +12,8 @@ import { GFFObject } from "@/resource/GFFObject";
 import { ResourceLoader } from "@/loaders";
 import type { SaveGame } from "@/engine/SaveGame";
 import { CharacterBuilder } from "@/engine/rules/CharacterBuilder";
+import { CharacterRules } from "@/engine/rules/CharacterRules";
+import type { GFFStruct } from "@/resource/GFFStruct";
 import type { ICharacterBuild } from "@/engine/rules/CharacterBuilder";
 import { TalentFeat, TalentSpell } from "@/talents";
 import { ModuleObject, ModuleCreature, ModulePlayer, ModulePlaceable, ModuleItem } from "@/module";
@@ -177,6 +180,59 @@ export class GMSpawner {
     }
   }
 
+  /**
+   * Rebuild a template at the level (and class) config.restat asks for, as levelling up would (CharacterBuilder):
+   * class levels, feats, powers, skills and Force points. Going up, its main attack ability (the higher of
+   * Strength and Dexterity) gains a point per four levels, as level-ups give them. Going down, its physical and
+   * Force abilities shrink in proportion to the level above 10 (a level 20 rancor's Strength 45 is 24 at level 8),
+   * but not below 14. Feats of its own that its class doesn't give (a beast's or a boss's) stay. Returns its new
+   * vitality.
+   */
+  static restatTemplate(root: GFFStruct, config: GMCreatureSpawnConfig): number {
+    const want = config.restat!;
+    const get = (label: string, fallback: number) => root.hasField(label) ? Number(root.getFieldByLabel(label).getValue()) : fallback;
+    const classStructs = root.hasField('ClassList') ? root.getFieldByLabel('ClassList').getChildStructs() : [];
+    const oldLevel = classStructs.reduce((sum, st) => sum + (Number(st.getFieldByLabel('ClassLevel')?.getValue()) || 0), 0) || 1;
+    const classId = want.classId ?? (Number(classStructs[0]?.getFieldByLabel('Class')?.getValue()) || 0);
+    const level = Math.max(1, Math.min(50, Math.round(Number(want.level) || oldLevel)));
+
+    const attributes = { str: get('Str', 14), dex: get('Dex', 14), con: get('Con', 14), int: get('Int', 10), wis: get('Wis', 12), cha: get('Cha', 10) };
+    const labels = { str: 'Str', dex: 'Dex', con: 'Con', wis: 'Wis' } as const;
+    if (level < oldLevel) {
+      for (const key of Object.keys(labels) as (keyof typeof labels)[]) {
+        const old = attributes[key];
+        if (old <= 10) continue;
+        attributes[key] = Math.round(Math.max(Math.min(old, 14), 10 + (old - 10) * level / oldLevel));
+        GMTemplates.set(root, GFFDataType.BYTE, labels[key], attributes[key]);
+      }
+    } else {
+      const shift = Math.floor(level / 4) - Math.floor(oldLevel / 4);
+      const primary: 'str' | 'dex' = attributes.str >= attributes.dex ? 'str' : 'dex';
+      attributes[primary] = Math.max(3, Math.min(255, attributes[primary] + shift));
+      GMTemplates.set(root, GFFDataType.BYTE, labels[primary], attributes[primary]);
+    }
+
+    const build = CharacterBuilder.build({
+      classId, level, attributes,
+      alignment: config.factionId === GMFaction.HOSTILE ? 'dark' : 'light',
+    });
+    // Its own feats its class has nothing to do with stay; the class's are rebuilt for the new level
+    const { code } = CharacterRules.featCodes(classId);
+    const classFeats = new Set(CharacterRules.table('feat')
+      .filter((row: any) => { const v = row[`${code}_list`]; return !!code && v !== undefined && v !== '' && v !== '****'; })
+      .map((row: any) => Number(row.__index)));
+    const own = root.hasField('FeatList')
+      ? root.getFieldByLabel('FeatList').getChildStructs().map((st) => Number(st.getFieldByLabel('Feat')?.getValue())).filter((f) => Number.isFinite(f) && !classFeats.has(f))
+      : [];
+    GMTemplates.writeBuild(root, { ...build, feats: [...new Set([...build.feats, ...own])] }, classId, level);
+
+    const hp = Math.max(1, Math.round(want.hp ?? build.maxHp));
+    GMTemplates.set(root, GFFDataType.WORD, 'HitPoints', hp);
+    GMTemplates.set(root, GFFDataType.WORD, 'CurrentHitPoints', hp);
+    GMTemplates.set(root, GFFDataType.WORD, 'MaxHitPoints', hp);
+    return hp;
+  }
+
   /** Every creature template the game has (read once, then cached), for the template browser */
   static async loadCreatureTemplateIndex(): Promise<GMCreatureTemplateInfo[]> {
     if (this.creatureTemplateIndex) return this.creatureTemplateIndex;
@@ -282,6 +338,8 @@ export class GMSpawner {
       GMTemplates.writeBuild(root, abilities, config.classId ?? 0, config.level || 4);
     }
 
+    const restatHp = loadedFromUTC && config.restat ? this.restatTemplate(root, config) : 0;
+
     // Gear. Customized (or built without a template): the hands and armour are what the config says, '' for
     // empty. From a template: its own gear, with the config only filling an empty hand. Either way the template's
     // other slots (creature claws and hides, belts, implants) stay.
@@ -308,7 +366,9 @@ export class GMSpawner {
     area.attachObject(creature);
     creature.load();
     creature.firstName = config.name || creature.firstName;
-    if (useConfig) {
+    if (restatHp) {
+      GMManager.setCreatureHP(creature, restatHp, restatHp);
+    } else if (useConfig) {
       GMManager.setCreatureHP(creature, targetHp, targetHp);
     } else {
       // Some templates' current HP is above their maximum (it includes their Constitution bonus): start at full
@@ -323,6 +383,15 @@ export class GMSpawner {
     }
 
     const model = await creature.loadModel();
+    // Removed or hidden while its model was still loading: discard the half-built replica cleanly
+    if (creature.destroyed || !creature.box) {
+      if (model) {
+        model.removeFromParent();
+        try { model.dispose(); } catch {}
+      }
+      delete creature.gmSpawning;
+      return null;
+    }
     if (model) {
       model.userData.moduleObject = creature;
       model.hasCollision = true;
@@ -434,6 +503,14 @@ export class GMSpawner {
     }
 
     const model = await plc.loadModel();
+    if (plc.destroyed || !plc.box) {
+      if (model) {
+        model.removeFromParent();
+        try { model.dispose(); } catch {}
+      }
+      delete plc.gmSpawning;
+      return null;
+    }
     if (plc.container && scale !== 1.0) {
       plc.container.scale.setScalar(scale);
     }
@@ -609,14 +686,16 @@ export class GMSpawner {
     opts: { netIdPrefix: string; existingNetId?: string; remote?: boolean; leadParty?: boolean; possess?: boolean }
   ): Promise<ModulePlayer> {
     const area = GameState.module.area;
+    const pos = area.getNearestWalkablePoint ? area.getNearestWalkablePoint(loc.position, player.getHitDistance?.() || 0.5) : loc.position;
+    player.position.copy(pos);
+    player.setFacing(loc.facing, true);
+    player.getCurrentRoom();
+
     const model = await player.loadModel();
     if (model) {
       model.userData.moduleObject = player;
       model.hasCollision = true;
     }
-
-    player.position.copy(loc.position);
-    player.setFacing(loc.facing, true);
 
     if (!GMManager.spawnedPlayers.includes(player)) {
       GMManager.spawnedPlayers.push(player);
@@ -709,7 +788,7 @@ export class GMSpawner {
   }
 
   static async createItemFromResRefAsync(itemResRef: string): Promise<ModuleItem> {
-    const resKey = itemResRef.toLowerCase().trim();
+    const resKey = GMItems.forThisGame(itemResRef).toLowerCase().trim();
     const buffer = await GMTemplates.loadBuffer(ResourceTypes.uti, resKey);
     if (buffer) {
       const gff = new GFFObject(buffer);
@@ -724,7 +803,7 @@ export class GMSpawner {
     item.equippedRes = resKey;
     item.inventoryRes = resKey;
     item.stackSize = 1;
-    item.load();
+    item.initProperties();
     return item;
   }
 
@@ -819,11 +898,13 @@ export class GMSpawner {
 
   /** A creature's hands and armour as item resrefs ('' for empty) */
   static gearOf(cre: ModuleCreature): Required<GMGear> {
+    // An item equipped after spawning (the combat AI drawing a sword from its pack) has no equipped resref: its
+    // carried or template one names it
     const eq = cre?.equipment;
     return {
-      rightHandResRef: eq?.RIGHTHAND?.getEquippedRes() || '',
-      leftHandResRef: eq?.LEFTHAND?.getEquippedRes() || '',
-      armorResRef: eq?.ARMOR?.getEquippedRes() || '',
+      rightHandResRef: gmItemResRef(eq?.RIGHTHAND),
+      leftHandResRef: gmItemResRef(eq?.LEFTHAND),
+      armorResRef: gmItemResRef(eq?.ARMOR),
     };
   }
 
