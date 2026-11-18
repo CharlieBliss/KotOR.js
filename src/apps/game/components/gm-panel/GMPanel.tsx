@@ -73,7 +73,11 @@ export const GMPanel: React.FC = () => {
     // The game's cursor over the panel's layers, once its images can be read
     void installGameCursor();
     const onOpenJoin = () => setShowQuickJoinOnMenu(true);
-    const onOpenSheet = (section: string) => setSheet({ creature: null, section: section === 'abilities' ? 'skills' : 'overview', gmView: false });
+    const onOpenSheet = (section: string) => setSheet({
+      creature: null,
+      section: section === 'abilities' ? 'powers' : (['skills', 'feats', 'powers', 'effects'].includes(section) ? section as SheetSectionId : 'overview'),
+      gmView: false,
+    });
     const onOpenPlayerSheet = (creature: KotOR.ModuleCreature) => setSheet({ creature, section: 'overview', gmView: true });
     GMNetworkManager.events.addEventListener('open-character-sheet', onOpenSheet);
     GMManager.events.addEventListener('open-player-sheet', onOpenPlayerSheet);
@@ -226,8 +230,6 @@ export const GMPanel: React.FC = () => {
   const currentLeader = KotOR.GameState.getCurrentPlayer();
   const selectedObj = GMManager.selectedObject;
   const isPlayerView = !GMManager.isGMUser();
-  // A player's own sheet: their character, as the host last sent it
-  const canOpenSheet = isPlayerView && GMNetworkManager.role === 'client' && !!currentLeader;
   if (isPlayerView && drawerTab && drawerTab !== 'multiplayer') {
     queueMicrotask(() => setDrawerTab(null));
   }
@@ -237,7 +239,7 @@ export const GMPanel: React.FC = () => {
   const possessCandidateName = possessCandidate?.getName() || 'new character';
 
   const drawerTabs: { id: Exclude<DrawerTab, null>; label: string; title: string }[] = isPlayerView
-    ? [{ id: 'multiplayer', label: 'Session', title: 'Connection status and chat' }]
+    ? []
     : [
       { id: 'scenes', label: 'Scene', title: 'Load an area, or import a scene plan' },
       { id: 'actors', label: 'Place', title: 'Choose what the Place tool puts down: creatures, objects, mines or whole kits' },
@@ -337,10 +339,23 @@ export const GMPanel: React.FC = () => {
               {tab.label}
             </button>
           ))}
-          {canOpenSheet && (
-            <button className={`gm-btn ${sheet && !sheet.gmView ? 'active' : ''}`} onClick={() => setSheet(sheet && !sheet.gmView ? null : { creature: null, section: 'overview', gmView: false })} title="Your character sheet: stats, skills to roll, feats, powers (P)">
-              Character
-            </button>
+          {isPlayerView && (
+            <>
+              <button
+                className="gm-btn small"
+                onClick={() => KotOR.GameState.MenuManager?.MenuMap?.open?.()}
+                title="Area map (M)"
+              >
+                Map
+              </button>
+              <button
+                className="gm-btn small"
+                onClick={() => KotOR.GameState.MenuManager?.MenuOptions?.open?.()}
+                title="Game options (O / Esc)"
+              >
+                Options
+              </button>
+            </>
           )}
         </div>
 
@@ -485,8 +500,7 @@ export const GMPanel: React.FC = () => {
         <PlayerHud
           onOpenSheet={(section = 'overview') => setSheet(sheet && !sheet.gmView && sheet.section === section ? null : { creature: null, section, gmView: false })}
           onOpenChat={() => {
-            setDrawerTab('multiplayer');
-            // The Session tab's chat box, once it's drawn
+            setDrawerTab(drawerTab === 'multiplayer' ? null : 'multiplayer');
             setTimeout(() => (document.querySelector('.gm-drawer input[placeholder="Say something to everyone"]') as HTMLInputElement | null)?.focus(), 50);
           }}
         />

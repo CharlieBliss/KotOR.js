@@ -19,7 +19,9 @@ export type GMHudAim = 'enemy' | 'ally' | 'self';
 /** What something in the world is to the player: colours the target frame and the ring under it */
 export type GMHudRelation = 'enemy' | 'ally' | 'neutral' | 'object' | 'self';
 
-/** One thing the player can use from the power bar or the wheel */
+export type GMHudCategory = 'attack' | 'feat' | 'offense' | 'buff' | 'heal' | 'item';
+
+/** One thing the player can use from the power bar, wheel, or abilities drawer */
 export interface GMHudAbility {
   /** Stable across sessions, for the saved bar: 'power:12', 'feat:30', 'item:g_i_medeqpmnt01', 'attack' */
   key: string;
@@ -38,6 +40,14 @@ export interface GMHudAbility {
   entry: any;
   /** Works only on droids, or only on Force users (Disable Droid): GMCombatAI.powerTargetRule */
   onlyOn?: GMPowerTargetRule;
+  /** Category for grouping in the Abilities browser */
+  category?: GMHudCategory;
+  /** Full in-game description from spells.2da / feat.2da / item */
+  description?: string;
+  /** Human-readable range label (Personal, Touch, Close, Medium, Long) */
+  range?: string;
+  /** False when a higher rank of the same spell prerequisite chain is also known */
+  isBestRank?: boolean;
 }
 
 /** Something the player can do to the target besides fighting it (GMPlayerHud.targetActions) */
@@ -116,15 +126,38 @@ export class GMPlayerHud {
   // What the player can use
   // ---------------------------------------------------------------------------
 
+  private static rangeLabel(range: any): string | undefined {
+    switch (String(range || '').toUpperCase()) {
+      case 'P': return 'Personal';
+      case 'T': return 'Touch';
+      case 'S': return 'Close (10 m)';
+      case 'M': return 'Medium (15 m)';
+      case 'L': return 'Long (28 m)';
+      default: return undefined;
+    }
+  }
+
+  private static itemDescription(item: any): string {
+    const raw = item?.getDescription?.() ?? item?.descIdentified ?? item?.description;
+    if (!raw) return '';
+    if (typeof raw === 'string') return raw.trim();
+    if (typeof raw?.getValue === 'function') return String(raw.getValue() || '').trim();
+    return '';
+  }
+
   /** Everything the character can use in a fight: attack, combat feats, powers, then items */
   static abilities(pc: ModuleCreature | undefined = this.player()): GMHudAbility[] {
     if (!pc) return [];
     const out: GMHudAbility[] = [];
     const fp = Number(pc.getFP?.() ?? 0);
     const ranged = pc.getEquippedWeaponType?.() === RANGED_WEAPON_TYPE;
+    const spellRows = GameState.TwoDAManager?.datatables?.get('spells')?.rows;
+    const featRows = GameState.TwoDAManager?.datatables?.get('feat')?.rows;
 
     out.push({
       key: 'attack', kind: 'attack', name: 'Attack', icon: 'i_attack', aim: 'enemy', cost: 0, usable: true,
+      category: 'attack', isBestRank: true,
+      description: 'Attack the selected enemy with your equipped weapon.',
       entry: { action: { type: ActionType.ActionPhysicalAttacks } },
     });
 
@@ -133,9 +166,12 @@ export class GMPlayerHud {
       if (feat?.category != MELEE_FEAT && feat?.category != RANGED_FEAT) continue;
       const forRanged = feat.category == RANGED_FEAT;
       const usable = forRanged === ranged;
+      const fRow = featRows?.[feat.id];
       out.push({
         key: `feat:${feat.id}`, kind: 'feat', name: CharacterRules.text(feat.name, feat.label || 'Combat feat'),
         icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0, usable,
+        category: 'feat', isBestRank: true,
+        description: CharacterRules.text(feat.description ?? fRow?.description, ''),
         why: usable ? undefined : (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand'),
         entry: { talent: feat },
       });
@@ -146,6 +182,14 @@ export class GMPlayerHud {
     const spells: any[] = pc.getSpells?.() || [];
     const seen = new Set<number>();
     const powers = spells.filter((s) => s && !seen.has(s.id) && seen.add(s.id));
+    // Track lower-rank powers superseded by a higher rank the character also knows
+    const superseded = new Set<number>();
+    for (const s of powers) {
+      const prereqs: number[] = Array.isArray(s.prerequisites)
+        ? s.prerequisites
+        : String(spellRows?.[s.id]?.prerequisites || '').split('_').map(Number).filter((n) => Number.isFinite(n) && n >= 0);
+      for (const reqId of prereqs) superseded.add(reqId);
+    }
     // spells.2da's empty cells ('****') load as -1: a power is hostile or friendly when its column is 0 or more
     const marked = (v: any) => { const n = parseInt(v); return !isNaN(n) && n >= 0; };
     const isHostile = (s: any) => marked(s.forcehostile);
@@ -154,11 +198,21 @@ export class GMPlayerHud {
       const cost = Number(spell.getForcePointCost?.(pc) ?? spell.forcepoints ?? 0) || 0;
       const usable = cost <= fp;
       const personal = String(spell.range || '').toUpperCase() === 'P';
+      const sRow = spellRows?.[spell.id];
+      const name = CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`);
+      const hostile = isHostile(spell);
+      const category: GMHudCategory = hostile
+        ? 'offense'
+        : (/heal|cure|restor|revive/i.test(`${name} ${spell.label || ''}`) ? 'heal' : 'buff');
       out.push({
         onlyOn: GMCombatAI.powerTargetRule(spell.forcehostile),
-        key: `power:${spell.id}`, kind: 'power', name: CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`),
-        icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : isHostile(spell) ? 'enemy' : 'ally',
+        key: `power:${spell.id}`, kind: 'power', name,
+        icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : hostile ? 'enemy' : 'ally',
         cost, usable, why: usable ? undefined : `Needs ${cost} Force (you have ${Math.floor(fp)})`,
+        category,
+        description: CharacterRules.text(spell.spelldesc ?? sRow?.spelldesc, ''),
+        range: this.rangeLabel(spell.range ?? sRow?.range),
+        isBestRank: !superseded.has(spell.id),
         entry: { talent: spell },
       });
     }
@@ -181,8 +235,28 @@ export class GMPlayerHud {
       out.push({
         key: `item:${item.getItemResRef()}`, kind: 'item', name: item.getName?.() || item.getItemResRef(),
         icon: String(item.getIcon?.() || '').toLowerCase(), aim: hostile ? 'enemy' : 'self', cost: 0, count, usable: true,
+        category: 'item', isBestRank: true,
+        description: this.itemDescription(item),
         entry: { item },
       });
+    }
+    return out;
+  }
+
+  /** Active non-visual effects on the character for HUD buff badges */
+  static activeEffects(pc: ModuleCreature | undefined = this.player()): { label: string; secondsLeft?: number }[] {
+    if (!pc || !Array.isArray(pc.effects)) return [];
+    const spells = GameState.TwoDAManager?.datatables?.get('spells')?.rows;
+    const out: { label: string; secondsLeft?: number }[] = [];
+    const seen = new Set<string>();
+    for (const e of pc.effects as any[]) {
+      if (!e || e.isVisualEffect?.()) continue;
+      const spellRow = typeof e.spellId === 'number' && e.spellId >= 0 ? spells?.[e.spellId] : undefined;
+      const label = spellRow ? CharacterRules.text(spellRow.name, spellRow.label || '') : '';
+      if (!label || seen.has(label)) continue;
+      seen.add(label);
+      const ms = Number(e.getDuration?.() ?? 0);
+      out.push({ label, ...(ms > 0 ? { secondsLeft: Math.ceil(ms / 1000) } : {}) });
     }
     return out;
   }

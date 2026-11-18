@@ -310,3 +310,19 @@ describe('the default bar', () => {
     expect(bar.slice(5)).toEqual(['power:28', 'power:8', 'item:medpac']);
   });
 });
+
+describe('descriptions, spell chains & active effects', () => {
+  test('marks superseded lower spell ranks and populates category, range and item descriptions', () => {
+    pc.spells = [
+      spell(8, 'Burst of Speed', { forcefriendly: '2', range: 'P', prerequisites: [] }, 10),
+      spell(33, 'Knight Speed', { forcefriendly: '2', range: 'P', prerequisites: [8] }, 15),
+      spell(46, 'Stun', { forcehostile: '1', range: 'M', prerequisites: [] }, 10),
+    ];
+    pc.inventory = [{ ...item('medpac', 'self', 2), descIdentified: 'Restores 30 vitality.' }];
+    const byKey = new Map(GMPlayerHud.abilities(pc).map((a) => [a.key, a]));
+    expect(byKey.get('power:8')).toMatchObject({ category: 'buff', range: 'Personal', isBestRank: false });
+    expect(byKey.get('power:33')).toMatchObject({ category: 'buff', range: 'Personal', isBestRank: true });
+    expect(byKey.get('power:46')).toMatchObject({ category: 'offense', range: 'Medium (15 m)', isBestRank: true });
+    expect(byKey.get('item:medpac')).toMatchObject({ category: 'item', description: 'Restores 30 vitality.' });
+  });
+});

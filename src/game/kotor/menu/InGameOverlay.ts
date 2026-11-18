@@ -1029,7 +1029,7 @@ export class InGameOverlay extends GameMenu {
   /** Whether KotOR's combat panels are hidden for a mode's own HUD (ownsCombatHud) */
   combatPanelsHidden: boolean = false;
 
-  /** Hide (or bring back) the target frame and its actions, the action slots, the combat queue and the party */
+  /** Hide (or bring back) KotOR's combat panels and native menu strip when a mode draws its own HUD (ownsCombatHud) */
   setCombatPanelsHidden(hidden: boolean) {
     this.combatPanelsHidden = hidden;
     const each = (fn: (name: string) => void) => {
@@ -1037,11 +1037,16 @@ export class InGameOverlay extends GameMenu {
         for (const prefix of ['BTN_ACTION', 'LBL_ACTION', 'BTN_ACTIONUP', 'BTN_ACTIONDOWN']) fn(prefix + i);
       }
     };
+    const topMenuControls = [
+      'LBL_MENUBG', 'LBL_MOULDING3', 'BTN_MSG', 'BTN_JOU', 'BTN_MAP', 'BTN_OPT',
+      'BTN_CHAR', 'BTN_ABI', 'BTN_INV', 'BTN_EQU', 'TB_PAUSE', 'TB_SOLO', 'TB_STEALTH', 'BTN_SWAPWEAPONS',
+    ];
     if (!hidden) {
       each((name) => (this as any)[name]?.show?.());
+      for (const name of topMenuControls) (this as any)[name]?.show?.();
       return;
     }
-    for (const name of ['LBL_NAME', 'LBL_NAMEBG', 'PB_HEALTH', 'LBL_HEALTHBG', 'LBL_ACTIONDESC', 'LBL_ACTIONDESCBG']) (this as any)[name]?.hide?.();
+    for (const name of ['LBL_NAME', 'LBL_NAMEBG', 'PB_HEALTH', 'LBL_HEALTHBG', 'LBL_ACTIONDESC', 'LBL_ACTIONDESCBG', ...topMenuControls]) (this as any)[name]?.hide?.();
     for (let i = 0; i < 3; i++) {
       for (const prefix of ['BTN_TARGET', 'LBL_TARGET', 'BTN_TARGETUP', 'BTN_TARGETDOWN']) (this as any)[prefix + i]?.hide?.();
       this.TogglePartyMember(i, false);

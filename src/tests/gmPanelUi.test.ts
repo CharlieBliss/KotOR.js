@@ -262,6 +262,15 @@ describe("GM Panel React UI & store", () => {
     const html = renderToStaticMarkup(React.createElement(GMPanel));
     expect(html).toContain("gm-player-hud");
     expect(html).toContain("Carth");
+    expect(html).toContain("Skills");
+    expect(html).toContain("Powers");
+    expect(html).toContain("Items");
+    expect(html).toContain("Gear");
+    expect(html).toContain("Chat");
+    expect(html).toContain("Map");
+    expect(html).toContain("Options");
+    expect(html).not.toContain(">Character</button>");
+    expect(html).not.toContain(">Session</button>");
     expect(html).toContain("gm-downed");
     expect(html).toContain("Respawn at the entrance");
     expect(html).toContain("Open the door?");

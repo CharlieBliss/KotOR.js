@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import * as KotOR from "@/apps/game/KotOR";
-import { GMManager, GMNetworkManager, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
+import { GMManager, useGMStore } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { GameImage } from "@/apps/game/components/gm-panel/creator/GameImage";
 import { gameTextureUrl } from "@/apps/game/components/gm-panel/creator/gameTexture";
-import type { GMHudAbility, GMHudRelation, GMHudTargetAction } from "@/managers/gm/GMPlayerHud";
+import { SkillRollGrid } from "@/apps/game/components/gm-panel/sheet/sections";
+import type { GMHudAbility, GMHudCategory, GMHudRelation, GMHudTargetAction } from "@/managers/gm/GMPlayerHud";
+import type { SheetSectionId } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
 import "@/apps/game/components/gm-panel/gm-player-hud.scss";
 
 const { GMPlayerHud } = KotOR;
@@ -12,6 +14,14 @@ const { GMPlayerHud } = KotOR;
 const RELATION_TEXT: Record<GMHudRelation, string> = {
   enemy: 'Enemy', ally: 'Ally', neutral: 'Neutral', object: 'Object', self: 'You',
 };
+
+const CATEGORY_TABS: { id: 'all' | 'offense' | 'help' | 'feat' | 'item'; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'offense', label: 'Offensive Powers' },
+  { id: 'help', label: 'Buff & Heal' },
+  { id: 'feat', label: 'Combat Feats' },
+  { id: 'item', label: 'Items' },
+];
 
 /** The HUD's own redraw: health and Force move faster than the panel's poll */
 function useTicker(ms: number) {
@@ -31,12 +41,21 @@ const isTyping = (e: Event) => {
 
 const pct = (v: number, max: number) => `${Math.max(0, Math.min(100, max > 0 ? (100 * v) / max : 0))}%`;
 
+function matchesCategoryTab(a: GMHudAbility, tab: typeof CATEGORY_TABS[number]['id']): boolean {
+  if (tab === 'all') return true;
+  const cat: GMHudCategory | undefined = a.category;
+  if (tab === 'offense') return cat === 'offense' || (a.kind === 'power' && a.aim === 'enemy');
+  if (tab === 'help') return cat === 'buff' || cat === 'heal' || (a.kind === 'power' && a.aim !== 'enemy');
+  if (tab === 'feat') return cat === 'feat' || a.kind === 'feat' || a.kind === 'attack';
+  return cat === 'item' || a.kind === 'item';
+}
+
 /** An ability's icon over its initials (which show while it loads, or when the game has no icon for it) */
 const AbilityIcon: React.FC<{ ability?: GMHudAbility }> = ({ ability }) => {
-  const initials = (ability?.name || '?').split(/s+/).map((w) => w[0]).join('').slice(0, 2);
+  const initials = (ability?.name || '?').trim().split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2);
   return (
     <span className="gm-hud-icon-wrap">
-      <span className="gm-hud-icon gm-hud-icon-text" aria-hidden="true">{initials}</span>
+      <span className="gm-hud-icon gm-hud-icon-text" aria-hidden="true">{initials || '?'}</span>
       {ability?.icon && <GameImage texture={ability.icon} alt="" className="gm-hud-icon gm-hud-icon-image" />}
     </span>
   );
@@ -91,11 +110,6 @@ const TargetRings: React.FC = () => {
   );
 };
 
-/**
- * Who an ability lands on right now, as a chip on its slot: Target (the enemy or ally you have targeted), Nearest
- * (no enemy targeted: the nearest one), You, or No one. The name is in the tooltip; on the chip, names alike
- * ("Sith Lord", "Sith Assassin") couldn't be told apart
- */
 function landing(a: GMHudAbility): { text: string; side: string; title: string } {
   const l = GMPlayerHud.landsOn(a);
   const name = (l.who as any)?.getName?.() || '';
@@ -112,10 +126,7 @@ function landing(a: GMHudAbility): { text: string; side: string; title: string }
   return { text: 'No one', side: 'none', title: 'No enemy in reach' };
 }
 
-/**
- * Top centre: who the target is, which side they're on, their health, and what you can do to them: Attack, Talk,
- * Search, Open, Unlock, Sit, Disarm, as labelled buttons (R does the main one, as a click on them does)
- */
+/** Top centre: current target status and primary actions */
 const TargetFrame: React.FC<{ onAction: (id: GMHudTargetAction['id']) => void }> = ({ onAction }) => {
   const obj: any = GMPlayerHud.selected();
   const relation = GMPlayerHud.relation(obj);
@@ -123,7 +134,7 @@ const TargetFrame: React.FC<{ onAction: (id: GMHudTargetAction['id']) => void }>
     return (
       <div className="gm-hud-target empty">
         <span className="gm-hud-target-name">No target</span>
-        <span className="gm-hud-keys"><kbd>Tab</kbd> enemy <kbd>Shift+Tab</kbd> ally · or click something</span>
+        <span className="gm-hud-keys"><kbd>Tab</kbd> enemy <kbd>Shift+Tab</kbd> ally · or click</span>
       </div>
     );
   }
@@ -131,14 +142,12 @@ const TargetFrame: React.FC<{ onAction: (id: GMHudTargetAction['id']) => void }>
   const hp = creature ? Number(obj.getHP?.() ?? 0) : 0, maxHp = creature ? Number(obj.getMaxHP?.() ?? 0) : 0;
   const dead = creature && obj.isDead?.();
   const actions = GMPlayerHud.targetActions(obj);
-  const powers =
-    relation === 'enemy' ? 'Attack powers and grenades go here' :
-    relation === 'ally' ? 'Helping powers go here' : '';
   return (
     <div className={`gm-hud-target ${relation}`} data-relation={relation}>
       <div className="gm-hud-target-head">
         <span className="gm-hud-target-side">{dead ? 'Down' : RELATION_TEXT[relation]}</span>
         <span className="gm-hud-target-name">{obj.getName?.() || 'Target'}</span>
+        <span className="gm-hud-keys" style={{ marginLeft: 'auto' }}><kbd>Tab</kbd> next</span>
       </div>
       {creature && !dead && maxHp > 0 && (
         <div className="gm-hud-bar hp" title={`${Math.max(0, Math.round(hp))} / ${maxHp} vitality`}>
@@ -161,34 +170,36 @@ const TargetFrame: React.FC<{ onAction: (id: GMHudTargetAction['id']) => void }>
           ))}
         </div>
       )}
-      <div className="gm-hud-target-hint">
-        <span>{powers}</span>
-        <span className="gm-hud-keys"><kbd>Tab</kbd> <kbd>Shift+Tab</kbd></span>
-      </div>
     </div>
   );
 };
 
-/**
- * The things players do most in a session besides fighting, labelled with their keys: their sheet, their skills
- * (rolls the GM asks for), inventory, chat with the GM and table, and sneaking when they can
- */
-const QuickActions: React.FC<{ onOpenSheet: (section: 'overview' | 'skills') => void; onOpenChat: () => void; onStealth: () => void }> = ({ onOpenSheet, onOpenChat, onStealth }) => {
+/** Unified player menu strip above the portrait: Skills, Powers, Character Sheet, Inventory, Gear, Chat, Stealth */
+const QuickActions: React.FC<{
+  panel: 'none' | 'skills' | 'powers';
+  onToggleSkills: () => void;
+  onTogglePowers: () => void;
+  onOpenSheet: () => void;
+  onOpenChat: () => void;
+  onStealth: () => void;
+}> = ({ panel, onToggleSkills, onTogglePowers, onOpenSheet, onOpenChat, onStealth }) => {
   const stealth = GMPlayerHud.stealth();
   return (
-    <div className="gm-hud-quick" role="toolbar" aria-label="Quick actions">
-      <button onClick={() => onOpenSheet('overview')} title="Your character sheet: stats, feats, powers, effects (P)"><kbd>P</kbd>Sheet</button>
-      <button onClick={() => onOpenSheet('skills')} title="Your skills: roll one when the GM asks (K)"><kbd>K</kbd>Skills</button>
-      <button onClick={() => KotOR.GameState.MenuManager.MenuInventory?.open?.()} title="Inventory and equipment (I)"><kbd>I</kbd>Items</button>
-      <button onClick={onOpenChat} title="Talk to the GM and the table (Enter)"><kbd>↵</kbd>Chat</button>
+    <div className="gm-hud-quick" role="toolbar" aria-label="Player menus">
+      <button className={panel === 'skills' ? 'on' : ''} onClick={onToggleSkills} title="Roll skills & saving throws (K)"><kbd>K</kbd>Skills</button>
+      <button className={panel === 'powers' ? 'on' : ''} onClick={onTogglePowers} title="Browse powers, feats & items with descriptions (Q)"><kbd>Q</kbd>Powers</button>
+      <button onClick={onOpenSheet} title="Character sheet: stats, feats, powers & effects (P)"><kbd>P</kbd>Sheet</button>
+      <button onClick={() => KotOR.GameState.MenuManager?.MenuInventory?.open?.()} title="Inventory & consumables (I)"><kbd>I</kbd>Items</button>
+      <button onClick={() => KotOR.GameState.MenuManager?.MenuEquipment?.open?.()} title="Equipped weapons, armor & implants (U)"><kbd>U</kbd>Gear</button>
+      <button onClick={onOpenChat} title="Session status & chat with GM and party (Enter)"><kbd>↵</kbd>Chat</button>
       {stealth.can && (
-        <button className={stealth.on ? 'on' : ''} onClick={onStealth} title={stealth.on ? 'Stop sneaking (G)' : 'Sneak (G)'}><kbd>G</kbd>{stealth.on ? 'Sneaking' : 'Sneak'}</button>
+        <button className={`gm-hud-quick-wide ${stealth.on ? 'on' : ''}`} onClick={onStealth} title={stealth.on ? 'Stop sneaking (G)' : 'Sneak (G)'}><kbd>G</kbd>{stealth.on ? 'Stealth On' : 'Sneak'}</button>
       )}
     </div>
   );
 };
 
-/** Bottom left: you. Portrait, name, vitality and Force with numbers; click for the character sheet (P) */
+/** Bottom left: portrait, vitality/Force bars, and active buffs */
 const SelfFrame: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
   const pc: any = GMPlayerHud.player();
   if (!pc) return null;
@@ -198,12 +209,12 @@ const SelfFrame: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
   const name = pc.getName?.() || 'You';
   const level = Number(pc.getTotalClassLevel?.() || 0);
   return (
-    <button className="gm-hud-self" onClick={onOpenSheet} title="Your character sheet (P)">
+    <button className="gm-hud-self" onClick={onOpenSheet} title="Open character sheet (P)">
       <span className="gm-hud-portrait">
         {portrait ? <GameImage texture={portrait} alt={name} /> : <span className="gm-hud-initials">{name.slice(0, 1)}</span>}
       </span>
       <span className="gm-hud-self-body">
-        <span className="gm-hud-self-name">{name}{level ? <small> · level {level}</small> : null}</span>
+        <span className="gm-hud-self-name">{name}{level ? <small> · Lv {level}</small> : null}</span>
         <span className="gm-hud-bar hp" title="Vitality">
           <span style={{ width: pct(hp, maxHp) }} />
           <em>Vitality {Math.max(0, Math.round(hp))} / {maxHp}</em>
@@ -219,7 +230,185 @@ const SelfFrame: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
   );
 };
 
-/** The radial menu of everything usable. Move the mouse toward one; release Q (or click) to use it; 1–8 puts it on the bar */
+/** Lightweight non-blocking skill & save check roller anchored above the player menu */
+const QuickSkillsPopover: React.FC<{ pc: any; onClose: () => void }> = ({ pc, onClose }) => (
+  <div className="gm-hud-popover gm-hud-skills-popover" role="dialog" aria-label="Quick skill & save rolls">
+    <div className="gm-hud-popover-head">
+      <div>
+        <strong>Skills &amp; Saving Throws</strong>
+        <span>Click any check to roll</span>
+      </div>
+      <button type="button" className="gm-hud-mini-close" onClick={onClose}>Close</button>
+    </div>
+    <div className="gm-hud-popover-body">
+      <SkillRollGrid creature={pc} onRoll={(check) => KotOR.GMPlayerRequests.roll(check)} who="player" compact />
+    </div>
+  </div>
+);
+
+/** Categorized, searchable Powers/Feats/Items menu with full spell descriptions, Cast, and Pin to Bar 1–8 */
+const AbilitiesDrawer: React.FC<{
+  abilities: GMHudAbility[];
+  bar: (string | null)[];
+  onUse: (a: GMHudAbility) => void;
+  onAssign: (slot: number, key: string) => void;
+  onClose: () => void;
+}> = ({ abilities, bar, onUse, onAssign, onClose }) => {
+  const [tab, setTab] = useState<typeof CATEGORY_TABS[number]['id']>('all');
+  const [bestOnly, setBestOnly] = useState(true);
+  const [query, setQuery] = useState('');
+  const [selectedKey, setSelectedKey] = useState<string>('');
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return abilities.filter((a) => {
+      if (bestOnly && a.isBestRank === false && !q) return false;
+      if (!matchesCategoryTab(a, tab)) return false;
+      if (!q) return true;
+      return `${a.name} ${a.description || ''}`.toLowerCase().includes(q);
+    });
+  }, [abilities, tab, bestOnly, query]);
+
+  const selected = filtered.find((a) => a.key === selectedKey) || filtered[0];
+  const hasLowerRanks = abilities.some((a) => a.isBestRank === false);
+  const selectedSlot = selected ? bar.indexOf(selected.key) : -1;
+  const selectedLand = selected ? landing(selected) : undefined;
+
+  return (
+    <div className="gm-hud-popover gm-hud-abilities-drawer" role="dialog" aria-label="Powers and abilities">
+      <div className="gm-hud-popover-head">
+        <div>
+          <strong>Powers &amp; Abilities</strong>
+          <span>Filter by type, inspect descriptions, cast or pin to slots 1–8</span>
+        </div>
+        <button type="button" className="gm-hud-mini-close" onClick={onClose}>Close</button>
+      </div>
+
+      <div className="gm-hud-abilities-controls">
+        <div className="gm-hud-cat-tabs" role="tablist">
+          {CATEGORY_TABS.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.id}
+              className={`gm-hud-cat-tab ${tab === t.id ? 'on' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="gm-hud-abilities-tools">
+          <input
+            type="search"
+            className="gm-hud-search"
+            placeholder="Search spells, feats, items..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {hasLowerRanks && (
+            <label className="gm-hud-check" title="Hide superseded lower spell ranks">
+              <input type="checkbox" checked={bestOnly} onChange={(e) => setBestOnly(e.target.checked)} />
+              Best ranks
+            </label>
+          )}
+        </div>
+      </div>
+
+      <div className="gm-hud-abilities-split">
+        <div className="gm-hud-abilities-list" role="listbox">
+          {filtered.length === 0 ? (
+            <div className="gm-hud-empty-msg">No matching powers or abilities.</div>
+          ) : (
+            filtered.map((a) => {
+              const slotIdx = bar.indexOf(a.key);
+              return (
+                <button
+                  key={a.key}
+                  type="button"
+                  role="option"
+                  aria-selected={selected?.key === a.key}
+                  className={`gm-hud-ability-row ${selected?.key === a.key ? 'selected' : ''} ${!a.usable ? 'unusable' : ''} aim-${a.aim}`}
+                  onClick={() => setSelectedKey(a.key)}
+                  onDoubleClick={() => onUse(a)}
+                >
+                  <span className="gm-hud-ability-icon-sm"><AbilityIcon ability={a} /></span>
+                  <span className="gm-hud-ability-row-text">
+                    <strong>{a.name}</strong>
+                    <small>
+                      {a.aim === 'self' ? 'Self' : a.aim === 'ally' ? 'Ally' : 'Enemy'}
+                      {a.cost > 0 ? ` · ${a.cost} FP` : ''}
+                      {a.count != null ? ` · ×${a.count}` : ''}
+                    </small>
+                  </span>
+                  {slotIdx >= 0 && <kbd className="gm-hud-bound-tag">{slotIdx + 1}</kbd>}
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        <div className="gm-hud-ability-detail">
+          {selected ? (
+            <>
+              <div className="gm-hud-detail-head">
+                <span className="gm-hud-detail-icon"><AbilityIcon ability={selected} /></span>
+                <div>
+                  <div className="gm-hud-detail-title">{selected.name}</div>
+                  <div className="gm-hud-detail-pills">
+                    <span className={`gm-hud-pill aim-${selected.aim}`}>
+                      {selected.aim === 'self' ? 'Self' : selected.aim === 'ally' ? 'Ally' : 'Enemy'}
+                    </span>
+                    {selected.range && <span className="gm-hud-pill">{selected.range}</span>}
+                    {selected.cost > 0 && <span className="gm-hud-pill fp">{selected.cost} Force</span>}
+                    {selected.count != null && <span className="gm-hud-pill count">{selected.count} left</span>}
+                    {selectedLand && (
+                      <span className={`gm-hud-pill lands side-${selectedLand.side}`}>→ {selectedLand.text}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {!selected.usable && selected.why && (
+                <div className="gm-hud-detail-warn">{selected.why}</div>
+              )}
+              <div className="gm-hud-detail-desc">
+                {selected.description || 'No description available.'}
+              </div>
+              <div className="gm-hud-detail-footer">
+                <button
+                  type="button"
+                  className="gm-hud-cast-btn"
+                  disabled={!selected.usable}
+                  onClick={() => onUse(selected)}
+                >
+                  {selected.kind === 'attack' ? 'Attack' : selected.kind === 'item' ? 'Use Item' : 'Cast / Use'}
+                </button>
+                <div className="gm-hud-pin-group">
+                  <span>Pin to bar:</span>
+                  {Array.from({ length: GMPlayerHud.SLOTS }, (_, slot) => (
+                    <button
+                      key={slot}
+                      type="button"
+                      className={`gm-hud-pin-slot ${selectedSlot === slot ? 'on' : ''}`}
+                      onClick={() => onAssign(slot, selected.key)}
+                    >
+                      {slot + 1}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="gm-hud-empty-msg">Select an ability to read its description.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/** Radial quick-cast wheel (Hold Q) with center description snippet */
 const PowerWheel: React.FC<{
   abilities: GMHudAbility[];
   hovered: number;
@@ -229,8 +418,7 @@ const PowerWheel: React.FC<{
   held: string[];
 }> = ({ abilities, hovered, onHover, onPick, onClose, held }) => {
   const n = abilities.length;
-  // Big enough for every icon, small enough to stay clear of the target frame and the bar
-  const radius = Math.max(120, Math.min(260, n * 16, window.innerHeight / 2 - 120));
+  const radius = Math.max(125, Math.min(265, n * 16, window.innerHeight / 2 - 120));
   const onMove = (e: React.PointerEvent) => {
     const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
     const dx = e.clientX - cx, dy = e.clientY - cy;
@@ -263,17 +451,18 @@ const PowerWheel: React.FC<{
           {focus ? (
             <>
               <strong>{focus.name}</strong>
-              <span className={`gm-hud-wheel-lands side-${landing(focus).side}`}>→ {landing(focus).title.replace(/^Lands on /, '')}</span>
-              {focus.cost > 0 && <span>{focus.cost} Force</span>}
-              {focus.count != null && <span>{focus.count} left</span>}
+              <span className={`gm-hud-wheel-lands side-${landing(focus).side}`}>
+                → {landing(focus).title.replace(/^Lands on /, '')}{focus.cost > 0 ? ` · ${focus.cost} FP` : ''}{focus.range ? ` · ${focus.range}` : ''}
+              </span>
+              {focus.description && <p className="gm-hud-wheel-desc">{focus.description}</p>}
               {!focus.usable && <span className="warn">{focus.why}</span>}
-              <small>Release Q or click to use · 1–8 puts it on the bar</small>
+              <small>Release Q or click to cast · 1–8 binds slot</small>
             </>
           ) : (
             <>
-              <strong>{n ? 'Powers and items' : 'Nothing to use'}</strong>
-              <small>Point at one, then release Q or click · Esc or right-click closes</small>
-              {held.length > 0 && <span className="warn">World paused while you choose</span>}
+              <strong>{n ? 'Quick Wheel' : 'Nothing to use'}</strong>
+              <small>Point &amp; release Q to cast · Tap Q for searchable Powers menu</small>
+              {held.length > 0 && <span className="warn">World paused while choosing</span>}
             </>
           )}
         </div>
@@ -283,27 +472,30 @@ const PowerWheel: React.FC<{
 };
 
 /**
- * A GM session player's combat HUD, in place of KotOR's (GMPlayerHud hides that): the target frame and rings,
- * a power bar on 1–8, the power wheel on Q, a readable self frame, and the combat queue.
+ * A GM session player's combat HUD: target frame and rings, categorized abilities drawer (tap Q),
+ * radial quick wheel (hold Q), quick skill roller (K), unified menu strip, and 1–8 hotbar with descriptions.
  */
-export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills') => void; onOpenChat: () => void }> = ({ onOpenSheet, onOpenChat }) => {
+export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => void; onOpenChat: () => void }> = ({ onOpenSheet, onOpenChat }) => {
   useGMStore();
   useTicker(200);
   const [wheel, setWheel] = useState<{ open: boolean; sticky: boolean }>({ open: false, sticky: false });
+  const [panel, setPanel] = useState<'none' | 'skills' | 'powers'>('none');
+  const [hoveredSlot, setHoveredSlot] = useState<number>(-1);
   const [hovered, setHovered] = useState(-1);
   const [toast, setToast] = useState<{ text: string; at: number } | null>(null);
+  const qHoldTimer = useRef<number | null>(null);
+  const qOpenedWheelOnHold = useRef(false);
 
   const visible = GMPlayerHud.active() && KotOR.GameState.Mode === KotOR.EngineMode.INGAME && !KotOR.GMCutscene.active;
   const pc: any = GMPlayerHud.player();
   const abilities: GMHudAbility[] = visible ? GMPlayerHud.abilities(pc) : [];
-  // The wheel: what fits the target first (helping powers with a friend targeted, attacks otherwise)
   const wheelAbilities: GMHudAbility[] = visible ? GMPlayerHud.orderForTarget(abilities, pc) : [];
   const bar = visible ? GMPlayerHud.loadout(pc, abilities) : [];
   const byKey = new Map(abilities.map((a) => [a.key, a]));
+  const buffs = visible ? (GMPlayerHud.activeEffects?.(pc) || []) : [];
 
-  // The latest of everything for the key and mouse handlers, which are attached once
-  const live = useRef({ visible, abilities: wheelAbilities, bar, byKey, wheel, hovered });
-  live.current = { visible, abilities: wheelAbilities, bar, byKey, wheel, hovered };
+  const live = useRef({ visible, abilities: wheelAbilities, bar, byKey, wheel, hovered, panel });
+  live.current = { visible, abilities: wheelAbilities, bar, byKey, wheel, hovered, panel };
 
   const say = useCallback((text: string) => setToast({ text, at: Date.now() }), []);
   useEffect(() => {
@@ -319,12 +511,10 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
       if (result.message) say(result.message);
       return;
     }
-    // It was sent: say so, and to whom (a refusal from the GM's machine follows as its own notice)
     const who = result.target === GMPlayerHud.player() ? 'you' : (result.target as any)?.getName?.() || 'target';
     say(`${ability.name} → ${who}`);
   }, [say]);
 
-  // The GM's machine telling us why something we asked for didn't happen (GMPlayers.tellPlayer)
   const notice = GMPlayerHud.lastNotice;
   useEffect(() => { if (notice) say(notice.text); }, [notice?.at, say]);
 
@@ -339,6 +529,7 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
   }, [say]);
 
   const openWheel = useCallback((sticky: boolean) => {
+    setPanel('none');
     setHovered(-1);
     setWheel({ open: true, sticky });
     GMPlayerHud.setWheelOpen(true);
@@ -354,26 +545,30 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
     use(ability);
   }, [closeWheel, use]);
 
-  // Read every icon ahead, one after another, so the wheel opens with its pictures ready
+  // Read every icon ahead, one after another, so the wheel and drawer open with pictures ready
   const iconList = abilities.map((a) => a.icon).filter(Boolean).join(',');
   useEffect(() => {
-    let live = true;
-    (async () => { for (const icon of iconList.split(',')) { if (!live) return; if (icon) await gameTextureUrl(icon); } })();
-    return () => { live = false; };
+    let active = true;
+    (async () => { for (const icon of iconList.split(',')) { if (!active) return; if (icon) await gameTextureUrl(icon); } })();
+    return () => { active = false; };
   }, [iconList]);
 
-  // The HUD went away (a conversation, a cutscene, a menu): the wheel closes with it
-  useEffect(() => { if (!visible && wheel.open) closeWheel(); }, [visible, wheel.open, closeWheel]);
-  useEffect(() => () => GMPlayerHud.setWheelOpen(false), []);
+  useEffect(() => {
+    if (!visible && wheel.open) closeWheel();
+    if (!visible && panel !== 'none') setPanel('none');
+  }, [visible, wheel.open, panel, closeWheel]);
+  useEffect(() => () => {
+    if (qHoldTimer.current) window.clearTimeout(qHoldTimer.current);
+    GMPlayerHud.setWheelOpen(false);
+  }, []);
 
-  // The enemy we were on fell: on to the next
   useEffect(() => { if (visible) GMPlayerHud.retargetAfterKill(); });
 
   const onOpenChatRef = useRef(onOpenChat);
   onOpenChatRef.current = onOpenChat;
+  const onOpenSheetRef = useRef(onOpenSheet);
+  onOpenSheetRef.current = onOpenSheet;
 
-  // Keys: 1–8 the bar, Q the wheel, Tab / Shift+Tab targets, R the target's main action, G sneak, Enter chat.
-  // Caught before the game's own handlers, which would otherwise run KotOR's hidden action slots on the same keys
   useEffect(() => {
     const stop = (e: KeyboardEvent) => { e.preventDefault(); e.stopImmediatePropagation(); };
     const onDown = (e: KeyboardEvent) => {
@@ -386,11 +581,11 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
         const slot = Number(digit[1]) - 1;
         if (s.wheel.open && s.hovered >= 0) {
           GMPlayerHud.assignSlot(slot, s.abilities[s.hovered]?.key || null);
-          say(`${s.abilities[s.hovered]?.name} is on ${slot + 1}`);
+          say(`${s.abilities[s.hovered]?.name} pinned to ${slot + 1}`);
           return;
         }
         const key = s.bar[slot];
-        if (!key) { say(`Slot ${slot + 1} is empty: hold Q, point at something and press ${slot + 1}`); return; }
+        if (!key) { say(`Slot ${slot + 1} is empty — press Q to pin a power or ability`); return; }
         const ability = s.byKey.get(key);
         if (!ability) { say('None left'); return; }
         use(ability);
@@ -404,17 +599,43 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
       if (e.code === 'KeyQ') {
         stop(e);
         if (e.repeat) return;
-        if (s.wheel.open) closeWheel();
-        else openWheel(false);
+        if (s.wheel.open) { closeWheel(); return; }
+        qOpenedWheelOnHold.current = false;
+        if (qHoldTimer.current) window.clearTimeout(qHoldTimer.current);
+        qHoldTimer.current = window.setTimeout(() => {
+          qHoldTimer.current = null;
+          qOpenedWheelOnHold.current = true;
+          openWheel(false);
+        }, 200);
         return;
       }
-      if (e.code === 'Escape' && s.wheel.open) {
+      if (e.code === 'KeyK') {
         stop(e);
-        closeWheel();
+        if (!e.repeat) setPanel((p) => (p === 'skills' ? 'none' : 'skills'));
+        return;
+      }
+      if (e.code === 'KeyP') {
+        stop(e);
+        if (!e.repeat) onOpenSheetRef.current('overview');
+        return;
+      }
+      if (e.code === 'KeyI') {
+        stop(e);
+        if (!e.repeat) KotOR.GameState.MenuManager?.MenuInventory?.open?.();
+        return;
+      }
+      if (e.code === 'KeyU') {
+        stop(e);
+        if (!e.repeat) KotOR.GameState.MenuManager?.MenuEquipment?.open?.();
+        return;
+      }
+      if (e.code === 'Escape' && (s.wheel.open || s.panel !== 'none')) {
+        stop(e);
+        if (s.wheel.open) closeWheel();
+        else setPanel('none');
         return;
       }
       if (s.wheel.open) return;
-      // R: the target's main action (Attack, Talk, Search, Open...), as a click on it does
       if (e.code === 'KeyR') {
         stop(e);
         if (e.repeat) return;
@@ -439,10 +660,15 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
       if (/^Digit[1-8]$/.test(e.code) || e.code === 'Tab') { e.stopImmediatePropagation(); return; }
       if (e.code === 'KeyQ') {
         e.stopImmediatePropagation();
-        // Released over an entry: use it. A quick tap keeps the wheel open to choose with the mouse
-        if (s.wheel.open && !s.wheel.sticky) {
+        if (qHoldTimer.current) {
+          window.clearTimeout(qHoldTimer.current);
+          qHoldTimer.current = null;
+        }
+        if (qOpenedWheelOnHold.current && s.wheel.open && !s.wheel.sticky) {
           if (s.hovered >= 0) pick(s.hovered);
           else setWheel({ open: true, sticky: true });
+        } else if (!qOpenedWheelOnHold.current && !s.wheel.open) {
+          setPanel((p) => (p === 'powers' ? 'none' : 'powers'));
         }
       }
     };
@@ -459,6 +685,9 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
   const queue: string[] = Array.isArray(pc.gmNetQueue) ? pc.gmNetQueue.filter(Boolean).slice(0, 4) : [];
   const held = GMPlayerHud.heldBy();
   const frozen = GMManager.isPlayerFrozen(pc);
+  const hoveredKey = hoveredSlot >= 0 ? bar[hoveredSlot] : null;
+  const hoveredAbility = hoveredKey ? byKey.get(hoveredKey) : undefined;
+  const hoveredLands = hoveredAbility ? landing(hoveredAbility) : undefined;
 
   return (
     <div className="gm-player-hud">
@@ -469,11 +698,61 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
         <div className="gm-hud-paused">Paused: {held.join(', ')} {held.length === 1 ? 'is' : 'are'} choosing a power</div>
       )}
 
-      <QuickActions onOpenSheet={(section) => onOpenSheet(section)} onOpenChat={onOpenChat} onStealth={sneak} />
+      {buffs.length > 0 && (
+        <div className="gm-hud-buffs" aria-label="Active effects">
+          {buffs.map((b) => (
+            <span key={b.label} className="gm-hud-buff">
+              {b.label}{b.secondsLeft != null ? ` · ${b.secondsLeft}s` : ''}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <QuickActions
+        panel={panel}
+        onToggleSkills={() => setPanel((p) => (p === 'skills' ? 'none' : 'skills'))}
+        onTogglePowers={() => setPanel((p) => (p === 'powers' ? 'none' : 'powers'))}
+        onOpenSheet={() => onOpenSheet('overview')}
+        onOpenChat={onOpenChat}
+        onStealth={sneak}
+      />
       <SelfFrame onOpenSheet={() => onOpenSheet('overview')} />
+
+      {panel === 'skills' && (
+        <QuickSkillsPopover pc={pc} onClose={() => setPanel('none')} />
+      )}
+
+      {panel === 'powers' && (
+        <AbilitiesDrawer
+          abilities={abilities}
+          bar={bar}
+          onUse={use}
+          onAssign={(slot, key) => GMPlayerHud.assignSlot(slot, key)}
+          onClose={() => setPanel('none')}
+        />
+      )}
 
       <div className="gm-hud-dock">
         {toast && <div className="gm-hud-toast" key={toast.at}>{toast.text}</div>}
+        {hoveredAbility && panel === 'none' && !wheel.open && (
+          <div className="gm-hud-hover-card" role="status">
+            <div className="gm-hud-hover-head">
+              <strong>{hoveredAbility.name}</strong>
+              <span className="gm-hud-hover-meta">
+                {hoveredLands && <span className={`side-${hoveredLands.side}`}>{hoveredLands.text}</span>}
+                {hoveredAbility.cost > 0 && <span>{hoveredAbility.cost} FP</span>}
+                {hoveredAbility.range && <span>{hoveredAbility.range}</span>}
+                {hoveredAbility.count != null && <span>{hoveredAbility.count} left</span>}
+              </span>
+            </div>
+            {!hoveredAbility.usable && hoveredAbility.why && (
+              <div className="gm-hud-hover-warn">{hoveredAbility.why}</div>
+            )}
+            {hoveredAbility.description && (
+              <div className="gm-hud-hover-desc">{hoveredAbility.description}</div>
+            )}
+          </div>
+        )}
         {queue.length > 0 && (
           <div className="gm-hud-queue" aria-label="Combat queue">
             <span className="gm-hud-label">Queue</span>
@@ -489,30 +768,34 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: 'overview' | 'skills'
           {bar.map((key, i) => {
             const a = key ? byKey.get(key) : undefined;
             const lands = a ? landing(a) : undefined;
-            const title = a
-              ? `${i + 1}: ${a.name}\n${lands!.title}${a.cost ? `\n${a.cost} Force` : ''}${a.count != null ? `\n${a.count} left` : ''}${a.usable ? '' : `\n${a.why}`}\nRight-click to empty`
-              : key ? `${i + 1}: none left (right-click to empty)` : `${i + 1}: empty. Hold Q, point at a power and press ${i + 1}`;
             return (
               <button
                 key={i}
                 className={`gm-hud-slot ${a ? `aim-${a.aim}` : 'empty'} ${a && !a.usable ? 'unusable' : ''} ${lands?.side === 'none' ? 'no-one' : ''}`}
-                title={title}
-                onClick={() => (a ? use(a) : openWheel(true))}
+                onMouseEnter={() => setHoveredSlot(i)}
+                onMouseLeave={() => setHoveredSlot((s) => (s === i ? -1 : s))}
+                onFocus={() => setHoveredSlot(i)}
+                onBlur={() => setHoveredSlot((s) => (s === i ? -1 : s))}
+                onClick={() => (a ? use(a) : setPanel('powers'))}
                 onContextMenu={(e) => { e.preventDefault(); if (key) GMPlayerHud.assignSlot(i, null); }}
+                aria-label={a ? `${i + 1}: ${a.name}` : `Empty slot ${i + 1}`}
               >
                 {a ? <AbilityIcon ability={a} /> : <span className="gm-hud-slot-empty">+</span>}
                 <kbd className="gm-hud-slot-key">{i + 1}</kbd>
                 {a && a.cost > 0 && <span className="gm-hud-cost">{a.cost}</span>}
                 {a && a.count != null && <span className="gm-hud-count">{a.count}</span>}
-                {a && <span className="gm-hud-slot-name">{a.name}</span>}
                 {lands && <span className={`gm-hud-lands side-${lands.side}`}>{lands.text}</span>}
               </button>
             );
           })}
-          <button className="gm-hud-slot all" title="Every power and item (hold Q: point and release to use)" onClick={() => (wheel.open ? closeWheel() : openWheel(true))}>
-            <span className="gm-hud-slot-empty">◎</span>
+          <button
+            className={`gm-hud-slot all ${panel === 'powers' ? 'open' : ''}`}
+            title="Powers & Abilities (tap Q for categorized menu, hold Q for quick wheel)"
+            onClick={() => setPanel((p) => (p === 'powers' ? 'none' : 'powers'))}
+          >
+            <span className="gm-hud-slot-empty">✦</span>
             <kbd className="gm-hud-slot-key">Q</kbd>
-            <span className="gm-hud-slot-name">All</span>
+            <span className="gm-hud-slot-name-static">All</span>
           </button>
         </div>
       </div>
