@@ -89,7 +89,8 @@ export const CAREERS_SPECIES: readonly CareerSpeciesDef[] = [
     abilitySummary: 'Equips droid plating and upgrades (Race 5); 6 free career skills; never Force-sensitive.',
     modelGroup: 'droid',
     modelKeywords: ['droid', 'hk', 't3', 'protocol', 'war'],
-    defaultAppearanceId: 236,
+    // HK-50 (appearance 538): a full-model droid like the party's (236 was a War Droid, an enemy model)
+    defaultAppearanceId: 538,
     defaultPortraitId: 0,
   },
 ];

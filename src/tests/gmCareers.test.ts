@@ -4,7 +4,7 @@ jest.mock("@/GameState", () => ({
   GameState: {
     gmMode: true,
     GameKey: 'TSL',
-    AppearanceManager: { appearances: new Map([[136, { label: 'P_Male_01' }], [236, { label: 'Droid_War_01' }]]) },
+    AppearanceManager: { appearances: new Map([[136, { label: 'P_Male_01' }], [538, { label: 'Droid_NPC_hk50' }]]) },
   },
 }));
 jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));

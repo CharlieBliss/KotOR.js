@@ -76,7 +76,7 @@ export interface CareerTalentDef {
   id: string;
   name: string;
   description: string;
-  /** Existing KotOR feat or Force power icon resref */
+  /** A KotOR II feat (if_*) or Force power (ip_*) icon resref, as feat.2da / spells.2da name them (checked against the game) */
   icon: string;
   /** Whether multiple nodes of this talent stack ranks without a per-talent cap */
   ranked: boolean;
@@ -102,7 +102,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'toughened',
     name: 'Toughened',
     description: '+4 maximum Vitality per rank.',
-    icon: 'ifeat_toughness',
+    icon: 'if_toughn01',
     ranked: true,
     activation: 'passive',
     hooks: { maxHp: 4 },
@@ -111,7 +111,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'grit',
     name: 'Grit',
     description: '+2 maximum Strain per rank.',
-    icon: 'ifeat_condit',
+    icon: 'if_fortitude',
     ranked: true,
     activation: 'passive',
     hooks: { maxStrain: 2 },
@@ -120,7 +120,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'sidestep',
     name: 'Sidestep',
     description: '+1 Defence (+1 additional Defence against ranged attacks) per rank.',
-    icon: 'ifeat_dueling',
+    icon: 'if_lreflexes',
     ranked: true,
     activation: 'passive',
     hooks: { defense: 1, defenseVs: { ranged: 1 } },
@@ -129,7 +129,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'feral_strength',
     name: 'Feral Strength',
     description: '+2 damage with melee and unarmed attacks per rank.',
-    icon: 'ifeat_pwratt',
+    icon: 'if_pattack01',
     ranked: true,
     activation: 'passive',
     hooks: { damageBonus: { amount: 2, scope: 'melee' } },
@@ -138,7 +138,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'point_blank',
     name: 'Point Blank',
     description: '+2 damage with ranged weapons per rank.',
-    icon: 'ifeat_rpdshot',
+    icon: 'if_rshot01',
     ranked: true,
     activation: 'passive',
     hooks: { damageBonus: { amount: 2, scope: 'ranged' } },
@@ -147,7 +147,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'lethal_blows',
     name: 'Lethal Blows',
     description: '+1 critical threat range and +4 critical hit damage per rank.',
-    icon: 'ifeat_critstrk',
+    icon: 'if_crtstrk01',
     ranked: true,
     activation: 'passive',
     hooks: {
@@ -159,7 +159,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'enduring',
     name: 'Enduring',
     description: 'Reduce incoming damage from hits by 2 per rank.',
-    icon: 'ifeat_imp_tough',
+    icon: 'if_toughn02',
     ranked: true,
     activation: 'passive',
     hooks: { damageReduction: 2 },
@@ -168,7 +168,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'resolve',
     name: 'Resolve',
     description: '+1 to all saving throws and +2 to Discipline checks per rank.',
-    icon: 'ifeat_mstr_cond',
+    icon: 'if_ironwill',
     ranked: true,
     activation: 'passive',
     hooks: {
@@ -180,7 +180,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'keen_eye',
     name: 'Keen Eye',
     description: '+3 to Awareness and Survival checks per rank.',
-    icon: 'ifeat_awarness',
+    icon: 'if_focaware',
     ranked: true,
     activation: 'passive',
     hooks: {
@@ -191,7 +191,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'force_rating',
     name: 'Force Rating',
     description: '+6 max Force points, +2 Force power save DC, and -1 Force power cost per rank.',
-    icon: 'ip_forcefocus',
+    icon: 'if_focsense',
     ranked: true,
     activation: 'passive',
     requirements: { forceSensitive: true },
@@ -205,7 +205,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'relentless',
     name: 'Relentless',
     description: 'On a kill, recover 2 Strain and gain +2 attack on your next strike per rank.',
-    icon: 'ifeat_flurry',
+    icon: 'if_flurry01',
     ranked: true,
     activation: 'passive',
     hooks: {
@@ -216,7 +216,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'calm_center',
     name: 'Calm Center',
     description: 'Recover 1 extra Strain each combat round and 4 Vitality when combat ends per rank.',
-    icon: 'ip_meditate',
+    icon: 'if_battlemed',
     ranked: true,
     activation: 'passive',
     hooks: {
@@ -243,7 +243,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'battle_focus',
     name: 'Battle Focus',
     description: 'Active (2 Strain): Line up your next attack for +2 attack, +4 damage, and +1 crit threat per rank.',
-    icon: 'ifeat_wpnfoc',
+    icon: 'if_weapfoc05',
     ranked: true,
     activation: 'active',
     strainCost: 2,
@@ -264,7 +264,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'parry_stance',
     name: 'Parry Stance',
     description: 'Active (2 Strain): Brace your guard for 1 round, gaining +2 Defence and +3 damage reduction per rank.',
-    icon: 'ifeat_jedidef',
+    icon: 'if_jedidef01',
     ranked: true,
     activation: 'active',
     strainCost: 2,
@@ -283,7 +283,7 @@ export const CAREERS_TALENTS: readonly CareerTalentDef[] = [
     id: 'inspiring_command',
     name: 'Inspiring Command',
     description: 'Active (2 Strain): Bolster an ally (or yourself) for 2 rounds with +2 attack and +2 Defence per rank.',
-    icon: 'ip_valor',
+    icon: 'ip_inspfol01',
     ranked: true,
     activation: 'active',
     strainCost: 2,
