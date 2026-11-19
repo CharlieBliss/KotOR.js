@@ -295,9 +295,12 @@ export class GMSessions {
    */
   static async loadSession(save: GMSessionSave): Promise<boolean> {
     if (!save?.scene?.module) return false;
+    GMManager.setRuleset(save.rules?.ruleset === 'careers' ? 'careers' : 'kotor');
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
-    if (save.rules?.pacing) GMPacing.configure({ mode: save.rules.pacing.mode, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents });
+    GMPacing.configure(save.rules?.pacing
+      ? { mode: save.rules.pacing.mode, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents }
+      : { mode: 'off', timeLimit: 0, showIntents: true });
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 

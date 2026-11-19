@@ -35,6 +35,7 @@ import {
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMPacing } from "@/managers/gm/GMPacing";
+import { CareersRules, GMCareersCharacters } from "@/managers/gm/careers";
 import { CombatRound } from "@/combat/CombatRound";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
@@ -655,6 +656,26 @@ export class GMPlayers {
    * Execute a client's interaction request on the host using the engine's normal actions,
    * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
    */
+  /** Host: verify a joining player's character matches the session's rule set; returns a refusal reason or null */
+  static checkJoinRuleset(preset: GMPlayerJoinPreset | undefined): string | null {
+    const ruleset = GMManager.ruleset || 'kotor';
+    const hasCareers = !!preset?.careersCharacter;
+    if (ruleset === 'careers') {
+      if (!hasCareers || !GMCareersCharacters.isCareersCharacter(preset!.careersCharacter)) {
+        return 'This session uses the Careers rule set (KotOR II). Pick or make a Careers character to join.';
+      }
+      const problems = CareersRules.validate(preset!.careersCharacter);
+      if (problems.length) {
+        return `Your Careers character can't join: ${problems[0]}`;
+      }
+      return null;
+    }
+    if (hasCareers) {
+      return 'This session uses classic KotOR rules. Pick a classic character or quick build to join.';
+    }
+    return null;
+  }
+
   /**
    * Host: a player connected (or reconnected). A reconnecting player, same peer id, takes back the character
    * they left behind; a new one gets a character from the build they picked. Either way they get the scene.
@@ -672,10 +693,21 @@ export class GMPlayers {
       assign(existingPeer.controlledNetId);
       return;
     }
+
+    const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
+    const reserved = GMSessions.reservedPlayers.get(String(name || 'Player').trim().toLowerCase());
+    if (!rejoinNetId && !reserved) {
+      const refusal = this.checkJoinRuleset(preset);
+      if (refusal) {
+        GMLog.info('host', `refused ${name || peerId}: ${refusal}`);
+        net.send('join.refused', { reason: refusal, ruleset: GMManager.ruleset }, peerId);
+        return;
+      }
+    }
+
     const peerInfo: GMPeerInfo = { peerId, name: name || 'Player', role: 'client', joinedAt: Date.now() };
     net.peers.set(peerId, peerInfo);
 
-    const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
     net.appendChat('System', rejoinNetId ? `${peerInfo.name} rejoined the game.` : `${peerInfo.name} joined the game!`);
     const spawnedNetId = rejoinNetId || await this.spawnPlayerFromNetworkPreset(peerId, peerInfo.name, preset);
     peerInfo.controlledNetId = spawnedNetId;
@@ -1159,6 +1191,17 @@ export class GMPlayers {
       GMSessions.reservedPlayers.delete(reserved.name.trim().toLowerCase());
       const pc = await GMSessions.spawnSavedPlayer(reserved, peerId);
       if (pc) GMNetworkManager.appendChat('System', `${reserved.name} picked up their saved character.`);
+      return pc ? (pc.gmNetId || null) : null;
+    }
+    if (GMManager.ruleset === 'careers' && preset?.careersCharacter && GMCareersCharacters.isCareersCharacter(preset.careersCharacter)) {
+      const config = GMCareersCharacters.toSpawnConfig({
+        ...preset.careersCharacter,
+        name: preset.name || preset.careersCharacter.name || playerName || 'Connected Player',
+      });
+      const pc = await GMSpawner.spawnPlayerCharacter(
+        { ...config, possessImmediately: false, ownerPeerId: peerId },
+        GMManager.sceneStartPoint ? GMManager.sceneStartPoint.clone() : undefined
+      );
       return pc ? (pc.gmNetId || null) : null;
     }
     if (preset?.character && GMCharacters.isCharacter(preset.character)) {

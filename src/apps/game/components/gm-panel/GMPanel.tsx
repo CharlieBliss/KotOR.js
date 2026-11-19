@@ -169,10 +169,20 @@ export const GMPanel: React.FC = () => {
   const startJoin = () => {
     const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
     // A character the player made goes along whole; the host holds it to the session's rules
-    const made = joinCharacterId ? KotOR.GMCharacters.get(joinCharacterId) : undefined;
+    const careersMade = joinCharacterId.startsWith('car:') && KotOR.GMCareersCharacters
+      ? KotOR.GMCareersCharacters.get(joinCharacterId.slice(4))
+      : undefined;
+    const made = !careersMade && joinCharacterId ? KotOR.GMCharacters.get(joinCharacterId) : undefined;
     KotOR.GameState.gmMode = true;
     GMManager.active = true;
-    GMNetworkManager.joinSession(joinUrl, joinPlayerName, made ? {
+    GMNetworkManager.joinSession(joinUrl, joinPlayerName, careersMade ? {
+      name: joinPlayerName,
+      appearanceId: KotOR.GMCareersCharacters.resolveAppearance(careersMade),
+      classId: KotOR.CareersRules.isForceSensitive(careersMade) ? 3 : 0,
+      rightHandResRef: careersMade.gear?.rightHand,
+      armorResRef: careersMade.gear?.armor,
+      careersCharacter: { ...careersMade, name: joinPlayerName || careersMade.name },
+    } : made ? {
       name: joinPlayerName,
       appearanceId: KotOR.GMCharacters.resolveAppearance(made),
       classId: made.classId,

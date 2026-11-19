@@ -202,7 +202,28 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </label>
           <div className="gm-hint">Only during fights. Players steer their move with the movement keys and press Ready (Space or R3); you can press Go any time. Change it mid-fight to speed up an easy one.</div>
         </div>
-        <CreationLimits />
+        {KotOR.GameState.GameKey === KotOR.GameEngineType.TSL && (
+          <div className="gm-section">
+            <div className="gm-section-title">Rule set</div>
+            <label className="gm-field" title="Pick between classic KotOR classes or the Careers &amp; specializations overhaul (KotOR II only)">
+              <span>Character rules</span>
+              <select
+                className="gm-select"
+                value={GMManager.ruleset || 'kotor'}
+                onChange={(e) => GMManager.setRuleset(e.target.value as KotOR.GMRuleset)}
+              >
+                <option value="kotor">Classic KotOR rules</option>
+                <option value="careers">Careers &amp; specializations (overhaul)</option>
+              </select>
+            </label>
+            <div className="gm-hint">
+              {GMManager.ruleset === 'careers'
+                ? 'Players join with a Careers character (species, career, XP-bought skills & tree nodes). Classic characters are refused on join.'
+                : 'Classic KotOR classes and character creation. Careers characters are refused on join.'}
+            </div>
+          </div>
+        )}
+        {GMManager.ruleset !== 'careers' && <CreationLimits />}
         <details className="gm-section" open={GMSessions.getSavedSessions().length > 0}>
           <summary>Saved sessions <span className="gm-summary-note">{GMSessions.getSavedSessions().length} saved</span></summary>
           <div className="gm-row">

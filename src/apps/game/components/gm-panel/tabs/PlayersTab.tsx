@@ -8,6 +8,7 @@ import {
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import type { DrawerTab } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { CharacterCreator } from "@/apps/game/components/gm-panel/creator/CharacterCreator";
+import { CareersCreator } from "@/apps/game/components/gm-panel/creator/CareersCreator";
 
 /** Players tab: the player characters, calling checks, rewards, and adding characters */
 export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab) => void }> = React.memo(({ active, onOpenTab }) => {
@@ -272,10 +273,26 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
       <details className="gm-section" open={KotOR.GameState.PartyManager.party.length === 0}>
         <summary>Add a character <span className="gm-summary-note">quick build, your own, or from a save</span></summary>
       <div className="gm-row">
-        <button className="gm-btn small success" onClick={() => setCreatorOpen(true)}>Make a character…</button>
-        <span className="gm-hint">Saved characters, and the full character creator</span>
+        <button className="gm-btn small success" onClick={() => setCreatorOpen(true)}>
+          {GMManager.ruleset === 'careers' ? 'Make a Careers character…' : 'Make a character…'}
+        </button>
+        <span className="gm-hint">
+          {GMManager.ruleset === 'careers'
+            ? 'Saved Careers characters, and the 7-step Careers creator'
+            : 'Saved characters, and the full character creator'}
+        </span>
       </div>
-      {creatorOpen && (
+      {creatorOpen && GMManager.ruleset === 'careers' && (
+        <CareersCreator
+          onClose={() => setCreatorOpen(false)}
+          useLabel="Add & play"
+          onUse={async (c) => {
+            setCreatorOpen(false);
+            await GMSpawner.spawnPlayerCharacter({ ...KotOR.GMCareersCharacters.toSpawnConfig(c), possessImmediately: true });
+          }}
+        />
+      )}
+      {creatorOpen && GMManager.ruleset !== 'careers' && (
         <CharacterCreator
           onClose={() => setCreatorOpen(false)}
           useLabel="Add & play"

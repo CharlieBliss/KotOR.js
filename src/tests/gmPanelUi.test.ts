@@ -28,6 +28,8 @@ const mockKotOR: any = {
   },
   GMManager: {
     active: false,
+    ruleset: "kotor",
+    setRuleset: jest.fn(),
     controlMode: "FREECAM",
     activeTool: "select",
     lastPlacementTool: "place_creature",
@@ -147,6 +149,14 @@ const mockKotOR: any = {
     configure: jest.fn(), go: jest.fn(),
   },
   GM_PACING_MODES: [{ id: 'off', label: 'Real time', title: '' }],
+  GMCareersCharacters: {
+    list: jest.fn((): any[] => []),
+    get: jest.fn((): any => undefined),
+    listeners: new Set(),
+  },
+  CareersRules: {
+    derive: jest.fn(() => ({ level: 1 })),
+  },
 };
 
 jest.mock("@/apps/game/KotOR", () => mockKotOR);

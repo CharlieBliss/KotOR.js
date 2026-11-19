@@ -53,6 +53,7 @@ import { GMMines } from "@/managers/gm/GMMines";
 import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPacing } from "@/managers/gm/GMPacing";
+import type { GMRuleset } from "@/managers/gm/careers/types";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
 export * from "@/managers/gm/GMTypes";
@@ -133,8 +134,27 @@ export class GMManager {
   /** Where players joining this scene appear (a scene plan's start), instead of the camera target */
   static sceneStartPoint: THREE.Vector3 | null = null;
 
+  /** Session rule set: 'kotor' (classic) or 'careers' (KotOR II only) */
+  static ruleset: GMRuleset = 'kotor';
+
+  /** Switch the session's rule set ('careers' is KotOR II only); broadcasts to players */
+  static setRuleset(ruleset: GMRuleset): boolean {
+    const next: GMRuleset = ruleset === 'careers' ? 'careers' : 'kotor';
+    if (next === 'careers' && GameState.GameKey !== GameEngineType.TSL) {
+      GMLog.warn('host', 'The Careers rule set is only available in KotOR II.');
+      return false;
+    }
+    if (this.ruleset === next) return true;
+    this.ruleset = next;
+    GMLog.info('host', `session rule set: ${next}`);
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+    return true;
+  }
+
   static sessionRules(): GMSessionRules {
     return {
+      ruleset: this.ruleset,
       deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state(),
       tacticalPause: { enabled: this.tacticalPause, by: [...this.wheelHolds.values()].map((h) => h.name) },
       paused: this.worldPaused,

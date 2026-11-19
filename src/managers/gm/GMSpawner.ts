@@ -550,6 +550,17 @@ export class GMSpawner {
    * give it by the game's rules (CharacterBuilder), unless the config sets them explicitly
    */
   static buildPlayerAbilities(config: Partial<GMPlayerSpawnConfig>): ICharacterBuild {
+    if (config.ruleset === 'careers') {
+      return {
+        classId: config.classId ?? 0,
+        level: Math.max(1, Math.floor(config.level || 1)),
+        feats: Array.isArray(config.featIds) ? [...config.featIds] : [],
+        powers: Array.isArray(config.spellIds) ? [...config.spellIds] : [],
+        skillRanks: Array.isArray(config.skillRanks) ? [...config.skillRanks] : new Array(8).fill(0),
+        maxHp: typeof config.hp === 'number' && config.hp > 0 ? config.hp : 16,
+        maxFp: typeof config.fp === 'number' && config.fp >= 0 ? config.fp : 0,
+      };
+    }
     const build = CharacterBuilder.build({
       classId: config.classId ?? 3,
       level: config.level || 1,
@@ -610,11 +621,19 @@ export class GMSpawner {
     set(GFFDataType.BYTE, 'Int', config.int || 12);
     set(GFFDataType.BYTE, 'Wis', config.wis || 14);
     set(GFFDataType.BYTE, 'Cha', config.cha || 14);
-    set(GFFDataType.BYTE, 'GoodEvil', 50);
-    set(GFFDataType.BYTE, 'NaturalAC', 2);
+    set(GFFDataType.BYTE, 'GoodEvil', config.goodEvil ?? 50);
+    set(GFFDataType.BYTE, 'NaturalAC', config.naturalAC ?? 2);
     set(GFFDataType.BYTE, 'PerceptionRange', 13);
     set(GFFDataType.WORD, 'SoundSetFile', config.gender === 1 ? 83 : 85);
-    set(GFFDataType.BYTE, 'Race', 6);
+    set(GFFDataType.BYTE, 'Race', config.race ?? 6);
+    if (typeof config.subraceIndex === 'number') {
+      set(GFFDataType.BYTE, 'SubraceIndex', config.subraceIndex);
+    }
+    if (config.saves) {
+      set(GFFDataType.CHAR, 'FortSaveThrow', config.saves.fortitude);
+      set(GFFDataType.CHAR, 'RefSaveThrow', config.saves.reflex);
+      set(GFFDataType.CHAR, 'WillSaveThrow', config.saves.will);
+    }
 
     // Scripts for party/player behavior
     set(GFFDataType.RESREF, 'ScriptAttacked', 'k_hen_attacked01');

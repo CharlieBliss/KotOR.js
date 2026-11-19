@@ -1,6 +1,7 @@
 import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
 import type { GMPacingState } from "@/managers/gm/GMPacing";
+import type { GMCareersCharacter, GMRuleset } from "@/managers/gm/careers/types";
 import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 import { GameState } from "@/GameState";
 
@@ -244,6 +245,8 @@ export type GMDeathRule = 'kotor' | 'gm' | 'respawn';
 
 /** Session-wide rules the GM sets, which players need to know */
 export interface GMSessionRules {
+  /** Which rule set this session runs ('kotor' by default; 'careers' in KotOR II only) */
+  ruleset?: GMRuleset;
   deathRule: GMDeathRule;
   /** Players can only watch: no moving or acting, and NPCs leave them alone */
   frozen?: boolean;
@@ -284,6 +287,8 @@ export interface GMPlayerJoinPreset {
   armorResRef?: string;
   /** A character the player made (GMCharacters); the host holds it to the session's creation limits */
   character?: GMCharacter;
+  /** A character made for the Careers rule set (KotOR II); checked on join by the host */
+  careersCharacter?: GMCareersCharacter;
 }
 
 /** A player's character as their game streams it to the host (see GMNetworkManager.update) */
@@ -329,6 +334,8 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
 export interface GMPacketMap {
   'host.register': { sessionName?: string; [key: string]: any };
   'peer.join': { name?: string; preset?: GMPlayerJoinPreset; [key: string]: any };
+  /** Host to one player: refused on join (e.g. character doesn't match the session's rule set) */
+  'join.refused': { reason: string; ruleset?: GMRuleset };
   'peer.leave': { wasHost?: boolean; name?: string };
   'world.snapshot': GMWorldSnapshot;
   'world.tick': { actors: GMSerializedActor[] };
@@ -767,6 +774,11 @@ export class GMNetworkManager {
       this.setJoinState('playing');
       this.notifyChange();
     }, 'to-me-or-all');
+
+    this.on('join.refused', 'client', (packet) => {
+      const reason = packet.payload?.reason || 'The GM could not admit that character to this session.';
+      this.failJoin(reason);
+    }, 'to-me');
 
     this.on('relay.error', 'any', (packet) => {
       const { code, message } = packet.payload || ({} as GMPacketMap['relay.error']);
