@@ -212,8 +212,8 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
                 value={GMManager.ruleset || 'kotor'}
                 onChange={(e) => GMManager.setRuleset(e.target.value as KotOR.GMRuleset)}
               >
-                <option value="kotor">Classic KotOR rules</option>
-                <option value="careers">Careers &amp; specializations (overhaul)</option>
+                <option value="kotor" disabled={!!GMManager.rulesetLockReason('kotor')}>Classic KotOR rules</option>
+                <option value="careers" disabled={!!GMManager.rulesetLockReason('careers')}>Careers &amp; specializations (overhaul)</option>
               </select>
             </label>
             <div className="gm-hint">
@@ -221,6 +221,11 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
                 ? 'Players join with a Careers character (species, career, XP-bought skills & tree nodes). Classic characters are refused on join.'
                 : 'Classic KotOR classes and character creation. Careers characters are refused on join.'}
             </div>
+            {GMManager.rulesetLockReason(GMManager.ruleset === 'careers' ? 'kotor' : 'careers') && (
+              <div className="gm-hint">
+                Can't switch: {GMManager.rulesetLockReason(GMManager.ruleset === 'careers' ? 'kotor' : 'careers')}
+              </div>
+            )}
           </div>
         )}
         {GMManager.ruleset !== 'careers' && <CreationLimits />}

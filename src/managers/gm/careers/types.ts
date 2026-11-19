@@ -139,6 +139,8 @@ export interface CareerStartingKit {
   rightHand?: string;
   leftHand?: string;
   armor?: string;
+  /** What a droid of this career wears instead of `armor` (droids can't wear armour suits); none when omitted */
+  droidArmor?: string;
   items?: { resRef: string; stack: number }[];
 }
 

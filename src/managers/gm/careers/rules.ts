@@ -26,6 +26,16 @@ import type {
 
 const ROW_COSTS = [5, 10, 15, 20] as const;
 
+/** The most ranks a sheet can hold in one skill (rank 6 needs a capstone) */
+export const MAX_SKILL_RANK = 6;
+
+/** A bought-rank count from a sheet, made safe: a whole number from 0 to MAX_SKILL_RANK (anything else counts as 0) */
+export function safeRanks(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(MAX_SKILL_RANK, Math.floor(n)));
+}
+
 /**
  * Pure rules engine for the Careers rule set: XP costs, level derivation, skill rank caps,
  * specialization tree links, Force sensitivity / alignment restrictions, derived stats, and validation.
@@ -61,8 +71,21 @@ export class CareersRules {
     if (!def?.levelCapped) return 5;
     const lvl = Math.max(1, Math.min(20, Math.floor(level || 1)));
     const cap = Math.min(5, 2 + Math.floor((lvl - 1) / 4));
-    if (hasCapstone && lvl >= 17 && def.category === 'combat') return 6;
+    if (hasCapstone && lvl >= 17) return MAX_SKILL_RANK;
     return cap;
+  }
+
+  /** Whether the character owns a capstone node for this skill (which opens rank 6 from level 17) */
+  static hasCapstone(c: Pick<GMCareersCharacter, 'nodes' | 'specializations'>, skillId: CareerSkillId): boolean {
+    for (const [specId, nodeIds] of Object.entries(c.nodes || {})) {
+      if (!Array.isArray(nodeIds) || !c.specializations?.includes(specId)) continue;
+      const spec = CAREERS_SPEC_BY_ID.get(specId);
+      if (!spec) continue;
+      for (const node of spec.nodes) {
+        if (node.kind === 'capstone' && node.skillId === skillId && nodeIds.includes(node.id)) return true;
+      }
+    }
+    return false;
   }
 
   /** XP cost to raise a characteristic from (newValue - 1) to newValue at creation */
@@ -92,6 +115,25 @@ export class CareersRules {
     if (!species || !career) return false;
     if (species.forceIneligible) return false;
     return !!(species.forceSensitive || career.forceSensitive);
+  }
+
+  /** Whether a species may take a career (a species that can never use the Force can't take a Force career) */
+  static careerAllowed(speciesId: string, careerId: string): boolean {
+    const species = CAREERS_SPECIES_BY_ID.get(speciesId);
+    const career = CAREERS_BY_ID.get(careerId);
+    if (!species || !career) return false;
+    return !(species.forceIneligible && career.forceSensitive);
+  }
+
+  /** The career's starting gear for this species: droids (Race 5) swap the armour suit for droid armour, or nothing */
+  static kitFor(careerId: string, speciesId: string): { rightHand: string; leftHand: string; armor: string } {
+    const kit = CAREERS_BY_ID.get(careerId)?.startingKit || {};
+    const droid = CAREERS_SPECIES_BY_ID.get(speciesId)?.race === 5;
+    return {
+      rightHand: kit.rightHand || '',
+      leftHand: kit.leftHand || '',
+      armor: (droid ? kit.droidArmor : kit.armor) || '',
+    };
   }
 
   /** All career skills granted by the character's career and owned specializations */
@@ -126,8 +168,7 @@ export class CareersRules {
     const out = {} as Record<CareerSkillId, number>;
     for (const def of CAREER_SKILLS) {
       const f = free[def.id] || 0;
-      const b = Math.max(0, Math.floor(c.boughtSkillRanks?.[def.id] || 0));
-      out[def.id] = f + b;
+      out[def.id] = f + safeRanks(c.boughtSkillRanks?.[def.id]);
     }
     return out;
   }
@@ -152,7 +193,7 @@ export class CareersRules {
     const free = this.freeRanksOf(c);
     for (const def of CAREER_SKILLS) {
       const f = free[def.id] || 0;
-      const b = Math.max(0, Math.floor(c.boughtSkillRanks?.[def.id] || 0));
+      const b = safeRanks(c.boughtSkillRanks?.[def.id]);
       const isCareer = careerSkills.has(def.id);
       for (let r = f + 1; r <= f + b; r++) total += this.skillRankCost(r, isCareer);
     }
@@ -223,7 +264,7 @@ export class CareersRules {
   }
 
   /** Check whether a node in a specialization tree can be bought right now */
-  static canBuyNode(c: GMCareersCharacter, specId: string, nodeId: string): { ok: boolean; cost: number; reason?: string } {
+  static canBuyNode(c: GMCareersCharacter, specId: string, nodeId: string, startingOnly: boolean = false): { ok: boolean; cost: number; reason?: string } {
     const spec = CAREERS_SPEC_BY_ID.get(specId);
     if (!spec) return { ok: false, cost: 0, reason: 'Unknown specialization.' };
     if (!c.specializations.includes(specId)) return { ok: false, cost: 0, reason: `You don't own ${spec.name}.` };
@@ -235,9 +276,39 @@ export class CareersRules {
     if (node.row > 0 && !node.links.some((link) => owned.has(link))) {
       return { ok: false, cost, reason: 'Needs a link to an owned node.' };
     }
-    const derived = this.derive(c);
-    if (derived.totalXpRemaining < cost) return { ok: false, cost, reason: `Needs ${cost} XP (${derived.totalXpRemaining} left).` };
+    // Never sell a feat the character already has, from baseline proficiencies or another tree
+    if (node.kind === 'feat' && typeof node.featId === 'number' && this.ownedFeatIds(c).has(node.featId)) {
+      return { ok: false, cost, reason: `You already have ${node.label}.` };
+    }
+    const short = this.shortOfXp(this.derive(c), cost, startingOnly);
+    if (short) return { ok: false, cost, reason: short };
     return { ok: true, cost };
+  }
+
+  /**
+   * Why a purchase can't be paid for, or null when it can. The creator pays from starting XP only
+   * (`startingOnly`): it never moves `campaignXpSpent`, so letting it spend campaign XP would book that XP as
+   * starting XP and overspend it. Spending campaign XP goes through the in-play purchase path, which records it.
+   */
+  static shortOfXp(derived: GMCareersDerived, cost: number, startingOnly: boolean): string | null {
+    const left = startingOnly ? derived.startingXpRemaining : derived.totalXpRemaining;
+    if (left >= cost) return null;
+    return `Needs ${cost} ${startingOnly ? 'starting ' : ''}XP (${left} left).`;
+  }
+
+  /** Effective KotOR feat IDs: baseline proficiencies + bought feat nodes */
+  static ownedFeatIds(c: Pick<GMCareersCharacter, 'nodes'>): Set<number> {
+    const featSet = new Set<number>(BASELINE_CAREER_FEATS);
+    for (const [specId, nodeIds] of Object.entries(c.nodes || {})) {
+      const spec = CAREERS_SPEC_BY_ID.get(specId);
+      if (!spec || !Array.isArray(nodeIds)) continue;
+      const byId = new Map(spec.nodes.map((n) => [n.id, n]));
+      for (const nodeId of nodeIds) {
+        const node = byId.get(nodeId);
+        if (node?.kind === 'feat' && typeof node.featId === 'number') featSet.add(node.featId);
+      }
+    }
+    return featSet;
   }
 
   /** Check whether a node can be refunded without breaking links to other owned nodes */
@@ -259,19 +330,20 @@ export class CareersRules {
   }
 
   /** Check whether a skill rank can be bought right now */
-  static canBuySkillRank(c: GMCareersCharacter, skillId: CareerSkillId, atCreation: boolean = true): { ok: boolean; cost: number; nextRank: number; reason?: string } {
+  static canBuySkillRank(c: GMCareersCharacter, skillId: CareerSkillId, atCreation: boolean = true, startingOnly: boolean = false): { ok: boolean; cost: number; nextRank: number; reason?: string } {
     const derived = this.derive(c);
     const current = derived.skillRanks[skillId] || 0;
     const nextRank = current + 1;
-    const cap = this.maxSkillRank(skillId, derived.level, atCreation);
+    const cap = this.maxSkillRank(skillId, derived.level, atCreation, this.hasCapstone(c, skillId));
     const cost = this.skillRankCost(nextRank, derived.careerSkills.has(skillId));
     if (nextRank > cap) return { ok: false, cost, nextRank, reason: atCreation ? 'Rank 2 is the maximum at creation.' : `Capped at rank ${cap} for level ${derived.level}.` };
-    if (derived.totalXpRemaining < cost) return { ok: false, cost, nextRank, reason: `Needs ${cost} XP (${derived.totalXpRemaining} left).` };
+    const short = this.shortOfXp(derived, cost, startingOnly);
+    if (short) return { ok: false, cost, nextRank, reason: short };
     return { ok: true, cost, nextRank };
   }
 
   /** Check whether a Force power can be learned right now */
-  static canBuyPower(c: GMCareersCharacter, spellId: number): { ok: boolean; cost: number; reason?: string } {
+  static canBuyPower(c: GMCareersCharacter, spellId: number, startingOnly: boolean = false): { ok: boolean; cost: number; reason?: string } {
     const power = CAREERS_POWER_BY_ID.get(spellId);
     if (!power) return { ok: false, cost: 0, reason: 'Unknown Force power.' };
     if (!this.isForceSensitive(c)) return { ok: false, cost: power.xpCost, reason: 'Only Force-sensitive characters can learn Force powers.' };
@@ -279,8 +351,8 @@ export class CareersRules {
       return { ok: false, cost: power.xpCost, reason: `Only ${power.alignment}-side characters can learn ${power.name}.` };
     }
     if (c.powers.includes(spellId)) return { ok: false, cost: power.xpCost, reason: 'Already known.' };
-    const derived = this.derive(c);
-    if (derived.totalXpRemaining < power.xpCost) return { ok: false, cost: power.xpCost, reason: `Needs ${power.xpCost} XP (${derived.totalXpRemaining} left).` };
+    const short = this.shortOfXp(this.derive(c), power.xpCost, startingOnly);
+    if (short) return { ok: false, cost: power.xpCost, reason: short };
     return { ok: true, cost: power.xpCost };
   }
 
@@ -322,19 +394,7 @@ export class CareersRules {
 
     const baseDefense = 10 + modifiers.dex + levelBaseline;
 
-    // Effective KotOR feat IDs: baseline proficiencies + bought feat nodes
-    const featSet = new Set<number>(BASELINE_CAREER_FEATS);
-    if (c.nodes) {
-      for (const [specId, nodeIds] of Object.entries(c.nodes)) {
-        const spec = CAREERS_SPEC_BY_ID.get(specId);
-        if (!spec || !Array.isArray(nodeIds)) continue;
-        const byId = new Map(spec.nodes.map((n) => [n.id, n]));
-        for (const nodeId of nodeIds) {
-          const node = byId.get(nodeId);
-          if (node?.kind === 'feat' && typeof node.featId === 'number') featSet.add(node.featId);
-        }
-      }
-    }
+    const featSet = this.ownedFeatIds(c);
 
     const maxHp = Math.max(1, species.hpBase + level * (6 + modifiers.con));
     const maxStrain = Math.max(1, species.strainBase + modifiers.wis);
@@ -444,12 +504,26 @@ export class CareersRules {
       }
     }
 
+    // Bought ranks must be whole numbers in range (the sums ignore anything else, so say so)
+    for (const [skillId, value] of Object.entries(c.boughtSkillRanks || {})) {
+      const def = CAREER_SKILL_BY_ID.get(skillId as CareerSkillId);
+      if (!def) problems.push(`Unknown skill: ${skillId}.`);
+      else if (!Number.isInteger(value) || (value as number) < 0 || (value as number) > MAX_SKILL_RANK) {
+        problems.push(`${def.name} has an invalid rank count (${value}).`);
+      }
+    }
+
+    // A species that can never use the Force can't take a Force career
+    if (species && career && !this.careerAllowed(species.id, career.id)) {
+      problems.push(`${species.name} characters can't take the ${career.name} career: they can never use the Force.`);
+    }
+
     const derived = this.derive(c);
 
     // Skill rank caps
     for (const def of CAREER_SKILLS) {
       const rank = derived.skillRanks[def.id] || 0;
-      const cap = this.maxSkillRank(def.id, derived.level, atCreation);
+      const cap = this.maxSkillRank(def.id, derived.level, atCreation, this.hasCapstone(c, def.id));
       if (rank > cap) {
         problems.push(`${def.name} rank ${rank} exceeds the maximum of ${cap}${atCreation ? ' at creation' : ` at level ${derived.level}`}.`);
       }

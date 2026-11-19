@@ -227,6 +227,7 @@ export class GMSessions {
       groups: groups.length ? groups : undefined,
       atmosphere: Object.keys(GMAtmosphere.current).length ? { ...GMAtmosphere.current } : undefined,
       sets: sets.length ? sets : undefined,
+      careersXp: GMPlayers.careersXpAwarded.size ? Object.fromEntries(GMPlayers.careersXpAwarded) : undefined,
     };
   }
 
@@ -295,7 +296,9 @@ export class GMSessions {
    */
   static async loadSession(save: GMSessionSave): Promise<boolean> {
     if (!save?.scene?.module) return false;
-    GMManager.setRuleset(save.rules?.ruleset === 'careers' ? 'careers' : 'kotor');
+    GMManager.setRuleset(save.rules?.ruleset === 'careers' ? 'careers' : 'kotor', true);
+    GMPlayers.careersXpAwarded = new Map(Object.entries(save.careersXp || {})
+      .filter(([, xp]) => Number.isFinite(xp) && xp >= 0));
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
     GMPacing.configure(save.rules?.pacing

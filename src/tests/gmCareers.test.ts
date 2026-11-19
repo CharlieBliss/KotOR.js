@@ -77,13 +77,16 @@ describe('Careers vertical slice data & formulas', () => {
     // Level baseline (level - 1) / 3 floored, up to +6
     expect([1, 5, 9, 13, 17, 20].map((l) => CareersRules.levelBaseline(l))).toEqual([0, 1, 2, 4, 5, 6]);
 
-    // Combat & save skill rank caps rise every 4 levels; other skills reach 5 freely (2 at creation)
+    // Combat, save and engine skill rank caps rise every 4 levels; narrative skills reach 5 freely (2 at creation)
     expect([1, 4, 5, 8, 9, 13, 17, 20].map((l) => CareersRules.maxSkillRank('lightsaber', l, false))).toEqual([2, 2, 3, 3, 4, 5, 5, 5]);
     expect(CareersRules.maxSkillRank('lightsaber', 17, false, true)).toBe(6);
     expect(CareersRules.maxSkillRank('resilience', 1, false)).toBe(2);
     expect(CareersRules.maxSkillRank('resilience', 13, false)).toBe(5);
-    expect(CareersRules.maxSkillRank('computer_use', 1, false)).toBe(5);
+    // Rank 5 is engine skill 20: not at level 2
+    expect(CareersRules.maxSkillRank('security', 2, false)).toBe(2);
+    expect(CareersRules.maxSkillRank('computer_use', 13, false)).toBe(5);
     expect(CareersRules.maxSkillRank('computer_use', 1, true)).toBe(2);
+    expect(CareersRules.maxSkillRank('charm', 1, false)).toBe(5);
   });
 
   test('engine skills convert at rank * 4 and Persuade uses the best of Charm, Negotiation, Deception', () => {
@@ -109,6 +112,82 @@ describe('Careers vertical slice data & formulas', () => {
     expect(CareersRules.isForceSensitive(droidJedi)).toBe(false);
     expect(CareersRules.derive(droidJedi).maxFp).toBe(0);
     expect(CareersRules.derive(droidJedi).startingXpBudget).toBe(175);
+    // ...and can't take a Force career at all
+    droidJedi.name = 'R-Jedi';
+    expect(CareersRules.careerAllowed('droid', 'jedi_guardian')).toBe(false);
+    expect(CareersRules.validate(droidJedi).some((p) => p.includes('never use the Force'))).toBe(true);
+  });
+
+  test("droids don't start in an armour suit they can't wear", () => {
+    const droid = GMCareersCharacters.blank('droid', 'soldier');
+    expect(droid.gear?.armor).toBe('');
+    expect(droid.gear?.rightHand).toBe('g_w_blstrrfl001');
+    expect(GMCareersCharacters.blank('human', 'soldier').gear?.armor).toBe('g_a_class4001');
+    // A droid saved with the career's suit before droids had their own kit spawns without it
+    droid.name = 'Old HK';
+    droid.gear = { rightHand: 'g_w_blstrrfl001', leftHand: '', armor: 'g_a_class4001' };
+    expect(GMCareersCharacters.toSpawnConfig(droid).armorResRef).toBe('');
+  });
+
+  test('no feat is sold twice across trees, and a capstone opens rank 6', () => {
+    const peacekeeper = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'peacekeeper')!;
+    const commando = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'commando')!;
+    const feats = (s: typeof commando) => s.nodes.map((n) => n.featId);
+    expect(feats(peacekeeper).filter((f) => feats(commando).includes(f))).toEqual([]);
+
+    // A guard for future data: a node whose feat you already own can't be bought
+    const c = GMCareersCharacters.blank('human', 'soldier');
+    c.specializations = ['commando', 'peacekeeper'];
+    c.nodes = { commando: ['r0c0'], peacekeeper: [] };
+    const sameFeat = { ...peacekeeper.nodes[0], featId: commando.nodes[0].featId };
+    const original = peacekeeper.nodes[0];
+    (peacekeeper.nodes as any)[0] = sameFeat;
+    try {
+      expect(CareersRules.canBuyNode(c, 'peacekeeper', 'r0c0')).toMatchObject({ ok: false, reason: expect.stringContaining('already have') });
+    } finally {
+      (peacekeeper.nodes as any)[0] = original;
+    }
+
+    expect(CareersRules.hasCapstone(c, 'lightsaber')).toBe(false);
+    const capstone = { id: 'r3c1', row: 3, col: 1, kind: 'capstone', skillId: 'lightsaber', label: 'Blade Master', description: '', links: [] as string[] };
+    const saved = peacekeeper.nodes[10];
+    (peacekeeper.nodes as any)[10] = capstone;
+    try {
+      c.nodes.peacekeeper = ['r3c1'];
+      expect(CareersRules.hasCapstone(c, 'lightsaber')).toBe(true);
+    } finally {
+      (peacekeeper.nodes as any)[10] = saved;
+    }
+  });
+});
+
+describe('sheets from untrusted files', () => {
+  test('huge or broken rank counts are rejected quickly instead of looped over', () => {
+    const c = GMCareersCharacters.blank('human', 'soldier');
+    c.name = 'Cheat';
+    c.boughtSkillRanks = { stealth: 1e12 } as any;
+    const started = Date.now();
+    const problems = CareersRules.validate(c);
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(problems.some((p) => p.includes('invalid rank count'))).toBe(true);
+
+    c.boughtSkillRanks = { stealth: NaN, bogus_skill: 1 } as any;
+    const again = CareersRules.validate(c);
+    expect(again.some((p) => p.includes('Stealth has an invalid rank count'))).toBe(true);
+    expect(again.some((p) => p.includes('Unknown skill'))).toBe(true);
+    expect(CareersRules.derive(c).engineSkills.every((n) => Number.isFinite(n))).toBe(true);
+  });
+
+  test('the creator spends starting XP only, even once the GM has awarded campaign XP', () => {
+    const c = GMCareersCharacters.blank('human', 'soldier');
+    c.characteristics = { str: 3, dex: 3, con: 3, int: 2, wis: 2, cha: 2 }; // 90 of 110
+    c.campaignXpEarned = 100;
+    // 20 starting XP left: a 20 XP row-3 node would need campaign XP, which the creator can't book
+    expect(CareersRules.canBuyNode(c, 'commando', 'r0c0', true)).toMatchObject({ ok: true });
+    c.nodes.commando = ['r0c0', 'r1c0']; // 15 more: 5 starting XP left
+    expect(CareersRules.canBuyNode(c, 'commando', 'r2c0', true)).toMatchObject({ ok: false, reason: expect.stringContaining('starting XP') });
+    // The in-play path may use the whole pool
+    expect(CareersRules.canBuyNode(c, 'commando', 'r2c0', false).ok).toBe(true);
   });
 });
 
@@ -279,5 +358,37 @@ describe('Session rule-set switch and join validation', () => {
     });
     expect(failSpy).toHaveBeenCalledWith('Wrong rule set.');
     failSpy.mockRestore();
+    // ...and now knows the session's rule set
+    expect(GMManager.ruleset).toBe('careers');
+  });
+
+  test('a joining character may not claim more campaign XP than the GM awarded', async () => {
+    GMPlayers.careersXpAwarded = new Map();
+    GMManager.setRuleset('careers');
+    const c = GMCareersCharacters.blank('human', 'soldier');
+    c.name = 'Mira';
+    c.campaignXpEarned = 950;
+    c.campaignXpSpent = 950; // a level 20 claim
+    expect(GMPlayers.checkJoinRuleset({ name: 'Mira', appearanceId: 136, classId: 0, careersCharacter: c }, 'Mira'))
+      .toContain('the GM has awarded you 0');
+
+    GMPlayers.recordCareersXp('mira ', 600);
+    GMPlayers.recordCareersXp('Mira', 350);
+    expect(GMPlayers.careersXpFor('MIRA')).toBe(950);
+    // Still refused here only if the sheet itself is invalid (rank caps etc.), not over the XP claim
+    const verdict = GMPlayers.checkJoinRuleset({ name: 'Mira', appearanceId: 136, classId: 0, careersCharacter: c }, 'Mira');
+    expect(verdict === null || !verdict.includes('campaign XP')).toBe(true);
+  });
+
+  test("the rule set can't switch under characters made with the other rules, except when loading a session", () => {
+    GMManager.ruleset = 'kotor';
+    const classic: any = { destroyed: false, firstName: 'Atton', gmPlayerConfig: { name: 'Atton' } };
+    GMManager.spawnedPlayers = [classic];
+    expect(GMManager.rulesetLockReason('careers')).toContain('Atton');
+    expect(GMManager.setRuleset('careers')).toBe(false);
+    expect(GMManager.ruleset).toBe('kotor');
+    expect(GMManager.setRuleset('careers', true)).toBe(true);
+    expect(GMManager.ruleset).toBe('careers');
+    GMManager.spawnedPlayers = [];
   });
 });

@@ -754,11 +754,30 @@ export class GMPlayers {
   }
 
   /**
-   * Execute a client's interaction request on the host using the engine's normal actions,
-   * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
+   * Careers rules: the campaign XP the GM has awarded each player, by lowercased player name. The host's record,
+   * not the player's file: a joining character may not claim more than this. Saved with the session.
    */
+  static careersXpAwarded: Map<string, number> = new Map();
+
+  static careersXpKey(playerName: string | undefined): string {
+    return String(playerName || 'Player').trim().toLowerCase();
+  }
+
+  /** Campaign XP the GM has awarded this player so far (0 when none) */
+  static careersXpFor(playerName: string | undefined): number {
+    return this.careersXpAwarded.get(this.careersXpKey(playerName)) || 0;
+  }
+
+  /** Record an award of campaign XP to a player (the Careers advancement path calls this as the GM awards XP) */
+  static recordCareersXp(playerName: string | undefined, amount: number) {
+    const xp = Math.floor(Number(amount));
+    if (!Number.isFinite(xp) || xp <= 0) return;
+    const key = this.careersXpKey(playerName);
+    this.careersXpAwarded.set(key, (this.careersXpAwarded.get(key) || 0) + xp);
+  }
+
   /** Host: verify a joining player's character matches the session's rule set; returns a refusal reason or null */
-  static checkJoinRuleset(preset: GMPlayerJoinPreset | undefined): string | null {
+  static checkJoinRuleset(preset: GMPlayerJoinPreset | undefined, playerName?: string): string | null {
     const ruleset = GMManager.ruleset || 'kotor';
     const hasCareers = !!preset?.careersCharacter;
     if (ruleset === 'careers') {
@@ -768,6 +787,13 @@ export class GMPlayers {
       const problems = CareersRules.validate(preset!.careersCharacter);
       if (problems.length) {
         return `Your Careers character can't join: ${problems[0]}`;
+      }
+      // The GM hands out campaign XP; a file can't award itself any
+      const claimed = Math.max(0, Math.floor(Number(preset!.careersCharacter!.campaignXpEarned) || 0));
+      const awarded = this.careersXpFor(playerName ?? preset!.name);
+      if (claimed > awarded) {
+        return `Your Careers character has ${claimed} campaign XP, but the GM has awarded you ${awarded} in this session. `
+          + 'Join with a character that has no more than that, or ask the GM.';
       }
       return null;
     }
@@ -798,7 +824,7 @@ export class GMPlayers {
     const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
     const reserved = GMSessions.reservedPlayers.get(String(name || 'Player').trim().toLowerCase());
     if (!rejoinNetId && !reserved) {
-      const refusal = this.checkJoinRuleset(preset);
+      const refusal = this.checkJoinRuleset(preset, name);
       if (refusal) {
         GMLog.info('host', `refused ${name || peerId}: ${refusal}`);
         net.send('join.refused', { reason: refusal, ruleset: GMManager.ruleset }, peerId);
@@ -952,6 +978,10 @@ export class GMPlayers {
     return true;
   }
 
+  /**
+   * Execute a client's interaction request on the host using the engine's normal actions,
+   * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
+   */
   static applyClientIntentOnHost(peerId: string, intent: GMClientIntent) {
     if (!intent) return;
     const who = GMNetworkManager.peers.get(peerId)?.name || peerId;

@@ -137,14 +137,35 @@ export class GMManager {
   /** Session rule set: 'kotor' (classic) or 'careers' (KotOR II only) */
   static ruleset: GMRuleset = 'kotor';
 
-  /** Switch the session's rule set ('careers' is KotOR II only); broadcasts to players */
-  static setRuleset(ruleset: GMRuleset): boolean {
+  /**
+   * Why the session can't switch to this rule set right now, or null when it can: player characters built
+   * under the other rule set are in the scene (they'd keep playing by rules the session no longer uses)
+   */
+  static rulesetLockReason(ruleset: GMRuleset): string | null {
+    if (ruleset === this.ruleset) return null;
+    const others = this.spawnedPlayers.filter((pc) => pc && !pc.destroyed
+      && ((pc.gmPlayerConfig?.ruleset === 'careers') !== (ruleset === 'careers')));
+    if (!others.length) return null;
+    const names = others.map((pc) => pc.firstName || pc.gmPlayerConfig?.name || 'a player').slice(0, 3).join(', ');
+    return `${names}${others.length > 3 ? ' and others' : ''} ${others.length === 1 ? 'was' : 'were'} made with the ${this.ruleset === 'careers' ? 'Careers' : 'classic'} rules. Remove ${others.length === 1 ? 'that character' : 'those characters'} first.`;
+  }
+
+  /**
+   * Switch the session's rule set ('careers' is KotOR II only); broadcasts to players. Refused while player
+   * characters of the other rule set are in the scene, unless `force` (loading a saved session, which replaces them)
+   */
+  static setRuleset(ruleset: GMRuleset, force: boolean = false): boolean {
     const next: GMRuleset = ruleset === 'careers' ? 'careers' : 'kotor';
     if (next === 'careers' && GameState.GameKey !== GameEngineType.TSL) {
       GMLog.warn('host', 'The Careers rule set is only available in KotOR II.');
       return false;
     }
     if (this.ruleset === next) return true;
+    const locked = force ? null : this.rulesetLockReason(next);
+    if (locked) {
+      GMLog.warn('host', `rule set not changed: ${locked}`);
+      return false;
+    }
     this.ruleset = next;
     GMLog.info('host', `session rule set: ${next}`);
     GMNetworkManager.broadcastSessionRules(this.sessionRules());
@@ -1561,6 +1582,16 @@ export class GMManager {
     },
   };
 }
+
+// A player's game follows the host's rule set (the creator, the sheet and the join card read GMManager.ruleset)
+GMNetworkManager.on('session.rules', 'client', (packet) => {
+  const ruleset = packet.payload?.ruleset;
+  if (ruleset === 'careers' || ruleset === 'kotor') GMManager.ruleset = ruleset;
+});
+GMNetworkManager.on('join.refused', 'client', (packet) => {
+  const ruleset = packet.payload?.ruleset;
+  if (ruleset === 'careers' || ruleset === 'kotor') GMManager.ruleset = ruleset;
+}, 'to-me');
 
 // A player's game takes control of the character the GM hands it
 GMNetworkManager.on('actor.assign', 'client', (packet) => {

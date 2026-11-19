@@ -99,6 +99,16 @@ export const CareersCreator: React.FC<{
     if (!sp) return;
     const label = KotOR.AppearanceManager?.appearances?.get(sp.defaultAppearanceId)?.label || '';
     const forceOk = !sp.forceIneligible && (sp.forceSensitive || KotOR.CAREERS_BY_ID.get(draft.careerId)?.forceSensitive);
+    // A species that can't take the current career (a droid Jedi) moves to the first career it can take
+    const careerReset = KotOR.CareersRules.careerAllowed(sp.id, draft.careerId) ? {} : (() => {
+      const career = KotOR.CAREERS_LIST.find((c) => KotOR.CareersRules.careerAllowed(sp.id, c.id));
+      if (!career) return {};
+      const startingSpecId = career.specializations[0];
+      return {
+        careerId: career.id, startingSpecId, specializations: [startingSpecId], nodes: { [startingSpecId]: [] },
+        freeCareerSkills: [], freeSpecSkills: [], gear: KotOR.CareersRules.kitFor(career.id, sp.id),
+      };
+    })();
     update({
       speciesId: sp.id,
       characteristics: { ...sp.characteristics },
@@ -108,6 +118,9 @@ export const CareersCreator: React.FC<{
       freeCareerSkills: draft.freeCareerSkills.slice(0, sp.freeCareerSkills),
       freeSpeciesSkills: sp.freeNonCareerSkills ? draft.freeSpeciesSkills.slice(0, sp.freeNonCareerSkills) : [],
       powers: forceOk ? draft.powers : [],
+      // Droids and organics wear different things
+      gear: KotOR.CareersRules.kitFor(draft.careerId, sp.id),
+      ...careerReset,
     });
   };
 
@@ -128,11 +141,7 @@ export const CareersCreator: React.FC<{
       freeSpeciesSkills: [],
       nodes: { [startingSpecId]: [] },
       powers: forceOk ? draft.powers : [],
-      gear: {
-        rightHand: career.startingKit.rightHand || '',
-        leftHand: career.startingKit.leftHand || '',
-        armor: career.startingKit.armor || '',
-      },
+      gear: KotOR.CareersRules.kitFor(career.id, draft.speciesId),
     });
   };
 
@@ -221,7 +230,7 @@ export const CareersCreator: React.FC<{
       update({ boughtSkillRanks: next });
       return;
     }
-    const check = Rules.canBuySkillRank(draft, skillId, draft.campaignXpSpent === 0);
+    const check = Rules.canBuySkillRank(draft, skillId, draft.campaignXpSpent === 0, true);
     if (!check.ok) return;
     update({ boughtSkillRanks: { ...draft.boughtSkillRanks, [skillId]: bought + 1 } });
   };
@@ -236,7 +245,7 @@ export const CareersCreator: React.FC<{
       update({ nodes: { ...draft.nodes, [spec.id]: owned.filter((id) => id !== nodeId) } });
       return;
     }
-    const check = Rules.canBuyNode(draft, spec.id, nodeId);
+    const check = Rules.canBuyNode(draft, spec.id, nodeId, true);
     if (!check.ok) {
       if (check.reason) setMessage(check.reason);
       return;
@@ -249,7 +258,7 @@ export const CareersCreator: React.FC<{
       update({ powers: draft.powers.filter((id) => id !== spellId) });
       return;
     }
-    const check = Rules.canBuyPower(draft, spellId);
+    const check = Rules.canBuyPower(draft, spellId, true);
     if (!check.ok) {
       if (check.reason) setMessage(check.reason);
       return;
@@ -320,11 +329,14 @@ export const CareersCreator: React.FC<{
               <div className="cc-choice-grid">
                 {KotOR.CAREERS_LIST.map((car) => {
                   const startSpec = KotOR.CAREERS_SPEC_BY_ID.get(car.specializations[0]);
+                  const allowed = KotOR.CareersRules.careerAllowed(draft.speciesId, car.id);
                   return (
                     <button
                       key={car.id}
                       className={`cc-choice-card ${draft.careerId === car.id ? 'on' : ''}`}
                       onClick={() => pickCareer(car.id)}
+                      disabled={!allowed}
+                      title={allowed ? undefined : `${KotOR.CAREERS_SPECIES_BY_ID.get(draft.speciesId)?.name || 'This species'} can never use the Force`}
                     >
                       <div className="cc-choice-title">
                         <span>{car.name}</span>
@@ -453,7 +465,7 @@ export const CareersCreator: React.FC<{
                     <div className="cc-tree-grid">
                       {spec.nodes.map((node) => {
                         const owned = (draft.nodes[spec.id] || []).includes(node.id);
-                        const check = Rules.canBuyNode(draft, spec.id, node.id);
+                        const check = Rules.canBuyNode(draft, spec.id, node.id, true);
                         const cost = Rules.nodeCost(node.row);
                         const cls = owned ? 'owned' : check.ok ? 'available' : 'locked';
                         return (
@@ -488,7 +500,7 @@ export const CareersCreator: React.FC<{
                           const free = freeRanks[def.id] || 0;
                           const bought = draft.boughtSkillRanks[def.id] || 0;
                           const rank = free + bought;
-                          const check = Rules.canBuySkillRank(draft, def.id, draft.campaignXpSpent === 0);
+                          const check = Rules.canBuySkillRank(draft, def.id, draft.campaignXpSpent === 0, true);
                           return (
                             <div key={def.id} className={`cc-skill-row ${isCareer ? 'career' : ''}`}>
                               <span>
@@ -511,7 +523,7 @@ export const CareersCreator: React.FC<{
                   <div className="cc-choice-grid">
                     {KotOR.CAREERS_STARTER_POWERS.map((p) => {
                       const owned = draft.powers.includes(p.spellId);
-                      const check = Rules.canBuyPower(draft, p.spellId);
+                      const check = Rules.canBuyPower(draft, p.spellId, true);
                       const wrongSide = p.alignment !== 'universal' && p.alignment !== draft.alignment;
                       return (
                         <button

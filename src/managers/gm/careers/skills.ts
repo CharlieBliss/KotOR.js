@@ -26,14 +26,15 @@ export const CAREER_SKILLS: readonly CareerSkillDef[] = [
   { id: 'ranged_heavy', name: 'Ranged (Heavy)', category: 'combat', ability: 'dex', levelCapped: true },
   { id: 'gunnery', name: 'Gunnery', category: 'combat', ability: 'dex', levelCapped: true },
 
-  // Engine skills (converted at rank * 4 into KotOR's skills.2da; Persuade derives from Charm/Negotiation/Deception)
-  { id: 'computer_use', name: 'Computer Use', category: 'engine', ability: 'int', engineSkill: SkillType.COMPUTER_USE },
-  { id: 'demolitions', name: 'Demolitions', category: 'engine', ability: 'int', engineSkill: SkillType.DEMOLITIONS },
-  { id: 'stealth', name: 'Stealth', category: 'engine', ability: 'dex', engineSkill: SkillType.STEALTH },
-  { id: 'awareness', name: 'Awareness', category: 'engine', ability: 'wis', engineSkill: SkillType.AWARENESS },
-  { id: 'repair', name: 'Repair', category: 'engine', ability: 'int', engineSkill: SkillType.REPAIR },
-  { id: 'security', name: 'Security', category: 'engine', ability: 'dex', engineSkill: SkillType.SECURITY },
-  { id: 'treat_injury', name: 'Treat Injury', category: 'engine', ability: 'wis', engineSkill: SkillType.TREAT_INJURY },
+  // Engine skills (converted at rank * 4 into KotOR's skills.2da; Persuade derives from Charm/Negotiation/Deception).
+  // Level-capped like combat skills: rank 5 is engine skill 20, which would open most of KotOR II's locks at level 2
+  { id: 'computer_use', name: 'Computer Use', category: 'engine', ability: 'int', engineSkill: SkillType.COMPUTER_USE, levelCapped: true },
+  { id: 'demolitions', name: 'Demolitions', category: 'engine', ability: 'int', engineSkill: SkillType.DEMOLITIONS, levelCapped: true },
+  { id: 'stealth', name: 'Stealth', category: 'engine', ability: 'dex', engineSkill: SkillType.STEALTH, levelCapped: true },
+  { id: 'awareness', name: 'Awareness', category: 'engine', ability: 'wis', engineSkill: SkillType.AWARENESS, levelCapped: true },
+  { id: 'repair', name: 'Repair', category: 'engine', ability: 'int', engineSkill: SkillType.REPAIR, levelCapped: true },
+  { id: 'security', name: 'Security', category: 'engine', ability: 'dex', engineSkill: SkillType.SECURITY, levelCapped: true },
+  { id: 'treat_injury', name: 'Treat Injury', category: 'engine', ability: 'wis', engineSkill: SkillType.TREAT_INJURY, levelCapped: true },
 
   // Narrative — General (Resilience, Coordination and Discipline also drive saves and follow the level cap)
   { id: 'astrogation', name: 'Astrogation', category: 'general', ability: 'int' },

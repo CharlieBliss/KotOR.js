@@ -183,9 +183,9 @@ export const CAREERS_SPECIALIZATIONS: readonly CareerSpecializationDef[] = [
       { id: 'r0c1', row: 0, col: 1, kind: 'feat', featId: CombatFeatType.JEDI_DEFENSE, label: 'Jedi Defense', description: 'Deflect incoming blaster bolts with a lightsaber.', links: ['r1c1'] },
       { id: 'r0c2', row: 0, col: 2, kind: 'feat', featId: CombatFeatType.DUELING, label: 'Dueling', description: 'Bonus attack and defence when wielding a single blade.', links: ['r1c2'] },
       // Row 1 (10 XP)
-      { id: 'r1c0', row: 1, col: 0, kind: 'feat', featId: CombatFeatType.POWER_ATTACK, label: 'Power Attack', description: 'Commit strength behind a decisive strike.', links: ['r0c0', 'r1c1', 'r2c0'] },
+      { id: 'r1c0', row: 1, col: 0, kind: 'feat', featId: CombatFeatType.WEAPON_FOCUS_LIGHTSABER, label: 'Lightsaber Focus', description: 'Drilled forms: +1 to attack with a lightsaber.', links: ['r0c0', 'r1c1', 'r2c0'] },
       { id: 'r1c1', row: 1, col: 1, kind: 'feat', featId: CombatFeatType.CONDITIONING, label: 'Conditioning', description: 'Steadfast focus that improves saving throws.', links: ['r0c1', 'r1c0', 'r1c2', 'r2c1'] },
-      { id: 'r1c2', row: 1, col: 2, kind: 'feat', featId: CombatFeatType.TWO_WEAPON_FIGHTING, label: 'Two-Weapon Fighting', description: 'Reduced penalties for dual blades or double-bladed lightsabers.', links: ['r0c2', 'r1c1', 'r2c2'] },
+      { id: 'r1c2', row: 1, col: 2, kind: 'feat', featId: CombatFeatType.WEAPON_SPEC_LIGHTSABER, label: 'Lightsaber Specialization', description: 'Heavier, surer cuts: extra damage with a lightsaber.', links: ['r0c2', 'r1c1', 'r2c2'] },
       // Row 2 (15 XP)
       { id: 'r2c0', row: 2, col: 0, kind: 'feat', featId: CombatFeatType.IMPROVED_FLURRY, label: 'Improved Flurry', description: 'Fluid extra strikes with tighter guard.', links: ['r1c0', 'r2c1', 'r3c0'] },
       { id: 'r2c1', row: 2, col: 1, kind: 'feat', featId: CombatFeatType.ADVANCED_JEDI_DEFENSE, label: 'Improved Jedi Defense', description: 'Deflect blaster fire more reliably and redirect bolts.', links: ['r1c1', 'r2c0', 'r2c2', 'r3c1'] },

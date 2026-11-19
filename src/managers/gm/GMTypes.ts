@@ -305,6 +305,8 @@ export interface GMSessionSave {
   atmosphere?: GMAtmosphereSettings;
   /** Rooms of other areas placed in the scene (GMSetPieces) */
   sets?: AreaSetPieceDef[];
+  /** Careers rules: the campaign XP the GM has awarded each player, by lowercased player name (host's record) */
+  careersXp?: Record<string, number>;
 }
 
 /**

@@ -140,11 +140,7 @@ export class GMCareersCharacters {
       startingXpSpent: 0,
       campaignXpEarned: 0,
       campaignXpSpent: 0,
-      gear: {
-        rightHand: career.startingKit.rightHand || '',
-        leftHand: career.startingKit.leftHand || '',
-        armor: career.startingKit.armor || '',
-      },
+      gear: CareersRules.kitFor(career.id, species.id),
       updated: 0,
     };
   }
@@ -172,8 +168,10 @@ export class GMCareersCharacters {
     const career = CAREERS_BY_ID.get(character.careerId) || CAREERS_BY_ID.get('soldier')!;
     const derived = CareersRules.derive(character);
     const a = derived.kotorAttributes;
-    const gear = character.gear || {};
-    const kit = career.startingKit;
+    const gear = { ...(character.gear || {}) };
+    const kit = CareersRules.kitFor(career.id, species.id);
+    // A droid saved with the career's armour suit (made before droids had their own kit) can't wear it
+    if (species.race === 5 && gear.armor && gear.armor === career.startingKit.armor) gear.armor = kit.armor;
 
     return {
       ruleset: 'careers',
@@ -198,9 +196,9 @@ export class GMCareersCharacters {
       int: a.int,
       wis: a.wis,
       cha: a.cha,
-      rightHandResRef: gear.rightHand ?? kit.rightHand ?? '',
-      leftHandResRef: gear.leftHand ?? kit.leftHand ?? '',
-      armorResRef: gear.armor ?? kit.armor ?? '',
+      rightHandResRef: gear.rightHand ?? kit.rightHand,
+      leftHandResRef: gear.leftHand ?? kit.leftHand,
+      armorResRef: gear.armor ?? kit.armor,
       featIds: derived.featIds,
       spellIds: derived.spellIds,
       skillRanks: derived.engineSkills,
