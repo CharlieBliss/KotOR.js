@@ -1,6 +1,6 @@
 import { describe, expect, jest, test } from "@jest/globals";
 
-jest.mock("@/GameState", () => ({ GameState: { hooks: { onEffectRemoved: () => {}, onEffectApplied: () => {} } } }));
+jest.mock("@/GameState", () => ({ GameState: { hooks: { onEffectRemoved: () => {}, onEffectApplied: () => {}, alignEffectDuration: (s: number) => s } } }));
 jest.mock("@/utility/GameFileSystem", () => ({ GameFileSystem: {} }));
 jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 

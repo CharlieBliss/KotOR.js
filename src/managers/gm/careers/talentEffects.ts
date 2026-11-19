@@ -1,3 +1,4 @@
+import { GameState } from "@/GameState";
 import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
 import type { CareerTalentDef, TalentAttackScope } from "@/managers/gm/careers/talents";
 import type { CareerSkillId } from "@/managers/gm/careers/types";
@@ -88,6 +89,14 @@ export function scopeTotal(totals: ScopeTotals, weapon?: ModuleItem): number {
   return sum;
 }
 
+/**
+ * Seconds stretched to end with a whole turn, as every lasting effect in a GM session is (EngineHooks
+ * alignEffectDuration), so a buff, cooldown or winded spell never runs out partway through a round
+ */
+export function turnAligned(seconds: number): number {
+  return GameState.hooks?.alignEffectDuration ? GameState.hooks.alignEffectDuration(seconds) : seconds;
+}
+
 /** A temporary bonus from an active talent or a combat reaction */
 export interface CareerTempBuff {
   id: string;
@@ -121,9 +130,10 @@ export class CareersTalentState {
 
   /** Add a buff, or refresh one with the same id */
   addBuff(buff: CareerTempBuff) {
+    const timed = { ...buff, remaining: turnAligned(buff.remaining) };
     const idx = this.buffs.findIndex((b) => b.id === buff.id);
-    if (idx >= 0) this.buffs[idx] = { ...buff };
-    else this.buffs.push({ ...buff });
+    if (idx >= 0) this.buffs[idx] = timed;
+    else this.buffs.push(timed);
   }
 
   /** What the buffs add to one stat */
@@ -143,7 +153,8 @@ export class CareersTalentState {
   }
 
   startCooldown(talentId: string, seconds: number | undefined) {
-    if (seconds && seconds > 0) this.cooldowns.set(talentId, seconds);
+    // (ready again at a turn's start, so it can be planned for)
+    if (seconds && seconds > 0) this.cooldowns.set(talentId, turnAligned(seconds));
   }
 
   /** Run buffs and cooldowns down by world time (seconds) */

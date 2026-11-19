@@ -15,7 +15,7 @@ import type { ICareersCreatureRules, ICareersDamageContext } from "@/engine/Care
 import { CareersRules } from "@/managers/gm/careers/rules";
 import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
 import type { TalentAim } from "@/managers/gm/careers/talents";
-import { CareersTalentState, forEachTalent, scopeTotal } from "@/managers/gm/careers/talentEffects";
+import { CareersTalentState, forEachTalent, scopeTotal, turnAligned } from "@/managers/gm/careers/talentEffects";
 import type { CareerBuffBadge, CareerTempBuff } from "@/managers/gm/careers/talentEffects";
 import { combatSkillForWeapon } from "@/managers/gm/careers/weapons";
 import type {
@@ -350,7 +350,7 @@ export class CareersRuntime implements ICareersCreatureRules {
     this.quietTimer = 0;
     if (this.strain > this.derived.maxStrain) {
       this.strain = this.derived.maxStrain;
-      this.windedSeconds = CareersRuntime.WINDED_SECONDS;
+      this.windedSeconds = turnAligned(CareersRuntime.WINDED_SECONDS);
       this.owner?.updateMovementSpeed?.();
       return { ok: true, becameWinded: true };
     }

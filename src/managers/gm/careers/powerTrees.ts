@@ -23,7 +23,7 @@ export const FORCE_WAVE = 26;
 export const PUSH_UPGRADES = {
   strength: { damage: 4, saveDC: 2 },
   distance: { pushDistance: 2 },
-  stun: { stunSeconds: 2 },
+  stun: { stunSeconds: 3 },
   magnitude: { extraTargets: 2 },
   duration: { durationSeconds: 3 },
 } as const;
@@ -48,7 +48,7 @@ export const CAREERS_POWER_TREES: readonly CareerPowerTreeDef[] = [
         description: 'Variant: draws the target to you instead (Force Push\'s cost).', links: ['root', 'whirlwind'] },
       // Row 2 (10 XP)
       { id: 'stun', row: 2, col: 0, kind: 'passive', xpCost: 10, label: 'Stun', upgrade: PUSH_UPGRADES.stun,
-        description: 'Pushed targets stay stunned 2 s longer after they land.', links: ['strength', 'strength_2'] },
+        description: 'Pushed targets stay stunned a turn (3 s) longer after they land.', links: ['strength', 'strength_2'] },
       { id: 'magnitude', row: 2, col: 1, kind: 'passive', xpCost: 10, label: 'Magnitude', upgrade: PUSH_UPGRADES.magnitude,
         description: 'Up to 2 more enemies within 4 m of the target are pushed too.', links: ['distance', 'wave'] },
       { id: 'whirlwind', row: 2, col: 2, kind: 'variant', xpCost: 10, label: 'Whirlwind', variantSpellId: FORCE_WHIRLWIND,
@@ -59,7 +59,7 @@ export const CAREERS_POWER_TREES: readonly CareerPowerTreeDef[] = [
       { id: 'wave', row: 3, col: 1, kind: 'variant', xpCost: 20, label: 'Mastery: Wave', variantSpellId: FORCE_WAVE,
         description: 'Variant: pushes everyone around you (KotOR\'s Force Wave).', links: ['magnitude'] },
       { id: 'duration', row: 3, col: 2, kind: 'passive', xpCost: 15, label: 'Duration', upgrade: PUSH_UPGRADES.duration,
-        description: 'Whirlwind holds 3 s longer.', links: ['whirlwind'] },
+        description: 'Whirlwind holds a turn (3 s) longer.', links: ['whirlwind'] },
     ],
   },
 ];

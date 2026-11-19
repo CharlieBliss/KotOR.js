@@ -271,7 +271,7 @@ describe('the power-cast hook', () => {
       return e;
     };
     expect(rt.adjustPowerEffect(state(FORCE_WHIRLWIND, GameEffectSetStateType.WHIRLWIND), target, GameEffectDurationType.TEMPORARY, 6)).toBe(9);
-    expect(rt.adjustPowerEffect(state(FORCE_PUSH, GameEffectSetStateType.CUT_SCENE_STUNNED), target, GameEffectDurationType.TEMPORARY, 2)).toBe(4);
+    expect(rt.adjustPowerEffect(state(FORCE_PUSH, GameEffectSetStateType.CUT_SCENE_STUNNED), target, GameEffectDurationType.TEMPORARY, 2)).toBe(5);
     // Anything else the power leaves lasts as long as it did
     const other = new EffectDamage();
     other.setSpellId(FORCE_WHIRLWIND);
@@ -315,6 +315,55 @@ describe('the power-cast hook', () => {
     expect(cast.extraPowerTargets()).toEqual([nearer, near]);
     cast.spell = { id: FORCE_WAVE, range: 'S' };
     expect(cast.extraPowerTargets()).toEqual([]);
+  });
+});
+
+describe('effects end with a whole turn', () => {
+  test("in a GM session a lasting effect is stretched to a whole turn; shows, mirrors and players' copies aren't", () => {
+    const was = (GameState as any).hooks;
+    (GameState as any).hooks = GMManager.engineHooks;
+    try {
+      const target = makeCreature();
+      target.addEffect = Object.getPrototypeOf(Object.getPrototypeOf(target)).addEffect; // the real ModuleObject one
+      target.isImmuneToEffect = () => false;
+      target.effectsChanged = () => {};
+      const lasting = (type: number, seconds: number, mirrored = false) => {
+        const e = type === GameEffectType.EffectSetState ? new EffectSetState() : new EffectDamage();
+        e.type = type;
+        e.setDurationType(GameEffectDurationType.TEMPORARY);
+        e.setDuration(seconds);
+        e.mirrored = mirrored;
+        (e as any).onApply = () => {};
+        (e as any).loadModel = () => {};
+        target.addEffect(e, GameEffectDurationType.TEMPORARY, seconds);
+        return e.getDuration();
+      };
+      expect(lasting(GameEffectType.EffectSetState, 2)).toBe(3);
+      expect(lasting(GameEffectType.EffectSetState, 6)).toBe(6);
+      expect(lasting(GameEffectType.EffectVisualEffect, 1.5)).toBe(1.5);
+      expect(lasting(GameEffectType.EffectSetState, 2, true)).toBe(2);
+      GMNetworkManager.role = 'client';
+      expect(lasting(GameEffectType.EffectSetState, 2)).toBe(2);
+    } finally {
+      (GameState as any).hooks = was;
+      GMNetworkManager.role = 'host';
+    }
+  });
+
+  test("Careers buffs, cooldowns and winded run whole turns too", () => {
+    const was = (GameState as any).hooks;
+    (GameState as any).hooks = GMManager.engineHooks;
+    try {
+      const { rt } = casterWith(['root']);
+      rt.talents.addBuff({ id: 'x', label: 'X', remaining: 4 });
+      expect(rt.talents.buffs[0].remaining).toBe(6);
+      rt.talents.startCooldown('y', 7);
+      expect(rt.talents.cooldownLeft('y')).toBe(9);
+      rt.spendStrain(99);
+      expect(rt.windedSeconds).toBe(6);
+    } finally {
+      (GameState as any).hooks = was;
+    }
   });
 });
 

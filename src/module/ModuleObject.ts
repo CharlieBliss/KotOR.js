@@ -2250,6 +2250,12 @@ export class ModuleObject {
       effect.initialize();
     }
 
+    // A lasting effect may be stretched to end with a whole turn (a GM session's rounds); a mirror of the host's
+    // effect keeps the host's time
+    if(effect.getDurationType() == GameEffectDurationType.TEMPORARY && effect.duration > 0 && !effect.mirrored){
+      effect.setDuration(GameState.hooks.alignEffectDuration(effect.duration, effect));
+    }
+
     effect.setAttachedObject(this);
     effect.loadModel();
     effect.onApply(this);

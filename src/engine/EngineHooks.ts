@@ -50,6 +50,11 @@ export interface EngineHooks {
   /** The world is paused: projectiles and the module clock hold still */
   isWorldPaused(): boolean;
   /**
+   * How long a lasting effect should run, in seconds, given what was asked: the mode can stretch it to end with a
+   * whole combat round (turn), so a planned action is never half-eaten by an effect that runs out mid-round
+   */
+  alignEffectDuration(seconds: number, effect?: GameEffect): number;
+  /**
    * Movement input for creature, heading facing (radians): the mode uses it to steer a planned move instead (the
    * world holds while everyone plans), and the character stays where it is. False: it moves as usual
    */
@@ -146,6 +151,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   consumePlayerItem: () => false,
   giveRecoveredMine: () => false,
   isWorldPaused: () => false,
+  alignEffectDuration: (seconds) => seconds,
   steerPlannedMove: () => false,
   isPlayerFrozen: () => false,
   isPlayerCharacter: () => false,

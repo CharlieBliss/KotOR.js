@@ -258,3 +258,27 @@ describe('requests from players', () => {
     expect(GMPacing.ready.has('p1')).toBe(true);
   });
 });
+
+describe('lasting effects end with a whole turn', () => {
+  test('in real time: rounded up to whole 3 s rounds', () => {
+    expect(GMPacing.phase).toBe('off');
+    expect(GMPacing.turnAlignedSeconds(2)).toBe(3);
+    expect(GMPacing.turnAlignedSeconds(3)).toBe(3);
+    expect(GMPacing.turnAlignedSeconds(5.9995)).toBe(6); // a timer's 6 s
+    expect(GMPacing.turnAlignedSeconds(7)).toBe(9);
+    expect(GMPacing.turnAlignedSeconds(0)).toBe(0);
+  });
+
+  test('in a paced fight: on a round boundary of the shared clock', () => {
+    GMPacing.update(0.1, scan());
+    // Planning: the round hasn't started, so it's whole rounds from its start
+    expect(GMPacing.turnAlignedSeconds(4)).toBe(6);
+    GMPacing.go('go');
+    play(1);
+    // 1 s into the round: a 6 s stun runs to the end of the round after next (5 s), not 1 s into a fourth
+    expect(GMPacing.windowTime).toBeCloseTo(1, 5);
+    expect(GMPacing.turnAlignedSeconds(6) + GMPacing.windowTime).toBeCloseTo(9, 5);
+    expect(GMPacing.turnAlignedSeconds(1)).toBeCloseTo(2, 5);
+    expect(GMPacing.turnAlignedSeconds(2)).toBeCloseTo(2, 5);
+  });
+});

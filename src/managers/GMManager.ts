@@ -3,6 +3,7 @@ import { GMTemplates } from "@/managers/gm/GMTemplates";
 import { GMObjectKind } from "@/managers/gm/GMObjectKind";
 import * as THREE from "three";
 import { GameState } from "@/GameState";
+import { GameEffectType } from "@/enums/effects/GameEffectType";
 import { EngineMode } from "@/enums/engine/EngineMode";
 import { ModuleCreatureAnimState } from "@/enums/module/ModuleCreatureAnimState";
 import { CacheScope } from "@/enums/resource/CacheScope";
@@ -81,6 +82,9 @@ export class GMManager {
   static preservePartyOnWarp: boolean = true;
 
   static worldPaused: boolean = false;
+
+  /** Effects that are only for show: they keep the time they were given rather than ending with a turn */
+  static COSMETIC_EFFECTS: ReadonlySet<number> = new Set([GameEffectType.EffectVisualEffect, GameEffectType.EffectBeam]);
 
   /** The GM pauses (or resumes) the world, on every machine */
   static setWorldPaused(paused: boolean) {
@@ -1532,6 +1536,9 @@ export class GMManager {
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
     isWorldPaused: () => GMManager.worldHeld(),
+    // Lasting effects end with a whole turn (the host decides; a beam or spark is only for show and keeps its time)
+    alignEffectDuration: (seconds, effect) =>
+      GMNetworkManager.role === 'client' || (effect && GMManager.COSMETIC_EFFECTS.has(effect.type)) ? seconds : GMPacing.turnAlignedSeconds(seconds),
     steerPlannedMove: (creature, facing) => GMPlayerHud.steerPlannedMove(creature, facing),
     ownsCombatHud: () => GMPlayerHud.active(),
     padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),

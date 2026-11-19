@@ -124,6 +124,20 @@ export class GMPacing {
     else this.changed();
   }
 
+  /**
+   * A lasting effect's seconds, stretched to end with a whole turn. While the fight is paced it ends on a round
+   * boundary of the shared clock (a stun landing 1 s into a round and asked for 6 s runs to the end of the round
+   * after next), so nobody plans an action and loses part of their turn to an effect running out mid-round. In real
+   * time there's no shared clock, so it's rounded up to whole rounds
+   */
+  static turnAlignedSeconds(seconds: number): number {
+    if (!(seconds > 0)) return seconds;
+    const round = CombatRound.ROUND_LENGTH / 1000;
+    const offset = this.phase === 'play' ? Math.min(this.windowTime, round) : 0;
+    // (a hair under a round counts as the round: durations come in as 5.999 from timers)
+    return Math.ceil((offset + seconds - 1e-3) / round) * round - offset;
+  }
+
   /** Rounds played between holds (events mode holds only on its events) */
   static windowsPerHold(): number {
     return this.mode === 'rounds' ? this.everyRounds : Infinity;
