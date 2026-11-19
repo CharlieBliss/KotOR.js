@@ -308,6 +308,15 @@ export class AudioEngine {
   }
 
   update ( delta: number, position = new THREE.Vector3(), rotation = new THREE.Euler(), forward = new THREE.Vector3() ) {
+    // The listener only takes finite numbers: a NaN camera or forward vector (a map still placing its camera)
+    // threw every frame. It stays where it was until they're good
+    const finite = (...v: number[]) => v.every(Number.isFinite);
+    const placed = finite(position.x, position.y, position.z) && finite(forward.x, forward.y, forward.z) && (forward.x || forward.y || forward.z);
+    if(placed) this.updateListener(position, rotation, forward);
+    this.updateMusic(delta);
+  }
+
+  private updateListener(position: THREE.Vector3, rotation: THREE.Euler, forward: THREE.Vector3){
     // Set listener position using modern AudioParam properties
     if(typeof this.audioCtx.listener.positionX !== 'undefined'){
       this.audioCtx.listener.positionX.value = position.x;
@@ -334,6 +343,9 @@ export class AudioEngine {
       [position.x, position.y, position.z],
       [rotation.x, rotation.y, rotation.z]
     );
+  }
+
+  private updateMusic(delta: number){
 
     //Handle the background music loop
     if(this.areaMusicLoaded && this.bgmState == BackgroundMusicState.ENDED && this.bgmMode == BackgroundMusicMode.AREA){

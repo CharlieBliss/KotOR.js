@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import { GMManager, GMNetworkManager } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { CharacterCreator } from "@/apps/game/components/gm-panel/creator/CharacterCreator";
+import { CareersCreator } from "@/apps/game/components/gm-panel/creator/CareersCreator";
 
 /** The join form a player fills in, kept by the panel (the Session tab shows it too) */
 export interface GMJoinForm {
@@ -21,7 +22,10 @@ export interface GMJoinForm {
 export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = ({ join, leaveJoin }) => {
   const { joinUrl, setJoinUrl, joinPlayerName, setJoinPlayerName, joinPresetIdx, setJoinPresetIdx, joinCharacterId, setJoinCharacterId, startJoin } = join;
   const [creatorOpen, setCreatorOpen] = useState(false);
+  const [careersCreatorOpen, setCareersCreatorOpen] = useState(false);
+  const isTSL = KotOR.GameState.GameKey === KotOR.GameEngineType?.TSL;
   const characters = KotOR.GMCharacters.list();
+  const careersCharacters = isTSL && KotOR.GMCareersCharacters ? KotOR.GMCareersCharacters.list() : [];
   const joinState = GMNetworkManager.joinState;
   const joinInProgress = GMNetworkManager.role === 'client' && joinState !== 'playing' && joinState !== 'idle';
   const joinStatusText: Record<string, [string, string]> = {
@@ -68,12 +72,16 @@ export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = (
               <select
                 id="gm-join-build"
                 className="gm-select"
-                value={joinCharacterId ? `chr:${joinCharacterId}` : `preset:${joinPresetIdx}`}
+                value={joinCharacterId ? (joinCharacterId.startsWith('car:') ? joinCharacterId : `chr:${joinCharacterId}`) : `preset:${joinPresetIdx}`}
                 onChange={e => {
                   const [kind, value] = e.target.value.split(':');
                   if (kind === 'chr') {
                     setJoinCharacterId(value);
                     const c = characters.find((x) => x.id === value);
+                    if (c) setJoinPlayerName(c.name);
+                  } else if (kind === 'car') {
+                    setJoinCharacterId(`car:${value}`);
+                    const c = careersCharacters.find((x) => x.id === value);
                     if (c) setJoinPlayerName(c.name);
                   } else {
                     setJoinCharacterId('');
@@ -81,6 +89,14 @@ export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = (
                   }
                 }}
               >
+                {careersCharacters.length > 0 && (
+                  <optgroup label="Careers characters (KotOR II)">
+                    {careersCharacters.map((c) => {
+                      const d = KotOR.CareersRules.derive(c);
+                      return <option key={c.id} value={`car:${c.id}`}>{c.name || 'Unnamed'} (Careers Lv.{d.level})</option>;
+                    })}
+                  </optgroup>
+                )}
                 {characters.length > 0 && (
                   <optgroup label="Your characters">
                     {characters.map((c) => <option key={c.id} value={`chr:${c.id}`}>{c.name} (Lv.{c.level})</option>)}
@@ -94,8 +110,11 @@ export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = (
               </select>
             </div>
           </div>
-          <div className="gm-row" style={{ justifyContent: 'flex-start' }}>
+          <div className="gm-row" style={{ justifyContent: 'flex-start', gap: 6 }}>
             <button className="gm-btn" onClick={() => setCreatorOpen(true)}>Make or edit characters…</button>
+            {isTSL && (
+              <button className="gm-btn" onClick={() => setCareersCreatorOpen(true)}>Careers characters…</button>
+            )}
           </div>
           {creatorOpen && (
             <CharacterCreator
@@ -103,6 +122,14 @@ export const JoinCard: React.FC<{ join: GMJoinForm; leaveJoin: () => void }> = (
               useLabel="Choose"
               onUse={(c) => { setJoinCharacterId(c.id); setJoinPlayerName(c.name); setCreatorOpen(false); }}
               startEditing={characters.length === 0}
+            />
+          )}
+          {careersCreatorOpen && (
+            <CareersCreator
+              onClose={() => setCareersCreatorOpen(false)}
+              useLabel="Choose"
+              onUse={(c) => { setJoinCharacterId(`car:${c.id}`); setJoinPlayerName(c.name); setCareersCreatorOpen(false); }}
+              startEditing={careersCharacters.length === 0}
             />
           )}
           <div className="gm-row" style={{ justifyContent: 'flex-end' }}>

@@ -499,14 +499,17 @@ export class ModuleObject {
     let faster = 1, slower = 0;
     for(const effect of this.effects){
       if(!effect) continue;
+      // An effect without its amount counts for nothing (Math.max with NaN is NaN: the creature's speed was)
+      const percent = Number(effect.getInt(0));
+      if(!Number.isFinite(percent)) continue;
       if(effect.type == GameEffectType.EffectMovementSpeedIncrease){
-        const percent = effect.getInt(0);
         faster = Math.max(faster, (percent < 100 ? percent + 100 : percent) / 100);
       }else if(effect.type == GameEffectType.EffectMovementSpeedDecrease){
-        slower = Math.max(slower, Math.min(99, Math.max(0, effect.getInt(0))) / 100);
+        slower = Math.max(slower, Math.min(99, Math.max(0, percent)) / 100);
       }
     }
-    this.movementSpeed = faster * (1 - slower);
+    const speedScale = (this as any).careersRules?.getSpeedMultiplier?.() ?? 1;
+    this.movementSpeed = faster * (1 - slower) * speedScale;
   }
 
   /** What its effects decide, worked out again whenever one goes on or comes off */

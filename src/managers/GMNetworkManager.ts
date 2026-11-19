@@ -1,5 +1,7 @@
 import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
+import type { GMPacingState } from "@/managers/gm/GMPacing";
+import type { GMCareersCharacter, GMCareersNetworkState, GMRuleset, CareersPurchaseRequest } from "@/managers/gm/careers/types";
 import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 import { GameState } from "@/GameState";
 
@@ -45,7 +47,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel' | 'ready' | 'move' | 'spend_xp';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -140,6 +142,8 @@ export interface GMPlayerSheet {
   /** equipment slot name (RIGHTHAND, ARMOR...) -> item resref */
   equipment: Record<string, string>;
   inventory: GMLootItem[];
+  /** Live Careers state (character sheet, Strain, winded) when running under the Careers rule set */
+  careers?: GMCareersNetworkState;
 }
 
 export interface GMClientIntent {
@@ -160,6 +164,14 @@ export interface GMClientIntent {
   check?: GMCheck;
   /** wheel: the player opened (true) or closed their power wheel (the tactical pause rule holds the world meanwhile) */
   open?: boolean;
+  /** ready: the player is ready (true) or not to play the planned round (GMPacing) */
+  ready?: boolean;
+  /** move: where the player plans to go in the coming round */
+  x?: number;
+  y?: number;
+  z?: number;
+  /** spend_xp: a Careers post-creation XP purchase to validate and apply on the host */
+  purchase?: CareersPurchaseRequest;
 }
 
 export interface GMPeerInfo {
@@ -190,6 +202,8 @@ export interface GMSerializedActor {
   combat?: boolean;
   /** A player's character: the icons of its combat action and what's queued after it, for its player's HUD */
   queue?: string[];
+  /** While the world holds to plan: what this NPC is about to do ("attacking Mira"), when the GM shows intents */
+  intent?: string;
   /** Host is executing an intent for this player-owned actor, so the host owns its position */
   hostDriven?: boolean;
   /** Last client intent sequence number the host has applied to this actor */
@@ -235,6 +249,8 @@ export type GMDeathRule = 'kotor' | 'gm' | 'respawn';
 
 /** Session-wide rules the GM sets, which players need to know */
 export interface GMSessionRules {
+  /** Which rule set this session runs ('kotor' by default; 'careers' in KotOR II only) */
+  ruleset?: GMRuleset;
   deathRule: GMDeathRule;
   /** Players can only watch: no moving or acting, and NPCs leave them alone */
   frozen?: boolean;
@@ -244,6 +260,10 @@ export interface GMSessionRules {
   cutscene?: { active: boolean; caption?: string };
   /** Tactical pause: a player's open power wheel holds the world; by names who is choosing now */
   tacticalPause?: { enabled: boolean; by?: string[] };
+  /** The GM paused the world: it holds on every machine */
+  paused?: boolean;
+  /** Plan-then-play fights (GMPacing) */
+  pacing?: GMPacingState;
 }
 
 export interface GMWorldSnapshot {
@@ -271,6 +291,8 @@ export interface GMPlayerJoinPreset {
   armorResRef?: string;
   /** A character the player made (GMCharacters); the host holds it to the session's creation limits */
   character?: GMCharacter;
+  /** A character made for the Careers rule set (KotOR II); checked on join by the host */
+  careersCharacter?: GMCareersCharacter;
 }
 
 /** A player's character as their game streams it to the host (see GMNetworkManager.update) */
@@ -307,12 +329,18 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   levelup: { hostDriven: false, interrupts: false },
   roll: { hostDriven: false, interrupts: false },
   wheel: { hostDriven: false, interrupts: false },
+  ready: { hostDriven: false, interrupts: false },
+  // Planned during the hold: it goes in front of what's queued, so it doesn't stop it
+  move: { hostDriven: true, interrupts: false },
+  spend_xp: { hostDriven: false, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */
 export interface GMPacketMap {
   'host.register': { sessionName?: string; [key: string]: any };
   'peer.join': { name?: string; preset?: GMPlayerJoinPreset; [key: string]: any };
+  /** Host to one player: refused on join (e.g. character doesn't match the session's rule set) */
+  'join.refused': { reason: string; ruleset?: GMRuleset };
   'peer.leave': { wasHost?: boolean; name?: string };
   'world.snapshot': GMWorldSnapshot;
   'world.tick': { actors: GMSerializedActor[] };
@@ -752,6 +780,11 @@ export class GMNetworkManager {
       this.notifyChange();
     }, 'to-me-or-all');
 
+    this.on('join.refused', 'client', (packet) => {
+      const reason = packet.payload?.reason || 'The GM could not admit that character to this session.';
+      this.failJoin(reason);
+    }, 'to-me');
+
     this.on('relay.error', 'any', (packet) => {
       const { code, message } = packet.payload || ({} as GMPacketMap['relay.error']);
       if (code === 'peer-id-in-use') {
@@ -816,7 +849,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean; ready?: boolean; x?: number; y?: number; z?: number; purchase?: CareersPurchaseRequest } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {

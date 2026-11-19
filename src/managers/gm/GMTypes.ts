@@ -1,6 +1,7 @@
 import type { GMPlayerSheet, GMSessionRules } from "@/managers/GMNetworkManager";
 import type { ICharacterAttributes } from "@/engine/rules/CharacterBuilder";
 import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
+import type { GMCareersCharacter, GMRuleset } from "@/managers/gm/careers/types";
 
 export type GMControlMode = 'FREECAM' | 'POSSESS';
 export type GMToolMode = 'select' | 'place_creature' | 'place_placeable' | 'place_player' | 'teleport' | 'place_mine' | 'place_set'
@@ -171,6 +172,8 @@ export interface GMSceneBlueprint {
 }
 
 export interface GMPlayerSpawnConfig {
+  /** Which rule set built this character (omitted or 'kotor' uses classic KotOR rules) */
+  ruleset?: GMRuleset;
   name: string;
   appearanceId: number;
   portraitId: number;
@@ -183,6 +186,16 @@ export interface GMPlayerSpawnConfig {
   fp?: number;
   /** Which side's recommended Force powers the class takes (light by default) */
   alignment?: 'light' | 'dark';
+  /** Explicit GoodEvil byte (0–100); defaults to 50 for classic spawns */
+  goodEvil?: number;
+  /** Explicit NaturalAC byte; defaults to 2 for classic spawns, 0 for careers */
+  naturalAC?: number;
+  /** Explicit Race byte (6 = organic, 5 = droid); defaults to 6 */
+  race?: number;
+  /** Explicit SubraceIndex byte (0 avoids Wookiee SubRace 1 HP formula for careers) */
+  subraceIndex?: number;
+  /** Explicit raw saving throw bases written into FortSaveThrow / RefSaveThrow / WillSaveThrow */
+  saves?: { fortitude: number; reflex: number; will: number };
   str: number;
   dex: number;
   con: number;
@@ -198,6 +211,8 @@ export interface GMPlayerSpawnConfig {
   spellIds?: number[];
   /** Override the class's skill ranks (CharacterBuilder): skills.2da row -> rank */
   skillRanks?: number[];
+  /** Attached Careers character sheet when ruleset === 'careers' */
+  careers?: GMCareersCharacter;
   possessImmediately?: boolean;
   ownerPeerId?: string;
 }
@@ -290,6 +305,8 @@ export interface GMSessionSave {
   atmosphere?: GMAtmosphereSettings;
   /** Rooms of other areas placed in the scene (GMSetPieces) */
   sets?: AreaSetPieceDef[];
+  /** Careers rules: the campaign XP the GM has awarded each player, by lowercased player name (host's record) */
+  careersXp?: Record<string, number>;
 }
 
 /**

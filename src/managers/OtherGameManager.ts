@@ -269,7 +269,18 @@ export class OtherGameManager {
     if (!(await this.mount())) return [];
     const dir = `${GameFileSystem.OTHER_GAME_PREFIX}/modules`;
     const archives: (RIMObject | ERFObject)[] = [];
-    const tryOpen = async (file: string, kind: 'rim' | 'erf') => {
+    // The folder's own spelling of each file: names don't match by case (KotOR's cutscene modules are STUNT_00.rim)
+    const actual = new Map<string, string>();
+    try {
+      for (const f of await GameFileSystem.readdir(dir)) {
+        const base = String(f).split(/[\\/]/).pop() || '';
+        actual.set(base.toLowerCase(), base);
+      }
+    } catch (e) {
+      // Without a listing, try the names as given
+    }
+    const tryOpen = async (name: string, kind: 'rim' | 'erf') => {
+      const file = actual.get(name.toLowerCase()) ?? name;
       const filepath = `${dir}/${file}`;
       if (!(await GameFileSystem.exists(filepath))) return;
       try {

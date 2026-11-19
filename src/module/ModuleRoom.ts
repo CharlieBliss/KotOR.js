@@ -953,12 +953,11 @@ export class ModuleRoom extends ModuleObject {
     if(this.collisionManager.walkmesh)
       this.collisionManager.walkmesh.dispose();
 
-    try{
-      let wmIdx = GameState.walkmeshList.indexOf(this.collisionManager.walkmesh.mesh);
-      GameState.walkmeshList.splice(wmIdx, 1);
-    }catch(e){
-      console.error(e);
-    }
+    // A room without a walkmesh (its file is missing) has none to remove; and a mesh not in the list must not
+    // splice(-1) away another room's
+    const mesh = this.collisionManager.walkmesh?.mesh;
+    const wmIdx = mesh ? GameState.walkmeshList.indexOf(mesh) : -1;
+    if(wmIdx >= 0) GameState.walkmeshList.splice(wmIdx, 1);
 
     try{
       if(this.grass){

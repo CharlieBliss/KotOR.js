@@ -28,6 +28,8 @@ const mockKotOR: any = {
   },
   GMManager: {
     active: false,
+    ruleset: "kotor",
+    setRuleset: jest.fn(),
     controlMode: "FREECAM",
     activeTool: "select",
     lastPlacementTool: "place_creature",
@@ -134,6 +136,26 @@ const mockKotOR: any = {
     stealth: jest.fn(() => ({ can: true, on: false })),
     lastNotice: null as any,
     setWheelOpen: jest.fn(),
+    pacing: jest.fn((): any => undefined),
+    planning: jest.fn(() => false),
+    plannedMove: null as any,
+    readySent: false,
+    planSecondsLeftNow: jest.fn((): any => undefined),
+    setReady: jest.fn(),
+  },
+  GMPacing: {
+    mode: 'off', phase: 'off', round: 0, timeLimit: 0, showIntents: true, planners: [] as string[],
+    state: () => ({ mode: 'off', phase: 'off', round: 0, ready: [] as string[], waiting: [] as string[], timeLimit: 0, showIntents: true }),
+    configure: jest.fn(), go: jest.fn(),
+  },
+  GM_PACING_MODES: [{ id: 'off', label: 'Real time', title: '' }],
+  GMCareersCharacters: {
+    list: jest.fn((): any[] => []),
+    get: jest.fn((): any => undefined),
+    listeners: new Set(),
+  },
+  CareersRules: {
+    derive: jest.fn(() => ({ level: 1 })),
   },
 };
 

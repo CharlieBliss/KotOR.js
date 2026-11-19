@@ -233,7 +233,15 @@ export class SpellCastInstance {
       if(!this.item && this.spell && typeof (this.owner as any)?.subtractFP === 'function'){
         const fpCost = this.spell.getForcePointCost(this.owner);
         if(fpCost > 0){
-          (this.owner as any).subtractFP(fpCost);
+          const careers = (this.owner as any).careersRules;
+          if(careers){
+            const currentFp = typeof (this.owner as any).getFP === 'function' ? Number((this.owner as any).getFP()) : 0;
+            const paid = careers.payForceCost(fpCost, currentFp);
+            if(!paid.ok) return;
+            if(paid.fpToSpend > 0) (this.owner as any).subtractFP(paid.fpToSpend);
+          }else{
+            (this.owner as any).subtractFP(fpCost);
+          }
         }
       }
       

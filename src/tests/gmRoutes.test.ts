@@ -50,6 +50,6 @@ describe("GM packet routes", () => {
 
   test("only intents where the host acts for the player take over their character", () => {
     const hostDriven = Object.entries(GM_INTENTS).filter(([, v]) => v.hostDriven).map(([k]) => k).sort();
-    expect(hostDriven).toEqual(["ability", "attack", "mine", "open", "use"]);
+    expect(hostDriven).toEqual(["ability", "attack", "mine", "move", "open", "use"]);
   });
 });

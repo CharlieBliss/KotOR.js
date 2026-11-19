@@ -16,6 +16,7 @@ import type {
   GMSessionSave,
 } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
@@ -226,6 +227,7 @@ export class GMSessions {
       groups: groups.length ? groups : undefined,
       atmosphere: Object.keys(GMAtmosphere.current).length ? { ...GMAtmosphere.current } : undefined,
       sets: sets.length ? sets : undefined,
+      careersXp: GMPlayers.careersXpAwarded.size ? Object.fromEntries(GMPlayers.careersXpAwarded) : undefined,
     };
   }
 
@@ -294,8 +296,14 @@ export class GMSessions {
    */
   static async loadSession(save: GMSessionSave): Promise<boolean> {
     if (!save?.scene?.module) return false;
+    GMManager.setRuleset(save.rules?.ruleset === 'careers' ? 'careers' : 'kotor', true);
+    GMPlayers.careersXpAwarded = new Map(Object.entries(save.careersXp || {})
+      .filter(([, xp]) => Number.isFinite(xp) && xp >= 0));
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
+    GMPacing.configure(save.rules?.pacing
+      ? { mode: save.rules.pacing.mode, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents }
+      : { mode: 'off', timeLimit: 0, showIntents: true });
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 

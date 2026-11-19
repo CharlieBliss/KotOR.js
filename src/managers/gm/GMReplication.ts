@@ -12,6 +12,7 @@ import type { ITwoDAAnimation } from "@/interface/twoDA/ITwoDAAnimation";
 import type { GameEffect } from "@/effects/GameEffect";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import {
   GMNetworkManager,
   GMSerializedActor,
@@ -102,6 +103,7 @@ export class GMReplication {
       animState: isPlaceable ? 0 : ((obj as ModuleCreature).animationState?.index || 0),
       combat: isPlaceable ? undefined : !!(obj as ModuleCreature).combatData?.combatState,
       queue: obj.gmOwnerPeerId && !isPlaceable ? this.queueOf(obj as ModuleCreature) : undefined,
+      intent: this.intentOf(obj),
       hidden: !!obj.gmHidden,
       stealth: !!(obj as any).stealthMode,
       movementSpeed: isPlaceable ? undefined : (obj as ModuleCreature).movementSpeed,
@@ -126,6 +128,13 @@ export class GMReplication {
   }
 
   /** Host: a player character's combat action and queue, as icons (what the HUD's queue shows) */
+  /** While the world holds to plan, what an NPC in the fight is about to do (when the GM shows intents) */
+  static intentOf(obj: ModuleObject): string | undefined {
+    if (GMPacing.phase !== 'plan' || !GMPacing.showIntents || obj.gmOwnerPeerId || !GMObjectKind.isCreature(obj)) return undefined;
+    if (!(obj as ModuleCreature).combatData?.combatState || (obj as ModuleCreature).isDead?.()) return undefined;
+    return GMPacing.describeIntent(obj as ModuleCreature);
+  }
+
   static queueOf(cre: ModuleCreature): string[] {
     const round = cre.combatRound;
     if (!round) return [];
@@ -302,6 +311,7 @@ export class GMReplication {
     if (!actor || actor.hidden || !GameState.module?.area) return null;
     const existing = GMManager.netIdMap.get(actor.netId);
     if (existing) {
+      existing.gmNetIntent = actor.intent;
       if (actor.kind === 'placeable') {
         if (existing.position.x !== actor.x || existing.position.y !== actor.y || existing.position.z !== actor.z) {
           existing.position.set(actor.x, actor.y, actor.z);

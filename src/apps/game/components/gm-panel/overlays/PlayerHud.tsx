@@ -113,6 +113,116 @@ const TargetRings: React.FC = () => {
   );
 };
 
+/**
+ * While the world holds to plan a round: the planned move's ring on the ground, a line to it, and what each enemy
+ * is about to do over its head, drawn every frame
+ */
+const PlanMarks: React.FC = () => {
+  const ringRef = useRef<HTMLDivElement>(null);
+  const lineRef = useRef<HTMLDivElement>(null);
+  const labelsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    let raf = 0;
+    const v = new THREE.Vector3(), w = new THREE.Vector3(), right = new THREE.Vector3(), edge = new THREE.Vector3();
+    const labels = new Map<any, HTMLDivElement>();
+    const toScreen = (p: THREE.Vector3, out: THREE.Vector3, cam: THREE.Camera, rect: DOMRect) => {
+      out.copy(p).project(cam);
+      if (out.z > 1 || out.z < -1) return false;
+      out.set(rect.left + ((out.x + 1) / 2) * rect.width, rect.top + ((1 - out.y) / 2) * rect.height, 0);
+      return true;
+    };
+    const frame = () => {
+      raf = requestAnimationFrame(frame);
+      const cam = KotOR.GameState.currentCamera as THREE.PerspectiveCamera;
+      const canvas = KotOR.GameState.renderer?.domElement as HTMLCanvasElement | undefined;
+      const ring = ringRef.current, line = lineRef.current, holder = labelsRef.current;
+      if (!ring || !line || !holder) return;
+      const planning = GMPlayerHud.planning();
+      const pc: any = GMPlayerHud.player();
+      const rect = canvas?.getBoundingClientRect();
+      // The planned move
+      const to = planning ? GMPlayerHud.plannedMove : null;
+      if (to && pc && cam && rect && toScreen(to, v, cam, rect) && toScreen(pc.position, w, cam, rect)) {
+        right.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
+        edge.copy(to).addScaledVector(right, 0.5).project(cam);
+        const r = Math.max(8, Math.min(80, Math.abs(edge.x - to.clone().project(cam).x) / 2 * rect.width));
+        ring.style.display = 'block';
+        ring.style.left = `${v.x - r}px`;
+        ring.style.top = `${v.y - r * 0.4}px`;
+        ring.style.width = `${2 * r}px`;
+        ring.style.height = `${0.8 * r}px`;
+        const dx = v.x - w.x, dy = v.y - w.y;
+        line.style.display = 'block';
+        line.style.left = `${w.x}px`;
+        line.style.top = `${w.y}px`;
+        line.style.width = `${Math.hypot(dx, dy)}px`;
+        line.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
+      } else {
+        ring.style.display = 'none';
+        line.style.display = 'none';
+      }
+      // What each enemy is about to do
+      const seen = new Set<any>();
+      const creatures: any[] = planning && cam && rect ? (KotOR.GameState.module?.area?.creatures || []) : [];
+      for (const c of creatures) {
+        if (!c?.gmNetIntent || c === pc || GMPlayerHud.relation(c, pc) !== 'enemy') continue;
+        v.copy(c.position);
+        v.z += 2.1;
+        if (!toScreen(v, v, cam, rect as DOMRect)) continue;
+        seen.add(c);
+        let el = labels.get(c);
+        if (!el) {
+          el = document.createElement('div');
+          el.className = 'gm-hud-intent';
+          holder.appendChild(el);
+          labels.set(c, el);
+        }
+        if (el.textContent !== c.gmNetIntent) el.textContent = c.gmNetIntent;
+        el.style.left = `${v.x}px`;
+        el.style.top = `${v.y}px`;
+      }
+      for (const [c, el] of labels) if (!seen.has(c)) { el.remove(); labels.delete(c); }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => { cancelAnimationFrame(raf); for (const el of labels.values()) el.remove(); };
+  }, []);
+  return (
+    <>
+      <div ref={lineRef} className="gm-hud-plan-line" aria-hidden="true" />
+      <div ref={ringRef} className="gm-hud-ring planned" aria-hidden="true" />
+      <div ref={labelsRef} className="gm-hud-intents" aria-hidden="true" />
+    </>
+  );
+};
+
+/** The round being planned (the world holds: pick an action, steer your move, then Ready) or played */
+const PlanBanner: React.FC<{ padInUse: boolean }> = ({ padInUse }) => {
+  const pacing = GMPlayerHud.pacing();
+  if (!pacing || pacing.phase === 'off') return null;
+  if (pacing.phase === 'play') return <div className="gm-hud-plan playing">Round {pacing.round} playing</div>;
+  const left = GMPlayerHud.planSecondsLeftNow();
+  const ready = GMPlayerHud.readySent;
+  return (
+    <div className="gm-hud-plan" role="status">
+      <div className="gm-hud-plan-title">
+        Round {pacing.round} · Plan your move{left !== undefined ? <span className="gm-hud-plan-time"> · {left}s</span> : null}
+      </div>
+      <div className="gm-hud-plan-hint">
+        Pick an action, steer where to go with {padInUse ? 'the left stick' : 'W / S and the mouse'}, then Ready.
+      </div>
+      {(pacing.ready.length > 0 || pacing.waiting.length > 0) && (
+        <div className="gm-hud-plan-who">
+          {pacing.ready.length > 0 && <span className="ready">Ready: {pacing.ready.join(', ')}</span>}
+          {pacing.waiting.length > 0 && <span className="waiting">Choosing: {pacing.waiting.join(', ')}</span>}
+        </div>
+      )}
+      <button className={`gm-hud-plan-ready ${ready ? 'on' : ''}`} onClick={() => GMPlayerHud.setReady(!ready)}>
+        {ready ? 'Ready ✓ (undo)' : 'Ready'} <kbd>{padInUse ? 'R3' : 'Space'}</kbd>
+      </button>
+    </div>
+  );
+};
+
 function landing(a: GMHudAbility): { text: string; side: string; title: string } {
   const l = GMPlayerHud.landsOn(a);
   const name = (l.who as any)?.getName?.() || '';
@@ -228,6 +338,15 @@ const SelfFrame: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
             <em>Force {Math.max(0, Math.floor(fp))} / {maxFp}</em>
           </span>
         )}
+        {pc.careersRules && (() => {
+          const st = pc.careersRules.getStrainState();
+          return (
+            <span className={`gm-hud-bar strain ${st.windedSeconds > 0 ? 'winded' : ''}`} title={st.windedSeconds > 0 ? `Winded for ${Math.ceil(st.windedSeconds)}s: slowed, Strain abilities locked` : 'Strain (combat feats & pushes)'}>
+              <span style={{ width: pct(st.strain, st.maxStrain) }} />
+              <em>{st.windedSeconds > 0 ? `WINDED (${Math.ceil(st.windedSeconds)}s)` : `Strain ${Math.round(st.strain)} / ${st.maxStrain}`}</em>
+            </span>
+          );
+        })()}
       </span>
     </button>
   );
@@ -657,6 +776,12 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
         if (!e.repeat) sneak();
         return;
       }
+      // Planning a round: Space says you're ready (or takes it back)
+      if (e.code === 'Space' && GMPlayerHud.planning()) {
+        stop(e);
+        if (!e.repeat) GMPlayerHud.setReady(!GMPlayerHud.readySent);
+        return;
+      }
       if (e.code === 'Enter') {
         stop(e);
         onOpenChatRef.current();
@@ -788,6 +913,8 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
         else say(GMPlayerHud.selected() ? 'Nothing to do with it' : 'No target: RT picks an enemy');
       }
       if (edges.pressed.has(PAD.DOWN)) pad.current.area = 'quick';
+      // Planning a round: R3 says you're ready (or takes it back)
+      if (edges.pressed.has(PAD.R3) && GMPlayerHud.planning()) GMPlayerHud.setReady(!GMPlayerHud.readySent);
     };
     raf = requestAnimationFrame(tick);
     return () => { cancelAnimationFrame(raf); GMPlayerHud.padClaims = null; setPadFocus(null); };
@@ -806,7 +933,9 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
   return (
     <div className="gm-player-hud">
       <TargetRings />
+      <PlanMarks />
       <TargetFrame onAction={act} />
+      <PlanBanner padInUse={padInUse} />
 
       {held.length > 0 && (
         <div className="gm-hud-paused">Paused: {held.join(', ')} {held.length === 1 ? 'is' : 'are'} choosing a power</div>

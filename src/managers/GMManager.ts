@@ -52,6 +52,8 @@ import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
+import { GMPacing } from "@/managers/gm/GMPacing";
+import type { GMRuleset } from "@/managers/gm/careers/types";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
 export * from "@/managers/gm/GMTypes";
@@ -78,6 +80,14 @@ export class GMManager {
   static preservePartyOnWarp: boolean = true;
 
   static worldPaused: boolean = false;
+
+  /** The GM pauses (or resumes) the world, on every machine */
+  static setWorldPaused(paused: boolean) {
+    this.worldPaused = !!paused;
+    GMLog.info('host', paused ? 'the GM paused the world' : 'the GM resumed the world');
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+  }
 
   /** What the GM has selected, in the order it was picked (the Inspector edits all of them together) */
   static selection: ModuleObject[] = [];
@@ -124,10 +134,52 @@ export class GMManager {
   /** Where players joining this scene appear (a scene plan's start), instead of the camera target */
   static sceneStartPoint: THREE.Vector3 | null = null;
 
+  /** Session rule set: 'kotor' (classic) or 'careers' (KotOR II only) */
+  static ruleset: GMRuleset = 'kotor';
+
+  /**
+   * Why the session can't switch to this rule set right now, or null when it can: player characters built
+   * under the other rule set are in the scene (they'd keep playing by rules the session no longer uses)
+   */
+  static rulesetLockReason(ruleset: GMRuleset): string | null {
+    if (ruleset === this.ruleset) return null;
+    const others = this.spawnedPlayers.filter((pc) => pc && !pc.destroyed
+      && ((pc.gmPlayerConfig?.ruleset === 'careers') !== (ruleset === 'careers')));
+    if (!others.length) return null;
+    const names = others.map((pc) => pc.firstName || pc.gmPlayerConfig?.name || 'a player').slice(0, 3).join(', ');
+    return `${names}${others.length > 3 ? ' and others' : ''} ${others.length === 1 ? 'was' : 'were'} made with the ${this.ruleset === 'careers' ? 'Careers' : 'classic'} rules. Remove ${others.length === 1 ? 'that character' : 'those characters'} first.`;
+  }
+
+  /**
+   * Switch the session's rule set ('careers' is KotOR II only); broadcasts to players. Refused while player
+   * characters of the other rule set are in the scene, unless `force` (loading a saved session, which replaces them)
+   */
+  static setRuleset(ruleset: GMRuleset, force: boolean = false): boolean {
+    const next: GMRuleset = ruleset === 'careers' ? 'careers' : 'kotor';
+    if (next === 'careers' && GameState.GameKey !== GameEngineType.TSL) {
+      GMLog.warn('host', 'The Careers rule set is only available in KotOR II.');
+      return false;
+    }
+    if (this.ruleset === next) return true;
+    const locked = force ? null : this.rulesetLockReason(next);
+    if (locked) {
+      GMLog.warn('host', `rule set not changed: ${locked}`);
+      return false;
+    }
+    this.ruleset = next;
+    GMLog.info('host', `session rule set: ${next}`);
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+    return true;
+  }
+
   static sessionRules(): GMSessionRules {
     return {
+      ruleset: this.ruleset,
       deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state(),
       tacticalPause: { enabled: this.tacticalPause, by: [...this.wheelHolds.values()].map((h) => h.name) },
+      paused: this.worldPaused,
+      pacing: GMPacing.state(),
     };
   }
 
@@ -164,8 +216,11 @@ export class GMManager {
    * On a player's machine, the host's word on wheels (the session rules).
    */
   static worldHeld(): boolean {
-    if (this.worldPaused) return true;
-    if (GMNetworkManager.role === 'client') return !!GMNetworkManager.sessionRules?.tacticalPause?.by?.length;
+    if (GMNetworkManager.role === 'client') {
+      const rules = GMNetworkManager.sessionRules;
+      return !!(rules?.paused || rules?.pacing?.phase === 'plan' || rules?.tacticalPause?.by?.length);
+    }
+    if (this.worldPaused || GMPacing.phase === 'plan') return true;
     return this.wheelHolds.size > 0;
   }
 
@@ -568,6 +623,8 @@ export class GMManager {
 
     this.sceneLoading = true;
     this.selectedObject = null;
+    // A new scene starts in real time
+    GMPacing.stop('a new scene');
     // What could be undone was in the old scene
     GMHistory.clear();
     // A new scene starts unfrozen, with its own start point (a scene plan sets them again)
@@ -585,7 +642,13 @@ export class GMManager {
       );
     }
 
-    GameState.LoadModule(moduleResRef);
+    // A scene that won't load says so once and puts the game in the default scene, not on a stuck loading screen
+    GameState.LoadModule(moduleResRef).catch((e) => {
+      this.sceneLoading = false;
+      const fallback = this.defaultSceneModule();
+      GMNetworkManager.appendChat('System', `The "${moduleResRef}" area couldn't be loaded (${e?.message || e}).${moduleResRef === fallback ? '' : ` Loading ${fallback} instead.`}`);
+      if (GMNetworkManager.role !== 'client' && moduleResRef !== fallback) this.loadScene(fallback);
+    });
 
     // Once the new scene is up, bring the preserved players back (not awaited: callers only start the load)
     if (savedPlayerConfigs.length > 0 || savedNetworkPlayers.length > 0) {
@@ -1356,6 +1419,7 @@ export class GMManager {
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);
     GMCutscene.update(delta);
+    GMPlayerHud.updatePlannedMove(delta);
     if (GMNetworkManager.role === 'host') this.expireWheelHolds();
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
@@ -1365,6 +1429,17 @@ export class GMManager {
         GMPlayers.updateDownedPlayers(GMPlayers.downedTimer);
         GMPlayers.downedTimer = 0;
       }
+      // Careers Strain recovery and winded timers advance in world time on the host
+      for (const pc of this.spawnedPlayers) {
+        if (pc && !pc.destroyed && !pc.isDead?.() && pc.careersRules) {
+          pc.careersRules.tick(delta, !!pc.combatData?.combatState);
+        }
+      }
+    }
+
+    // Plan-then-play fights: the host holds the world for planning and plays one round at a time
+    if (GMNetworkManager.role !== 'client' && !this.sceneLoading) {
+      GMPacing.update(delta, GMPacing.scan(), this.worldPaused || this.wheelHolds.size > 0);
     }
 
     // NPCs run on the GM's machine only; players see the result through the world updates
@@ -1458,6 +1533,7 @@ export class GMManager {
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
     isWorldPaused: () => GMManager.worldHeld(),
+    steerPlannedMove: (creature, facing) => GMPlayerHud.steerPlannedMove(creature, facing),
     ownsCombatHud: () => GMPlayerHud.active(),
     padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),
     sharedWorld: () => GMNetworkManager.role !== 'offline',
@@ -1506,6 +1582,16 @@ export class GMManager {
     },
   };
 }
+
+// A player's game follows the host's rule set (the creator, the sheet and the join card read GMManager.ruleset)
+GMNetworkManager.on('session.rules', 'client', (packet) => {
+  const ruleset = packet.payload?.ruleset;
+  if (ruleset === 'careers' || ruleset === 'kotor') GMManager.ruleset = ruleset;
+});
+GMNetworkManager.on('join.refused', 'client', (packet) => {
+  const ruleset = packet.payload?.ruleset;
+  if (ruleset === 'careers' || ruleset === 'kotor') GMManager.ruleset = ruleset;
+}, 'to-me');
 
 // A player's game takes control of the character the GM hands it
 GMNetworkManager.on('actor.assign', 'client', (packet) => {

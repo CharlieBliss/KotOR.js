@@ -49,6 +49,8 @@ export interface GMObjectState {
   gmNetTarget?: THREE.Vector3;
   /** Client: our character's combat action and queue on the host, as icons (the HUD's queue) */
   gmNetQueue?: string[];
+  /** Client: while the world holds to plan, what this NPC is about to do, as the host says (GMPacing) */
+  gmNetIntent?: string;
   /** Client: whether this creature's weapons were last powered up (with the host's combat state) */
   gmNetPowered?: boolean;
   /** When this player character last rolled a skill (performance clock, ms), for GMChecks' cooldown */

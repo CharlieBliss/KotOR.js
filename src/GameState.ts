@@ -69,6 +69,7 @@ import { DEFAULT_ENGINE_HOOKS } from "@/engine/EngineHooks";
 import type { EngineHooks } from "@/engine/EngineHooks";
 import { PerformanceMonitor } from "@/utility/PerformanceMonitor";
 import { Dice } from "@/utility/Dice";
+import { FrameGuard } from "@/utility/FrameGuard";
 
 export interface GameStateInitializeOptions {
   Game: GameEngineType,
@@ -1117,6 +1118,8 @@ export class GameState implements EngineContext {
       await GameState.unloadCurrentModule(GameState.hooks.keepsModuleState());
 
       const module = await GameState.Module.Load(name, waypoint);
+      // No module files found (or they didn't load): one clear error, not a scene built from nothing
+      if(!module?.ifo) throw new Error(`Module "${name}" could not be loaded: its files weren't found`);
       await GameState.buildModuleScene(module);
 
       VideoManager.playMovieQueue( async () => {
@@ -1282,6 +1285,8 @@ export class GameState implements EngineContext {
 
   /** Dispose of the current module (saving it first when save), drop running scripts, and reset keys and factions */
   private static async unloadCurrentModule(save: boolean){
+    // A new map: its failures are new, and reported in full again
+    FrameGuard.reset();
     if(GameState.module){
       if(save){
         try{ await GameState.module.save(); }catch(e){
@@ -1575,7 +1580,7 @@ export class GameState implements EngineContext {
       return;
     }
 
-    GameState.controls.Update(delta);
+    FrameGuard.run('controls', () => GameState.controls.Update(delta));
     GameState.scene_cursor_holder.visible = GameState.Mode != EngineMode.MOVIE && GameState.Mode != EngineMode.LEGAL && !GameState.pointerOverPage;
     if(GameState.Mode == EngineMode.MOVIE || GameState.VideoManager.isMoviePlaying()){
       GameState.Mode = EngineMode.MOVIE;
@@ -1588,11 +1593,11 @@ export class GameState implements EngineContext {
       return;
     }
 
-    GameState.VideoEffectManager.Update(delta);
+    FrameGuard.run('video effects', () => GameState.VideoEffectManager.Update(delta));
 
-    GameState.MenuManager.Update(delta);
-    GameState.GMManager.update(delta);
-    if(GameState.State != EngineState.PAUSED && !GameState.hooks.isWorldPaused()) GameState.ProjectileManager.Update(delta);
+    FrameGuard.run('menus', () => GameState.MenuManager.Update(delta));
+    FrameGuard.run('GM mode', () => GameState.GMManager.update(delta));
+    if(GameState.State != EngineState.PAUSED && !GameState.hooks.isWorldPaused()) FrameGuard.run('projectiles', () => GameState.ProjectileManager.Update(delta));
     if(GameState.MenuManager.InGameAreaTransition)
       GameState.MenuManager.InGameAreaTransition.hide();
 
@@ -1606,30 +1611,32 @@ export class GameState implements EngineContext {
     if(GameState.MenuManager.InGamePause)
       GameState.MenuManager.InGamePause.hide();
 
-    switch(GameState.Mode){
-      case EngineMode.LOADING:
-        break;
-      case EngineMode.GUI:
-        GameState.UpdateGUI(delta);
-        break;
-      case EngineMode.INGAME:
-        GameState.UpdateIngame(delta);
-        break;
-      case EngineMode.DIALOG:
-        GameState.UpdateDialog(delta);
-        break;
-      case EngineMode.MINIGAME:
-        GameState.UpdateMinigame(delta);
-        break;
-      case EngineMode.FREELOOK:
-        GameState.UpdateFreeLook(delta);
-        break;
-    }
+    FrameGuard.run('world', () => {
+      switch(GameState.Mode){
+        case EngineMode.LOADING:
+          break;
+        case EngineMode.GUI:
+          GameState.UpdateGUI(delta);
+          break;
+        case EngineMode.INGAME:
+          GameState.UpdateIngame(delta);
+          break;
+        case EngineMode.DIALOG:
+          GameState.UpdateDialog(delta);
+          break;
+        case EngineMode.MINIGAME:
+          GameState.UpdateMinigame(delta);
+          break;
+        case EngineMode.FREELOOK:
+          GameState.UpdateFreeLook(delta);
+          break;
+      }
+    });
 
-    AudioEngine.GetAudioEngine().update(delta, GameState.currentCamera.position, GameState.currentCamera.rotation, GameState.forwardVector);
+    FrameGuard.run('audio', () => AudioEngine.GetAudioEngine().update(delta, GameState.currentCamera.position, GameState.currentCamera.rotation, GameState.forwardVector));
 
     if(render){
-      GameState.Render(delta);
+      FrameGuard.run('drawing', () => GameState.Render(delta));
     }
 
     //NoClickTimer: Update

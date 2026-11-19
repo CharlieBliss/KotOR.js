@@ -1,4 +1,5 @@
 import { GameState } from "@/GameState";
+import { FrameGuard } from "@/utility/FrameGuard";
 import { WindManager } from "@/managers/WindManager";
 import { GFFObject } from "@/resource/GFFObject";
 import type { OdysseyFace3 } from "@/three/odyssey/OdysseyFace3";
@@ -403,7 +404,7 @@ export class ModuleArea extends ModuleObject {
   }
 
   dispose(){
-    this.areaMap.dispose();
+    this.areaMap?.dispose();
 
     //clear area room objects
     while (this.rooms.length){
@@ -468,40 +469,21 @@ export class ModuleArea extends ModuleObject {
     let doorCount = this.doors.length;
     let partyCount = GameState.PartyManager.party.length;
 
-    //update triggers
-    for(let i = 0; i < trigCount; i++){
-      this.triggers[i]?.update(delta);
-    }
-
-    //update encounters
-    for(let i = 0; i < encounterCount; i++){
-      this.encounters[i]?.update(delta);
-    }
-    
-    //update aoe
-    for(let i = 0; i < aoeCount; i++){
-      this.areaOfEffects[i]?.update(delta);
-    }
-
-    //update party
-    for(let i = 0; i < partyCount; i++){
-      GameState.PartyManager.party[i]?.update(delta);
-    }
-    
-    //update creatures
-    for(let i = 0; i < creatureCount; i++){
-      this.creatures[i]?.update(delta);
-    }
-    
-    //update placeables
-    for(let i = 0; i < placeableCount; i++){
-      this.placeables[i]?.update(delta);
-    }
-    
-    //update doors
-    for(let i = 0; i < doorCount; i++){
-      this.doors[i]?.update(delta);
-    }
+    // Each object on its own (FrameGuard): one that throws is reported, and the rest of the area still runs
+    const each = (kind: string, list: any[], count: number) => {
+      for(let i = 0; i < count; i++){
+        const obj = list[i];
+        if(!obj) continue;
+        try { obj.update(delta); } catch(e) { FrameGuard.report(FrameGuard.nameOf(kind, obj), e); }
+      }
+    };
+    each('trigger', this.triggers, trigCount);
+    each('encounter', this.encounters, encounterCount);
+    each('area of effect', this.areaOfEffects, aoeCount);
+    each('party member', GameState.PartyManager.party, partyCount);
+    each('creature', this.creatures, creatureCount);
+    each('placeable', this.placeables, placeableCount);
+    each('door', this.doors, doorCount);
 
     //unset party controlled
     for(let i = 0; i < partyCount; i++){
@@ -512,15 +494,8 @@ export class ModuleArea extends ModuleObject {
       this.miniGame.tick(delta);
     }
 
-    //update rooms
-    for(let i = 0; i < roomCount; i++){
-      this.rooms[i]?.update(delta);
-      // this.rooms[i].hide();
-    }
-
-    for(let i = 0, spellCount = this.spellInstances.length; i < spellCount; i++){
-      this.spellInstances[i]?.update(delta);
-    }
+    each('room', this.rooms, roomCount);
+    each('spell', this.spellInstances, this.spellInstances.length);
 
     let spellIndex = this.spellInstances.length;
     while(spellIndex--){

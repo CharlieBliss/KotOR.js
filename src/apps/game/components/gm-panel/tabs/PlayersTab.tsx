@@ -8,6 +8,7 @@ import {
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import type { DrawerTab } from "@/apps/game/components/gm-panel/gmPanelStore";
 import { CharacterCreator } from "@/apps/game/components/gm-panel/creator/CharacterCreator";
+import { CareersCreator } from "@/apps/game/components/gm-panel/creator/CareersCreator";
 
 /** Players tab: the player characters, calling checks, rewards, and adding characters */
 export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab) => void }> = React.memo(({ active, onOpenTab }) => {
@@ -24,6 +25,8 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   // DM tools
   const [rewardXp, setRewardXp] = useState<number>(250);
+  const [careersXp, setCareersXp] = useState<number>(15);
+  const [careersXpReason, setCareersXpReason] = useState<string>('');
   const [rewardItem, setRewardItem] = useState<string>('g_i_medeqpmnt01');
   const [rewardAlign, setRewardAlign] = useState<number>(5);
   const updatePlayerCfg = (patch: Partial<GMPlayerSpawnConfig>) => {
@@ -133,6 +136,49 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </div>
         )}
       </div>
+
+      {GMManager.ruleset === 'careers' && GMManager.getPlayerCharacters().length > 0 && (
+        <div className="gm-section">
+          <div className="gm-section-title">Campaign XP (Careers)</div>
+          <div className="gm-grid-2">
+            <div className="gm-field">
+              <label>XP to award</label>
+              <input className="gm-input" type="number" min={1} max={500} value={careersXp} onChange={e => setCareersXp(Number(e.target.value))} />
+            </div>
+            <div className="gm-field">
+              <label>Reason (logged)</label>
+              <input className="gm-input" value={careersXpReason} placeholder="Encounter cleared…" onChange={e => setCareersXpReason(e.target.value)} />
+            </div>
+          </div>
+          <div className="gm-row" style={{ marginTop: 6 }}>
+            <button className="gm-btn small success" onClick={() => { GMPlayers.giveCareersXP('all', careersXp, careersXpReason); setCareersXpReason(''); }}>
+              Award {careersXp} XP to party
+            </button>
+          </div>
+          <div className="gm-list" style={{ marginTop: 6 }}>
+            {GMManager.getPlayerCharacters().filter((pc) => pc.careersRules).map((pc) => {
+              const st = pc.careersRules!.getStrainState();
+              const car = pc.gmPlayerConfig?.careers;
+              const derived = car ? KotOR.CareersRules.derive(car) : null;
+              return (
+                <div key={pc.gmNetId || pc.id} className="gm-card">
+                  <div className="gm-card-info">
+                    <div className="gm-card-title">{pc.getName()}</div>
+                    <div className="gm-card-sub">
+                      Lv.{derived?.level ?? 1} · {derived?.totalXpRemaining ?? 0} XP left · Strain {Math.round(st.strain)}/{st.maxStrain}{st.windedSeconds > 0 ? ` (Winded ${Math.ceil(st.windedSeconds)}s)` : ''}
+                    </div>
+                  </div>
+                  <div className="gm-row">
+                    <button className="gm-btn small success" onClick={() => GMPlayers.giveCareersXP(pc, careersXp, careersXpReason)}>+{careersXp} XP</button>
+                    <button className="gm-btn small" disabled={!car?.purchases?.length} onClick={() => GMPlayers.undoCareersPurchase(pc)} title="Refund the most recent XP purchase">Undo</button>
+                    <button className="gm-btn small danger" disabled={!car?.purchases?.length} onClick={() => GMPlayers.respecCareers(pc)} title="Refund all post-creation XP purchases">Respec</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {GMManager.getPlayerCharacters().length > 0 && (
         <div className="gm-section">
@@ -272,10 +318,26 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
       <details className="gm-section" open={KotOR.GameState.PartyManager.party.length === 0}>
         <summary>Add a character <span className="gm-summary-note">quick build, your own, or from a save</span></summary>
       <div className="gm-row">
-        <button className="gm-btn small success" onClick={() => setCreatorOpen(true)}>Make a character…</button>
-        <span className="gm-hint">Saved characters, and the full character creator</span>
+        <button className="gm-btn small success" onClick={() => setCreatorOpen(true)}>
+          {GMManager.ruleset === 'careers' ? 'Make a Careers character…' : 'Make a character…'}
+        </button>
+        <span className="gm-hint">
+          {GMManager.ruleset === 'careers'
+            ? 'Saved Careers characters, and the 7-step Careers creator'
+            : 'Saved characters, and the full character creator'}
+        </span>
       </div>
-      {creatorOpen && (
+      {creatorOpen && GMManager.ruleset === 'careers' && (
+        <CareersCreator
+          onClose={() => setCreatorOpen(false)}
+          useLabel="Add & play"
+          onUse={async (c) => {
+            setCreatorOpen(false);
+            await GMSpawner.spawnPlayerCharacter({ ...KotOR.GMCareersCharacters.toSpawnConfig(c), possessImmediately: true });
+          }}
+        />
+      )}
+      {creatorOpen && GMManager.ruleset !== 'careers' && (
         <CharacterCreator
           onClose={() => setCreatorOpen(false)}
           useLabel="Add & play"

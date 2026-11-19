@@ -12,6 +12,11 @@ import { ActionParameterType } from "@/enums/actions/ActionParameterType";
 import { ModuleObjectConstant } from "@/enums/module/ModuleObjectConstant";
 import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
 import type { ModuleObject, ModuleCreature, ModuleItem } from "@/module";
+import * as THREE from "three";
+import { GMPacing } from "@/managers/gm/GMPacing";
+import type { GMPacingState } from "@/managers/gm/GMPacing";
+import { GMNpcOrders } from "@/managers/GMNpcOrders";
+import { CombatRound } from "@/combat/CombatRound";
 
 /** Who an ability goes to: the enemy target, an ally (or you), or only you */
 export type GMHudAim = 'enemy' | 'ally' | 'self';
@@ -31,6 +36,8 @@ export interface GMHudAbility {
   aim: GMHudAim;
   /** Force points it costs (powers) */
   cost: number;
+  /** Strain cost (Careers combat feats or Force push) */
+  strainCost?: number;
   /** How many are carried (items) */
   count?: number;
   /** Can it be used right now, and if not, why not */
@@ -167,18 +174,28 @@ export class GMPlayerHud {
       entry: { action: { type: ActionType.ActionPhysicalAttacks } },
     });
 
+    const careers = pc.careersRules;
+
     // Combat feats: the best rank of each chain (Power Attack, not also its lesser ranks)
     for (const feat of GMCombatAI.bestRanks<any>(pc.getFeats?.() || [])) {
       if (feat?.category != MELEE_FEAT && feat?.category != RANGED_FEAT) continue;
       const forRanged = feat.category == RANGED_FEAT;
-      const usable = forRanged === ranged;
+      const strainCost = careers ? careers.getCombatFeatStrainCost(feat.id) : 0;
+      const windedBlock = !!(careers?.isWinded() && strainCost > 0);
+      const usable = forRanged === ranged && !windedBlock;
       const fRow = featRows?.[feat.id];
       out.push({
         key: `feat:${feat.id}`, kind: 'feat', name: CharacterRules.text(feat.name, feat.label || 'Combat feat'),
-        icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0, usable,
+        icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0,
+        ...(strainCost > 0 ? { strainCost } : {}),
+        usable,
         category: 'feat', isBestRank: true,
         description: CharacterRules.text(feat.description ?? fRow?.description, ''),
-        why: usable ? undefined : (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand'),
+        why: forRanged !== ranged
+          ? (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand')
+          : windedBlock
+            ? 'Winded: can\'t spend Strain'
+            : undefined,
         entry: { talent: feat },
       });
     }
@@ -202,7 +219,18 @@ export class GMPlayerHud {
     const isFriendly = (s: any) => marked(s.forcefriendly);
     for (const spell of [...powers.filter(isHostile), ...powers.filter((s) => !isHostile(s) && isFriendly(s))]) {
       const cost = Number(spell.getForcePointCost?.(pc) ?? spell.forcepoints ?? 0) || 0;
-      const usable = cost <= fp;
+      const armorBlocked = !!spell.isBlockedByArmor?.(pc);
+      const pushCost = cost > fp && careers ? careers.strainToPush(cost, fp) : null;
+      const canPushWithStrain = pushCost !== null;
+      const pushStrain = pushCost || 0;
+      const usable = !armorBlocked && (cost <= fp || canPushWithStrain);
+      const why = armorBlocked
+        ? 'Can\'t be used in armour'
+        : cost > fp
+          ? (careers
+            ? (careers.isWinded() ? 'Winded: can\'t push with Strain' : (canPushWithStrain ? undefined : `Needs ${cost} Force: too little Strain left to push`))
+            : `Needs ${cost} Force (you have ${Math.floor(fp)})`)
+          : undefined;
       const personal = String(spell.range || '').toUpperCase() === 'P';
       const sRow = spellRows?.[spell.id];
       const name = CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`);
@@ -214,7 +242,9 @@ export class GMPlayerHud {
         onlyOn: GMCombatAI.powerTargetRule(spell.forcehostile),
         key: `power:${spell.id}`, kind: 'power', name,
         icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : hostile ? 'enemy' : 'ally',
-        cost, usable, why: usable ? undefined : `Needs ${cost} Force (you have ${Math.floor(fp)})`,
+        cost,
+        ...(pushStrain > 0 ? { strainCost: pushStrain } : {}),
+        usable, why,
         category,
         description: CharacterRules.text(spell.spelldesc ?? sRow?.spelldesc, ''),
         range: this.rangeLabel(spell.range ?? sRow?.range),
@@ -550,6 +580,7 @@ export class GMPlayerHud {
 
   /** Cancel queued actions for the active player (client sends cancel intent; host/offline clears locally) */
   static stop() {
+    this.clearPlannedMove();
     if (GMNetworkManager.role === 'client') {
       GMNetworkManager.sendIntent('cancel');
       return;
@@ -630,5 +661,110 @@ export class GMPlayerHud {
       GMNetworkManager.sendIntent('wheel', undefined, { open: false });
     }
     GMManager.notifyChange();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Planning a round (GMPacing): the world holds while everyone picks what to do
+  // ---------------------------------------------------------------------------
+
+  /** The pacing, as the host last said */
+  static pacing(): GMPacingState | undefined {
+    return GMNetworkManager.sessionRules?.pacing;
+  }
+
+  /** The world holds for this player to plan */
+  static planning(): boolean {
+    return this.active() && this.pacing()?.phase === 'plan';
+  }
+
+  /** Where the player plans to go this round (moved by the movement keys or the left stick while planning) */
+  static plannedMove: THREE.Vector3 | null = null;
+  /** The latest movement input while planning: its heading, and when (ms) */
+  static steer: { facing: number; at: number } | null = null;
+  /** The planned move changed since it was sent */
+  static moveDirty: boolean = false;
+  /** This player said they are ready for this round */
+  static readySent: boolean = false;
+  /** The round the marker and ready belong to (a new hold starts both again) */
+  static planRound: number = -1;
+  /** When the hold began on this machine, and its seconds left then (the countdown) */
+  static planStartedAt: number = 0;
+  static planSecondsLeft: number | undefined;
+
+  /** The marker moves this many times faster than the character runs, so a round's run is quick to set */
+  static MARKER_SPEED = 2;
+
+  /** Movement input while planning steers the marker instead of the character (EngineHooks.steerPlannedMove) */
+  static steerPlannedMove(creature: ModuleObject, facing: number): boolean {
+    if (!this.planning() || creature !== this.player()) return false;
+    this.steer = { facing, at: performance.now() };
+    return true;
+  }
+
+  /** How far the character can run in one round (metres) */
+  static roundReach(pc: ModuleCreature | undefined = this.player()): number {
+    return ((pc as any)?.getRunSpeed?.() || 3.66) * CombatRound.ROUND_LENGTH / 1000;
+  }
+
+  /** Each frame: a new hold starts the plan again, the marker follows the movement input, and a settled marker is sent */
+  static updatePlannedMove(delta: number) {
+    const pacing = this.pacing();
+    const round = pacing?.phase === 'plan' ? pacing.round : -1;
+    if (round !== this.planRound) {
+      this.planRound = round;
+      this.plannedMove = null;
+      this.moveDirty = false;
+      this.readySent = false;
+      this.steer = null;
+      this.planStartedAt = performance.now();
+      this.planSecondsLeft = pacing?.secondsLeft;
+    }
+    const pc = this.player();
+    if (!this.planning() || !pc) return;
+    const now = performance.now();
+    if (this.steer && now - this.steer.at < 150) {
+      const from = this.plannedMove || pc.position;
+      const step = this.roundReach(pc) / (CombatRound.ROUND_LENGTH / 1000) * this.MARKER_SPEED * delta;
+      const to = GMPacing.clampMove(pc.position, {
+        x: from.x + Math.cos(this.steer.facing + Math.PI / 2) * step,
+        y: from.y + Math.sin(this.steer.facing + Math.PI / 2) * step,
+      }, this.roundReach(pc));
+      this.plannedMove = GMNpcOrders.walkable(new THREE.Vector3(to.x, to.y, from.z));
+      this.moveDirty = true;
+      // The input set the character going: it stays where it is until the round plays
+      (pc as any).force = 0;
+      (pc as any).controlled = false;
+    } else if (this.moveDirty && (!this.steer || now - this.steer.at > 300)) {
+      this.sendPlannedMove();
+    }
+  }
+
+  static sendPlannedMove() {
+    const p = this.plannedMove;
+    if (!p) return;
+    this.moveDirty = false;
+    GMNetworkManager.sendIntent('move', undefined, { x: p.x, y: p.y, z: p.z });
+  }
+
+  /** Seconds left to plan, counted down on this machine from what the host last said */
+  static planSecondsLeftNow(): number | undefined {
+    if (this.planSecondsLeft === undefined) return undefined;
+    return Math.max(0, Math.ceil(this.planSecondsLeft - (performance.now() - this.planStartedAt) / 1000));
+  }
+
+  /** Ready (or not) to play the round: a move still being set is sent first */
+  static setReady(ready: boolean = true): boolean {
+    if (!this.planning()) return false;
+    if (ready && this.moveDirty) this.sendPlannedMove();
+    this.readySent = ready;
+    GMNetworkManager.sendIntent('ready', undefined, { ready });
+    GMManager.notifyChange();
+    return true;
+  }
+
+  /** Drop the planned move (Stop) */
+  static clearPlannedMove() {
+    this.plannedMove = null;
+    this.moveDirty = false;
   }
 }

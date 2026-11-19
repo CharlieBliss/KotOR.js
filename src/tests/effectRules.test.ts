@@ -250,3 +250,24 @@ describe("drawing a weapon isn't a fight", () => {
     expect(cre.isExcitedByCombat()).toBe(true);
   });
 });
+
+describe("a creature's speed is always a number", () => {
+  test("a speed effect without its amount counts for nothing (its NaN made the creature's speed NaN)", () => {
+    const cre = creature({ effects: [{ type: GameEffectType.EffectMovementSpeedIncrease, getInt: (): any => undefined }, effect(GameEffectType.EffectMovementSpeedIncrease, 99)] });
+    cre.updateMovementSpeed();
+    expect(+cre.movementSpeed.toFixed(2)).toBe(1.99);
+  });
+
+  test("a blank or missing creaturespeed.2da row falls back to its appearance, then KotOR's usual speed", () => {
+    const rows: any = { 4: { runrate: '****', walkrate: '****' } };
+    (GameState as any).TwoDAManager = { datatables: new Map([['creaturespeed', { rows }]]) };
+    const cre = creature({ creatureAppearance: { rundist: '4.2', walkdist: '' } });
+    cre.getWalkRateId = () => 4;
+    expect(cre.getRunSpeed()).toBe(4.2);
+    expect(cre.getWalkSpeed()).toBe(ModuleCreature.DEFAULT_WALK_SPEED);
+    cre.getWalkRateId = () => 9; // no row at all
+    cre.creatureAppearance = undefined;
+    expect(cre.getRunSpeed()).toBe(ModuleCreature.DEFAULT_RUN_SPEED);
+    delete (GameState as any).TwoDAManager;
+  });
+});

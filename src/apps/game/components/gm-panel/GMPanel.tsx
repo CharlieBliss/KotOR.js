@@ -169,10 +169,20 @@ export const GMPanel: React.FC = () => {
   const startJoin = () => {
     const p = GMManager.PLAYER_PRESETS[joinPresetIdx] || GMManager.PLAYER_PRESETS[0];
     // A character the player made goes along whole; the host holds it to the session's rules
-    const made = joinCharacterId ? KotOR.GMCharacters.get(joinCharacterId) : undefined;
+    const careersMade = joinCharacterId.startsWith('car:') && KotOR.GMCareersCharacters
+      ? KotOR.GMCareersCharacters.get(joinCharacterId.slice(4))
+      : undefined;
+    const made = !careersMade && joinCharacterId ? KotOR.GMCharacters.get(joinCharacterId) : undefined;
     KotOR.GameState.gmMode = true;
     GMManager.active = true;
-    GMNetworkManager.joinSession(joinUrl, joinPlayerName, made ? {
+    GMNetworkManager.joinSession(joinUrl, joinPlayerName, careersMade ? {
+      name: joinPlayerName,
+      appearanceId: KotOR.GMCareersCharacters.resolveAppearance(careersMade),
+      classId: KotOR.CareersRules.isForceSensitive(careersMade) ? 3 : 0,
+      rightHandResRef: careersMade.gear?.rightHand,
+      armorResRef: careersMade.gear?.armor,
+      careersCharacter: { ...careersMade, name: joinPlayerName || careersMade.name },
+    } : made ? {
       name: joinPlayerName,
       appearanceId: KotOR.GMCharacters.resolveAppearance(made),
       classId: made.classId,
@@ -440,13 +450,25 @@ export const GMPanel: React.FC = () => {
             <button
               className={`gm-btn small ${GMManager.worldPaused ? 'danger' : ''}`}
               onClick={() => {
-                GMManager.worldPaused = !GMManager.worldPaused;
+                GMManager.setWorldPaused(!GMManager.worldPaused);
                 forceUpdate();
               }}
               title="Freeze movement, combat and effects for everyone"
             >
               {GMManager.worldPaused ? 'Paused' : GMManager.wheelHolds.size ? 'Held: power wheel' : 'Pause'}
             </button>
+            {KotOR.GMPacing.phase !== 'off' && (
+              <span className="gm-row" style={{ gap: 4 }}>
+                <span className="gm-hint" title={KotOR.GMPacing.phase === 'plan' ? `Choosing: ${KotOR.GMPacing.state().waiting.join(', ') || 'nobody'}` : 'The planned round is playing'}>
+                  {KotOR.GMPacing.phase === 'plan'
+                    ? `Round ${KotOR.GMPacing.round}: planning ${KotOR.GMPacing.state().ready.length}/${KotOR.GMPacing.planners.length} ready`
+                    : `Round ${KotOR.GMPacing.round} playing`}
+                </span>
+                {KotOR.GMPacing.phase === 'plan' && (
+                  <button className="gm-btn small success" onClick={() => KotOR.GMPacing.go('the GM says go')} title="Play the planned round now">Go</button>
+                )}
+              </span>
+            )}
             <button
               className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
               onClick={() => {

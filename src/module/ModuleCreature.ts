@@ -68,6 +68,7 @@ import { ExperienceType } from "@/enums/engine/ExperienceType";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
 import { TalentObjectType } from "@/enums/engine/TalentObjectType";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
+import type { ICareersCreatureRules } from "@/engine/CareersSeam";
 
 /**
 * ModuleCreature class.
@@ -104,6 +105,8 @@ export class ModuleCreature extends ModuleObject {
 
   challengeRating: number;
   classes: CreatureClass[];
+  /** Optional Careers rule-set seam (absent on enemies and classic KotOR characters) */
+  careersRules?: ICareersCreatureRules;
   comment: string;
   currentForce: number;
   currentHitPoints: number;
@@ -2672,8 +2675,12 @@ export class ModuleCreature extends ModuleObject {
     let baseac = 10;
     let classBonus = 0;
 
-    for(let i = 0; i < this.classes.length; i++){
-      classBonus += this.classes[i].getACBonus();
+    if(this.careersRules){
+      classBonus = this.careersRules.getDefenseBonus();
+    }else{
+      for(let i = 0; i < this.classes.length; i++){
+        classBonus += this.classes[i].getACBonus();
+      }
     }
 
     let armorAC = (this.equipment.ARMOR?.getACBonus() || 0);
@@ -2757,15 +2764,18 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getFortitudeSave(){
-    return (this.fortitudeSaveThrow || 0) + (this.fortbonus || 0) + this.getSaveBonus(1);
+    const base = this.careersRules ? this.careersRules.getSaveBase('fortitude') : (this.fortitudeSaveThrow || 0);
+    return base + (this.fortbonus || 0) + this.getSaveBonus(1);
   }
 
   getReflexSave(){
-    return (this.reflexSaveThrow || 0) + (this.refbonus || 0) + this.getSaveBonus(2);
+    const base = this.careersRules ? this.careersRules.getSaveBase('reflex') : (this.reflexSaveThrow || 0);
+    return base + (this.refbonus || 0) + this.getSaveBonus(2);
   }
 
   getWillSave(){
-    return (this.willSaveThrow || 0) + (this.willbonus || 0) + this.getSaveBonus(3);
+    const base = this.careersRules ? this.careersRules.getSaveBase('will') : (this.willSaveThrow || 0);
+    return base + (this.willbonus || 0) + this.getSaveBonus(3);
   }
 
   getSaveBonus(saveType: number = 0): number {
@@ -2843,24 +2853,29 @@ export class ModuleCreature extends ModuleObject {
     return this.walk;
   }
 
+  /** KotOR's usual speeds, for when a creature's tables don't give one (m/s) */
+  static DEFAULT_RUN_SPEED = 3.66;
+  static DEFAULT_WALK_SPEED = 1.75;
+
+  /**
+   * A speed from the tables: creaturespeed.2da's row for its walk rate, or (rate 7) its appearance's own. Always a
+   * usable number: a blank cell ('****') parsed to NaN, a missing row threw, and a NaN speed made its movement,
+   * its position, the camera on it and the audio listener NaN, every frame
+   */
+  private tableSpeed(column: 'runrate' | 'walkrate', appearanceField: 'rundist' | 'walkdist', fallback: number): number {
+    const usable = (v: any) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+    const fromAppearance = usable((this.creatureAppearance as any)?.[appearanceField]);
+    if(this.getWalkRateId() == 7) return fromAppearance ?? fallback;
+    const row = GameState.TwoDAManager.datatables.get('creaturespeed')?.rows?.[this.getWalkRateId()];
+    return usable(row?.[column]) ?? fromAppearance ?? fallback;
+  }
+
   getRunSpeed(){
-    if(this.getWalkRateId() == 7){
-      return this.creatureAppearance?.rundist ?? 0;
-    }
-    const creaturespeed2DA = GameState.TwoDAManager.datatables.get('creaturespeed');
-    if(creaturespeed2DA){
-      return parseFloat(creaturespeed2DA.rows[this.getWalkRateId()].runrate);
-    }
+    return this.tableSpeed('runrate', 'rundist', ModuleCreature.DEFAULT_RUN_SPEED);
   }
 
   getWalkSpeed(){
-    if(this.getWalkRateId() == 7){
-      return this.creatureAppearance?.walkdist ?? 0;
-    }
-    const creaturespeed2DA = GameState.TwoDAManager.datatables.get('creaturespeed');
-    if(creaturespeed2DA){
-      return parseFloat(creaturespeed2DA.rows[this.getWalkRateId()].walkrate);
-    }
+    return this.tableSpeed('walkrate', 'walkdist', ModuleCreature.DEFAULT_WALK_SPEED);
   }
 
   getMovementSpeed(){

@@ -34,6 +34,10 @@ import {
   GM_INTENTS,
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
+import { GMPacing } from "@/managers/gm/GMPacing";
+import { CareersAdvancement, CareersRules, CareersRuntime, GMCareersCharacters } from "@/managers/gm/careers";
+import type { CareersPurchaseRequest } from "@/managers/gm/careers";
+import { CombatRound } from "@/combat/CombatRound";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
@@ -431,15 +435,104 @@ export class GMPlayers {
     return true;
   }
 
-  /** Host: award XP to one connected player; it reaches them with their next character sheet */
-  static giveXP(peerId: string, amount: number): boolean {
+  /** Host: award XP to one connected player (campaign XP in Careers mode); reaches them with their next sheet */
+  static giveXP(peerId: string, amount: number, reason: string = ''): boolean {
     const actor = this.getPeerActor(peerId);
     const xp = Math.round(Number(amount));
     if (!actor || !(xp > 0)) return false;
+    const careers = (actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers);
+    if (careers) {
+      if (!CareersAdvancement.awardXp(careers, xp, reason)) return false;
+      // The host's record of what it awarded, which a later join is held to
+      this.recordCareersXp(GMNetworkManager.peers.get(peerId)?.name, xp);
+      CareersAdvancement.syncToCreature(actor, careers);
+      const note = reason ? ` (${reason})` : '';
+      GMNetworkManager.sendChatTo(peerId, 'GM', `You gained ${xp} campaign XP${note}.`);
+      this.updatePlayerSheets();
+      GMManager.notifyChange();
+      return true;
+    }
     actor.experience = (actor.experience || 0) + xp;
     GMNetworkManager.sendChatTo(peerId, 'GM', `You gained ${xp} XP.`);
     GMManager.notifyChange();
     return true;
+  }
+
+  /** Host: award campaign XP to a single careers character (connected or local) or the entire party */
+  static giveCareersXP(target: ModuleCreature | 'all', amount: number, reason: string = ''): number {
+    const xp = Math.round(Number(amount));
+    if (!(xp > 0)) return 0;
+    const list: ModuleCreature[] = target === 'all'
+      ? GMManager.getPlayerCharacters()
+      : (target ? [target] : []);
+    let awarded = 0;
+    for (const actor of list) {
+      const careers = actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+      if (!careers) continue;
+      if (!CareersAdvancement.awardXp(careers, xp, reason)) continue;
+      // A connected player's award goes in the host's record (the GM's own characters never join)
+      if (actor.gmOwnerPeerId) this.recordCareersXp(GMNetworkManager.peers.get(actor.gmOwnerPeerId)?.name, xp);
+      CareersAdvancement.syncToCreature(actor, careers);
+      awarded++;
+      if (actor.gmOwnerPeerId) {
+        const note = reason ? ` (${reason})` : '';
+        GMNetworkManager.sendChatTo(actor.gmOwnerPeerId, 'GM', `You gained ${xp} campaign XP${note}.`);
+      }
+    }
+    if (awarded > 0) {
+      const note = reason ? ` — ${reason}` : '';
+      GMLog.info('host', `awarded ${xp} campaign XP to ${awarded} character${awarded === 1 ? '' : 's'}${note}`);
+      this.updatePlayerSheets();
+      GMManager.notifyChange();
+    }
+    return awarded;
+  }
+
+  /** Host: validate and apply a Careers post-creation XP purchase live (outside combat, no respawn) */
+  static spendXpOnHost(actor: ModuleCreature, purchase: CareersPurchaseRequest | undefined, peerId?: string): boolean {
+    if (!actor || !purchase) return false;
+    const careers = actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+    if (!careers) {
+      if (peerId) this.tellPlayer(peerId, 'Only Careers characters spend campaign XP this way.');
+      return false;
+    }
+    const res = CareersAdvancement.applyPurchase(careers, purchase, !!actor.combatData?.combatState);
+    if (!res.ok) {
+      if (peerId) this.tellPlayer(peerId, res.reason || 'That XP purchase is not allowed right now.');
+      return false;
+    }
+    CareersAdvancement.syncToCreature(actor, careers);
+    GMLog.info('host', `${actor.getName()} spent ${res.record?.cost || 0} XP on ${purchase.kind}`);
+    this.updatePlayerSheets();
+    GMManager.notifyChange();
+    return true;
+  }
+
+  /** Host: refund a Careers character's most recent post-creation XP purchase live */
+  static undoCareersPurchase(actor: ModuleCreature): boolean {
+    const careers = actor?.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor?.gmPlayerConfig?.careers;
+    if (!careers) return false;
+    const undone = CareersAdvancement.undoLastPurchase(careers);
+    if (!undone) return false;
+    CareersAdvancement.syncToCreature(actor, careers);
+    GMLog.info('host', `refunded ${actor.getName()}'s last purchase (${undone.kind}, ${undone.cost} XP)`);
+    this.updatePlayerSheets();
+    GMManager.notifyChange();
+    return true;
+  }
+
+  /** Host: refund all post-creation XP purchases for a full respec live */
+  static respecCareers(actor: ModuleCreature): number {
+    const careers = actor?.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor?.gmPlayerConfig?.careers;
+    if (!careers) return 0;
+    const count = CareersAdvancement.respecPurchases(careers);
+    if (count > 0) {
+      CareersAdvancement.syncToCreature(actor, careers);
+      GMLog.info('host', `respecced ${actor.getName()} (${count} purchase${count === 1 ? '' : 's'} refunded)`);
+      this.updatePlayerSheets();
+      GMManager.notifyChange();
+    }
+    return count;
   }
 
   /** Host: put an item straight into one connected player's inventory */
@@ -485,6 +578,7 @@ export class GMPlayers {
       const resRef = gmItemResRef(item);
       if (resRef) equipment[slot] = resRef;
     }
+    const careersRuntime = cre.careersRules instanceof CareersRuntime ? cre.careersRules : undefined;
     return {
       netId: cre.gmNetId,
       classes: (cre.classes || []).map((c) => ({ id: c.id, level: c.level, spells: (c.spells || []).map((s) => s.id) })),
@@ -501,6 +595,12 @@ export class GMPlayers {
       naturalAC: cre.naturalAC || 0,
       equipment,
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
+      ...(careersRuntime ? {
+        careers: {
+          character: careersRuntime.character,
+          ...careersRuntime.getStrainState(),
+        },
+      } : {}),
     };
   }
 
@@ -596,6 +696,8 @@ export class GMPlayers {
     this.applyingHostSheet = true;
     try {
       await this.applySheetToCharacter(cre, sheet);
+      // The GM's awards and our purchases go back into our own saved Careers character, so they come to the next session
+      if (sheet.careers?.character) GMCareersCharacters.keepFromSession(sheet.careers.character);
 
       const inventoryJson = JSON.stringify(sheet.inventory);
       if (inventoryJson !== this.lastAppliedInventoryJson) {
@@ -630,6 +732,14 @@ export class GMPlayers {
     cre.maxForcePoints = sheet.maxForcePoints;
     cre.currentForce = sheet.currentForce;
     GMManager.setCreatureHP(cre, sheet.hp, sheet.maxHp);
+    if (sheet.careers?.character) {
+      if (cre.careersRules instanceof CareersRuntime) {
+        cre.careersRules.refresh(sheet.careers.character);
+      } else {
+        cre.careersRules = new CareersRuntime(sheet.careers.character, cre);
+      }
+      (cre.careersRules as CareersRuntime).syncStrain(sheet.careers);
+    }
     await this.syncEquipmentTo(cre, sheet.equipment);
   }
 
@@ -650,9 +760,55 @@ export class GMPlayers {
   }
 
   /**
-   * Execute a client's interaction request on the host using the engine's normal actions,
-   * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
+   * Careers rules: the campaign XP the GM has awarded each player, by lowercased player name. The host's record,
+   * not the player's file: a joining character may not claim more than this. Saved with the session.
    */
+  static careersXpAwarded: Map<string, number> = new Map();
+
+  static careersXpKey(playerName: string | undefined): string {
+    return String(playerName || 'Player').trim().toLowerCase();
+  }
+
+  /** Campaign XP the GM has awarded this player so far (0 when none) */
+  static careersXpFor(playerName: string | undefined): number {
+    return this.careersXpAwarded.get(this.careersXpKey(playerName)) || 0;
+  }
+
+  /** Record an award of campaign XP to a player (the Careers advancement path calls this as the GM awards XP) */
+  static recordCareersXp(playerName: string | undefined, amount: number) {
+    const xp = Math.floor(Number(amount));
+    if (!Number.isFinite(xp) || xp <= 0) return;
+    const key = this.careersXpKey(playerName);
+    this.careersXpAwarded.set(key, (this.careersXpAwarded.get(key) || 0) + xp);
+  }
+
+  /** Host: verify a joining player's character matches the session's rule set; returns a refusal reason or null */
+  static checkJoinRuleset(preset: GMPlayerJoinPreset | undefined, playerName?: string): string | null {
+    const ruleset = GMManager.ruleset || 'kotor';
+    const hasCareers = !!preset?.careersCharacter;
+    if (ruleset === 'careers') {
+      if (!hasCareers || !GMCareersCharacters.isCareersCharacter(preset!.careersCharacter)) {
+        return 'This session uses the Careers rule set (KotOR II). Pick or make a Careers character to join.';
+      }
+      const problems = CareersRules.validate(preset!.careersCharacter);
+      if (problems.length) {
+        return `Your Careers character can't join: ${problems[0]}`;
+      }
+      // The GM hands out campaign XP; a file can't award itself any
+      const claimed = Math.max(0, Math.floor(Number(preset!.careersCharacter!.campaignXpEarned) || 0));
+      const awarded = this.careersXpFor(playerName ?? preset!.name);
+      if (claimed > awarded) {
+        return `Your Careers character has ${claimed} campaign XP, but the GM has awarded you ${awarded} in this session. `
+          + 'Join with a character that has no more than that, or ask the GM.';
+      }
+      return null;
+    }
+    if (hasCareers) {
+      return 'This session uses classic KotOR rules. Pick a classic character or quick build to join.';
+    }
+    return null;
+  }
+
   /**
    * Host: a player connected (or reconnected). A reconnecting player, same peer id, takes back the character
    * they left behind; a new one gets a character from the build they picked. Either way they get the scene.
@@ -670,10 +826,21 @@ export class GMPlayers {
       assign(existingPeer.controlledNetId);
       return;
     }
+
+    const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
+    const reserved = GMSessions.reservedPlayers.get(String(name || 'Player').trim().toLowerCase());
+    if (!rejoinNetId && !reserved) {
+      const refusal = this.checkJoinRuleset(preset, name);
+      if (refusal) {
+        GMLog.info('host', `refused ${name || peerId}: ${refusal}`);
+        net.send('join.refused', { reason: refusal, ruleset: GMManager.ruleset }, peerId);
+        return;
+      }
+    }
+
     const peerInfo: GMPeerInfo = { peerId, name: name || 'Player', role: 'client', joinedAt: Date.now() };
     net.peers.set(peerId, peerInfo);
 
-    const rejoinNetId = GMReplication.findActorOwnedBy(peerId);
     net.appendChat('System', rejoinNetId ? `${peerInfo.name} rejoined the game.` : `${peerInfo.name} joined the game!`);
     const spawnedNetId = rejoinNetId || await this.spawnPlayerFromNetworkPreset(peerId, peerInfo.name, preset);
     peerInfo.controlledNetId = spawnedNetId;
@@ -698,6 +865,11 @@ export class GMPlayers {
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
     cancel: (actor) => { actor.gmFightTarget = undefined; return false; },
     wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
+    ready: (actor, intent, peerId) => GMPacing.setReady(peerId, !!intent.ready),
+    move: (actor, intent, peerId) => {
+      if (!GMPlayers.planMoveOnHost(actor, intent)) GMPlayers.tellPlayer(peerId, 'Moves are planned while the world holds.');
+    },
+    spend_xp: (actor, intent, peerId) => GMPlayers.spendXpOnHost(actor, intent.purchase, peerId),
     mine: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMMines.useMineOnHost(actor, intent).then((ok) => {
@@ -717,6 +889,34 @@ export class GMPlayers {
     use: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
   };
 
+  /**
+   * Host: a move planned in the hold (GMPacing): the character runs there first when the round plays, then does
+   * what else it planned. At most one round's run from where it stands.
+   */
+  static planMoveOnHost(actor: ModuleCreature, intent: GMClientIntent): boolean {
+    if (GMPacing.phase !== 'plan' || ![intent.x, intent.y, intent.z].every((n) => Number.isFinite(n))) return false;
+    const reach = (actor.getRunSpeed?.() || 3.66) * CombatRound.ROUND_LENGTH / 1000;
+    const to = GMPacing.clampMove(actor.position, { x: intent.x as number, y: intent.y as number }, reach);
+    // A move planned again replaces the last one
+    const queue: any[] = actor.actionQueue as any;
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i]?.gmPlannedMove) queue.splice(i, 1);
+    const move: any = new GameState.ActionFactory.ActionMoveToPoint();
+    move.setParameter(0, ActionParameterType.FLOAT, to.x);
+    move.setParameter(1, ActionParameterType.FLOAT, to.y);
+    move.setParameter(2, ActionParameterType.FLOAT, intent.z as number);
+    move.setParameter(3, ActionParameterType.DWORD, GameState.module.area.id);
+    move.setParameter(4, ActionParameterType.DWORD, ModuleObjectConstant.OBJECT_INVALID);
+    move.setParameter(5, ActionParameterType.INT, 1);
+    move.setParameter(6, ActionParameterType.FLOAT, 0.5);
+    move.setParameter(7, ActionParameterType.INT, 0);
+    move.setParameter(8, ActionParameterType.FLOAT, 30.0);
+    move.gmPlannedMove = true;
+    actor.actionQueue.addFront(move);
+    actor.gmHostDriven = true;
+    GMLog.info('host', `${actor.getName()} plans to move ${Math.hypot(to.x - actor.position.x, to.y - actor.position.y).toFixed(1)} m`);
+    return true;
+  }
+
   /** Host: why a power, feat, skill or item a player asked for couldn't be used, in words they can act on */
   static whyNot(actor: ModuleCreature, intent: GMClientIntent): string {
     const name = actor.getName() || 'You';
@@ -727,12 +927,27 @@ export class GMPlayers {
     if (intent.ability === 'spell') {
       const spell = actor.getSpells().find((s: any) => s.id === id);
       if (!spell) return `${name} doesn't know that power.`;
+      if (spell.isBlockedByArmor?.(actor)) return `${name} can't use that power while wearing armour.`;
       const rule = GMCombatAI.powerTargetRule(spell.forcehostile);
       if (target !== actor && !GMCombatAI.worksOn(rule, target)) return `That power only works on ${GMCombatAI.ruleText(rule)}.`;
       const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
-      if (cost > actor.getFP()) return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
+      if (cost > actor.getFP()) {
+        if (actor.careersRules) {
+          if (actor.careersRules.isWinded()) return `${name} is winded and cannot push with Strain.`;
+          if (actor.careersRules.strainToPush(cost, actor.getFP()) === null) {
+            return `Not enough Force or Strain: it needs ${cost} Force, ${name} has ${Math.floor(actor.getFP())} and too little Strain left to push.`;
+          }
+        } else {
+          return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
+        }
+      }
     }
-    if (intent.ability === 'feat' && !actor.getFeats().some((f: any) => f.id === id)) return `${name} doesn't have that feat.`;
+    if (intent.ability === 'feat') {
+      if (!actor.getFeats().some((f: any) => f.id === id)) return `${name} doesn't have that feat.`;
+      if (actor.careersRules?.isWinded() && actor.careersRules.getCombatFeatStrainCost(id) > 0) {
+        return `${name} is winded and cannot spend Strain.`;
+      }
+    }
     if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
     if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
     return `${name} can't use that right now.`;
@@ -772,6 +987,10 @@ export class GMPlayers {
     return true;
   }
 
+  /**
+   * Execute a client's interaction request on the host using the engine's normal actions,
+   * so pathing into range, door/placeable use, and combat resolve exactly as in single player.
+   */
   static applyClientIntentOnHost(peerId: string, intent: GMClientIntent) {
     if (!intent) return;
     const who = GMNetworkManager.peers.get(peerId)?.name || peerId;
@@ -857,14 +1076,19 @@ export class GMPlayers {
       case 'spell': {
         const spell = actor.getSpells().find((s: any) => s.id === id);
         if (!spell) return false;
+        if (spell.isBlockedByArmor?.(actor)) return false;
         // Disable Droid on a person, and the like: it does nothing, so it isn't cast
         if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
+        const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
+        // Only a Careers character pushes with Strain (not while winded, nor past its Strain); classic characters never stop here
+        if (actor.careersRules && cost > actor.getFP() && actor.careersRules.strainToPush(cost, actor.getFP()) === null) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }
       case 'feat': {
         const feat = actor.getFeats().find((f: any) => f.id === id);
         if (!feat) return false;
+        if (actor.careersRules?.isWinded() && actor.careersRules.getCombatFeatStrainCost(id) > 0) return false;
         feat.useTalentOnObject(target, actor);
         return true;
       }
@@ -1125,6 +1349,17 @@ export class GMPlayers {
       GMSessions.reservedPlayers.delete(reserved.name.trim().toLowerCase());
       const pc = await GMSessions.spawnSavedPlayer(reserved, peerId);
       if (pc) GMNetworkManager.appendChat('System', `${reserved.name} picked up their saved character.`);
+      return pc ? (pc.gmNetId || null) : null;
+    }
+    if (GMManager.ruleset === 'careers' && preset?.careersCharacter && GMCareersCharacters.isCareersCharacter(preset.careersCharacter)) {
+      const config = GMCareersCharacters.toSpawnConfig({
+        ...preset.careersCharacter,
+        name: preset.name || preset.careersCharacter.name || playerName || 'Connected Player',
+      });
+      const pc = await GMSpawner.spawnPlayerCharacter(
+        { ...config, possessImmediately: false, ownerPeerId: peerId },
+        GMManager.sceneStartPoint ? GMManager.sceneStartPoint.clone() : undefined
+      );
       return pc ? (pc.gmNetId || null) : null;
     }
     if (preset?.character && GMCharacters.isCharacter(preset.character)) {
