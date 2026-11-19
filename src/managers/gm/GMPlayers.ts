@@ -1075,7 +1075,8 @@ export class GMPlayers {
         // Disable Droid on a person, and the like: it does nothing, so it isn't cast
         if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
         const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
-        if (cost > actor.getFP() && actor.careersRules?.isWinded()) return false;
+        // Only a Careers character can be winded (and then can't pay with Strain); classic characters never stop here
+        if (actor.careersRules?.isWinded() && cost > actor.getFP()) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }
