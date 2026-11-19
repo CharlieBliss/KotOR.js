@@ -80,6 +80,15 @@ function createMockCreature(overrides: Record<string, any> = {}): any {
     // As ModuleCreature's for a classic (non-Careers) creature: the classes' base attack bonus
     getAttackBase: () => creature.getBaseAttackBonus(),
     getDeflectionBase: () => creature.getBaseAttackBonus(),
+    // ...and its talent seam, all nothing without Careers rules
+    getTalentAttackBonus: () => 0,
+    getTalentCritThreatBonus: () => 0,
+    getTalentDamageBonus: () => 0,
+    getDefenseBonusVs: () => 0,
+    getSpellCostReduction: () => 0,
+    onCombatRoundStart: () => {},
+    onAttackResolved: () => {},
+    onKill: () => {},
     // As ModuleCreature's: Dexterity for a ranged weapon, Strength otherwise
     getAttackAbilityModifier: (weapon?: any) => Math.floor(((weapon?.isRangedWeapon?.() ? (overrides.dex ?? 14) : (overrides.str ?? 14)) - 10) / 2),
     getAC: () => overrides.ac ?? 15,

@@ -15,6 +15,7 @@ import {
   toEngineSkillRanks,
 } from "@/managers/gm/careers/skills";
 import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
+import { totalTalentHooks } from "@/managers/gm/careers/talentEffects";
 import type {
   CareerAbilityKey,
   CareerAttributes,
@@ -460,41 +461,13 @@ export class CareersRules {
     const engineSkills = toEngineSkillRanks(skillRanks);
     const talentRanks = this.ownedTalentRanks(c);
 
-    // Aggregate passive talent hooks (multiplied by stacked rank)
-    let hpBonus = 0;
-    let strainBonus = 0;
-    let fpBonus = 0;
-    let defenseTalentBonus = 0;
-    let damageReduction = 0;
-    const saveTalentBonus = { fortitude: 0, reflex: 0, will: 0 };
-    const skillBonuses: Partial<Record<CareerSkillId, number>> = {};
-
-    for (const [talentId, rank] of Object.entries(talentRanks)) {
-      if (!(rank > 0)) continue;
-      const def = CAREERS_TALENT_BY_ID.get(talentId);
-      if (!def) continue;
-      const h = def.hooks;
-      if (h.maxHp) hpBonus += h.maxHp * rank;
-      if (h.maxStrain) strainBonus += h.maxStrain * rank;
-      if (h.maxFp) fpBonus += h.maxFp * rank;
-      if (h.defense) defenseTalentBonus += h.defense * rank;
-      if (h.damageReduction) damageReduction += h.damageReduction * rank;
-      if (h.saves) {
-        if (h.saves.fortitude) saveTalentBonus.fortitude += h.saves.fortitude * rank;
-        if (h.saves.reflex) saveTalentBonus.reflex += h.saves.reflex * rank;
-        if (h.saves.will) saveTalentBonus.will += h.saves.will * rank;
-      }
-      if (h.skillBonus) {
-        for (const [skillId, bonus] of Object.entries(h.skillBonus) as [CareerSkillId, number][]) {
-          if (bonus) skillBonuses[skillId] = (skillBonuses[skillId] || 0) + bonus * rank;
-        }
-      }
-    }
+    // Every passive talent hook, added up once here (combat reads these totals, not the talent list)
+    const talents = totalTalentHooks(talentRanks);
 
     const saveRanks = {
-      fortitude: (skillRanks.resilience || 0) * 2 + saveTalentBonus.fortitude,
-      reflex: (skillRanks.coordination || 0) * 2 + saveTalentBonus.reflex,
-      will: (skillRanks.discipline || 0) * 2 + saveTalentBonus.will,
+      fortitude: (skillRanks.resilience || 0) * 2 + talents.saves.fortitude,
+      reflex: (skillRanks.coordination || 0) * 2 + talents.saves.reflex,
+      will: (skillRanks.discipline || 0) * 2 + talents.saves.will,
     };
     const saves = {
       fortitude: saveRanks.fortitude + modifiers.con,
@@ -508,13 +481,13 @@ export class CareersRules {
       combatAttack[id] = (skillRanks[id] || 0) * 2 + modifiers[def.ability] + levelBaseline;
     }
 
-    const baseDefense = 10 + modifiers.dex + levelBaseline + defenseTalentBonus;
+    const baseDefense = 10 + modifiers.dex + levelBaseline + talents.defense;
 
     const featSet = this.ownedFeatIds(c);
 
-    const maxHp = Math.max(1, species.hpBase + level * (6 + modifiers.con) + hpBonus);
-    const maxStrain = Math.max(1, species.strainBase + modifiers.wis + strainBonus);
-    const maxFp = forceSensitive ? Math.max(0, CAREERS_FORCE_BASE + level * (4 + modifiers.wis) + fpBonus) : 0;
+    const maxHp = Math.max(1, species.hpBase + level * (6 + modifiers.con) + talents.maxHp);
+    const maxStrain = Math.max(1, species.strainBase + modifiers.wis + talents.maxStrain);
+    const maxFp = forceSensitive ? Math.max(0, CAREERS_FORCE_BASE + level * (4 + modifiers.wis) + talents.maxFp) : 0;
 
     const totalPurchaseCost = this.totalPurchaseCost(c);
     const startingXpBudget = species.startingXp;
@@ -536,15 +509,12 @@ export class CareersRules {
       maxStrain,
       maxFp,
       saveRanks,
-      saveTalentBonus,
       saves,
-      defenseTalentBonus,
-      damageReduction,
       baseDefense,
       combatAttack,
       skillRanks,
-      skillBonuses,
       talentRanks,
+      talents,
       engineSkills,
       careerSkills,
       featIds: [...featSet].sort((a, b) => a - b),

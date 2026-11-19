@@ -136,7 +136,7 @@ export class CombatRound {
     const owner: ModuleCreature = this.owner as any;
 
     this.roundStarted = true;
-    owner.onCombatRoundStart?.();
+    owner.onCombatRoundStart();
 
     this.onHandAttacks = owner.equipment.RIGHTHAND ? 1 : 0;
     this.additionalAttacks = 0;
@@ -553,7 +553,7 @@ export class CombatRound {
    */
   calculateAttackBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
     if(!creature) return 0;
-    let bonus = creature.getAttackBase(weapon) + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0) + (creature.getTalentAttackBonus?.(weapon) || 0);
+    let bonus = creature.getAttackBase(weapon) + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0) + creature.getTalentAttackBonus(weapon);
 
     // If weapon.possessor wasn't bound, check Weapon Focus directly on creature
     if(weapon && weapon.possessor !== creature){
@@ -671,7 +671,7 @@ export class CombatRound {
       }
     }
 
-    const extraThreat = creature?.getTalentCritThreatBonus?.(weapon) || 0;
+    const extraThreat = creature ? creature.getTalentCritThreatBonus(weapon) : 0;
     const minRoll = Math.max(2, 21 - (threatSpan * mult + extraThreat));
     return (attackRoll >= minRoll && attackRoll <= 20);
   }
@@ -852,7 +852,7 @@ export class CombatRound {
     const attack = this.attackList[this.currentAttack];
     const isRangedWeapon = Boolean(weapon?.isRangedWeapon?.());
     const targetAC = combatAction.target
-      ? combatAction.target.getAC() + ((combatAction.target as ModuleCreature).getDefenseBonusVs?.(isRangedWeapon) || 0)
+      ? combatAction.target.getAC() + ((combatAction.target as ModuleCreature).getDefenseBonusVs?.(isRangedWeapon) || 0) // (a door or placeable has none)
       : 10;
 
     let isHit = hasAssuredHit || naturalRoll === 20 || (naturalRoll !== 1 && (isCritical || attackRoll >= targetAC));
@@ -884,10 +884,9 @@ export class CombatRound {
       attack.attackResult = combatAction.attackResult;
     }
 
-    // Notify attacker seam (consumes next-attack buffs, triggers on-kill talents)
-    const landed = attack.attackResult === AttackResult.HIT_SUCCESSFUL ||
-      attack.attackResult === AttackResult.CRITICAL_HIT;
-    creature.onAttackResolved?.(landed, attack.attackResult === AttackResult.CRITICAL_HIT, Boolean(attack.killingBlow));
+    // The attack is rolled and its damage worked out: next-attack buffs are used up (kills are told when the
+    // damage lands, in CombatAttackData.applyDamageEffectToCreature)
+    creature.onAttackResolved();
 
     // Log to combat menu - create feedback message for the attack result
     this.logAttackResult(creature, weapon, combatAction, isCritical, hasAssuredHit);

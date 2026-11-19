@@ -10,6 +10,7 @@ import { ModelPreview } from "@/apps/game/components/gm-panel/creator/ModelPrevi
 import { ModelList } from "@/apps/game/components/gm-panel/creator/ModelList";
 import { creatorPortraits, portraitForModel } from "@/apps/game/components/gm-panel/creator/creatorData";
 import { Panel } from "@/apps/game/components/gm-panel/creator/sections";
+import { careerNodeTag, DedicationPicker } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
 import "@/apps/game/components/gm-panel/creator/creator.scss";
 import "@/apps/game/components/gm-panel/creator/careers-creator.scss";
 
@@ -490,14 +491,7 @@ export const CareersCreator: React.FC<{
                         const check = Rules.canBuyNode(draft, spec.id, node.id, true);
                         const cost = Rules.nodeCost(node.row);
                         const cls = owned ? 'owned' : check.ok ? 'available' : 'locked';
-                        const talent = node.kind === 'talent' && node.talentId ? KotOR.CAREERS_TALENT_BY_ID.get(node.talentId) : undefined;
-                        const chosenAbility = node.kind === 'characteristic' ? draft.nodeChoices?.[Rules.nodeChoiceKey(spec.id, node.id)] : undefined;
-                        const tag = node.kind === 'talent'
-                          ? (talent?.activation === 'active' ? `Active · ${talent.strainCost || 0} Strain` : 'Passive talent')
-                          : node.kind === 'feat' ? 'Feat'
-                          : node.kind === 'career_skill' ? 'Career skill'
-                          : node.kind === 'characteristic' ? (chosenAbility ? `+1 ${chosenAbility.toUpperCase()}` : '+1 Characteristic')
-                          : 'Capstone (Lv.17+)';
+                        const tag = careerNodeTag(node, spec.id, draft, d);
                         return (
                           <button
                             key={node.id}
@@ -516,23 +510,11 @@ export const CareersCreator: React.FC<{
                       })}
                     </div>
                     {pickingCharNode && (
-                      <div className="cc-free-chips" style={{ marginTop: 8 }}>
-                        <span className="cc-hint">Pick +1 characteristic for Dedication:</span>
-                        {KotOR.CAREER_ABILITIES.map((ab) => {
-                          const cur = d.effectiveCharacteristics[ab];
-                          return (
-                            <button
-                              key={ab}
-                              className="cc-chip"
-                              disabled={cur >= 6}
-                              onClick={() => toggleNode(pickingCharNode, ab)}
-                            >
-                              {KotOR.CAREER_ABILITY_LABELS[ab].short} ({cur} → {cur + 1})
-                            </button>
-                          );
-                        })}
-                        <button className="cc-chip" onClick={() => setPickingCharNode(null)}>Cancel</button>
-                      </div>
+                      <DedicationPicker
+                        values={d.effectiveCharacteristics}
+                        onPick={(ab) => toggleNode(pickingCharNode, ab)}
+                        onCancel={() => setPickingCharNode(null)}
+                      />
                     )}
                   </div>
                 )}

@@ -3089,24 +3089,19 @@ export class ModuleCreature extends ModuleObject {
     return this.careersRules ? this.careersRules.getSpellCostReduction() : 0;
   }
 
-  /** Force power damage bonus from talents; 0 for classic creatures */
-  getSpellDamageBonus(): number {
-    return this.careersRules ? this.careersRules.getSpellDamageBonus() : 0;
-  }
-
   /** Combat lifecycle seam: start of combat round */
   onCombatRoundStart(): void {
     this.careersRules?.onCombatRoundStart();
   }
 
-  /** Combat lifecycle seam: attack resolved (consumes single-attack buffs & runs on-kill hooks) */
-  onAttackResolved(landed: boolean, isCritical: boolean, killedTarget: boolean): void {
-    this.careersRules?.onAttackResolved(landed, isCritical, killedTarget);
+  /** Combat lifecycle seam: an attack was rolled, hit or miss (next-attack buffs are used up) */
+  onAttackResolved(): void {
+    this.careersRules?.onAttackResolved();
   }
 
-  /** Combat lifecycle seam: creature took damage */
-  onDamageTaken(amount: number): void {
-    if(amount > 0) this.careersRules?.onTakeDamage(amount);
+  /** Combat lifecycle seam: this creature's attack killed its target, once the damage has landed */
+  onKill(): void {
+    this.careersRules?.onKill();
   }
 
   /** The ability an attack adds (KotOR): Dexterity with a ranged weapon, Strength in melee or unarmed */

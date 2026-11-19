@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
-import type { CareerAbilityKey, CareersPurchaseRequest, GMCareersCharacter } from "@/managers/gm/careers/types";
+import type { CareersPurchaseRequest, GMCareersCharacter } from "@/managers/gm/careers/types";
+import { careerNodeTag, DedicationPicker } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
 import "@/apps/game/components/gm-panel/creator/careers-creator.scss";
 
 /**
@@ -16,7 +17,7 @@ export const CareersSheetSection: React.FC<{
   const [pickingCharNode, setPickingCharNode] = useState<{ specId: string; nodeId: string } | null>(null);
   const [note, setNote] = useState('');
 
-  const runtime = creature?.careersRules;
+  const runtime = KotOR.careersRuntimeOf(creature);
   const character: GMCareersCharacter | undefined = runtime?.character || creature?.gmPlayerConfig?.careers;
   if (!character) {
     return <div className="cc-hint">No Careers character sheet attached.</div>;
@@ -24,7 +25,7 @@ export const CareersSheetSection: React.FC<{
 
   const Rules = KotOR.CareersRules;
   const derived = Rules.derive(character);
-  const strain = runtime?.getStrainState?.() || { strain: 0, maxStrain: derived.maxStrain, windedSeconds: 0 };
+  const strain = runtime?.getStrainState() || { strain: 0, maxStrain: derived.maxStrain, windedSeconds: 0 };
   const inCombat = !!creature?.combatData?.combatState;
   const ownedSpecs = character.specializations?.length ? character.specializations : [character.startingSpecId];
   const activeSpecId = ownedSpecs.includes(selectedSpecId) ? selectedSpecId : character.startingSpecId;
@@ -102,15 +103,7 @@ export const CareersSheetSection: React.FC<{
               const check = Rules.canBuyNode(character, spec.id, node.id);
               const cost = Rules.nodeCost(node.row);
               const cls = owned ? 'owned' : (!inCombat && check.ok) ? 'available' : 'locked';
-              const talent = node.kind === 'talent' && node.talentId ? KotOR.CAREERS_TALENT_BY_ID.get(node.talentId) : undefined;
-              const talentRank = talent ? (derived.talentRanks[talent.id] || 0) : 0;
-              const chosenAbility = node.kind === 'characteristic' ? character.nodeChoices?.[Rules.nodeChoiceKey(spec.id, node.id)] : undefined;
-              const tag = node.kind === 'talent'
-                ? `${talent?.activation === 'active' ? `Active · ${talent.strainCost || 0} Strain` : 'Passive talent'}${talentRank > 1 ? ` · Rank ${talentRank}` : ''}`
-                : node.kind === 'feat' ? 'Feat'
-                : node.kind === 'career_skill' ? 'Career skill'
-                : node.kind === 'characteristic' ? (chosenAbility ? `+1 ${chosenAbility.toUpperCase()}` : '+1 Characteristic')
-                : 'Capstone (Lv.17+)';
+              const tag = careerNodeTag(node, spec.id, character, derived);
               return (
                 <button
                   key={node.id}
@@ -136,23 +129,12 @@ export const CareersSheetSection: React.FC<{
             })}
           </div>
           {pickingCharNode && pickingCharNode.specId === spec.id && (
-            <div className="cc-free-chips" style={{ marginTop: 8 }}>
-              <span className="cc-hint">Pick +1 characteristic for Dedication:</span>
-              {KotOR.CAREER_ABILITIES.map((ab: CareerAbilityKey) => {
-                const cur = derived.effectiveCharacteristics[ab];
-                return (
-                  <button
-                    key={ab}
-                    className="cc-chip"
-                    disabled={inCombat || cur >= 6}
-                    onClick={() => buy({ kind: 'node', specId: pickingCharNode.specId, nodeId: pickingCharNode.nodeId, ability: ab })}
-                  >
-                    {KotOR.CAREER_ABILITY_LABELS[ab].short} ({cur} → {cur + 1})
-                  </button>
-                );
-              })}
-              <button className="cc-chip" onClick={() => setPickingCharNode(null)}>Cancel</button>
-            </div>
+            <DedicationPicker
+              values={derived.effectiveCharacteristics}
+              disabled={inCombat}
+              onPick={(ab) => buy({ kind: 'node', specId: pickingCharNode.specId, nodeId: pickingCharNode.nodeId, ability: ab })}
+              onCancel={() => setPickingCharNode(null)}
+            />
           )}
         </div>
       )}
@@ -161,7 +143,10 @@ export const CareersSheetSection: React.FC<{
         <div>
           {KotOR.CAREER_SKILLS.map((def) => {
             const rank = derived.skillRanks[def.id] || 0;
-            const bonus = derived.skillBonuses[def.id] || 0;
+            // Only engine skills are rolled yet (KotOR's checks and the GM's skill checks, Persuade taking the best of
+            // Charm, Negotiation and Deception), so only those show a bonus
+            const rolled = def.engineSkill !== undefined || def.id === 'charm' || def.id === 'negotiation' || def.id === 'deception';
+            const bonus = rolled ? (derived.talents.skillBonus[def.id] || 0) : 0;
             const isCareer = derived.careerSkills.has(def.id);
             const check = Rules.canBuySkillRank(character, def.id, false);
             return (

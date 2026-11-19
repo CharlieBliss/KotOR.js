@@ -80,7 +80,7 @@ export const CharacterSheet: React.FC<{
   if (!creature) return null;
 
   // XP toward the next level (exptable.2da: the total XP each level starts at)
-  const careersChar = creature.careersRules?.character || creature.gmPlayerConfig?.careers;
+  const careersChar = KotOR.careersRuntimeOf(creature)?.character || creature.gmPlayerConfig?.careers;
   const careersDerived = careersChar && KotOR.CareersRules ? KotOR.CareersRules.derive(careersChar) : null;
   const level = careersDerived ? careersDerived.level : (Number(creature.getTotalClassLevel?.()) || 1);
   const expRows = KotOR.GameState.TwoDAManager.datatables.get('exptable')?.rows || {};

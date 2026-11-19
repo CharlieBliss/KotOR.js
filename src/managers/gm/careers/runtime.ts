@@ -1,28 +1,26 @@
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
-import { WeaponWield } from "@/enums/combat/WeaponWield";
 import { SkillType } from "@/enums/nwscript/SkillType";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { EffectACIncrease } from "@/effects/EffectACIncrease";
 import { EffectAttackIncrease } from "@/effects/EffectAttackIncrease";
-import type {
-  ICareersActiveTalentInfo,
-  ICareersCreatureRules,
-  ICareersDamageContext,
-  ICareersStrainState,
-  ICareersTalentActivationResult,
-} from "@/engine/CareersSeam";
+import type { ICareersCreatureRules, ICareersDamageContext } from "@/engine/CareersSeam";
 import { CareersRules } from "@/managers/gm/careers/rules";
-import { CAREERS_TALENT_BY_ID, weaponMatchesScope } from "@/managers/gm/careers/talents";
-import type { CareerTalentDef } from "@/managers/gm/careers/talents";
+import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
+import type { TalentAim } from "@/managers/gm/careers/talents";
+import { CareersTalentState, forEachTalent, scopeTotal } from "@/managers/gm/careers/talentEffects";
+import type { CareerBuffBadge, CareerTempBuff } from "@/managers/gm/careers/talentEffects";
+import { combatSkillForWeapon } from "@/managers/gm/careers/weapons";
 import type {
   CareerSkillId,
-  CombatSkillId,
   GMCareersCharacter,
   GMCareersDerived,
   GMCareersNetworkState,
 } from "@/managers/gm/careers/types";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleItem } from "@/module/ModuleItem";
+
+export { combatSkillForWeapon } from "@/managers/gm/careers/weapons";
+export type { CareerTempBuff } from "@/managers/gm/careers/talentEffects";
 
 /** Strain cost for KotOR combat feats (tier 1 / improved / master), replacing attack/AC penalties */
 export const COMBAT_FEAT_STRAIN_COST: Readonly<Record<number, number>> = {
@@ -49,19 +47,6 @@ export const COMBAT_FEAT_STRAIN_COST: Readonly<Record<number, number>> = {
   [CombatFeatType.MASTER_POWER_BLAST]: 4,
 };
 
-/** Temporary combat buff created by an active or reactive Careers talent */
-export interface CareerTempBuff {
-  id: string;
-  label: string;
-  remaining: number;
-  attackBonus?: number;
-  damageBonus?: number;
-  critThreatBonus?: number;
-  defenseBonus?: number;
-  damageReduction?: number;
-  nextAttackOnly?: boolean;
-}
-
 const ENGINE_SKILL_TO_CAREER: Readonly<Record<number, CareerSkillId>> = {
   [SkillType.COMPUTER_USE]: 'computer_use',
   [SkillType.DEMOLITIONS]: 'demolitions',
@@ -72,33 +57,44 @@ const ENGINE_SKILL_TO_CAREER: Readonly<Record<number, CareerSkillId>> = {
   [SkillType.TREAT_INJURY]: 'treat_injury',
 };
 
-/** Map a KotOR weapon (or unarmed) to the Careers combat skill that drives its attack bonus */
-export function combatSkillForWeapon(weapon?: ModuleItem): CombatSkillId {
-  if (!weapon) return 'brawl';
-  const baseId = weapon.baseItemId ?? weapon.getBaseItemId?.();
-  if (baseId === 8 || baseId === 9 || baseId === 10) return 'lightsaber';
-  const wield = weapon.getWeaponWield?.();
-  switch (wield) {
-    case WeaponWield.STUN_BATON:
-      return 'brawl';
-    case WeaponWield.ONE_HANDED_SWORD:
-    case WeaponWield.TWO_HANDED_SWORD:
-      return 'melee';
-    case WeaponWield.BLASTER_PISTOL:
-      return 'ranged_light';
-    case WeaponWield.BLASTER_RIFLE:
-      return 'ranged_heavy';
-    case WeaponWield.BLASTER_HEAVY:
-      return 'gunnery';
-    default:
-      return 'brawl';
-  }
+/** Strain and winded, as the HUD and the network show them */
+export interface CareersStrainState {
+  strain: number;
+  maxStrain: number;
+  /** Seconds left winded (0 when not) */
+  windedSeconds: number;
+}
+
+/** An active talent as the HUD and power wheel list it */
+export interface CareersActiveTalentInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rank: number;
+  strainCost: number;
+  aim: TalentAim;
+  category: 'feat' | 'buff' | 'heal';
+  cooldownRemaining: number;
+  usable: boolean;
+  why?: string;
+}
+
+export interface CareersTalentActivationResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+}
+
+/** The Careers rules on a creature, when it has them (the GM side's way to reach the full runtime) */
+export function careersRuntimeOf(obj: { careersRules?: ICareersCreatureRules } | undefined | null): CareersRuntime | undefined {
+  return obj?.careersRules instanceof CareersRuntime ? obj.careersRules : undefined;
 }
 
 /**
- * Runtime Careers rules object attached to a spawned careers creature (`creature.careersRules`).
- * Drives attack bonus, lightsaber deflection, defence, saves, Strain & winded state,
- * combat feats paid in Strain, Force-point pushing with Strain, and custom talent hooks & active talents.
+ * The Careers rules attached to a spawned Careers creature (`creature.careersRules`): its stats, Strain and winded
+ * state, combat feats paid in Strain, Force pushes, and its talents (passive totals from the sheet, plus the
+ * buffs and cooldowns of active talents in CareersTalentState).
  */
 export class CareersRuntime implements ICareersCreatureRules {
   static WINDED_SECONDS = 6; // 2 combat rounds
@@ -107,6 +103,10 @@ export class CareersRuntime implements ICareersCreatureRules {
   static ROUND_REFILL_AMOUNT = 1;
   static OUT_OF_COMBAT_REFILL_SECONDS = 4;
   static STRAIN_PER_MISSING_FP = 2;
+  /** How far an ally talent reaches (metres) */
+  static ALLY_TALENT_RANGE = 15;
+  /** Seconds a buff from a kill waits for the next attack */
+  static KILL_BUFF_SECONDS = 9;
 
   character: GMCareersCharacter;
   derived: GMCareersDerived;
@@ -116,17 +116,12 @@ export class CareersRuntime implements ICareersCreatureRules {
   strain: number = 0;
   /** Seconds remaining in winded state (0 when not winded) */
   windedSeconds: number = 0;
-
-  /** Active temporary buffs from active/reactive talents */
-  buffs: CareerTempBuff[] = [];
-  /** Remaining cooldowns (seconds) keyed by talent id */
-  cooldowns: Map<string, number> = new Map();
+  /** Buffs and cooldowns from active talents and combat reactions */
+  talents = new CareersTalentState();
 
   private roundTimer: number = 0;
   private quietTimer: number = 0;
   private wasInCombat: boolean = false;
-  /** Client-replicated buff badges when running as a replica */
-  private syncedBuffs?: { label: string; secondsLeft?: number }[];
 
   constructor(character: GMCareersCharacter, owner?: Partial<ModuleCreature>) {
     this.character = character;
@@ -141,228 +136,75 @@ export class CareersRuntime implements ICareersCreatureRules {
     if (this.strain > this.derived.maxStrain) this.strain = this.derived.maxStrain;
   }
 
-  /** Apply host-replicated Strain, buff badges, and cooldowns on a client replica */
-  syncStrain(state: ICareersStrainState & Partial<Pick<GMCareersNetworkState, 'activeBuffs' | 'cooldowns'>>) {
+  /** A player's machine: take the host's Strain, winded time, buff badges and cooldowns */
+  syncStrain(state: CareersStrainState & Partial<Pick<GMCareersNetworkState, 'activeBuffs' | 'cooldowns'>>) {
     const wasWinded = this.isWinded();
     this.strain = Math.max(0, Math.min(this.derived.maxStrain, Number(state.strain) || 0));
     this.windedSeconds = Math.max(0, Number(state.windedSeconds) || 0);
-    this.syncedBuffs = Array.isArray(state.activeBuffs) ? state.activeBuffs.map((b) => ({ ...b })) : [];
-    this.cooldowns.clear();
-    if (state.cooldowns && typeof state.cooldowns === 'object') {
-      for (const [id, secs] of Object.entries(state.cooldowns)) {
-        const n = Number(secs);
-        if (Number.isFinite(n) && n > 0) this.cooldowns.set(id, n);
-      }
-    }
-    if (wasWinded !== this.isWinded()) {
-      this.owner?.updateMovementSpeed?.();
-    }
+    this.talents.mirror(state.activeBuffs, state.cooldowns);
+    if (wasWinded !== this.isWinded()) this.owner?.updateMovementSpeed?.();
   }
 
   get maxStrain(): number {
     return this.derived.maxStrain;
   }
 
-  private forEachOwnedTalent(fn: (def: CareerTalentDef, rank: number) => void) {
-    for (const [id, rank] of Object.entries(this.derived.talentRanks)) {
-      if (!(rank > 0)) continue;
-      const def = CAREERS_TALENT_BY_ID.get(id);
-      if (def) fn(def, rank);
-    }
-  }
+  // --- Stats (the engine seam) ----------------------------------------------------------------
 
-  private healCreature(target: Partial<ModuleCreature> | undefined, amount: number) {
-    if (!target || !(amount > 0)) return;
-    if (typeof target.addHP === 'function') {
-      target.addHP(amount);
-      return;
-    }
-    const maxHp = target.getMaxHP?.() ?? target.maxHitPoints ?? 0;
-    const curHp = target.getHP?.() ?? target.currentHitPoints ?? 0;
-    const next = maxHp > 0 ? Math.min(maxHp, curHp + amount) : curHp + amount;
-    target.currentHitPoints = next;
-  }
-
-  /** Recover Strain (never below 0) */
-  recoverStrain(amount: number) {
-    if (!(amount > 0)) return;
-    this.strain = Math.max(0, this.strain - amount);
-  }
-
-  /** Add or refresh a temporary combat buff on this creature */
-  addBuff(buff: CareerTempBuff) {
-    const idx = this.buffs.findIndex((b) => b.id === buff.id);
-    if (idx >= 0) this.buffs[idx] = { ...buff };
-    else this.buffs.push({ ...buff });
-  }
-
-  /** Export remaining cooldowns as whole seconds for network sheet sync */
-  getCooldownSnapshot(): Record<string, number> {
-    const out: Record<string, number> = {};
-    for (const [id, secs] of this.cooldowns.entries()) {
-      const whole = Math.ceil(secs);
-      if (whole > 0) out[id] = whole;
-    }
-    return out;
-  }
-
-  // --- Core stat & combat seams ---------------------------------------------------------------
-
-  /** Base attack bonus replacing class BAB: combat skill rank * 2 + level baseline */
   getAttackBase(weapon?: ModuleItem): number {
-    const skill = combatSkillForWeapon(weapon);
-    const rank = this.derived.skillRanks[skill] || 0;
+    const rank = this.derived.skillRanks[combatSkillForWeapon(weapon)] || 0;
     return rank * 2 + this.derived.levelBaseline;
   }
 
-  /** Blaster deflection base replacing class BAB: Lightsaber skill rank * 2 + level baseline */
   getDeflectionBase(): number {
-    const rank = this.derived.skillRanks.lightsaber || 0;
-    return rank * 2 + this.derived.levelBaseline;
+    return (this.derived.skillRanks.lightsaber || 0) * 2 + this.derived.levelBaseline;
   }
 
-  /** Defence bonus replacing KotOR class AC bonus: level baseline + passive/active talent defence */
   getDefenseBonus(): number {
-    let bonus = this.derived.levelBaseline + this.derived.defenseTalentBonus;
-    for (const b of this.buffs) {
-      if (b.defenseBonus) bonus += b.defenseBonus;
-    }
-    return bonus;
+    return this.derived.levelBaseline + this.derived.talents.defense + this.talents.buffTotal('defenseBonus');
   }
 
-  /** Conditional defence bonus against melee or ranged attacks from talents */
   getDefenseBonusVs(isRanged: boolean): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      const vs = def.hooks.defenseVs;
-      if (!vs) return;
-      if (isRanged && vs.ranged) bonus += vs.ranged * rank;
-      if (!isRanged && vs.melee) bonus += vs.melee * rank;
-    });
-    return bonus;
+    const vs = this.derived.talents.defenseVs;
+    return isRanged ? vs.ranged : vs.melee;
   }
 
-  /** Raw save skill base (rank * 2 + passive talent saves, without ability mod) */
   getSaveBase(save: 'fortitude' | 'reflex' | 'will'): number {
     return this.derived.saveRanks[save];
   }
 
-  /** Talent attack roll bonus (passive + active buffs) */
   getTalentAttackBonus(weapon?: ModuleItem): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      const atk = def.hooks.attackBonus;
-      if (atk && weaponMatchesScope(atk.scope, weapon)) {
-        bonus += atk.amount * rank;
-      }
-    });
-    for (const b of this.buffs) {
-      if (b.attackBonus) bonus += b.attackBonus;
-    }
-    return bonus;
+    return scopeTotal(this.derived.talents.attack, weapon) + this.talents.buffTotal('attackBonus');
   }
 
-  /** Talent critical threat span bonus (passive + active buffs) */
   getCritThreatBonus(weapon?: ModuleItem): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      const crit = def.hooks.critThreatBonus;
-      if (crit && weaponMatchesScope(crit.scope, weapon)) {
-        bonus += crit.amount * rank;
-      }
-    });
-    for (const b of this.buffs) {
-      if (b.critThreatBonus) bonus += b.critThreatBonus;
-    }
-    return bonus;
+    return scopeTotal(this.derived.talents.critThreat, weapon) + this.talents.buffTotal('critThreatBonus');
   }
 
-  /** Talent damage bonus (passive + critical damage + active buffs) */
   getDamageBonus(ctx: ICareersDamageContext): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      const dmg = def.hooks.damageBonus;
-      if (dmg && weaponMatchesScope(dmg.scope, ctx.weapon)) {
-        bonus += dmg.amount * rank;
-      }
-      const critDmg = def.hooks.critDamageBonus;
-      if (ctx.isCritical && critDmg && weaponMatchesScope(critDmg.scope, ctx.weapon)) {
-        bonus += critDmg.amount * rank;
-      }
-    });
-    for (const b of this.buffs) {
-      if (b.damageBonus) bonus += b.damageBonus;
-    }
-    return bonus;
+    const t = this.derived.talents;
+    return scopeTotal(t.damage, ctx.weapon)
+      + (ctx.isCritical ? scopeTotal(t.critDamage, ctx.weapon) : 0)
+      + this.talents.buffTotal('damageBonus');
   }
 
-  /** Flat damage reduction per incoming hit from passive + active talents */
   getDamageReduction(): number {
-    let dr = this.derived.damageReduction;
-    for (const b of this.buffs) {
-      if (b.damageReduction) dr += b.damageReduction;
-    }
-    return Math.max(0, dr);
+    return Math.max(0, this.derived.talents.damageReduction + this.talents.buffTotal('damageReduction'));
   }
 
-  /** Flat skill check bonus from talents for a KotOR SkillType (0..7) */
   getSkillCheckBonus(engineSkill: number): number {
-    if (engineSkill === SkillType.PERSUADE) {
-      return Math.max(
-        this.derived.skillBonuses.charm || 0,
-        this.derived.skillBonuses.negotiation || 0,
-        this.derived.skillBonuses.deception || 0,
-      );
-    }
+    const bonus = this.derived.talents.skillBonus;
+    if (engineSkill === SkillType.PERSUADE) return Math.max(bonus.charm || 0, bonus.negotiation || 0, bonus.deception || 0);
     const id = ENGINE_SKILL_TO_CAREER[engineSkill];
-    return id ? (this.derived.skillBonuses[id] || 0) : 0;
+    return id ? (bonus[id] || 0) : 0;
   }
-
-  /** Flat check bonus for any Careers skill (including narrative skills) */
-  getNarrativeSkillBonus(skillId: CareerSkillId): number {
-    return this.derived.skillBonuses[skillId] || 0;
-  }
-
-  // --- Force power cast modifiers (ready for Phase 5 power trees) -----------------------------
 
   getSpellSaveDCBonus(): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      if (def.hooks.powerSaveDC) bonus += def.hooks.powerSaveDC * rank;
-    });
-    return bonus;
+    return this.derived.talents.powerSaveDC;
   }
 
   getSpellCostReduction(): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      if (def.hooks.powerCostReduction) bonus += def.hooks.powerCostReduction * rank;
-    });
-    return bonus;
-  }
-
-  getSpellDamageBonus(): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      if (def.hooks.powerDamageBonus) bonus += def.hooks.powerDamageBonus * rank;
-    });
-    return bonus;
-  }
-
-  getSpellDurationBonus(): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      if (def.hooks.powerDurationBonusSeconds) bonus += def.hooks.powerDurationBonusSeconds * rank;
-    });
-    return bonus;
-  }
-
-  getSpellRangeBonus(): number {
-    let bonus = 0;
-    this.forEachOwnedTalent((def, rank) => {
-      if (def.hooks.powerRangeBonusMeters) bonus += def.hooks.powerRangeBonusMeters * rank;
-    });
-    return bonus;
+    return this.derived.talents.powerCostReduction;
   }
 
   // --- Strain, combat feats, and Force pushing ------------------------------------------------
@@ -379,12 +221,8 @@ export class CareersRuntime implements ICareersCreatureRules {
     return this.isWinded() ? CareersRuntime.WINDED_SPEED_MULTIPLIER : 1;
   }
 
-  getStrainState(): ICareersStrainState {
-    return {
-      strain: this.strain,
-      maxStrain: this.derived.maxStrain,
-      windedSeconds: this.windedSeconds,
-    };
+  getStrainState(): CareersStrainState {
+    return { strain: this.strain, maxStrain: this.derived.maxStrain, windedSeconds: this.windedSeconds };
   }
 
   /**
@@ -406,29 +244,23 @@ export class CareersRuntime implements ICareersCreatureRules {
     return { ok: true, becameWinded: false };
   }
 
-  /**
-   * Seam called by TalentFeat.impactCaster: pays Strain for KotOR combat feats and returns true
-   * so KotOR's classic attack/AC penalties are skipped.
-   */
+  /** Recover Strain (never below 0) */
+  recoverStrain(amount: number) {
+    if (amount > 0) this.strain = Math.max(0, this.strain - amount);
+  }
+
   payCombatFeatStrain(featId: number): boolean {
     const cost = this.getCombatFeatStrainCost(featId);
     if (cost <= 0) return false;
     // Winded (a feat queued before it came on): no Strain to pay, so KotOR's own penalties apply instead
-    if (!this.spendStrain(cost).ok) return false;
-    return true;
+    return this.spendStrain(cost).ok;
   }
 
-  /**
-   * Seam called by SpellCastInstance: if FP is short, pays the missing FP in Strain (2 Strain / FP).
-   * Fails if already winded and lacking FP.
-   */
   payForceCost(fpCost: number, currentFp: number): { fpToSpend: number; ok: boolean } {
     if (fpCost <= 0) return { fpToSpend: 0, ok: true };
     if (currentFp >= fpCost) return { fpToSpend: fpCost, ok: true };
     const strainCost = this.strainToPush(fpCost, currentFp);
-    if (strainCost === null) return { fpToSpend: 0, ok: false };
-    const paid = this.spendStrain(strainCost);
-    if (!paid.ok) return { fpToSpend: 0, ok: false };
+    if (strainCost === null || !this.spendStrain(strainCost).ok) return { fpToSpend: 0, ok: false };
     return { fpToSpend: Math.max(0, currentFp), ok: true };
   }
 
@@ -446,33 +278,45 @@ export class CareersRuntime implements ICareersCreatureRules {
     return strainCost > room + CareersRuntime.STRAIN_PER_MISSING_FP ? null : strainCost;
   }
 
-  // --- Combat lifecycle reactions -------------------------------------------------------------
+  // --- Combat events --------------------------------------------------------------------------
+
+  private heal(target: Partial<ModuleCreature> | undefined, amount: number) {
+    if (!target || !(amount > 0)) return;
+    if (typeof target.addHP === 'function') {
+      target.addHP(amount);
+      return;
+    }
+    const maxHp = target.getMaxHP?.() ?? target.maxHitPoints ?? 0;
+    const curHp = target.getHP?.() ?? target.currentHitPoints ?? 0;
+    target.currentHitPoints = maxHp > 0 ? Math.min(maxHp, curHp + amount) : curHp + amount;
+  }
+
+  /** Strain and Vitality a reaction hook gives back, times rank */
+  private react(hook: { healStrain?: number; healHp?: number } | undefined, rank: number) {
+    if (!hook) return;
+    if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
+    if (hook.healHp) this.heal(this.owner, hook.healHp * rank);
+  }
 
   onCombatRoundStart() {
-    this.forEachOwnedTalent((def, rank) => {
-      const hook = def.hooks.onRoundStart;
-      if (!hook) return;
-      if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
-      if (hook.healHp) this.healCreature(this.owner, hook.healHp * rank);
-    });
+    forEachTalent(this.derived.talentRanks, (def, rank) => this.react(def.hooks.onRoundStart, rank));
   }
 
-  onAttackResolved(_landed: boolean, _isCritical: boolean, killedTarget: boolean) {
-    // Consume single-attack buffs (e.g. Battle Focus, Relentless) once an attack resolves
-    if (this.buffs.length > 0) {
-      this.buffs = this.buffs.filter((b) => !b.nextAttackOnly);
-    }
-    if (!killedTarget) return;
-    this.forEachOwnedTalent((def, rank) => {
+  onAttackResolved() {
+    // Battle Focus, a kill's bonus and the like last one attack, hit or miss
+    this.talents.consumeNextAttackBuffs();
+  }
+
+  onKill() {
+    forEachTalent(this.derived.talentRanks, (def, rank) => {
       const hook = def.hooks.onKill;
       if (!hook) return;
-      if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
-      if (hook.healHp) this.healCreature(this.owner, hook.healHp * rank);
+      this.react(hook, rank);
       if (hook.nextAttackBonus) {
-        this.addBuff({
+        this.talents.addBuff({
           id: `kill:${def.id}`,
           label: def.name,
-          remaining: 9,
+          remaining: CareersRuntime.KILL_BUFF_SECONDS,
           attackBonus: hook.nextAttackBonus * rank,
           nextAttackOnly: true,
         });
@@ -480,64 +324,19 @@ export class CareersRuntime implements ICareersCreatureRules {
     });
   }
 
-  onTakeDamage(amount: number) {
-    if (!(amount > 0)) return;
-    this.forEachOwnedTalent((def, rank) => {
-      const hook = def.hooks.onTakeDamage;
-      if (!hook) return;
-      if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
-      if (hook.nextAttackBonus) {
-        this.addBuff({
-          id: `hurt:${def.id}`,
-          label: def.name,
-          remaining: 6,
-          attackBonus: hook.nextAttackBonus * rank,
-          nextAttackOnly: true,
-        });
-      }
-    });
+  private onCombatEnd() {
+    forEachTalent(this.derived.talentRanks, (def, rank) => this.react(def.hooks.onCombatEnd, rank));
   }
 
-  private triggerCombatStart() {
-    this.forEachOwnedTalent((def, rank) => {
-      const hook = def.hooks.onCombatStart;
-      if (!hook) return;
-      if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
-      if (hook.tempDefense) {
-        this.addBuff({
-          id: `start:${def.id}`,
-          label: def.name,
-          remaining: hook.durationSeconds || 3,
-          defenseBonus: hook.tempDefense * rank,
-        });
-      }
-    });
-  }
+  // --- Active talents (HUD / power wheel / host) ----------------------------------------------
 
-  private triggerCombatEnd() {
-    this.forEachOwnedTalent((def, rank) => {
-      const hook = def.hooks.onCombatEnd;
-      if (!hook) return;
-      if (hook.healStrain) this.recoverStrain(hook.healStrain * rank);
-      if (hook.healHp) this.healCreature(this.owner, hook.healHp * rank);
-    });
-  }
-
-  // --- Active talents (HUD / power wheel / host execution) ------------------------------------
-
-  getActiveTalents(): ICareersActiveTalentInfo[] {
-    const out: ICareersActiveTalentInfo[] = [];
-    this.forEachOwnedTalent((def, rank) => {
+  getActiveTalents(): CareersActiveTalentInfo[] {
+    const out: CareersActiveTalentInfo[] = [];
+    forEachTalent(this.derived.talentRanks, (def, rank) => {
       if (def.activation !== 'active') return;
       const strainCost = def.strainCost || 0;
-      const cd = Math.max(0, this.cooldowns.get(def.id) || 0);
+      const cd = this.talents.cooldownLeft(def.id);
       const windedBlock = this.isWinded() && strainCost > 0;
-      const usable = !windedBlock && cd <= 0;
-      const why = windedBlock
-        ? 'Winded: can\'t spend Strain'
-        : cd > 0
-          ? `Ready in ${Math.ceil(cd)}s`
-          : undefined;
       out.push({
         id: def.id,
         name: def.name,
@@ -548,131 +347,120 @@ export class CareersRuntime implements ICareersCreatureRules {
         aim: def.aim || 'self',
         category: def.category || 'buff',
         cooldownRemaining: Math.ceil(cd),
-        usable,
-        why,
+        usable: !windedBlock && cd <= 0,
+        why: windedBlock ? "Winded: can't spend Strain" : cd > 0 ? `Ready in ${Math.ceil(cd)}s` : undefined,
       });
     });
     return out;
   }
 
-  getActiveBuffs(): { label: string; secondsLeft?: number }[] {
-    if (this.buffs.length > 0) {
-      return this.buffs.map((b) => ({
-        label: b.label,
-        ...(b.remaining > 0 ? { secondsLeft: Math.ceil(b.remaining) } : {}),
-      }));
-    }
-    return this.syncedBuffs ? this.syncedBuffs.map((b) => ({ ...b })) : [];
+  getActiveBuffs(): CareerBuffBadge[] {
+    return this.talents.badges();
   }
 
-  activateTalent(talentId: string, target?: ModuleCreature): ICareersTalentActivationResult {
+  getCooldownSnapshot(): Record<string, number> {
+    return this.talents.cooldownSnapshot();
+  }
+
+  /**
+   * Who a talent aimed at `target` lands on, or why it can't be used on them. 'self' talents land on the user
+   * whatever was aimed at; 'ally' talents on the user or a living, non-hostile creature in range
+   */
+  private recipientFor(aim: TalentAim, target: Partial<ModuleCreature> | undefined): { recipient?: Partial<ModuleCreature>; reason?: string } {
+    const self = this.owner;
+    if (aim === 'self' || !target || target === self) return { recipient: self };
+    if (target.isDead?.()) return { reason: 'They are down.' };
+    const hostile = !!(target.isHostile?.(self as ModuleCreature) || (self as ModuleCreature | undefined)?.isHostile?.(target as ModuleCreature));
+    if (aim === 'ally' && hostile) return { reason: 'That only works on allies.' };
+    if (aim === 'enemy' && !hostile) return { reason: 'That only works on enemies.' };
+    const from = self?.position, to = target.position;
+    if (from && to && typeof from.distanceTo === 'function' && from.distanceTo(to) > CareersRuntime.ALLY_TALENT_RANGE) {
+      return { reason: 'Too far away.' };
+    }
+    return { recipient: target };
+  }
+
+  /** Why a talent can't be used on this target (undefined when it can, or the talent isn't aimed) */
+  talentTargetProblem(talentId: string, target?: ModuleCreature): string | undefined {
+    const def = CAREERS_TALENT_BY_ID.get(talentId);
+    if (!def?.hooks.active?.affectTarget) return undefined;
+    return this.recipientFor(def.aim || 'self', target).reason;
+  }
+
+  /** Use an active talent (host): checks ownership, cooldown, target and Strain before anything is spent */
+  activateTalent(talentId: string, target?: ModuleCreature): CareersTalentActivationResult {
     const rank = this.derived.talentRanks[talentId] || 0;
     const def = CAREERS_TALENT_BY_ID.get(talentId);
-    if (!def || def.activation !== 'active' || rank <= 0) {
-      return { ok: false, reason: 'You don\'t have that active talent.' };
-    }
-    const cd = this.cooldowns.get(def.id) || 0;
-    if (cd > 0) {
-      return { ok: false, reason: `${def.name} is ready in ${Math.ceil(cd)}s.` };
-    }
-    const cost = def.strainCost || 0;
-    if (cost > 0) {
-      const paid = this.spendStrain(cost);
-      if (!paid.ok) {
-        return { ok: false, reason: 'Winded: cannot spend Strain.' };
-      }
-    }
+    if (!def || def.activation !== 'active' || rank <= 0) return { ok: false, reason: "You don't have that active talent." };
+    const cd = this.talents.cooldownLeft(def.id);
+    if (cd > 0) return { ok: false, reason: `${def.name} is ready in ${Math.ceil(cd)}s.` };
 
     const hook = def.hooks.active || {};
-    const recipient: Partial<ModuleCreature> | undefined =
-      hook.affectTarget && target ? target : this.owner;
+    const aimed = this.recipientFor(def.aim || 'self', hook.affectTarget ? target : undefined);
+    if (!aimed.recipient) return { ok: false, reason: aimed.reason || "That can't be used on them." };
+    const recipient = aimed.recipient;
 
-    if (hook.healHp) {
-      this.healCreature(recipient, hook.healHp * rank);
-    }
-    if (hook.healStrain) {
-      if (recipient?.careersRules instanceof CareersRuntime) {
-        recipient.careersRules.recoverStrain(hook.healStrain * rank);
-      } else if (recipient === this.owner) {
-        this.recoverStrain(hook.healStrain * rank);
-      }
+    if ((def.strainCost || 0) > 0 && !this.spendStrain(def.strainCost || 0).ok) {
+      return { ok: false, reason: 'Winded: cannot spend Strain.' };
     }
 
-    const hasBuff = Boolean(
-      hook.attackBonus || hook.damageBonus || hook.critThreatBonus || hook.defenseBonus || hook.damageReduction
-    );
-    if (hasBuff) {
-      const duration = hook.durationSeconds || 3;
-      const buff: CareerTempBuff = {
-        id: `active:${def.id}`,
-        label: def.name,
-        remaining: duration,
-        ...(hook.attackBonus ? { attackBonus: hook.attackBonus * rank } : {}),
-        ...(hook.damageBonus ? { damageBonus: hook.damageBonus * rank } : {}),
-        ...(hook.critThreatBonus ? { critThreatBonus: hook.critThreatBonus * rank } : {}),
-        ...(hook.defenseBonus ? { defenseBonus: hook.defenseBonus * rank } : {}),
-        ...(hook.damageReduction ? { damageReduction: hook.damageReduction * rank } : {}),
-        ...(hook.nextAttackOnly ? { nextAttackOnly: true } : {}),
-      };
-      if (recipient === this.owner) {
-        this.addBuff(buff);
-      } else if (recipient?.careersRules instanceof CareersRuntime) {
-        recipient.careersRules.addBuff(buff);
-      } else if (recipient && typeof recipient.addEffect === 'function') {
-        // Non-Careers ally: apply equivalent standard KotOR attack / AC buffs
-        if (buff.attackBonus) {
-          const eff = new EffectAttackIncrease();
-          eff.setInt(0, buff.attackBonus);
-          eff.setDurationType(GameEffectDurationType.TEMPORARY);
-          eff.setDuration(duration);
-          recipient.addEffect(eff, GameEffectDurationType.TEMPORARY, duration);
-        }
-        if (buff.defenseBonus) {
-          const eff = new EffectACIncrease();
-          eff.setInt(0, buff.defenseBonus);
-          eff.setInt(1, buff.defenseBonus);
-          eff.setDurationType(GameEffectDurationType.TEMPORARY);
-          eff.setDuration(duration);
-          recipient.addEffect(eff, GameEffectDurationType.TEMPORARY, duration);
-        }
-      }
+    if (hook.healHp) this.heal(recipient, hook.healHp * rank);
+
+    const buff: CareerTempBuff = {
+      id: `active:${def.id}`,
+      label: def.name,
+      remaining: hook.durationSeconds || 3,
+      ...(hook.attackBonus ? { attackBonus: hook.attackBonus * rank } : {}),
+      ...(hook.damageBonus ? { damageBonus: hook.damageBonus * rank } : {}),
+      ...(hook.critThreatBonus ? { critThreatBonus: hook.critThreatBonus * rank } : {}),
+      ...(hook.defenseBonus ? { defenseBonus: hook.defenseBonus * rank } : {}),
+      ...(hook.damageReduction ? { damageReduction: hook.damageReduction * rank } : {}),
+      ...(hook.nextAttackOnly ? { nextAttackOnly: true } : {}),
+    };
+    if (buff.attackBonus || buff.damageBonus || buff.critThreatBonus || buff.defenseBonus || buff.damageReduction) {
+      this.giveBuff(recipient, buff);
     }
 
-    if (def.cooldownSeconds && def.cooldownSeconds > 0) {
-      this.cooldowns.set(def.id, def.cooldownSeconds);
-    }
-
-    const who = this.owner?.getName?.() || 'Character';
-    return { ok: true, message: `${who} activated ${def.name}.` };
+    this.talents.startCooldown(def.id, def.cooldownSeconds);
+    return { ok: true, message: `${this.owner?.getName?.() || 'Character'} activated ${def.name}.` };
   }
 
-  // --- World time tick ------------------------------------------------------------------------
+  /** A buff on a Careers character goes in its talent state; anyone else gets KotOR's own attack / AC effects */
+  private giveBuff(recipient: Partial<ModuleCreature>, buff: CareerTempBuff) {
+    const careers = recipient === this.owner ? this : careersRuntimeOf(recipient);
+    if (careers) {
+      careers.talents.addBuff(buff);
+      return;
+    }
+    if (typeof recipient.addEffect !== 'function') return;
+    const duration = buff.remaining;
+    if (buff.attackBonus) {
+      const eff = new EffectAttackIncrease();
+      eff.setInt(0, buff.attackBonus);
+      eff.setDurationType(GameEffectDurationType.TEMPORARY);
+      eff.setDuration(duration);
+      recipient.addEffect(eff, GameEffectDurationType.TEMPORARY, duration);
+    }
+    if (buff.defenseBonus) {
+      const eff = new EffectACIncrease();
+      eff.setInt(0, buff.defenseBonus);
+      eff.setInt(1, buff.defenseBonus);
+      eff.setDurationType(GameEffectDurationType.TEMPORARY);
+      eff.setDuration(duration);
+      recipient.addEffect(eff, GameEffectDurationType.TEMPORARY, duration);
+    }
+  }
 
-  /** Advance Strain recovery, winded duration, active talent buffs, cooldowns, and combat transitions */
+  // --- World time (host) ----------------------------------------------------------------------
+
+  /** Advance Strain recovery, winded time, buffs, cooldowns, and the end of a fight */
   tick(delta: number, inCombat: boolean) {
     if (!(delta > 0)) return;
 
-    // Combat state transitions (start / end hooks)
-    if (inCombat && !this.wasInCombat) {
-      this.wasInCombat = true;
-      this.triggerCombatStart();
-    } else if (!inCombat && this.wasInCombat) {
-      this.wasInCombat = false;
-      this.triggerCombatEnd();
-    }
+    if (!inCombat && this.wasInCombat) this.onCombatEnd();
+    this.wasInCombat = inCombat;
 
-    // Active talent cooldowns
-    for (const [id, secs] of this.cooldowns.entries()) {
-      const next = secs - delta;
-      if (next <= 0) this.cooldowns.delete(id);
-      else this.cooldowns.set(id, next);
-    }
-
-    // Temporary talent buffs
-    if (this.buffs.length > 0) {
-      for (const b of this.buffs) b.remaining -= delta;
-      this.buffs = this.buffs.filter((b) => b.remaining > 0);
-    }
+    this.talents.tick(delta);
 
     // Winded timer
     if (this.windedSeconds > 0) {

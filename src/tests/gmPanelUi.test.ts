@@ -157,6 +157,7 @@ const mockKotOR: any = {
   CareersRules: {
     derive: jest.fn(() => ({ level: 1 })),
   },
+  careersRuntimeOf: jest.fn((): any => undefined),
 };
 
 jest.mock("@/apps/game/KotOR", () => mockKotOR);

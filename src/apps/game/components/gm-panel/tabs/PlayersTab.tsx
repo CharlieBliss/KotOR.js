@@ -156,8 +156,8 @@ export const PlayersTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
             </button>
           </div>
           <div className="gm-list" style={{ marginTop: 6 }}>
-            {GMManager.getPlayerCharacters().filter((pc) => pc.careersRules).map((pc) => {
-              const st = pc.careersRules!.getStrainState();
+            {GMManager.getPlayerCharacters().filter((pc) => KotOR.careersRuntimeOf(pc)).map((pc) => {
+              const st = KotOR.careersRuntimeOf(pc)!.getStrainState();
               const car = pc.gmPlayerConfig?.careers;
               const derived = car ? KotOR.CareersRules.derive(car) : null;
               return (

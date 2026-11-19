@@ -1,4 +1,5 @@
 import type { SkillType } from "@/enums/nwscript/SkillType";
+import type { CareerBuffBadge, CareerTalentTotals } from "@/managers/gm/careers/talentEffects";
 
 /** Which character/combat rule set a GM session uses (KotOR II only for 'careers') */
 export type GMRuleset = 'kotor' | 'careers';
@@ -193,7 +194,7 @@ export interface GMCareersNetworkState {
   maxStrain: number;
   windedSeconds: number;
   /** Active talent buffs currently ticking on the host (for HUD badges) */
-  activeBuffs?: { label: string; secondsLeft?: number }[];
+  activeBuffs?: CareerBuffBadge[];
   /** Remaining active talent cooldowns in whole seconds (for HUD usability) */
   cooldowns?: Record<string, number>;
 }
@@ -265,24 +266,18 @@ export interface GMCareersDerived {
   maxFp: number;
   /** Raw save ranks * 2 + passive talent save bonuses (without ability modifier, for raw save fields / seams) */
   saveRanks: { fortitude: number; reflex: number; will: number };
-  /** Passive save bonuses from talents */
-  saveTalentBonus: { fortitude: number; reflex: number; will: number };
   /** Total saves including ability modifiers and passive talents */
   saves: { fortitude: number; reflex: number; will: number };
-  /** Passive defence bonus from talents */
-  defenseTalentBonus: number;
-  /** Passive flat damage reduction from talents */
-  damageReduction: number;
   /** Base unarmoured defence: 10 + DEX mod + level baseline + passive talent defence */
   baseDefense: number;
   /** Attack bonus per combat skill: rank * 2 + ability mod + level baseline */
   combatAttack: Record<CombatSkillId, number>;
   /** Effective skill ranks (free + bought) for all skills */
   skillRanks: Record<CareerSkillId, number>;
-  /** Flat check bonuses from passive talents (engine & narrative skills) */
-  skillBonuses: Partial<Record<CareerSkillId, number>>;
   /** Total stacked ranks of each owned custom talent across all owned specializations */
   talentRanks: Record<string, number>;
+  /** Every passive talent hook added up (defence, saves, skill bonuses, scoped attack and damage bonuses...) */
+  talents: CareerTalentTotals;
   /** 8-element KotOR skills.2da array (rank * 4; Persuade = max(Charm, Negotiation, Deception) * 4) */
   engineSkills: number[];
   /** Full set of career skills (career + all owned specializations + owned 'career_skill' nodes) */

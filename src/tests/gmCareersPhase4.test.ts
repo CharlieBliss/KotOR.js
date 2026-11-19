@@ -99,6 +99,8 @@ function makeCreature(fields: Record<string, any> = {}): any {
     addHP(amt: number) { this.currentHitPoints = Math.min(this.maxHitPoints, this.currentHitPoints + amt); },
     addEffect(e: any) { this.effects.push(e); },
     clearAllActions: jest.fn(),
+    // No factions here: nobody is hostile unless a test says so
+    isHostile: (other: any) => !!cre.hostileTo?.includes(other),
     ...fields,
   });
   return cre;
@@ -301,7 +303,6 @@ describe('Phase 4 engine hooks (classic pinned vs Careers talents)', () => {
     expect(classic.getTalentSkillBonus(SkillType.AWARENESS)).toBe(0);
     expect(classic.getSpellSaveDCBonus()).toBe(0);
     expect(classic.getSpellCostReduction()).toBe(0);
-    expect(classic.getSpellDamageBonus()).toBe(0);
 
     // Classic critical threat (1 -> only 20)
     expect(round.isCritical(19, sword, undefined, classic)).toBe(false);
@@ -391,7 +392,8 @@ describe('Phase 4 engine hooks (classic pinned vs Careers talents)', () => {
 
       expect(cre.getSkillLevel(SkillType.AWARENESS)).toBe(4); // rank 0 + wis(1) + keen_eye(3)
       expect(GMChecks.checkBonus(cre, { kind: 'skill', skill: SkillType.AWARENESS })).toBe(4);
-      expect((cre.careersRules as CareersRuntime).getNarrativeSkillBonus('survival')).toBe(3);
+      // Survival has no roll yet: its bonus is kept on the sheet's totals for when narrative checks come
+      expect((cre.careersRules as CareersRuntime).derived.talents.skillBonus.survival).toBe(3);
     } finally {
       (peacekeeper.nodes as any)[5] = saved;
     }
@@ -419,10 +421,10 @@ describe('Phase 4 combat lifecycle hooks & active talents (HUD, host intent, net
     expect(cre.currentHitPoints).toBe(24);
 
     // Relentless onKill recovers 2 Strain and grants +2 next attack bonus, consumed on next attack
-    cre.onAttackResolved(true, false, true);
+    cre.onKill();
     expect(rt.strain).toBe(2);
     expect(cre.getTalentAttackBonus()).toBe(2);
-    cre.onAttackResolved(false, false, false);
+    cre.onAttackResolved();
     expect(cre.getTalentAttackBonus()).toBe(0);
   });
 
@@ -550,5 +552,90 @@ describe('Phase 4 combat lifecycle hooks & active talents (HUD, host intent, net
     await GMPlayers.applySheetToCharacter(replica, sheetExpired);
     expect(GMPlayerHud.activeEffects(replica)).toEqual([]);
     expect(GMPlayerHud.abilities(replica).find((a) => a.key === 'talent:parry_stance')?.usable).toBe(true);
+  });
+});
+
+describe('phase 4 review fixes', () => {
+  const near = (x: number) => ({ x, y: 0, z: 0, distanceTo(o: any) { return Math.abs(o.x - this.x); } });
+
+  test("an ally talent lands only on a living, non-hostile creature in range, and nothing is spent otherwise", () => {
+    const peacekeeper = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'peacekeeper')!;
+    const saved = peacekeeper.nodes[5];
+    (peacekeeper.nodes as any)[5] = { ...saved, kind: 'talent', talentId: 'inspiring_command' };
+    try {
+      const sheet = GMCareersCharacters.blank('human', 'jedi_guardian');
+      sheet.nodes.peacekeeper = ['r0c2', 'r1c2'];
+      const jedi = makeCreature({ gmNetId: 'pc_j', position: near(0) });
+      const rt = new CareersRuntime(sheet, jedi);
+      jedi.careersRules = rt;
+
+      const enemy = makeCreature({ gmNetId: 'npc_e', position: near(3) });
+      enemy.hostileTo = [jedi];
+      const res = rt.activateTalent('inspiring_command', enemy);
+      expect(res).toMatchObject({ ok: false, reason: 'That only works on allies.' });
+      expect(enemy.effects).toHaveLength(0);
+      expect(rt.strain).toBe(0);
+      expect(rt.getCooldownSnapshot()).toEqual({});
+
+      const farAlly = makeCreature({ gmNetId: 'ally_far', position: near(40) });
+      expect(rt.activateTalent('inspiring_command', farAlly)).toMatchObject({ ok: false, reason: 'Too far away.' });
+      expect(rt.talentTargetProblem('inspiring_command', farAlly)).toBe('Too far away.');
+
+      const downAlly = makeCreature({ gmNetId: 'ally_down', position: near(2), currentHitPoints: 0 });
+      expect(rt.activateTalent('inspiring_command', downAlly).ok).toBe(false);
+
+      // Aimed at nobody (or themselves): it lands on the user
+      expect(rt.activateTalent('inspiring_command').ok).toBe(true);
+      expect(jedi.getTalentAttackBonus()).toBe(2);
+    } finally {
+      (peacekeeper.nodes as any)[5] = saved;
+    }
+  });
+
+  test('a kill is told once the damage has landed, so damage reduction that saves the target means no kill', () => {
+    const sheet = GMCareersCharacters.blank('human', 'jedi_guardian');
+    sheet.nodes.peacekeeper = ['r0c0', 'r1c0', 'r2c0']; // ... Relentless
+    const jedi = makeCreature({ gmNetId: 'pc_j' });
+    const rt = new CareersRuntime(sheet, jedi);
+    jedi.careersRules = rt;
+    rt.spendStrain(4);
+
+    // A Careers target with Enduring (DR 2) and 5 HP takes a 6-point hit: 4 gets through, it survives
+    const tough = GMCareersCharacters.blank('human', 'soldier');
+    tough.nodes.commando = ['r0c1', 'r1c1', 'r2c1']; // ... Enduring
+    const target = makeCreature({ gmNetId: 'npc_t', currentHitPoints: 5, maxHitPoints: 5 });
+    target.careersRules = new CareersRuntime(tough, target);
+    target.addEffect = function (e: any) { e.object = this; e.onApply?.(); };
+
+    const hit = new CombatAttackData();
+    hit.damageList[DamageType.BASE].damageValue = 6;
+    hit.applyDamageEffectToCreature(jedi, target);
+    expect(target.currentHitPoints).toBe(1);
+    expect(rt.strain).toBe(4); // no Relentless
+
+    // The next hit kills: Relentless gives 2 Strain back and +2 on the next attack
+    hit.applyDamageEffectToCreature(jedi, target);
+    expect(target.isDead()).toBe(true);
+    expect(rt.strain).toBe(2);
+    expect(jedi.getTalentAttackBonus()).toBe(2);
+  });
+
+  test('talent nodes take their name and description from the talent table', () => {
+    for (const spec of CAREERS_SPECIALIZATIONS) {
+      for (const node of spec.nodes) {
+        if (node.kind !== 'talent') continue;
+        const talent = CAREERS_TALENT_BY_ID.get(node.talentId!)!;
+        expect([node.label, node.description]).toEqual([talent.name, talent.description]);
+      }
+    }
+  });
+
+  test('passive talent totals are added up once with the sheet, split by the attacks they cover', () => {
+    const sheet = GMCareersCharacters.blank('human', 'soldier');
+    sheet.nodes.commando = ['r0c0', 'r1c0', 'r2c0', 'r3c0', 'r0c2', 'r1c2'];
+    const t = CareersRules.derive(sheet).talents;
+    expect(t.damage).toEqual({ melee: 2, ranged: 2 });
+    expect(t.critThreat).toEqual({ any: 1 });
+    expect(t.critDamage).toEqual({ any: 4 });
   });
 });

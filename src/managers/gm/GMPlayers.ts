@@ -35,7 +35,7 @@ import {
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
 import { GMPacing } from "@/managers/gm/GMPacing";
-import { CareersAdvancement, CareersRules, CareersRuntime, GMCareersCharacters } from "@/managers/gm/careers";
+import { CareersAdvancement, CareersRules, CareersRuntime, GMCareersCharacters, careersRuntimeOf } from "@/managers/gm/careers";
 import type { CareersPurchaseRequest, GMCareersCharacter } from "@/managers/gm/careers";
 import { CombatRound } from "@/combat/CombatRound";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -438,7 +438,7 @@ export class GMPlayers {
   /** The Careers character sheet attached to an actor, if it runs under the Careers rule set */
   static careersOf(actor: ModuleCreature | undefined): GMCareersCharacter | undefined {
     if (!actor) return undefined;
-    return actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+    return careersRuntimeOf(actor)?.character || actor.gmPlayerConfig?.careers;
   }
 
   /** Host: award XP to one connected player (campaign XP in Careers mode); reaches them with their next sheet */
@@ -595,7 +595,7 @@ export class GMPlayers {
       const resRef = gmItemResRef(item);
       if (resRef) equipment[slot] = resRef;
     }
-    const careersRuntime = cre.careersRules instanceof CareersRuntime ? cre.careersRules : undefined;
+    const careersRuntime = careersRuntimeOf(cre);
     return {
       netId: cre.gmNetId,
       classes: this.sheetClassesOf(cre),
@@ -957,6 +957,7 @@ export class GMPlayers {
   static whyNot(actor: ModuleCreature, intent: GMClientIntent): string {
     const name = actor.getName() || 'You';
     const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
+    const careers = careersRuntimeOf(actor);
     if (actor.isDead?.()) return `${name} is down.`;
     if (!target || target.gmHidden) return "That target isn't there any more.";
     const id = Number(intent.abilityId);
@@ -968,9 +969,9 @@ export class GMPlayers {
       if (target !== actor && !GMCombatAI.worksOn(rule, target)) return `That power only works on ${GMCombatAI.ruleText(rule)}.`;
       const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
       if (cost > actor.getFP()) {
-        if (actor.careersRules) {
-          if (actor.careersRules.isWinded()) return `${name} is winded and cannot push with Strain.`;
-          if (actor.careersRules.strainToPush(cost, actor.getFP()) === null) {
+        if (careers) {
+          if (careers.isWinded()) return `${name} is winded and cannot push with Strain.`;
+          if (careers.strainToPush(cost, actor.getFP()) === null) {
             return `Not enough Force or Strain: it needs ${cost} Force, ${name} has ${Math.floor(actor.getFP())} and too little Strain left to push.`;
           }
         } else {
@@ -980,16 +981,18 @@ export class GMPlayers {
     }
     if (intent.ability === 'feat') {
       if (!actor.getFeats().some((f: any) => f.id === id)) return `${name} doesn't have that feat.`;
-      if (actor.careersRules?.isWinded() && actor.careersRules.getCombatFeatStrainCost(id) > 0) {
+      if (careers?.isWinded() && careers.getCombatFeatStrainCost(id) > 0) {
         return `${name} is winded and cannot spend Strain.`;
       }
     }
     if (intent.ability === 'talent') {
-      if (!actor.careersRules) return `${name} doesn't have active talents.`;
+      if (!careers) return `${name} doesn't have active talents.`;
       const tId = typeof intent.talentId === 'string' ? intent.talentId : '';
-      const info = actor.careersRules.getActiveTalents().find((t) => t.id === tId);
+      const info = careers.getActiveTalents().find((t) => t.id === tId);
       if (!info) return `${name} doesn't have that talent.`;
       if (info.why) return `${info.name}: ${info.why}.`;
+      const onTarget = careers.talentTargetProblem(tId, GMObjectKind.isCreature(target) ? target as ModuleCreature : undefined);
+      if (onTarget) return `${info.name}: ${onTarget}`;
     }
     if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
     if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
@@ -1112,6 +1115,7 @@ export class GMPlayers {
     if (!actor || actor.isDead()) return false;
     const target = intent.targetNetId ? GMManager.netIdMap.get(intent.targetNetId) : actor;
     if (!target || target.gmHidden) return false;
+    const careers = careersRuntimeOf(actor);
     // Aimed at an enemy: that's who they're fighting now (they go back to attacking it after)
     if (target !== actor && GMObjectKind.isCreature(target) && (target as ModuleCreature).isHostile?.(actor)) actor.gmFightTarget = target;
     const id = Number(intent.abilityId);
@@ -1125,25 +1129,26 @@ export class GMPlayers {
         if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
         const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
         // Only a Careers character pushes with Strain (not while winded, nor past its Strain); classic characters never stop here
-        if (actor.careersRules && cost > actor.getFP() && actor.careersRules.strainToPush(cost, actor.getFP()) === null) return false;
+        if (careers && cost > actor.getFP() && careers.strainToPush(cost, actor.getFP()) === null) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }
       case 'feat': {
         const feat = actor.getFeats().find((f: any) => f.id === id);
         if (!feat) return false;
-        if (actor.careersRules?.isWinded() && actor.careersRules.getCombatFeatStrainCost(id) > 0) return false;
+        if (careers?.isWinded() && careers.getCombatFeatStrainCost(id) > 0) return false;
         feat.useTalentOnObject(target, actor);
         return true;
       }
       case 'talent': {
-        if (!actor.careersRules) return false;
+        if (!careers) return false;
         const talentId = typeof intent.talentId === 'string' && intent.talentId.length > 0 && intent.talentId.length <= 64
           ? intent.talentId
           : '';
         if (!talentId) return false;
         const targetCreature = GMObjectKind.isCreature(target) ? (target as ModuleCreature) : actor;
-        const res = actor.careersRules.activateTalent(talentId, targetCreature);
+        // The runtime checks the talent is theirs and that its target is one it may land on (an ally in range)
+        const res = careers.activateTalent(talentId, targetCreature);
         if (!res.ok) return false;
         if (res.message) GMLog.info('host', res.message);
         this.updatePlayerSheets();

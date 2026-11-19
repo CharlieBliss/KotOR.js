@@ -54,6 +54,7 @@ import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPacing } from "@/managers/gm/GMPacing";
 import type { GMRuleset } from "@/managers/gm/careers/types";
+import { careersRuntimeOf } from "@/managers/gm/careers/runtime";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
 export * from "@/managers/gm/GMTypes";
@@ -1431,9 +1432,7 @@ export class GMManager {
       }
       // Careers Strain recovery and winded timers advance in world time on the host
       for (const pc of this.spawnedPlayers) {
-        if (pc && !pc.destroyed && !pc.isDead?.() && pc.careersRules) {
-          pc.careersRules.tick(delta, !!pc.combatData?.combatState);
-        }
+        if (pc && !pc.destroyed && !pc.isDead?.()) careersRuntimeOf(pc)?.tick(delta, !!pc.combatData?.combatState);
       }
     }
 

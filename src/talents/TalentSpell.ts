@@ -143,7 +143,7 @@ export class TalentSpell extends TalentObject {
         cost = Math.round(cost * (1 + (alignment - 50) * 0.01));
       }
       cost -= chaMod;
-      cost -= (creature.getSpellCostReduction?.() || 0);
+      cost -= creature.getSpellCostReduction();
     }
     return Math.max(1, cost);
   }

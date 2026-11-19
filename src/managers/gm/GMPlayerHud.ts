@@ -14,6 +14,7 @@ import { ModuleTriggerType } from "@/enums/module/ModuleTriggerType";
 import type { ModuleObject, ModuleCreature, ModuleItem } from "@/module";
 import * as THREE from "three";
 import { GMPacing } from "@/managers/gm/GMPacing";
+import { careersRuntimeOf } from "@/managers/gm/careers/runtime";
 import type { GMPacingState } from "@/managers/gm/GMPacing";
 import { GMNpcOrders } from "@/managers/GMNpcOrders";
 import { CombatRound } from "@/combat/CombatRound";
@@ -174,7 +175,7 @@ export class GMPlayerHud {
       entry: { action: { type: ActionType.ActionPhysicalAttacks } },
     });
 
-    const careers = pc.careersRules;
+    const careers = careersRuntimeOf(pc);
 
     // Combat feats: the best rank of each chain (Power Attack, not also its lesser ranks)
     for (const feat of GMCombatAI.bestRanks<any>(pc.getFeats?.() || [])) {
@@ -201,7 +202,7 @@ export class GMPlayerHud {
     }
 
     // Active Careers talents (cost Strain, appear alongside feats/powers on the wheel and hotbar)
-    if (careers?.getActiveTalents) {
+    if (careers) {
       for (const t of careers.getActiveTalents()) {
         out.push({
           key: `talent:${t.id}`,
@@ -315,7 +316,7 @@ export class GMPlayerHud {
       const ms = Number(e.getDuration?.() ?? 0);
       out.push({ label, ...(ms > 0 ? { secondsLeft: Math.ceil(ms / 1000) } : {}) });
     }
-    for (const b of pc.careersRules?.getActiveBuffs?.() || []) {
+    for (const b of careersRuntimeOf(pc)?.getActiveBuffs() || []) {
       if (!b.label || seen.has(b.label)) continue;
       seen.add(b.label);
       out.push(b);
@@ -451,7 +452,7 @@ export class GMPlayerHud {
         GMNetworkManager.sendIntent('ability', targetNetId, { ability: 'talent', talentId: ability.entry.careersTalentId });
         return { ok: true, target };
       }
-      const res = pc.careersRules?.activateTalent?.(ability.entry.careersTalentId, target as ModuleCreature);
+      const res = careersRuntimeOf(pc)?.activateTalent(ability.entry.careersTalentId, target as ModuleCreature);
       if (!res?.ok) return { ok: false, message: res?.reason || "Can't use that talent now" };
       GMManager.notifyChange();
       return { ok: true, target };

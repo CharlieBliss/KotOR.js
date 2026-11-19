@@ -438,12 +438,7 @@ export class CombatAttackData {
    * Apply Careers talent damage hooks (passive, critical damage, and active talent buffs); no-op for classic creatures
    */
   applyTalentDamageModifiers(creature: ModuleCreature, isCritical: boolean, isOffHand: boolean, damageSlot: number = DamageType.BASE){
-    const bonus = creature.getTalentDamageBonus?.({
-      weapon: this.attackWeapon,
-      isCritical,
-      isRanged: Boolean(this.attackWeapon?.isRangedWeapon?.()),
-      isOffHand,
-    }) || 0;
+    const bonus = creature.getTalentDamageBonus({ weapon: this.attackWeapon, isCritical, isOffHand });
     if(bonus > 0 && this.damageList[damageSlot]){
       this.damageList[damageSlot].addDamage(bonus);
     }
@@ -556,7 +551,10 @@ export class CombatAttackData {
       damageEffect.setInt(i, damage ? damage.damageValue : 0);
     }
 
+    const wasAlive = !target.isDead?.();
     target.addEffect(damageEffect, GameEffectDurationType.INSTANT);
+    // A kill, after damage reduction and the like have had their say (killingBlow is only a prediction)
+    if(wasAlive && target.isDead?.()) owner?.onKill?.();
   }
 
   /**

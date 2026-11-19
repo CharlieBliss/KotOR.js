@@ -1,6 +1,4 @@
-import { WeaponWield } from "@/enums/combat/WeaponWield";
 import type { CareerSkillId } from "@/managers/gm/careers/types";
-import type { ModuleItem } from "@/module/ModuleItem";
 
 export type TalentActivation = 'passive' | 'active';
 export type TalentAttackScope = 'any' | 'melee' | 'ranged' | 'lightsaber' | 'unarmed';
@@ -14,8 +12,6 @@ export interface CareerTalentRequirements {
 export interface CareerTalentActiveHook {
   /** Immediate HP healed per rank */
   healHp?: number;
-  /** Immediate Strain recovered per rank (after paying activation cost) */
-  healStrain?: number;
   /** Buff duration in seconds */
   durationSeconds?: number;
   /** Temporary Defence bonus per rank */
@@ -30,7 +26,7 @@ export interface CareerTalentActiveHook {
   critThreatBonus?: number;
   /** When true, attack/damage/crit bonuses apply to the next attack only and are consumed */
   nextAttackOnly?: boolean;
-  /** When true (with aim: 'ally'), applies buffs/healing to the targeted ally instead of self */
+  /** When true (with aim: 'ally'), applies buffs/healing to the targeted ally (or the user) instead of self */
   affectTarget?: boolean;
 }
 
@@ -42,7 +38,10 @@ export interface CareerTalentHooks {
   defense?: number;
   saves?: { fortitude?: number; reflex?: number; will?: number };
 
-  /** Flat bonus on skill checks (multiplied by rank; applies to engine & narrative checks, not ranks) */
+  /**
+   * Flat bonus on skill checks (multiplied by rank; not ranks). Only the seven engine skills are rolled today
+   * (KotOR's checks and the GM's skill checks); a narrative skill's bonus waits for narrative checks
+   */
   skillBonus?: Partial<Record<CareerSkillId, number>>;
 
   /** Attack roll modifiers (multiplied by rank) */
@@ -60,19 +59,14 @@ export interface CareerTalentHooks {
   /** Flat damage reduction per incoming hit (multiplied by rank) */
   damageReduction?: number;
 
-  /** Force power casting modifiers (multiplied by rank; sets up Phase 5 power trees) */
+  /** Force power casting modifiers (multiplied by rank): save DC up, Force point cost down */
   powerSaveDC?: number;
-  powerDamageBonus?: number;
   powerCostReduction?: number;
-  powerDurationBonusSeconds?: number;
-  powerRangeBonusMeters?: number;
 
   /** Combat lifecycle reactions (multiplied by rank) */
-  onCombatStart?: { healStrain?: number; tempDefense?: number; durationSeconds?: number };
   onCombatEnd?: { healHp?: number; healStrain?: number };
   onRoundStart?: { healStrain?: number; healHp?: number };
   onKill?: { healStrain?: number; healHp?: number; nextAttackBonus?: number };
-  onTakeDamage?: { healStrain?: number; nextAttackBonus?: number };
 
   /** Active talent behaviour (for activation === 'active') */
   active?: CareerTalentActiveHook;
@@ -97,23 +91,6 @@ export interface CareerTalentDef {
   cooldownSeconds?: number;
   requirements?: CareerTalentRequirements;
   hooks: CareerTalentHooks;
-}
-
-/** Check whether a weapon (or unarmed) matches a talent's attack scope */
-export function weaponMatchesScope(scope: TalentAttackScope | undefined, weapon?: ModuleItem): boolean {
-  if (!scope || scope === 'any') return true;
-  if (!weapon) return scope === 'unarmed' || scope === 'melee';
-  const baseId = weapon.baseItemId ?? weapon.getBaseItemId?.();
-  const isLightsaber = baseId === 8 || baseId === 9 || baseId === 10;
-  if (scope === 'lightsaber') return isLightsaber;
-  const wield = weapon.getWeaponWield?.();
-  const isRanged = Boolean(weapon.isRangedWeapon?.()) ||
-    wield === WeaponWield.BLASTER_PISTOL ||
-    wield === WeaponWield.BLASTER_RIFLE ||
-    wield === WeaponWield.BLASTER_HEAVY;
-  if (scope === 'ranged') return isRanged;
-  if (scope === 'melee') return !isRanged;
-  return false;
 }
 
 /**
