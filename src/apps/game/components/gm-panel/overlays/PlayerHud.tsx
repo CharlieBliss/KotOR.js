@@ -123,7 +123,7 @@ const PlanMarks: React.FC = () => {
   const labelsRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let raf = 0;
-    const v = new THREE.Vector3(), w = new THREE.Vector3(), right = new THREE.Vector3(), edge = new THREE.Vector3();
+    const v = new THREE.Vector3(), w = new THREE.Vector3(), right = new THREE.Vector3(), edge = new THREE.Vector3(), proj = new THREE.Vector3();
     const labels = new Map<any, HTMLDivElement>();
     const toScreen = (p: THREE.Vector3, out: THREE.Vector3, cam: THREE.Camera, rect: DOMRect) => {
       out.copy(p).project(cam);
@@ -133,19 +133,29 @@ const PlanMarks: React.FC = () => {
     };
     const frame = () => {
       raf = requestAnimationFrame(frame);
-      const cam = KotOR.GameState.currentCamera as THREE.PerspectiveCamera;
-      const canvas = KotOR.GameState.renderer?.domElement as HTMLCanvasElement | undefined;
       const ring = ringRef.current, line = lineRef.current, holder = labelsRef.current;
       if (!ring || !line || !holder) return;
-      const planning = GMPlayerHud.planning();
+      // Avoid layout reads and per-frame allocations whenever the world isn't in plan phase
+      if (!GMPlayerHud.planning()) {
+        if (ring.style.display !== 'none') ring.style.display = 'none';
+        if (line.style.display !== 'none') line.style.display = 'none';
+        if (labels.size) {
+          for (const el of labels.values()) el.remove();
+          labels.clear();
+        }
+        return;
+      }
+      const cam = KotOR.GameState.currentCamera as THREE.PerspectiveCamera;
+      const canvas = KotOR.GameState.renderer?.domElement as HTMLCanvasElement | undefined;
       const pc: any = GMPlayerHud.player();
       const rect = canvas?.getBoundingClientRect();
       // The planned move
-      const to = planning ? GMPlayerHud.plannedMove : null;
+      const to = GMPlayerHud.plannedMove;
       if (to && pc && cam && rect && toScreen(to, v, cam, rect) && toScreen(pc.position, w, cam, rect)) {
         right.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
         edge.copy(to).addScaledVector(right, 0.5).project(cam);
-        const r = Math.max(8, Math.min(80, Math.abs(edge.x - to.clone().project(cam).x) / 2 * rect.width));
+        proj.copy(to).project(cam);
+        const r = Math.max(8, Math.min(80, Math.abs(edge.x - proj.x) / 2 * rect.width));
         ring.style.display = 'block';
         ring.style.left = `${v.x - r}px`;
         ring.style.top = `${v.y - r * 0.4}px`;
@@ -163,7 +173,7 @@ const PlanMarks: React.FC = () => {
       }
       // What each enemy is about to do
       const seen = new Set<any>();
-      const creatures: any[] = planning && cam && rect ? (KotOR.GameState.module?.area?.creatures || []) : [];
+      const creatures: any[] = cam && rect ? (KotOR.GameState.module?.area?.creatures || []) : [];
       for (const c of creatures) {
         if (!c?.gmNetIntent || c === pc || GMPlayerHud.relation(c, pc) !== 'enemy') continue;
         v.copy(c.position);

@@ -1439,7 +1439,7 @@ export class GMManager {
 
     // Plan-then-play fights: the host holds the world for planning and plays one round at a time
     if (GMNetworkManager.role !== 'client' && !this.sceneLoading) {
-      GMPacing.update(delta, GMPacing.scan(), this.worldPaused || this.wheelHolds.size > 0);
+      GMPacing.update(delta, undefined, this.worldPaused || this.wheelHolds.size > 0);
     }
 
     // NPCs run on the GM's machine only; players see the result through the world updates

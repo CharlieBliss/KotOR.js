@@ -56,28 +56,21 @@ export class CareersAdvancement {
       return { ok: false, reason: 'XP can only be spent outside combat.' };
     }
 
-    let cost = 0;
     if (req.kind === 'skill') {
       const check = CareersRules.canBuySkillRank(character, req.skillId, false);
       if (!check.ok) return { ok: false, reason: check.reason };
-      cost = check.cost;
-      const split = this.splitCost(character, cost);
+      const res = this.spendAndRecord(character, req, check.cost);
       character.boughtSkillRanks[req.skillId] = (character.boughtSkillRanks[req.skillId] || 0) + 1;
-      character.startingXpSpent = (character.startingXpSpent || 0) + split.startingXpPaid;
-      character.campaignXpSpent = (character.campaignXpSpent || 0) + split.campaignXpPaid;
-      return this.record(character, req, cost, split);
+      return res;
     }
 
     if (req.kind === 'node') {
       const check = CareersRules.canBuyNode(character, req.specId, req.nodeId);
       if (!check.ok) return { ok: false, reason: check.reason };
-      cost = check.cost;
-      const split = this.splitCost(character, cost);
+      const res = this.spendAndRecord(character, req, check.cost);
       if (!character.nodes[req.specId]) character.nodes[req.specId] = [];
       character.nodes[req.specId].push(req.nodeId);
-      character.startingXpSpent = (character.startingXpSpent || 0) + split.startingXpPaid;
-      character.campaignXpSpent = (character.campaignXpSpent || 0) + split.campaignXpPaid;
-      return this.record(character, req, cost, split);
+      return res;
     }
 
     if (req.kind === 'specialization') {
@@ -86,37 +79,31 @@ export class CareersAdvancement {
       if (character.specializations.includes(req.specId)) return { ok: false, reason: `Already owns ${spec.name}.` };
       const career = CAREERS_BY_ID.get(character.careerId);
       const inCareer = !!career && spec.careerId === career.id;
-      cost = CareersRules.specializationCost(character.specializations.length + 1, inCareer);
+      const cost = CareersRules.specializationCost(character.specializations.length + 1, inCareer);
       const derived = CareersRules.derive(character);
       if (derived.totalXpRemaining < cost) return { ok: false, reason: `Needs ${cost} XP (${derived.totalXpRemaining} left).` };
-      const split = this.splitCost(character, cost);
+      const res = this.spendAndRecord(character, req, cost);
       character.specializations.push(req.specId);
       if (!character.nodes[req.specId]) character.nodes[req.specId] = [];
-      character.startingXpSpent = (character.startingXpSpent || 0) + split.startingXpPaid;
-      character.campaignXpSpent = (character.campaignXpSpent || 0) + split.campaignXpPaid;
-      return this.record(character, req, cost, split);
+      return res;
     }
 
     if (req.kind === 'power') {
       const check = CareersRules.canBuyPower(character, req.spellId);
       if (!check.ok) return { ok: false, reason: check.reason };
-      cost = check.cost;
-      const split = this.splitCost(character, cost);
+      const res = this.spendAndRecord(character, req, check.cost);
       character.powers.push(req.spellId);
-      character.startingXpSpent = (character.startingXpSpent || 0) + split.startingXpPaid;
-      character.campaignXpSpent = (character.campaignXpSpent || 0) + split.campaignXpPaid;
-      return this.record(character, req, cost, split);
+      return res;
     }
 
     return { ok: false, reason: 'Unknown purchase.' };
   }
 
-  private static record(
-    character: GMCareersCharacter,
-    req: CareersPurchaseRequest,
-    cost: number,
-    split: { startingXpPaid: number; campaignXpPaid: number }
-  ): CareersPurchaseResult {
+  /** Pay cost from leftover starting XP first, then campaign XP, and append an undoable purchase record */
+  private static spendAndRecord(character: GMCareersCharacter, req: CareersPurchaseRequest, cost: number): CareersPurchaseResult {
+    const split = this.splitCost(character, cost);
+    character.startingXpSpent = (character.startingXpSpent || 0) + split.startingXpPaid;
+    character.campaignXpSpent = (character.campaignXpSpent || 0) + split.campaignXpPaid;
     const rec: CareersPurchaseRecord = { ...req, cost, ...split, at: Date.now() };
     if (!Array.isArray(character.purchases)) character.purchases = [];
     character.purchases.push(rec);

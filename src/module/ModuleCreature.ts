@@ -68,7 +68,6 @@ import { ExperienceType } from "@/enums/engine/ExperienceType";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
 import { TalentObjectType } from "@/enums/engine/TalentObjectType";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
-import type { ICareersCreatureRules } from "@/engine/CareersSeam";
 
 /**
 * ModuleCreature class.
@@ -105,8 +104,6 @@ export class ModuleCreature extends ModuleObject {
 
   challengeRating: number;
   classes: CreatureClass[];
-  /** Optional Careers rule-set seam (absent on enemies and classic KotOR characters) */
-  careersRules?: ICareersCreatureRules;
   comment: string;
   currentForce: number;
   currentHitPoints: number;

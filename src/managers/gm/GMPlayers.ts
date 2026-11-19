@@ -36,7 +36,7 @@ import {
 import { GMManager } from "@/managers/GMManager";
 import { GMPacing } from "@/managers/gm/GMPacing";
 import { CareersAdvancement, CareersRules, CareersRuntime, GMCareersCharacters } from "@/managers/gm/careers";
-import type { CareersPurchaseRequest } from "@/managers/gm/careers";
+import type { CareersPurchaseRequest, GMCareersCharacter } from "@/managers/gm/careers";
 import { CombatRound } from "@/combat/CombatRound";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
@@ -435,12 +435,18 @@ export class GMPlayers {
     return true;
   }
 
+  /** The Careers character sheet attached to an actor, if it runs under the Careers rule set */
+  static careersOf(actor: ModuleCreature | undefined): GMCareersCharacter | undefined {
+    if (!actor) return undefined;
+    return actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+  }
+
   /** Host: award XP to one connected player (campaign XP in Careers mode); reaches them with their next sheet */
   static giveXP(peerId: string, amount: number, reason: string = ''): boolean {
     const actor = this.getPeerActor(peerId);
     const xp = Math.round(Number(amount));
     if (!actor || !(xp > 0)) return false;
-    const careers = (actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers);
+    const careers = this.careersOf(actor);
     if (careers) {
       if (!CareersAdvancement.awardXp(careers, xp, reason)) return false;
       // The host's record of what it awarded, which a later join is held to
@@ -467,7 +473,7 @@ export class GMPlayers {
       : (target ? [target] : []);
     let awarded = 0;
     for (const actor of list) {
-      const careers = actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+      const careers = this.careersOf(actor);
       if (!careers) continue;
       if (!CareersAdvancement.awardXp(careers, xp, reason)) continue;
       // A connected player's award goes in the host's record (the GM's own characters never join)
@@ -491,7 +497,7 @@ export class GMPlayers {
   /** Host: validate and apply a Careers post-creation XP purchase live (outside combat, no respawn) */
   static spendXpOnHost(actor: ModuleCreature, purchase: CareersPurchaseRequest | undefined, peerId?: string): boolean {
     if (!actor || !purchase) return false;
-    const careers = actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
+    const careers = this.careersOf(actor);
     if (!careers) {
       if (peerId) this.tellPlayer(peerId, 'Only Careers characters spend campaign XP this way.');
       return false;
@@ -510,7 +516,7 @@ export class GMPlayers {
 
   /** Host: refund a Careers character's most recent post-creation XP purchase live */
   static undoCareersPurchase(actor: ModuleCreature): boolean {
-    const careers = actor?.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor?.gmPlayerConfig?.careers;
+    const careers = this.careersOf(actor);
     if (!careers) return false;
     const undone = CareersAdvancement.undoLastPurchase(careers);
     if (!undone) return false;
@@ -523,7 +529,7 @@ export class GMPlayers {
 
   /** Host: refund all post-creation XP purchases for a full respec live */
   static respecCareers(actor: ModuleCreature): number {
-    const careers = actor?.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor?.gmPlayerConfig?.careers;
+    const careers = this.careersOf(actor);
     if (!careers) return 0;
     const count = CareersAdvancement.respecPurchases(careers);
     if (count > 0) {
@@ -595,12 +601,18 @@ export class GMPlayers {
       naturalAC: cre.naturalAC || 0,
       equipment,
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
-      ...(careersRuntime ? {
-        careers: {
-          character: careersRuntime.character,
-          ...careersRuntime.getStrainState(),
-        },
-      } : {}),
+      ...(careersRuntime ? (() => {
+        const st = careersRuntime.getStrainState();
+        return {
+          careers: {
+            character: careersRuntime.character,
+            strain: st.strain,
+            maxStrain: st.maxStrain,
+            // Whole seconds avoid sub-second float jitter in sheet diffing while winded
+            windedSeconds: Math.ceil(st.windedSeconds),
+          },
+        };
+      })() : {}),
     };
   }
 
@@ -714,14 +726,19 @@ export class GMPlayers {
   /** Make a character's stats, classes, feats, skills, XP, HP/FP and equipment match a sheet */
   static async applySheetToCharacter(cre: ModuleCreature, sheet: GMPlayerSheet) {
     Object.assign(cre, sheet.attributes);
-    cre.classes = sheet.classes.map((c) => {
-      const cls = new CreatureClass(c.id);
-      cls.setLevel(c.level);
-      for (const spellId of c.spells) cls.addSpell(new TalentSpell(spellId));
-      return cls;
-    });
-    const featRows = GameState.TwoDAManager.datatables.get('feat')?.rows || {};
-    cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
+    // Only reconstruct CreatureClass / TalentFeat / TalentSpell objects when classes or feats actually changed
+    const buildJson = JSON.stringify({ classes: sheet.classes, feats: sheet.feats });
+    if (buildJson !== cre.gmLastAppliedBuildJson) {
+      cre.gmLastAppliedBuildJson = buildJson;
+      cre.classes = sheet.classes.map((c) => {
+        const cls = new CreatureClass(c.id);
+        cls.setLevel(c.level);
+        for (const spellId of c.spells) cls.addSpell(new TalentSpell(spellId));
+        return cls;
+      });
+      const featRows = GameState.TwoDAManager.datatables.get('feat')?.rows || {};
+      cre.feats = sheet.feats.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
+    }
     sheet.skills.forEach((rank, i) => cre.skills?.[i]?.setRank(rank));
     cre.experience = sheet.xp;
     // Set, not setGoodEvil: that queues KotOR's own shift icon and stinger, and the GM's alignment.shift has

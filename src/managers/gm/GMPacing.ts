@@ -100,33 +100,34 @@ export class GMPacing {
   }
 
   /** The host, each frame: delta in seconds; heldOtherwise when the GM's pause or a power wheel holds the world */
-  static update(delta: number, scan: GMPacingScan = this.scan(), heldOtherwise = false) {
+  static update(delta: number, scan?: GMPacingScan, heldOtherwise = false) {
     if (this.mode === 'off') {
       if (this.phase !== 'off') this.stop('pacing is off');
       return;
     }
+    const s = scan ?? this.scan();
     if (this.phase === 'off') {
-      if (scan.fighting) this.hold('the fight starts', scan);
+      if (s.fighting) this.hold('the fight starts', s);
       return;
     }
     if (this.phase === 'plan') {
-      this.updatePlanners(scan.planners);
+      this.updatePlanners(s.planners);
       if (this.planners.length && this.planners.every((p) => this.ready.has(p))) this.go('everyone is ready');
       else if (this.deadline && this.now() >= this.deadline) this.go('time is up');
       return;
     }
     // Playing: world time only (the GM's pause or an open wheel stops the clock too)
     if (heldOtherwise) return;
-    if (!scan.fighting) {
+    if (!s.fighting) {
       this.quietTime += delta;
       if (this.quietTime >= this.FIGHT_END_SECONDS) this.stop('the fight is over');
       return;
     }
     this.quietTime = 0;
-    const event = this.mode === 'events' ? this.eventIn(scan) : '';
-    this.remember(scan);
+    const event = this.mode === 'events' ? this.eventIn(s) : '';
+    this.remember(s);
     if (event) {
-      this.hold(event, scan);
+      this.hold(event, s);
       return;
     }
     this.windowTime += delta;
@@ -134,7 +135,7 @@ export class GMPacing {
       this.windowTime = 0;
       this.windowsSinceHold++;
       this.round++;
-      if (this.windowsSinceHold >= this.windowsPerHold()) this.hold(`round ${this.round}`, scan);
+      if (this.windowsSinceHold >= this.windowsPerHold()) this.hold(`round ${this.round}`, s);
     }
   }
 

@@ -242,7 +242,7 @@ export class TalentFeat extends TalentObject {
     if(!BitWise.InstanceOfObject(object, ModuleObjectType.ModuleCreature)) return;
 
     // Careers characters pay Strain instead of suffering KotOR's combat-feat attack/AC penalties
-    if((object as any).careersRules?.payCombatFeatStrain?.(this.id)) return;
+    if(object.careersRules?.payCombatFeatStrain(this.id)) return;
 
     const armorClassPenalty = this.getArmorClassPenalty();
     if(armorClassPenalty > 0){

@@ -342,6 +342,17 @@ describe('Advancement in play (live recomputation, undo, respec, network sync)',
     expect(clientReplica.careersRules?.getStrainState().strain).toBe(4);
     expect(clientReplica.careersRules?.getAttackBase(makeWeapon(WeaponWield.ONE_HANDED_SWORD, 3))).toBe(4); // melee rank 2 * 2 + lv2 baseline 0
 
+    // Subsequent sheet sync with only Strain / winded changed rounds windedSeconds and skips rebuilding classes & feats
+    const classesBefore = clientReplica.classes;
+    const featsBefore = clientReplica.feats;
+    (cre.careersRules as CareersRuntime).windedSeconds = 4.2;
+    const windedSheet = GMPlayers.buildPlayerSheet(cre);
+    expect(windedSheet.careers?.windedSeconds).toBe(5);
+    await GMPlayers.applySheetToCharacter(clientReplica, windedSheet);
+    expect(clientReplica.classes).toBe(classesBefore);
+    expect(clientReplica.feats).toBe(featsBefore);
+    expect(clientReplica.careersRules?.getStrainState().windedSeconds).toBe(5);
+
     // Undo last purchase drops campaignXpSpent from 55 -> 40 -> back to level 1
     expect(GMPlayers.undoCareersPurchase(cre)).toBe(true);
     expect(sheet.campaignXpSpent).toBe(40);

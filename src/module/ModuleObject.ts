@@ -1,4 +1,5 @@
 import type { GMObjectState } from "@/managers/gm/GMObjectState";
+import type { ICareersCreatureRules } from "@/engine/CareersSeam";
 import { isBehaviourScript } from "@/module/creature/ScriptControl";
 import * as THREE from "three";
 import type { Action } from "@/actions/Action";
@@ -161,6 +162,8 @@ export class ModuleObject {
   faction: Faction;
 
   effects: GameEffect[] = [];
+  /** Optional Careers rule-set seam (absent on enemies and classic KotOR characters) */
+  careersRules?: ICareersCreatureRules;
   casting: any[] = [];
   damageList: any[] = [];
   _locals: { Booleans: any[]; Numbers: {}; };
@@ -508,7 +511,7 @@ export class ModuleObject {
         slower = Math.max(slower, Math.min(99, Math.max(0, percent)) / 100);
       }
     }
-    const speedScale = (this as any).careersRules?.getSpeedMultiplier?.() ?? 1;
+    const speedScale = this.careersRules?.getSpeedMultiplier() ?? 1;
     this.movementSpeed = faster * (1 - slower) * speedScale;
   }
 

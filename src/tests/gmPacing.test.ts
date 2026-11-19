@@ -78,6 +78,10 @@ describe('the plan-then-play loop', () => {
 
   test('nothing holds while pacing is off, and turning it off mid-fight lets go', () => {
     GMPacing.mode = 'off';
+    const scanSpy = jest.spyOn(GMPacing, 'scan');
+    GMPacing.update(0.1);
+    expect(scanSpy).not.toHaveBeenCalled();
+    scanSpy.mockRestore();
     GMPacing.update(0.1, scan());
     expect(GMPacing.phase).toBe('off');
     GMPacing.configure({ mode: 'every' });
