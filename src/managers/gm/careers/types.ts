@@ -168,6 +168,68 @@ export interface CareerStarterPowerDef {
   description: string;
 }
 
+export type CareerPowerNodeKind = 'root' | 'passive' | 'variant';
+/** A variant that has no KotOR power of its own: the family's root power, cast differently */
+export type CareerPowerVariant = 'pull';
+
+/** What one rank of a passive power upgrade adds, to every power in its family */
+export interface CareerPowerUpgrade {
+  /** Damage added to each of the power's damage effects */
+  damage?: number;
+  /** Added to the power's save DC */
+  saveDC?: number;
+  /** Metres added to a Force push's knockback */
+  pushDistance?: number;
+  /** Seconds added to the stun the power's script leaves (Push's, once the target lands) */
+  stunSeconds?: number;
+  /** More enemies near a single target that the power also hits */
+  extraTargets?: number;
+  /** Seconds added to the power's hold (Whirlwind's) */
+  durationSeconds?: number;
+}
+
+export interface CareerPowerNodeDef {
+  id: string;
+  row: 0 | 1 | 2 | 3;
+  col: 0 | 1 | 2;
+  kind: CareerPowerNodeKind;
+  label: string;
+  description: string;
+  xpCost: number;
+  /** Neighbour node ids (the branch above and below; every row 1 node links to the root) */
+  links: string[];
+  /** kind 'passive': what each rank adds */
+  upgrade?: CareerPowerUpgrade;
+  /** kind 'variant': the KotOR power it adds to the wheel (spells.2da row) */
+  variantSpellId?: number;
+  /** kind 'variant' with no KotOR power: how the root power is cast instead */
+  variant?: CareerPowerVariant;
+}
+
+/** One Force power family as a tree: the basic power at the root, upgrades and variants below */
+export interface CareerPowerTreeDef {
+  id: string;
+  name: string;
+  description: string;
+  /** spells.2da row of the root power */
+  rootSpellId: number;
+  alignment: 'universal' | 'light' | 'dark';
+  nodes: CareerPowerNodeDef[];
+}
+
+/** A family's passive upgrades added up (each rank owned times its numbers) */
+export type CareerPowerModifiers = Required<CareerPowerUpgrade>;
+
+/** A variant with no KotOR power of its own, as the wheel lists it */
+export interface CareerPowerVariantDef {
+  treeId: string;
+  variant: CareerPowerVariant;
+  /** The root power it's cast as */
+  spellId: number;
+  name: string;
+  description: string;
+}
+
 export interface CareersXpLogEntry {
   amount: number;
   reason: string;
@@ -178,7 +240,8 @@ export type CareersPurchaseRequest =
   | { kind: 'skill'; skillId: CareerSkillId }
   | { kind: 'node'; specId: string; nodeId: string; ability?: CareerAbilityKey }
   | { kind: 'specialization'; specId: string }
-  | { kind: 'power'; spellId: number };
+  | { kind: 'power'; spellId: number }
+  | { kind: 'power_node'; treeId: string; nodeId: string };
 
 export type CareersPurchaseRecord = CareersPurchaseRequest & {
   cost: number;
@@ -205,7 +268,8 @@ export interface GMCareersNetworkState {
  */
 export interface GMCareersCharacter {
   id: string;
-  version: 1;
+  /** 2 since the Force power ids were corrected and Force Push became a tree (GMCareersCharacters.upgrade) */
+  version: 1 | 2;
   ruleset: 'careers';
   game: 'tsl';
   name: string;
@@ -232,8 +296,10 @@ export interface GMCareersCharacter {
   nodes: Record<string, string[]>;
   /** Chosen characteristic (+1) for owned 'characteristic' (Dedication) nodes, keyed by `${specId}:${nodeId}` */
   nodeChoices?: Record<string, CareerAbilityKey>;
-  /** Purchased Force powers (spells.2da rows) */
+  /** Purchased Force powers bought on their own (spells.2da rows) */
   powers: number[];
+  /** Purchased Force power tree nodes, keyed by power tree id (the root first) */
+  powerNodes?: Record<string, string[]>;
   alignment: 'light' | 'dark';
   /** Starting XP spent during creation (does NOT count toward level) */
   startingXpSpent: number;
@@ -284,8 +350,12 @@ export interface GMCareersDerived {
   careerSkills: Set<CareerSkillId>;
   /** Effective KotOR feat IDs (baseline proficiencies + owned feat nodes) */
   featIds: number[];
-  /** Known Force power spell IDs */
+  /** Known Force power spell IDs (powers bought on their own, tree roots, and KotOR variants) */
   spellIds: number[];
+  /** Each owned power family's passive upgrades added up, under every spell id in the family */
+  powerFamilies: Record<number, CareerPowerModifiers>;
+  /** Owned variants with no KotOR power of their own (Pull), for the wheel */
+  powerVariants: CareerPowerVariantDef[];
   /** XP accounting */
   startingXpBudget: number;
   startingXpUsed: number;

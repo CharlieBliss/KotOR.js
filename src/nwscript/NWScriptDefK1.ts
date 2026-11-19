@@ -1518,7 +1518,7 @@ NWScriptDefK1.Actions = {
     args: [],
     action: function(this: NWScriptInstance, args: []){
       if(BitWise.InstanceOfObject(this.caller, ModuleObjectType.ModuleCreature)){
-        return (this.caller as ModuleCreature).getSpellSaveDC();
+        return (this.caller as ModuleCreature).getSpellSaveDC(this.getSpellId());
       }
 
       return 10;
@@ -2937,6 +2937,11 @@ NWScriptDefK1.Actions = {
     action: function(this: NWScriptInstance, args: [number, GameEffect, ModuleObject, number]){
       if(BitWise.InstanceOfObject(args[2], ModuleObjectType.ModuleObject)){
         if(typeof (args[1] as any)?.setDurationType === 'function'){
+          // A Careers caster's Force power tree changes what the power applies (and for how long)
+          const caster = args[1].creator || this.caller;
+          if(caster?.careersRules && args[1].getSpellId() >= 0){
+            args[3] = caster.careersRules.adjustPowerEffect(args[1], args[2], args[0], args[3], this.talent);
+          }
           args[1].setDurationType(args[0]);
           args[1].setDuration(args[3]);
           if(args[0] == GameEffectDurationType.TEMPORARY){

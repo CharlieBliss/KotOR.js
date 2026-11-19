@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import type { CareersPurchaseRequest, GMCareersCharacter } from "@/managers/gm/careers/types";
-import { careerNodeTag, DedicationPicker } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
+import { careerNodeTag, DedicationPicker, PowerTreeGrid } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
 import "@/apps/game/components/gm-panel/creator/careers-creator.scss";
 
 /**
@@ -75,7 +75,7 @@ export const CareersSheetSection: React.FC<{
         </button>
         {derived.forceSensitive && (
           <button className={`cc-chip ${subTab === 'powers' ? 'on' : ''}`} onClick={() => setSubTab('powers')}>
-            Force powers ({character.powers.length})
+            Force powers ({derived.spellIds.length})
           </button>
         )}
         <button className={`cc-chip ${subTab === 'log' ? 'on' : ''}`} onClick={() => setSubTab('log')}>
@@ -170,6 +170,17 @@ export const CareersSheetSection: React.FC<{
         </div>
       )}
 
+      {subTab === 'powers' && derived.forceSensitive && KotOR.CAREERS_POWER_TREES.map((tree) => (
+        <div key={tree.id} style={{ marginBottom: 12 }}>
+          <h4>{tree.name}</h4>
+          <PowerTreeGrid
+            tree={tree}
+            character={character}
+            lockedWhy={inCombat ? 'Wait until out of combat' : undefined}
+            onNode={(nodeId) => buy({ kind: 'power_node', treeId: tree.id, nodeId })}
+          />
+        </div>
+      ))}
       {subTab === 'powers' && derived.forceSensitive && (
         <div className="cc-choice-grid">
           {KotOR.CAREERS_STARTER_POWERS.map((p) => {

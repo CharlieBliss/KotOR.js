@@ -224,9 +224,12 @@ export class GMPlayerHud {
 
     // Powers: hostile ones first, then friendly. Personal ones (range P: Battle Meditation, Force Speed) are cast on
     // yourself whatever else they do
-    const spells: any[] = pc.getSpells?.() || [];
-    const seen = new Set<number>();
-    const powers = spells.filter((s) => s && !seen.has(s.id) && seen.add(s.id));
+    // (a Careers character's power tree variants with no KotOR power of their own, such as Pull, are listed too:
+    // each casts its family's root power, so they're told apart by the variant, not the spell id)
+    const spells: any[] = [...(pc.getSpells?.() || []), ...(careers?.getPowerVariants().map((v) => v.talent) || [])];
+    const powerKey = (s: any) => `${s.id}${s.careersVariant ? `:${s.careersVariant}` : ''}`;
+    const seen = new Set<string>();
+    const powers = spells.filter((s) => s && !seen.has(powerKey(s)) && seen.add(powerKey(s)));
     // Track lower-rank powers superseded by a higher rank the character also knows
     const superseded = new Set<number>();
     for (const s of powers) {
@@ -255,20 +258,20 @@ export class GMPlayerHud {
           : undefined;
       const personal = String(spell.range || '').toUpperCase() === 'P';
       const sRow = spellRows?.[spell.id];
-      const name = CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`);
+      const name = spell.careersVariantName || CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`);
       const hostile = isHostile(spell);
       const category: GMHudCategory = hostile
         ? 'offense'
         : (/heal|cure|restor|revive/i.test(`${name} ${spell.label || ''}`) ? 'heal' : 'buff');
       out.push({
         onlyOn: GMCombatAI.powerTargetRule(spell.forcehostile),
-        key: `power:${spell.id}`, kind: 'power', name,
+        key: `power:${powerKey(spell)}`, kind: 'power', name,
         icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : hostile ? 'enemy' : 'ally',
         cost,
         ...(pushStrain > 0 ? { strainCost: pushStrain } : {}),
         usable, why,
         category,
-        description: CharacterRules.text(spell.spelldesc ?? sRow?.spelldesc, ''),
+        description: spell.careersVariantDescription || CharacterRules.text(spell.spelldesc ?? sRow?.spelldesc, ''),
         range: this.rangeLabel(spell.range ?? sRow?.range),
         isBestRank: !superseded.has(spell.id),
         entry: { talent: spell },

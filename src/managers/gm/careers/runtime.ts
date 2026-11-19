@@ -1,8 +1,16 @@
+import * as THREE from "three";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { SkillType } from "@/enums/nwscript/SkillType";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
+import { GameEffectType } from "@/enums/effects/GameEffectType";
 import { EffectACIncrease } from "@/effects/EffectACIncrease";
 import { EffectAttackIncrease } from "@/effects/EffectAttackIncrease";
+import { GameEffectSetStateType } from "@/enums/effects/GameEffectSetStateType";
+import type { EffectForcePushed } from "@/effects/EffectForcePushed";
+import type { EffectLink } from "@/effects/EffectLink";
+import type { GameEffect } from "@/effects/GameEffect";
+import { TalentSpell } from "@/talents/TalentSpell";
+import { GMCareersCharacters } from "@/managers/gm/careers/characters";
 import type { ICareersCreatureRules, ICareersDamageContext } from "@/engine/CareersSeam";
 import { CareersRules } from "@/managers/gm/careers/rules";
 import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
@@ -11,6 +19,9 @@ import { CareersTalentState, forEachTalent, scopeTotal } from "@/managers/gm/car
 import type { CareerBuffBadge, CareerTempBuff } from "@/managers/gm/careers/talentEffects";
 import { combatSkillForWeapon } from "@/managers/gm/careers/weapons";
 import type {
+  CareerPowerModifiers,
+  CareerPowerVariant,
+  CareerPowerVariantDef,
   CareerSkillId,
   GMCareersCharacter,
   GMCareersDerived,
@@ -18,6 +29,7 @@ import type {
 } from "@/managers/gm/careers/types";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleItem } from "@/module/ModuleItem";
+import type { ModuleObject } from "@/module/ModuleObject";
 
 export { combatSkillForWeapon } from "@/managers/gm/careers/weapons";
 export type { CareerTempBuff } from "@/managers/gm/careers/talentEffects";
@@ -107,6 +119,8 @@ export class CareersRuntime implements ICareersCreatureRules {
   static ALLY_TALENT_RANGE = 15;
   /** Seconds a buff from a kill waits for the next attack */
   static KILL_BUFF_SECONDS = 9;
+  /** How far in front of the caster a pulled target lands (metres) */
+  static PULL_STOP_METRES = 1.5;
 
   character: GMCareersCharacter;
   derived: GMCareersDerived;
@@ -124,14 +138,15 @@ export class CareersRuntime implements ICareersCreatureRules {
   private wasInCombat: boolean = false;
 
   constructor(character: GMCareersCharacter, owner?: Partial<ModuleCreature>) {
-    this.character = character;
+    // (a character from an older save is brought up to date, in place: GMCareersCharacters.upgrade)
+    this.character = GMCareersCharacters.upgrade(character);
     this.derived = CareersRules.derive(character);
     this.owner = owner;
   }
 
   /** Refresh derived numbers after live XP advancement or sheet sync (preserving current Strain & buffs) */
   refresh(character: GMCareersCharacter) {
-    this.character = character;
+    this.character = GMCareersCharacters.upgrade(character);
     this.derived = CareersRules.derive(character);
     if (this.strain > this.derived.maxStrain) this.strain = this.derived.maxStrain;
   }
@@ -205,6 +220,104 @@ export class CareersRuntime implements ICareersCreatureRules {
 
   getSpellCostReduction(): number {
     return this.derived.talents.powerCostReduction;
+  }
+
+  // --- Force power trees (the power-cast hook) ------------------------------------------------
+
+  /** The family upgrades owned for this power (spells.2da row), if any */
+  getPowerModifiers(spellId: number): CareerPowerModifiers | undefined {
+    return this.derived.powerFamilies[spellId];
+  }
+
+  getPowerSaveDCBonus(spellId: number): number {
+    return this.getPowerModifiers(spellId)?.saveDC || 0;
+  }
+
+  getPowerExtraTargets(spellId: number): number {
+    return this.getPowerModifiers(spellId)?.extraTargets || 0;
+  }
+
+  /**
+   * One of this caster's Force powers is applying an effect to `target` (NWScript ApplyEffectToObject). The power's
+   * tree changes it in place, once per effect (Wave applies one effect to everyone it hits): more damage, a longer
+   * push, Pull's destination. The Stun lands on each target, and the duration returned covers Duration's extra time
+   */
+  adjustPowerEffect(effect: GameEffect, target: ModuleObject, durationType: number, duration: number, talent?: unknown): number {
+    const mods = this.getPowerModifiers(effect.getSpellId());
+    const variant = (talent as { careersVariant?: CareerPowerVariant } | undefined)?.careersVariant;
+    if (!mods && !variant) return duration;
+    const parts = effect.type === GameEffectType.EffectLink
+      ? [(effect as EffectLink).effect1, (effect as EffectLink).effect2].filter(Boolean)
+      : [effect];
+
+    for (const part of parts) {
+      if (part.type === GameEffectType.EffectDamage && mods?.damage && !(part as any).careersPowerAdjusted) {
+        (part as any).careersPowerAdjusted = true;
+        // The bonus goes on the damage type the power deals most of
+        let best = -1;
+        for (let i = 0; i < 16; i++) if (part.getInt(i) > 0 && (best < 0 || part.getInt(i) > part.getInt(best))) best = i;
+        if (best >= 0) part.setInt(best, part.getInt(best) + mods.damage);
+      }
+      if (part.type === GameEffectType.EffectForcePushed) {
+        const push = part as EffectForcePushed;
+        if (variant === 'pull') this.aimPull(push, target);
+        else if (mods?.pushDistance && !(push as any).careersPowerAdjusted) {
+          (push as any).careersPowerAdjusted = true;
+          push.pushDistance += mods.pushDistance;
+        }
+      }
+    }
+
+    // The powers' own lasting states run longer: KotOR's stun once a pushed target lands (Stun), and Whirlwind's
+    // hold (Duration). Checked in the game: Push's script stuns for about 2 s after the knockdown
+    if (durationType === GameEffectDurationType.TEMPORARY && duration > 0 && mods) {
+      const states = parts.filter((p) => p.type === GameEffectType.EffectSetState).map((p) => p.getInt(0));
+      if (states.includes(GameEffectSetStateType.CUT_SCENE_STUNNED)) return duration + mods.stunSeconds;
+      if (states.includes(GameEffectSetStateType.WHIRLWIND)) return duration + mods.durationSeconds;
+    }
+    return duration;
+  }
+
+  /** Pull: the push lands the target in front of the caster instead of knocking it away */
+  private aimPull(push: EffectForcePushed, target: ModuleObject) {
+    const from = this.owner?.position, to = target?.position;
+    if (!from || !to) return;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const d = Math.hypot(dx, dy);
+    if (!(d > CareersRuntime.PULL_STOP_METRES)) return;
+    // Walk back from just in front of the caster until the ground is walkable
+    for (let stop = CareersRuntime.PULL_STOP_METRES; stop < d; stop += 0.5) {
+      const dest = { x: from.x + (dx / d) * stop, y: from.y + (dy / d) * stop, z: to.z };
+      const check = typeof push.validateWalkablePosition === 'function'
+        ? push.validateWalkablePosition(new THREE.Vector3(dest.x, dest.y, dest.z))
+        : { face: true, closestPoint: dest };
+      if (check.face && check.closestPoint) {
+        push.setInt(0, 1); // targeted: the floats are where it lands
+        push.setFloat(0, check.closestPoint.x);
+        push.setFloat(1, check.closestPoint.y);
+        push.setFloat(2, check.closestPoint.z + 0.005);
+        return;
+      }
+    }
+  }
+
+  /** Power objects for this character's variants with no KotOR power of their own (Pull), made once each */
+  private variantTalents = new Map<string, TalentSpell>();
+
+  /** The wheel's variants: each casts its root power, tagged so the power-cast hook knows */
+  getPowerVariants(): { def: CareerPowerVariantDef; talent: TalentSpell }[] {
+    return this.derived.powerVariants.map((def) => {
+      const key = `${def.treeId}:${def.variant}`;
+      let talent = this.variantTalents.get(key);
+      if (!talent) {
+        talent = new TalentSpell(def.spellId);
+        (talent as any).careersVariant = def.variant;
+        (talent as any).careersVariantName = def.name;
+        (talent as any).careersVariantDescription = def.description;
+        this.variantTalents.set(key, talent);
+      }
+      return { def, talent };
+    });
   }
 
   // --- Strain, combat feats, and Force pushing ------------------------------------------------

@@ -214,20 +214,27 @@ export const CAREERS_SPEC_BY_ID: ReadonlyMap<string, CareerSpecializationDef> = 
 );
 
 /**
- * Vertical slice starter Force powers (root powers from KotOR II spells.2da).
- * Full Force power trees plug in at Phase 5.
+ * Force powers bought on their own (KotOR II spells.2da rows, checked against the game's table). Force Push isn't
+ * here: it's the root of its own tree (powerTrees.ts), as each family will be once its tree is drawn.
  */
 export const CAREERS_STARTER_POWERS: readonly CareerStarterPowerDef[] = [
-  { spellId: 27, label: 'FORCE_POWER_FORCE_PUSH', name: 'Force Push', alignment: 'universal', xpCost: 10, description: 'Telekinetic blast that knocks an enemy back and off their feet.' },
   { spellId: 8, label: 'FORCE_POWER_SPEED_BURST', name: 'Burst of Speed', alignment: 'universal', xpCost: 10, description: 'Accelerate movement speed and reflexes through the Force.' },
-  { spellId: 11, label: 'FORCE_POWER_AFFECT_MIND', name: 'Affect Mind', alignment: 'universal', xpCost: 10, description: 'Nudge weak minds in conversation and tense scenes.' },
-  { spellId: 28, label: 'FORCE_POWER_CURE', name: 'Cure', alignment: 'light', xpCost: 10, description: 'Channel the light side to mend wounds for yourself or an ally.' },
-  { spellId: 20, label: 'FORCE_POWER_FORCE_VALOR', name: 'Force Valor', alignment: 'light', xpCost: 10, description: 'Bolster attributes and saving throws for nearby allies.' },
+  { spellId: 6, label: 'FORCE_POWER_AFFECT_MIND', name: 'Affect Mind', alignment: 'universal', xpCost: 10, description: 'Nudge weak minds in conversation and tense scenes.' },
+  { spellId: 10, label: 'FORCE_POWER_CURE', name: 'Cure', alignment: 'light', xpCost: 10, description: 'Channel the light side to mend wounds for yourself or an ally.' },
+  { spellId: 22, label: 'FORCE_POWER_FORCE_VALOR', name: 'Force Valor', alignment: 'light', xpCost: 10, description: 'Bolster attributes and saving throws for nearby allies.' },
   { spellId: 46, label: 'FORCE_POWER_STUN', name: 'Stun', alignment: 'light', xpCost: 10, description: 'Lock a foe in place briefly without dealing lethal harm.' },
-  { spellId: 24, label: 'FORCE_POWER_SHOCK', name: 'Shock', alignment: 'dark', xpCost: 15, description: 'Discharge a bolt of dark-side lightning at a target.' },
-  { spellId: 34, label: 'FORCE_POWER_WOUND', name: 'Wound', alignment: 'dark', xpCost: 15, description: 'Crush an enemy\'s lungs with telekinetic malice.' },
-  { spellId: 18, label: 'FORCE_POWER_FEAR', name: 'Fear', alignment: 'dark', xpCost: 10, description: 'Break an opponent\'s resolve so they cower in terror.' },
+  { spellId: 43, label: 'FORCE_POWER_SHOCK', name: 'Shock', alignment: 'dark', xpCost: 15, description: 'Discharge a bolt of dark-side lightning at a target.' },
+  { spellId: 50, label: 'FORCE_POWER_WOUND', name: 'Wound', alignment: 'dark', xpCost: 15, description: 'Crush an enemy\'s lungs with telekinetic malice.' },
+  { spellId: 16, label: 'FORCE_POWER_FEAR', name: 'Fear', alignment: 'dark', xpCost: 10, description: 'Break an opponent\'s resolve so they cower in terror.' },
 ];
+
+/**
+ * Version 1 characters were saved with spells.2da rows that were wrong for KotOR II: the row each old id really
+ * meant to name (27, the old Force Push, becomes the Push tree's root instead: see GMCareersCharacters.upgrade)
+ */
+export const CAREERS_V1_POWER_IDS: Readonly<Record<number, number>> = { 11: 6, 28: 10, 20: 22, 24: 43, 34: 50, 18: 16 };
+/** The old Force Push row in version 1 characters */
+export const CAREERS_V1_FORCE_PUSH = 27;
 
 export const CAREERS_POWER_BY_ID: ReadonlyMap<number, CareerStarterPowerDef> = new Map(
   CAREERS_STARTER_POWERS.map((p) => [p.spellId, p])

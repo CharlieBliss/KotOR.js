@@ -10,7 +10,7 @@ import { ModelPreview } from "@/apps/game/components/gm-panel/creator/ModelPrevi
 import { ModelList } from "@/apps/game/components/gm-panel/creator/ModelList";
 import { creatorPortraits, portraitForModel } from "@/apps/game/components/gm-panel/creator/creatorData";
 import { Panel } from "@/apps/game/components/gm-panel/creator/sections";
-import { careerNodeTag, DedicationPicker } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
+import { careerNodeTag, DedicationPicker, PowerTreeGrid } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
 import "@/apps/game/components/gm-panel/creator/creator.scss";
 import "@/apps/game/components/gm-panel/creator/careers-creator.scss";
 
@@ -120,6 +120,7 @@ export const CareersCreator: React.FC<{
       freeCareerSkills: draft.freeCareerSkills.slice(0, sp.freeCareerSkills),
       freeSpeciesSkills: sp.freeNonCareerSkills ? draft.freeSpeciesSkills.slice(0, sp.freeNonCareerSkills) : [],
       powers: forceOk ? draft.powers : [],
+      powerNodes: forceOk ? (draft.powerNodes || {}) : {},
       // Droids and organics wear different things
       gear: KotOR.CareersRules.kitFor(draft.careerId, sp.id),
       ...careerReset,
@@ -144,6 +145,7 @@ export const CareersCreator: React.FC<{
       nodes: { [startingSpecId]: [] },
       nodeChoices: {},
       powers: forceOk ? draft.powers : [],
+      powerNodes: forceOk ? (draft.powerNodes || {}) : {},
       gear: KotOR.CareersRules.kitFor(career.id, draft.speciesId),
     });
   };
@@ -288,6 +290,33 @@ export const CareersCreator: React.FC<{
     }
     update({ powers: [...draft.powers, spellId] });
   };
+
+  /** Buy a power tree node with starting XP, or refund one nothing else in the tree hangs from */
+  const togglePowerNode = (treeId: string, nodeId: string, owned: boolean) => {
+    const current = draft.powerNodes?.[treeId] || [];
+    if (owned) {
+      if (!Rules.canRemovePowerNode(draft, treeId, nodeId)) {
+        setMessage('Refund the upgrades below it first.');
+        return;
+      }
+      update({ powerNodes: { ...(draft.powerNodes || {}), [treeId]: current.filter((id) => id !== nodeId) } });
+      return;
+    }
+    const check = Rules.canBuyPowerNode(draft, treeId, nodeId, true);
+    if (!check.ok) {
+      if (check.reason) setMessage(check.reason);
+      return;
+    }
+    update({ powerNodes: { ...(draft.powerNodes || {}), [treeId]: [...current, nodeId] } });
+  };
+
+  /** The power trees a character of this alignment may keep (the other side's trees are dropped) */
+  const keepPowerTrees = (alignment: 'light' | 'dark') => Object.fromEntries(
+    Object.entries(draft.powerNodes || {}).filter(([treeId]) => {
+      const side = KotOR.CAREERS_POWER_TREE_BY_ID.get(treeId)?.alignment;
+      return side === 'universal' || side === alignment;
+    })
+  );
 
   const stepIndex = STEPS.findIndex((s) => s.id === step);
 
@@ -476,7 +505,7 @@ export const CareersCreator: React.FC<{
                   <button className={`cc-chip ${spendTab === 'tree' ? 'on' : ''}`} onClick={() => setSpendTab('tree')}>{spec.name} tree</button>
                   <button className={`cc-chip ${spendTab === 'skills' ? 'on' : ''}`} onClick={() => setSpendTab('skills')}>Skills</button>
                   {d.forceSensitive && (
-                    <button className={`cc-chip ${spendTab === 'powers' ? 'on' : ''}`} onClick={() => setSpendTab('powers')}>Force powers ({draft.powers.length})</button>
+                    <button className={`cc-chip ${spendTab === 'powers' ? 'on' : ''}`} onClick={() => setSpendTab('powers')}>Force powers ({draft.powers.length + Object.values(draft.powerNodes || {}).reduce((n, ids) => n + ids.length, 0)})</button>
                   )}
                 </div>
 
@@ -551,6 +580,19 @@ export const CareersCreator: React.FC<{
                   </div>
                 )}
 
+                {spendTab === 'powers' && d.forceSensitive && KotOR.CAREERS_POWER_TREES.map((tree) => (
+                  <div key={tree.id} style={{ marginBottom: 12 }}>
+                    <h4>{tree.name}</h4>
+                    <div className="cc-hint">{tree.description} Learn the power first; each upgrade needs the one above it.</div>
+                    <PowerTreeGrid
+                      tree={tree}
+                      character={draft}
+                      startingOnly
+                      canRefund
+                      onNode={(nodeId, owned) => togglePowerNode(tree.id, nodeId, owned)}
+                    />
+                  </div>
+                ))}
                 {spendTab === 'powers' && d.forceSensitive && (
                   <div className="cc-choice-grid">
                     {KotOR.CAREERS_STARTER_POWERS.map((p) => {
@@ -598,6 +640,7 @@ export const CareersCreator: React.FC<{
                       onClick={() => update({
                         alignment: 'light',
                         powers: draft.powers.filter((id) => KotOR.CAREERS_POWER_BY_ID.get(id)?.alignment !== 'dark'),
+                        powerNodes: keepPowerTrees('light'),
                       })}
                     >
                       Light side
@@ -607,6 +650,7 @@ export const CareersCreator: React.FC<{
                       onClick={() => update({
                         alignment: 'dark',
                         powers: draft.powers.filter((id) => KotOR.CAREERS_POWER_BY_ID.get(id)?.alignment !== 'light'),
+                        powerNodes: keepPowerTrees('dark'),
                       })}
                     >
                       Dark side

@@ -16,9 +16,11 @@ import {
 } from "@/managers/gm/careers/skills";
 import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
 import { totalTalentHooks } from "@/managers/gm/careers/talentEffects";
+import { CAREERS_POWER_TREE_BY_ID, CAREERS_POWER_TREES, ownedPowerNodes, totalPowerTrees } from "@/managers/gm/careers/powerTrees";
 import type {
   CareerAbilityKey,
   CareerAttributes,
+  CareerPowerTreeDef,
   CareerSkillId,
   CareerTreeNodeDef,
   CombatSkillId,
@@ -279,7 +281,7 @@ export class CareersRules {
       }
     }
 
-    // 5. Force powers
+    // 5. Force powers bought on their own
     if (Array.isArray(c.powers)) {
       for (const spellId of c.powers) {
         const power = CAREERS_POWER_BY_ID.get(spellId);
@@ -287,7 +289,63 @@ export class CareersRules {
       }
     }
 
+    // 6. Force power tree nodes
+    for (const tree of CAREERS_POWER_TREES) {
+      for (const node of ownedPowerNodes(tree, c.powerNodes?.[tree.id])) total += node.xpCost;
+    }
+
     return total;
+  }
+
+  /** Check whether a node of a Force power tree can be bought right now (the root first, then along its links) */
+  static canBuyPowerNode(
+    c: GMCareersCharacter, treeId: string, nodeId: string, startingOnly: boolean = false
+  ): { ok: boolean; cost: number; reason?: string } {
+    const tree = CAREERS_POWER_TREE_BY_ID.get(treeId);
+    if (!tree) return { ok: false, cost: 0, reason: 'Unknown Force power tree.' };
+    const node = tree.nodes.find((n) => n.id === nodeId);
+    if (!node) return { ok: false, cost: 0, reason: 'Unknown node.' };
+    const cost = node.xpCost;
+    if (!this.isForceSensitive(c)) return { ok: false, cost, reason: 'Only Force-sensitive characters can learn Force powers.' };
+    if (tree.alignment !== 'universal' && tree.alignment !== c.alignment) {
+      return { ok: false, cost, reason: `Only ${tree.alignment}-side characters can learn ${tree.name}.` };
+    }
+    const owned = new Set(ownedPowerNodes(tree, c.powerNodes?.[treeId]).map((n) => n.id));
+    if (owned.has(nodeId)) return { ok: false, cost, reason: 'Already owned.' };
+    if (node.kind !== 'root' && !owned.has('root')) return { ok: false, cost, reason: `Learn ${tree.name} first.` };
+    if (node.kind !== 'root' && !node.links.some((link) => owned.has(link))) {
+      return { ok: false, cost, reason: 'Needs a link to an owned node.' };
+    }
+    const short = this.shortOfXp(this.derive(c), cost, startingOnly);
+    if (short) return { ok: false, cost, reason: short };
+    return { ok: true, cost };
+  }
+
+  /** Whether a power tree node can be refunded at creation: nothing owned below it depends on it alone */
+  static canRemovePowerNode(c: GMCareersCharacter, treeId: string, nodeId: string): boolean {
+    const tree = CAREERS_POWER_TREE_BY_ID.get(treeId);
+    if (!tree) return false;
+    const remaining = ownedPowerNodes(tree, c.powerNodes?.[treeId]).filter((n) => n.id !== nodeId);
+    return this.powerTreeLinksValid(tree, remaining.map((n) => n.id));
+  }
+
+  /** Whether every owned node of a power tree reaches the root through owned nodes */
+  static powerTreeLinksValid(tree: CareerPowerTreeDef, ownedIds: string[]): boolean {
+    const owned = new Set(ownedIds);
+    if (owned.size === 0) return true;
+    if (!owned.has('root')) return false;
+    const byId = new Map(tree.nodes.map((n) => [n.id, n]));
+    const reached = new Set(['root']);
+    const queue = ['root'];
+    while (queue.length) {
+      for (const link of byId.get(queue.shift()!)?.links || []) {
+        if (owned.has(link) && !reached.has(link)) {
+          reached.add(link);
+          queue.push(link);
+        }
+      }
+    }
+    return [...owned].every((id) => reached.has(id));
   }
 
   /** Whether every owned node in a specialization tree is reachable from row 0 via owned links */
@@ -463,6 +521,8 @@ export class CareersRules {
 
     // Every passive talent hook, added up once here (combat reads these totals, not the talent list)
     const talents = totalTalentHooks(talentRanks);
+    // Force power trees: the powers they teach and each family's upgrades
+    const powerTrees = totalPowerTrees(c.powerNodes);
 
     const saveRanks = {
       fortitude: (skillRanks.resilience || 0) * 2 + talents.saves.fortitude,
@@ -518,7 +578,9 @@ export class CareersRules {
       engineSkills,
       careerSkills,
       featIds: [...featSet].sort((a, b) => a - b),
-      spellIds: forceSensitive ? [...(c.powers || [])] : [],
+      spellIds: forceSensitive ? [...new Set([...(c.powers || []), ...powerTrees.spellIds])] : [],
+      powerFamilies: forceSensitive ? powerTrees.families : {},
+      powerVariants: forceSensitive ? powerTrees.variants : [],
       startingXpBudget,
       startingXpUsed,
       startingXpRemaining,
@@ -678,6 +740,25 @@ export class CareersRules {
             problems.push(`${power.name} requires ${power.alignment}-side alignment.`);
           }
         }
+      }
+    }
+
+    // Force power trees
+    for (const [treeId, nodeIds] of Object.entries(c.powerNodes || {})) {
+      if (!Array.isArray(nodeIds) || nodeIds.length === 0) continue;
+      const tree = CAREERS_POWER_TREE_BY_ID.get(treeId);
+      if (!tree) {
+        problems.push(`Unknown Force power tree (${treeId}).`);
+        continue;
+      }
+      if (!derived.forceSensitive) problems.push(`Non-Force-sensitive characters cannot learn ${tree.name}.`);
+      if (tree.alignment !== 'universal' && tree.alignment !== c.alignment) {
+        problems.push(`${tree.name} requires ${tree.alignment}-side alignment.`);
+      }
+      const unknown = nodeIds.filter((id) => !tree.nodes.some((n) => n.id === id));
+      if (unknown.length) problems.push(`Unknown ${tree.name} nodes: ${unknown.join(', ')}.`);
+      if (!this.powerTreeLinksValid(tree, nodeIds.filter((id) => !unknown.includes(id)))) {
+        problems.push(`${tree.name}: every node needs a link back to the power.`);
       }
     }
 

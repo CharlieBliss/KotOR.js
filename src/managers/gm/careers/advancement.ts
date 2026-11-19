@@ -81,6 +81,10 @@ export class CareersAdvancement {
         const spellId = Number(r.spellId);
         return Number.isInteger(spellId) && spellId >= 0 ? { kind: 'power', spellId } : null;
       }
+      case 'power_node': {
+        const treeId = text(r.treeId), nodeId = text(r.nodeId);
+        return treeId && nodeId ? { kind: 'power_node', treeId, nodeId } : null;
+      }
     }
     return null;
   }
@@ -143,6 +147,15 @@ export class CareersAdvancement {
       return res;
     }
 
+    if (req.kind === 'power_node') {
+      const check = CareersRules.canBuyPowerNode(character, req.treeId, req.nodeId);
+      if (!check.ok) return { ok: false, reason: check.reason };
+      const res = this.spendAndRecord(character, req, check.cost);
+      if (!character.powerNodes) character.powerNodes = {};
+      character.powerNodes[req.treeId] = [...(character.powerNodes[req.treeId] || []), req.nodeId];
+      return res;
+    }
+
     return { ok: false, reason: 'Unknown purchase.' };
   }
 
@@ -191,6 +204,10 @@ export class CareersAdvancement {
     } else if (last.kind === 'power') {
       const idx = character.powers.lastIndexOf(last.spellId);
       if (idx >= 0) character.powers.splice(idx, 1);
+    } else if (last.kind === 'power_node') {
+      // Purchases are refunded newest first, so nothing bought through this node is still owned
+      const list = character.powerNodes?.[last.treeId];
+      if (Array.isArray(list)) character.powerNodes![last.treeId] = list.filter((id) => id !== last.nodeId);
     }
 
     character.startingXpSpent = Math.max(0, (character.startingXpSpent || 0) - last.startingXpPaid);

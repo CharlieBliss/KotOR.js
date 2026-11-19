@@ -241,12 +241,12 @@ describe('XP purchases, tree links, and validation', () => {
     const jedi = GMCareersCharacters.blank('human', 'jedi_guardian');
     jedi.name = 'Bao';
     jedi.alignment = 'light';
-    jedi.powers = [24]; // Shock (dark)
+    jedi.powers = [43]; // Shock (dark)
     expect(CareersRules.validate(jedi).some((p) => p.includes('dark-side'))).toBe(true);
 
     const trooper = GMCareersCharacters.blank('human', 'soldier');
     trooper.name = 'Trooper';
-    trooper.powers = [27]; // Force Push on non-Force-sensitive
+    trooper.powers = [43]; // a Force power on a non-Force-sensitive
     expect(CareersRules.validate(trooper).some((p) => p.includes('Non-Force-sensitive'))).toBe(true);
 
     trooper.powers = [];

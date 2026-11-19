@@ -1,4 +1,6 @@
+import type { GameEffect } from "@/effects/GameEffect";
 import type { ModuleItem } from "@/module/ModuleItem";
+import type { ModuleObject } from "@/module/ModuleObject";
 
 /** What the engine tells the Careers rules about an attack whose damage is being worked out */
 export interface ICareersDamageContext {
@@ -38,6 +40,18 @@ export interface ICareersCreatureRules {
   getSpellSaveDCBonus(): number;
   /** Force points taken off each power's cost */
   getSpellCostReduction(): number;
+
+  // --- Force power trees (the power-cast hook)
+  /** Save DC added to this power (spells.2da row) by its tree's upgrades */
+  getPowerSaveDCBonus(spellId: number): number;
+  /** More enemies near a single target that this power also hits */
+  getPowerExtraTargets(spellId: number): number;
+  /**
+   * A Force power of this caster is applying one of its effects (NWScript ApplyEffectToObject): its tree's upgrades
+   * change it in place (damage, push distance, Pull, Stun) and the duration it's applied for comes back.
+   * `talent` is the power object cast, which says when it was cast as a variant
+   */
+  adjustPowerEffect(effect: GameEffect, target: ModuleObject, durationType: number, duration: number, talent?: unknown): number;
 
   // --- Paying for things
   /**

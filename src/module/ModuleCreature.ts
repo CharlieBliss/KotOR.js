@@ -2738,7 +2738,8 @@ export class ModuleCreature extends ModuleObject {
     return this.getAbility(5, calculateBonuses);
   }
 
-  getSpellSaveDC(){
+  /** The DC to save against this creature's powers (spellId: the power, for a Careers caster's power tree upgrades) */
+  getSpellSaveDC(spellId: number = -1){
     const wisMod = Math.floor((this.getWIS() - 10) / 2);
     const chaMod = Math.floor((this.getCHA() - 10) / 2);
     let focusBonus = 0;
@@ -2750,7 +2751,8 @@ export class ModuleCreature extends ModuleObject {
       focusBonus = 1;
     }
     const level = this.getTotalClassLevel() || this.getSpellCasterLevel();
-    return 5 + level + wisMod + chaMod + focusBonus + this.getSpellSaveDCBonus();
+    const powerBonus = spellId >= 0 && this.careersRules ? this.careersRules.getPowerSaveDCBonus(spellId) : 0;
+    return 5 + level + wisMod + chaMod + focusBonus + this.getSpellSaveDCBonus() + powerBonus;
   }
 
   getFortitudeSave(){

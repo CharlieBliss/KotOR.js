@@ -1,5 +1,6 @@
 import { GameState } from "@/GameState";
-import { CAREERS_BY_ID, CAREERS_SPECIES_BY_ID } from "@/managers/gm/careers/data";
+import { CAREERS_BY_ID, CAREERS_SPECIES_BY_ID, CAREERS_V1_FORCE_PUSH, CAREERS_V1_POWER_IDS } from "@/managers/gm/careers/data";
+import { CAREERS_POWER_TREE_BY_ID } from "@/managers/gm/careers/powerTrees";
 import { CareersRules } from "@/managers/gm/careers/rules";
 import { CAREER_ABILITIES } from "@/managers/gm/careers/skills";
 import type { GMCareersCharacter } from "@/managers/gm/careers/types";
@@ -22,6 +23,7 @@ export class GMCareersCharacters {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
       return (Array.isArray(parsed) ? parsed : [])
         .filter((c) => this.isCareersCharacter(c))
+        .map((c) => this.upgrade(c))
         .sort((a, b) => b.updated - a.updated);
     } catch (e) {
       return [];
@@ -35,9 +37,9 @@ export class GMCareersCharacters {
   static save(character: GMCareersCharacter): GMCareersCharacter {
     const derived = CareersRules.derive(character);
     const saved: GMCareersCharacter = {
-      ...character,
+      ...this.upgrade(character),
       id: character.id || this.newId(),
-      version: 1,
+      version: 2,
       ruleset: 'careers',
       game: 'tsl',
       startingXpSpent: derived.startingXpUsed,
@@ -105,7 +107,35 @@ export class GMCareersCharacters {
     if (!this.isCareersCharacter({ ...rest, id: rest.id || 'x', updated: rest.updated || 0 })) {
       return { character: null, problem: 'The file is missing parts of a Careers character.' };
     }
-    return { character: { ...rest, id: this.newId(), updated: Date.now() } };
+    return { character: this.upgrade({ ...rest, id: this.newId(), updated: Date.now() }) };
+  }
+
+  /**
+   * Bring a character saved by an older version up to date, in place (and return it). Version 1 used spells.2da
+   * rows that were wrong for KotOR II: each is mapped to the power it meant, in `powers` and in the purchase log,
+   * and its Force Push becomes the root of the Push tree (the purchase kept, so undo still refunds it)
+   */
+  static upgrade<T extends GMCareersCharacter>(c: T): T {
+    if (!c || (c.version ?? 1) >= 2) return c;
+    const pushTree = CAREERS_POWER_TREE_BY_ID.get('force_push')!;
+    const fix = (id: number) => CAREERS_V1_POWER_IDS[id] ?? id;
+    const hadPush = (c.powers || []).includes(CAREERS_V1_FORCE_PUSH);
+    c.powers = [...new Set((c.powers || []).filter((id) => id !== CAREERS_V1_FORCE_PUSH).map(fix))];
+    if (hadPush) {
+      c.powerNodes = { ...(c.powerNodes || {}) };
+      const owned = c.powerNodes[pushTree.id] || [];
+      if (!owned.includes('root')) c.powerNodes[pushTree.id] = ['root', ...owned];
+    }
+    if (Array.isArray(c.purchases)) {
+      c.purchases = c.purchases.map((p) => {
+        if (p.kind !== 'power') return p;
+        if (p.spellId !== CAREERS_V1_FORCE_PUSH) return { ...p, spellId: fix(p.spellId) };
+        const { spellId, ...paid } = p;
+        return { ...paid, kind: 'power_node', treeId: pushTree.id, nodeId: 'root' };
+      });
+    }
+    c.version = 2;
+    return c;
   }
 
   /** Shape check for a saved Careers character (rules are checked by CareersRules.validate) */
@@ -131,7 +161,7 @@ export class GMCareersCharacters {
     const appearanceLabel = GameState.AppearanceManager?.appearances?.get(appearanceId)?.label || '';
     return {
       id: '',
-      version: 1,
+      version: 2,
       ruleset: 'careers',
       game: 'tsl',
       name: '',
@@ -150,6 +180,7 @@ export class GMCareersCharacters {
       boughtSkillRanks: {},
       nodes: { [startingSpecId]: [] },
       powers: [],
+      powerNodes: {},
       alignment: 'light',
       startingXpSpent: 0,
       campaignXpEarned: 0,
@@ -178,6 +209,7 @@ export class GMCareersCharacters {
    * - Baseline weapon/armour proficiencies + KotOR feats from owned tree nodes (skipping KotOR prereqs)
    */
   static toSpawnConfig(character: GMCareersCharacter): GMPlayerSpawnConfig {
+    this.upgrade(character);
     const species = CAREERS_SPECIES_BY_ID.get(character.speciesId) || CAREERS_SPECIES_BY_ID.get('human')!;
     const career = CAREERS_BY_ID.get(character.careerId) || CAREERS_BY_ID.get('soldier')!;
     const derived = CareersRules.derive(character);

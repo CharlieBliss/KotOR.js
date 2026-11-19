@@ -962,7 +962,7 @@ export class GMPlayers {
     if (!target || target.gmHidden) return "That target isn't there any more.";
     const id = Number(intent.abilityId);
     if (intent.ability === 'spell') {
-      const spell = actor.getSpells().find((s: any) => s.id === id);
+      const spell = this.spellToCast(actor, id, intent.variant);
       if (!spell) return `${name} doesn't know that power.`;
       if (spell.isBlockedByArmor?.(actor)) return `${name} can't use that power while wearing armour.`;
       const rule = GMCombatAI.powerTargetRule(spell.forcehostile);
@@ -1107,6 +1107,16 @@ export class GMPlayers {
   }
 
   /**
+   * Host: the power object a player's request casts: one their character knows, or (with a variant) a Careers power
+   * tree variant they own, which casts its root power differently (Pull). Anything else isn't theirs to cast
+   */
+  static spellToCast(actor: ModuleCreature, spellId: number, variant?: unknown): any {
+    if (variant === undefined) return actor.getSpells().find((s: any) => s.id === spellId);
+    return careersRuntimeOf(actor)?.getPowerVariants()
+      .find((v) => v.def.variant === variant && v.talent.id === spellId)?.talent;
+  }
+
+  /**
    * Host: use a Force power, feat, skill or item a player picked from KotOR's action menu, through the same
    * engine path as anyone else. It must be theirs: a power or feat their character knows, a skill they have
    * ranks in, an item they carry or wear. Returns false when it can't be used.
@@ -1122,7 +1132,7 @@ export class GMPlayers {
 
     switch (intent.ability) {
       case 'spell': {
-        const spell = actor.getSpells().find((s: any) => s.id === id);
+        const spell = this.spellToCast(actor, id, intent.variant);
         if (!spell) return false;
         if (spell.isBlockedByArmor?.(actor)) return false;
         // Disable Droid on a person, and the like: it does nothing, so it isn't cast
@@ -1225,7 +1235,14 @@ export class GMPlayers {
     }
     const talent = entry.talent;
     if (talent) {
-      if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)) return send('spell', talent.id);
+      if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSpell)) {
+        // A Careers power tree variant (Pull) is its root power cast differently: the host is told which
+        if (talent.careersVariant) {
+          GMNetworkManager.sendIntent('ability', targetNetId, { ability: 'spell', abilityId: talent.id, variant: talent.careersVariant });
+          return true;
+        }
+        return send('spell', talent.id);
+      }
       if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentFeat)) return send('feat', talent.id);
       if (BitWise.InstanceOf(talent.objectType, TalentObjectType.TalentSkill)) return send('skill', talent.id);
     }

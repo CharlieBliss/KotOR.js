@@ -206,6 +206,40 @@ export class SpellCastInstance {
     }
   }  
 
+  /** Run the power's impact script on a target (the talent is passed to the script, as GetSpellId and the like read it) */
+  runImpactScript(target: ModuleObject){
+    const instance = GameState.NWScript.Load(this.impactscript);
+    if(!instance) return;
+    instance.talent = this.spell;
+    instance.spellTarget = target;
+    instance.spellItem = this.item;
+    instance.lastSpellCaster = this.owner;
+    instance.lastSpellAttacker = this.owner;
+    instance.lastSpell = this.spell;
+    instance.lastSpellHarmful = this.spell?.hostilesetting == 1;
+    instance.run(this.owner, 0);
+  }
+
+  /** How far from the target a Magnitude upgrade reaches more enemies (metres) */
+  static EXTRA_TARGET_RANGE = 4;
+
+  /**
+   * More enemies a Careers caster's Force power also lands on (its tree's Magnitude): the nearest living hostile
+   * creatures around a single target. Area powers (Wave) already reach everyone and get none
+   */
+  extraPowerTargets(): ModuleObject[] {
+    const owner: any = this.owner, target: any = this.target;
+    const count = this.spell ? (owner?.careersRules?.getPowerExtraTargets(this.spell.id) || 0) : 0;
+    if(count <= 0 || !target?.position || target === owner) return [];
+    if(String(this.spell?.range || '').toUpperCase() !== 'M') return [];
+    const creatures: any[] = owner?.area?.creatures || GameState.module?.area?.creatures || [];
+    return creatures
+      .filter((c) => c && c !== target && c !== owner && !c.destroyed && !c.isDead?.() && c.isHostile?.(owner)
+        && c.position?.distanceTo?.(target.position) <= SpellCastInstance.EXTRA_TARGET_RANGE)
+      .sort((a, b) => a.position.distanceTo(target.position) - b.position.distanceTo(target.position))
+      .slice(0, count);
+  }
+
   impact(){
     //We only want to run the impact script once
     if(this.impacted) return;
@@ -245,17 +279,10 @@ export class SpellCastInstance {
 
       if(this.impactscript != ''){
         console.log('Casting spell', this.impactscript, this);
-        const instance = GameState.NWScript.Load(this.impactscript);
-        if(instance) {
-          //pass the talent to the script instance and run it
-          instance.talent = this.spell;
-          instance.spellTarget = this.target;
-          instance.spellItem = this.item;
-          instance.lastSpellCaster = this.owner;
-          instance.lastSpellAttacker = this.owner;
-          instance.lastSpell = this.spell;
-          instance.lastSpellHarmful = this.spell?.hostilesetting == 1;
-          instance.run(this.owner, 0);
+        this.runImpactScript(this.target);
+        // A Careers caster's Magnitude: the power lands on more enemies near a single target (already paid for)
+        if(!this.item){
+          for(const extra of this.extraPowerTargets()) this.runImpactScript(extra);
         }
       }
     }

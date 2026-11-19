@@ -16,6 +16,9 @@ import { GameEffect } from "@/effects/GameEffect";
  * @license {@link https://www.gnu.org/licenses/gpl-3.0.txt|GPLv3}
  */
 export class EffectForcePushed extends GameEffect {
+  /** Metres an untargeted push knocks the creature back (a Careers caster's Distance upgrade adds to it) */
+  pushDistance: number = 5.0;
+
   constructor(){
     super();
     this.type = GameEffectType.EffectForcePushed;
@@ -48,7 +51,7 @@ export class EffectForcePushed extends GameEffect {
 
         const fpDirX = -Math.cos(this.object.facing + Math.PI/2);
         const fpDirY = -Math.sin(this.object.facing + Math.PI/2);
-        let fPushDistance = 5.0;
+        let fPushDistance = this.pushDistance;
         this.setFloat(0, this.object.position.x + (fPushDistance * fpDirX));
         this.setFloat(1, this.object.position.y + (fPushDistance* fpDirY));
         this.setFloat(2, this.object.position.z + 0.0);

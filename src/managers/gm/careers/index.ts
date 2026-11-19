@@ -4,6 +4,7 @@ export * from "@/managers/gm/careers/talents";
 export * from "@/managers/gm/careers/talentEffects";
 export * from "@/managers/gm/careers/weapons";
 export * from "@/managers/gm/careers/data";
+export * from "@/managers/gm/careers/powerTrees";
 export * from "@/managers/gm/careers/rules";
 export * from "@/managers/gm/careers/characters";
 export * from "@/managers/gm/careers/runtime";
