@@ -5,8 +5,11 @@ import { CombatActionType } from "@/enums/combat/CombatActionType";
 import { ActionType } from "@/enums/actions/ActionType";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 
-/** When the world holds for everyone to plan: every round, every 2 or 3 rounds, only on events, or never */
-export type GMPacingMode = 'off' | 'every' | 'every2' | 'every3' | 'events';
+/** When the world holds for everyone to plan: every N rounds (GMPacing.everyRounds), only on events, or never */
+export type GMPacingMode = 'off' | 'rounds' | 'events';
+/** The modes older saves name, before 'rounds' took a number: every round, every 2 or every 3 */
+type GMPacingLegacyMode = 'every' | 'every2' | 'every3';
+const LEGACY_ROUNDS: Record<GMPacingLegacyMode, number> = { every: 1, every2: 2, every3: 3 };
 
 /** off: real time (no fight, or pacing is off) · plan: the world holds while everyone chooses · play: one round runs */
 export type GMPacingPhase = 'off' | 'plan' | 'play';
@@ -14,6 +17,8 @@ export type GMPacingPhase = 'off' | 'plan' | 'play';
 /** What players need to know about the pacing (sent in the session rules) */
 export interface GMPacingState {
   mode: GMPacingMode;
+  /** Rounds played between holds in 'rounds' mode */
+  everyRounds: number;
   phase: GMPacingPhase;
   /** The round being planned or played (1 = the fight's first) */
   round: number;
@@ -40,9 +45,7 @@ export interface GMPacingScan {
 
 export const GM_PACING_MODES: { id: GMPacingMode; label: string; title: string }[] = [
   { id: 'off', label: 'Real time', title: 'Fights run in real time' },
-  { id: 'every', label: 'Every round', title: 'The world holds before every round while everyone plans' },
-  { id: 'every2', label: 'Every 2 rounds', title: 'The world holds every second round' },
-  { id: 'every3', label: 'Every 3 rounds', title: 'The world holds every third round' },
+  { id: 'rounds', label: 'Every few rounds', title: 'The world holds before every round, or every few, while everyone plans' },
   { id: 'events', label: 'On events', title: 'The world holds when the fight starts, a new enemy joins, a player falls or gets badly hurt' },
 ];
 
@@ -53,6 +56,9 @@ export const GM_PACING_MODES: { id: GMPacingMode; label: string; title: string }
  */
 export class GMPacing {
   static mode: GMPacingMode = 'off';
+  /** Rounds played between holds in 'rounds' mode (1: every round) */
+  static everyRounds: number = 1;
+  static MAX_EVERY_ROUNDS = 10;
   /** Seconds to plan before the round plays anyway (0: no limit) */
   static timeLimit: number = 0;
   static showIntents: boolean = true;
@@ -83,8 +89,32 @@ export class GMPacing {
   static LOW_HEALTH = 0.25;
   static now: () => number = () => Date.now();
 
-  static configure(settings: { mode?: GMPacingMode; timeLimit?: number; showIntents?: boolean }) {
-    if (settings.mode && GM_PACING_MODES.some((m) => m.id === settings.mode)) this.mode = settings.mode;
+  /** Every per-fight value back to real time (the settings stay) */
+  static reset() {
+    this.phase = 'off';
+    this.round = 0;
+    this.windowTime = 0;
+    this.windowsSinceHold = 0;
+    this.quietTime = 0;
+    this.deadline = 0;
+    this.ready.clear();
+    this.planners = [];
+    this.seenHostiles.clear();
+    this.hurtPlayers.clear();
+    this.downPlayers.clear();
+  }
+
+  /** The GM's settings (or a save's); unknown values are ignored, and the old 'every2'-style modes still load */
+  static configure(settings: { mode?: GMPacingMode | GMPacingLegacyMode; everyRounds?: number; timeLimit?: number; showIntents?: boolean }) {
+    const legacy = LEGACY_ROUNDS[settings.mode as GMPacingLegacyMode];
+    if (legacy) {
+      this.mode = 'rounds';
+      this.everyRounds = legacy;
+    } else if (settings.mode && GM_PACING_MODES.some((m) => m.id === settings.mode)) {
+      this.mode = settings.mode as GMPacingMode;
+    }
+    const every = Math.round(Number(settings.everyRounds));
+    if (every >= 1) this.everyRounds = Math.min(this.MAX_EVERY_ROUNDS, every);
     if (typeof settings.timeLimit === 'number' && settings.timeLimit >= 0) {
       this.timeLimit = settings.timeLimit;
       if (this.phase === 'plan') this.deadline = this.timeLimit ? this.now() + this.timeLimit * 1000 : 0;
@@ -96,7 +126,7 @@ export class GMPacing {
 
   /** Rounds played between holds (events mode holds only on its events) */
   static windowsPerHold(): number {
-    return this.mode === 'every' ? 1 : this.mode === 'every2' ? 2 : this.mode === 'every3' ? 3 : Infinity;
+    return this.mode === 'rounds' ? this.everyRounds : Infinity;
   }
 
   /** The host, each frame: delta in seconds; heldOtherwise when the GM's pause or a power wheel holds the world */
@@ -163,12 +193,9 @@ export class GMPacing {
 
   /** Hold the world for everyone to plan */
   static hold(reason: string, scan?: GMPacingScan) {
-    const starting = this.phase === 'off';
-    if (starting) {
+    if (this.phase === 'off') {
+      this.reset();
       this.round = 1;
-      this.seenHostiles.clear();
-      this.hurtPlayers.clear();
-      this.downPlayers.clear();
     }
     if (scan) {
       this.remember(scan);
@@ -198,20 +225,15 @@ export class GMPacing {
 
   static stop(reason: string) {
     if (this.phase === 'off') return;
-    this.phase = 'off';
-    this.ready.clear();
-    this.planners = [];
-    this.deadline = 0;
-    this.windowTime = 0;
-    this.windowsSinceHold = 0;
-    this.quietTime = 0;
+    this.reset();
     GMLog.info('pacing', `back to real time (${reason})`);
     this.changed();
   }
 
   /** A player is ready (or not) to play the round */
   static setReady(peerId: string, ready: boolean) {
-    if (this.phase !== 'plan') return;
+    // Only someone planning this hold can be ready (anyone else's word would count toward "everyone is ready")
+    if (this.phase !== 'plan' || !this.planners.includes(peerId)) return;
     if (ready === this.ready.has(peerId)) return;
     if (ready) this.ready.add(peerId);
     else this.ready.delete(peerId);
@@ -230,6 +252,7 @@ export class GMPacing {
     const name = (peerId: string) => GameState.GMNetworkManager?.peers?.get(peerId)?.name || peerId;
     return {
       mode: this.mode,
+      everyRounds: this.everyRounds,
       phase: this.phase,
       round: this.round,
       ready: this.planners.filter((p) => this.ready.has(p)).map(name),

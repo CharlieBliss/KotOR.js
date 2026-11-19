@@ -2572,6 +2572,12 @@ export class ModuleObject {
    */
   subtractFP(nAmount = 0){}
 
+  /** Pay a Force power's cost (false: it can't be paid, and nothing is spent); ModuleCreature adds the Careers rules */
+  payForcePoints(cost: number): boolean {
+    if(cost > 0) this.subtractFP(cost);
+    return true;
+  }
+
   /**
    * Get the AC
    * @returns 

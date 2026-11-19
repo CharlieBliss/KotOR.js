@@ -3,6 +3,7 @@ import { CAREERS_BY_ID, CAREERS_SPEC_BY_ID } from "@/managers/gm/careers/data";
 import { CareersRules } from "@/managers/gm/careers/rules";
 import { CareersRuntime } from "@/managers/gm/careers/runtime";
 import type {
+  CareerSkillId,
   CareersPurchaseRecord,
   CareersPurchaseRequest,
   GMCareersCharacter,
@@ -45,6 +46,36 @@ export class CareersAdvancement {
     const startingXpPaid = Math.min(startingAvail, cost);
     const campaignXpPaid = cost - startingXpPaid;
     return { startingXpPaid, campaignXpPaid };
+  }
+
+  /**
+   * A purchase request as it came over the network, rebuilt with only the fields its kind has (null when it isn't
+   * one). The record keeps the request's fields, so anything else a client sent would be saved and synced with it
+   */
+  static parsePurchase(raw: unknown): CareersPurchaseRequest | null {
+    if (!raw || typeof raw !== 'object') return null;
+    const r = raw as Record<string, unknown>;
+    const text = (v: unknown) => (typeof v === 'string' && v.length > 0 && v.length <= 64 ? v : null);
+    switch (r.kind) {
+      case 'skill': {
+        const skillId = text(r.skillId);
+        // (canBuySkillRank refuses ids that aren't in the skill list)
+        return skillId ? { kind: 'skill', skillId: skillId as CareerSkillId } : null;
+      }
+      case 'node': {
+        const specId = text(r.specId), nodeId = text(r.nodeId);
+        return specId && nodeId ? { kind: 'node', specId, nodeId } : null;
+      }
+      case 'specialization': {
+        const specId = text(r.specId);
+        return specId ? { kind: 'specialization', specId } : null;
+      }
+      case 'power': {
+        const spellId = Number(r.spellId);
+        return Number.isInteger(spellId) && spellId >= 0 ? { kind: 'power', spellId } : null;
+      }
+    }
+    return null;
   }
 
   /** Validate and apply a post-creation XP purchase (blocked while in combat) */

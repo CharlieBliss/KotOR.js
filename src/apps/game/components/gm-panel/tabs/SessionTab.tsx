@@ -183,6 +183,20 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
               {KotOR.GM_PACING_MODES.map((m) => <option key={m.id} value={m.id} title={m.title}>{m.label}</option>)}
             </select>
           </label>
+          {KotOR.GMPacing.mode === 'rounds' && (
+            <label className="gm-field" title="How many rounds play between holds">
+              <span>Hold every</span>
+              <select
+                className="gm-input"
+                value={KotOR.GMPacing.everyRounds}
+                onChange={(e) => KotOR.GMPacing.configure({ everyRounds: Number(e.target.value) })}
+              >
+                {Array.from({ length: KotOR.GMPacing.MAX_EVERY_ROUNDS }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>{n === 1 ? 'round' : `${n} rounds`}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="gm-field" title="After this long, the round plays even if someone is still choosing">
             <span>Time to plan</span>
             <select

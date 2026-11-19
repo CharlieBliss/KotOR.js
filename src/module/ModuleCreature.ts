@@ -2670,15 +2670,7 @@ export class ModuleCreature extends ModuleObject {
 
   getAC(){
     let baseac = 10;
-    let classBonus = 0;
-
-    if(this.careersRules){
-      classBonus = this.careersRules.getDefenseBonus();
-    }else{
-      for(let i = 0; i < this.classes.length; i++){
-        classBonus += this.classes[i].getACBonus();
-      }
-    }
+    let classBonus = this.getClassDefenseBonus();
 
     let armorAC = (this.equipment.ARMOR?.getACBonus() || 0);
 
@@ -2761,18 +2753,15 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getFortitudeSave(){
-    const base = this.careersRules ? this.careersRules.getSaveBase('fortitude') : (this.fortitudeSaveThrow || 0);
-    return base + (this.fortbonus || 0) + this.getSaveBonus(1);
+    return this.getSaveBase('fortitude') + (this.fortbonus || 0) + this.getSaveBonus(1);
   }
 
   getReflexSave(){
-    const base = this.careersRules ? this.careersRules.getSaveBase('reflex') : (this.reflexSaveThrow || 0);
-    return base + (this.refbonus || 0) + this.getSaveBonus(2);
+    return this.getSaveBase('reflex') + (this.refbonus || 0) + this.getSaveBonus(2);
   }
 
   getWillSave(){
-    const base = this.careersRules ? this.careersRules.getSaveBase('will') : (this.willSaveThrow || 0);
-    return base + (this.willbonus || 0) + this.getSaveBonus(3);
+    return this.getSaveBase('will') + (this.willbonus || 0) + this.getSaveBonus(3);
   }
 
   getSaveBonus(saveType: number = 0): number {
@@ -3011,6 +3000,52 @@ export class ModuleCreature extends ModuleObject {
       bab += this.classes[i].getBaseAttackBonus();
     }
     return bab;
+  }
+
+  /*
+   * The rule-set seam: each of these asks the Careers rules when the creature has them (careersRules) and
+   * KotOR's classes otherwise, so combat and casting code never needs to know which rules a creature uses
+   */
+
+  /** The attack roll's base with this weapon: Careers combat skill, or the classes' base attack bonus */
+  getAttackBase(weapon?: ModuleItem): number {
+    return this.careersRules ? this.careersRules.getAttackBase(weapon) : this.getBaseAttackBonus();
+  }
+
+  /** The lightsaber deflection roll's base: Careers Lightsaber skill, or the classes' base attack bonus */
+  getDeflectionBase(): number {
+    return this.careersRules ? this.careersRules.getDeflectionBase() : this.getBaseAttackBonus();
+  }
+
+  /** Defence from training: the Careers level baseline, or the classes' AC bonuses */
+  getClassDefenseBonus(): number {
+    if(this.careersRules) return this.careersRules.getDefenseBonus();
+    let bonus = 0;
+    for(let i = 0; i < this.classes.length; i++){
+      bonus += this.classes[i].getACBonus();
+    }
+    return bonus;
+  }
+
+  /** A saving throw's base: Careers save skill, or the class save field */
+  getSaveBase(save: 'fortitude' | 'reflex' | 'will'): number {
+    if(this.careersRules) return this.careersRules.getSaveBase(save);
+    if(save === 'fortitude') return this.fortitudeSaveThrow || 0;
+    if(save === 'reflex') return this.reflexSaveThrow || 0;
+    return this.willSaveThrow || 0;
+  }
+
+  /**
+   * Pay a Force power's cost. Careers characters short of Force points may push with Strain; false when the
+   * power can't be paid for (and nothing is spent)
+   */
+  payForcePoints(cost: number): boolean {
+    if(!(cost > 0)) return true;
+    if(!this.careersRules) return super.payForcePoints(cost);
+    const paid = this.careersRules.payForceCost(cost, Number(this.getFP()) || 0);
+    if(!paid.ok) return false;
+    if(paid.fpToSpend > 0) this.subtractFP(paid.fpToSpend);
+    return true;
   }
 
   /** The ability an attack adds (KotOR): Dexterity with a ranged weapon, Strength in melee or unarmed */

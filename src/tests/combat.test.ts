@@ -77,6 +77,9 @@ function createMockCreature(overrides: Record<string, any> = {}): any {
     getGoodEvil: () => overrides.goodEvil ?? 50,
     getTotalClassLevel: () => overrides.level ?? 8,
     getBaseAttackBonus: () => overrides.bab ?? 6,
+    // As ModuleCreature's for a classic (non-Careers) creature: the classes' base attack bonus
+    getAttackBase: () => creature.getBaseAttackBonus(),
+    getDeflectionBase: () => creature.getBaseAttackBonus(),
     // As ModuleCreature's: Dexterity for a ranged weapon, Strength otherwise
     getAttackAbilityModifier: (weapon?: any) => Math.floor(((weapon?.isRangedWeapon?.() ? (overrides.dex ?? 14) : (overrides.str ?? 14)) - 10) / 2),
     getAC: () => overrides.ac ?? 15,

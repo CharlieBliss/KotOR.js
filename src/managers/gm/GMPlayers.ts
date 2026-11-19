@@ -495,8 +495,14 @@ export class GMPlayers {
   }
 
   /** Host: validate and apply a Careers post-creation XP purchase live (outside combat, no respawn) */
-  static spendXpOnHost(actor: ModuleCreature, purchase: CareersPurchaseRequest | undefined, peerId?: string): boolean {
-    if (!actor || !purchase) return false;
+  static spendXpOnHost(actor: ModuleCreature, raw: unknown, peerId?: string): boolean {
+    if (!actor) return false;
+    // A player's request is rebuilt from known fields before anything trusts it
+    const purchase = CareersAdvancement.parsePurchase(raw);
+    if (!purchase) {
+      if (peerId) this.tellPlayer(peerId, "The host didn't understand that XP purchase.");
+      return false;
+    }
     const careers = this.careersOf(actor);
     if (!careers) {
       if (peerId) this.tellPlayer(peerId, 'Only Careers characters spend campaign XP this way.');
@@ -577,6 +583,11 @@ export class GMPlayers {
     return true;
   }
 
+  /** A creature's classes as a sheet lists them (class, level, powers) */
+  static sheetClassesOf(cre: ModuleCreature): GMPlayerSheet['classes'] {
+    return (cre.classes || []).map((c) => ({ id: c.id, level: c.level, spells: (c.spells || []).map((s) => s.id) }));
+  }
+
   static buildPlayerSheet(cre: ModuleCreature): GMPlayerSheet {
     const equipment: Record<string, string> = {};
     for (const slot of this.PLAYER_EQUIP_SLOTS) {
@@ -587,7 +598,7 @@ export class GMPlayers {
     const careersRuntime = cre.careersRules instanceof CareersRuntime ? cre.careersRules : undefined;
     return {
       netId: cre.gmNetId,
-      classes: (cre.classes || []).map((c) => ({ id: c.id, level: c.level, spells: (c.spells || []).map((s) => s.id) })),
+      classes: this.sheetClassesOf(cre),
       attributes: { str: cre.str, dex: cre.dex, con: cre.con, int: cre.int, wis: cre.wis, cha: cre.cha },
       feats: (cre.feats || []).map((f) => f.id),
       skills: (cre.skills || []).map((s) => s?.rank ?? 0),
@@ -726,10 +737,12 @@ export class GMPlayers {
   /** Make a character's stats, classes, feats, skills, XP, HP/FP and equipment match a sheet */
   static async applySheetToCharacter(cre: ModuleCreature, sheet: GMPlayerSheet) {
     Object.assign(cre, sheet.attributes);
-    // Only reconstruct CreatureClass / TalentFeat / TalentSpell objects when classes or feats actually changed
-    const buildJson = JSON.stringify({ classes: sheet.classes, feats: sheet.feats });
-    if (buildJson !== cre.gmLastAppliedBuildJson) {
-      cre.gmLastAppliedBuildJson = buildJson;
+    // Rebuild the class, feat and power objects only when the creature's own build differs from the sheet's.
+    // Compared with the creature as it is now (not the last sheet applied), so a level-up, GM grant or Careers
+    // purchase made some other way is still put back by the next sheet
+    const sameBuild = JSON.stringify(this.sheetClassesOf(cre)) === JSON.stringify(sheet.classes)
+      && JSON.stringify((cre.feats || []).map((f) => f.id)) === JSON.stringify(sheet.feats);
+    if (!sameBuild) {
       cre.classes = sheet.classes.map((c) => {
         const cls = new CreatureClass(c.id);
         cls.setLevel(c.level);
@@ -920,7 +933,9 @@ export class GMPlayers {
     const move: any = new GameState.ActionFactory.ActionMoveToPoint();
     move.setParameter(0, ActionParameterType.FLOAT, to.x);
     move.setParameter(1, ActionParameterType.FLOAT, to.y);
-    move.setParameter(2, ActionParameterType.FLOAT, intent.z as number);
+    // The height too stays within a round's run of where they stand (the client's word is only a suggestion)
+    const z = Math.max(actor.position.z - reach, Math.min(actor.position.z + reach, intent.z as number));
+    move.setParameter(2, ActionParameterType.FLOAT, z);
     move.setParameter(3, ActionParameterType.DWORD, GameState.module.area.id);
     move.setParameter(4, ActionParameterType.DWORD, ModuleObjectConstant.OBJECT_INVALID);
     move.setParameter(5, ActionParameterType.INT, 1);

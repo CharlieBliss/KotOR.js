@@ -552,8 +552,7 @@ export class CombatRound {
    */
   calculateAttackBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
     if(!creature) return 0;
-    const baseAttack = creature.careersRules ? creature.careersRules.getAttackBase(weapon) : creature.getBaseAttackBonus();
-    let bonus = baseAttack + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0);
+    let bonus = creature.getAttackBase(weapon) + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0);
 
     // If weapon.possessor wasn't bound, check Weapon Focus directly on creature
     if(weapon && weapon.possessor !== creature){
@@ -796,9 +795,8 @@ export class CombatRound {
 
     // An opposed roll with the lightsaber against the attack roll (Precise Shot penalizes deflection)
     const precisePenalty = CombatAttackData.GetPreciseShotRank(this.owner as ModuleCreature) * 2;
-    const deflectBase = targetCreature.careersRules ? targetCreature.careersRules.getDeflectionBase() : targetCreature.getBaseAttackBonus();
     const deflectRoll = Dice.roll(1, DiceType.d20,
-      deflectBase + targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus) - precisePenalty;
+      targetCreature.getDeflectionBase() +targetCreature.getAttackAbilityModifier(rightHand) + deflectBonus) - precisePenalty;
     if(deflectRoll < attackRoll) return false;
     // "If the attack is beaten by 10 or more, the bolt is deflected back at the enemy"
     if(deflectRoll >= attackRoll + 10) this.reflectBolt(targetCreature, weapon);

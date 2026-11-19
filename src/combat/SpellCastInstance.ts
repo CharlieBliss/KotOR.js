@@ -230,19 +230,12 @@ export class SpellCastInstance {
       }
 
       // Deduct Force Points if cast as a Force Power (not from an item)
-      if(!this.item && this.spell && typeof (this.owner as any)?.subtractFP === 'function'){
+      // (Careers characters may push with Strain, and a power that can't be paid for fizzles)
+      const payer: any = this.owner;
+      if(!this.item && this.spell && typeof payer?.subtractFP === 'function'){
         const fpCost = this.spell.getForcePointCost(this.owner);
-        if(fpCost > 0){
-          const careers = this.owner.careersRules;
-          if(careers){
-            const currentFp = typeof (this.owner as any).getFP === 'function' ? Number((this.owner as any).getFP()) : 0;
-            const paid = careers.payForceCost(fpCost, currentFp);
-            if(!paid.ok) return;
-            if(paid.fpToSpend > 0) (this.owner as any).subtractFP(paid.fpToSpend);
-          }else{
-            (this.owner as any).subtractFP(fpCost);
-          }
-        }
+        const paid = typeof payer.payForcePoints === 'function' ? payer.payForcePoints(fpCost) : (payer.subtractFP(fpCost), true);
+        if(!paid) return;
       }
       
       // An item's spell: the item pays for the use now that it has gone off (a stack or charges)

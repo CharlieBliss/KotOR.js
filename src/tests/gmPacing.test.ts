@@ -44,20 +44,11 @@ let clock = 0;
 beforeEach(() => {
   clock = 100000;
   GMPacing.now = () => clock;
-  GMPacing.mode = 'every';
+  GMPacing.mode = 'rounds';
+  GMPacing.everyRounds = 1;
   GMPacing.timeLimit = 0;
   GMPacing.showIntents = true;
-  GMPacing.phase = 'off';
-  GMPacing.round = 0;
-  GMPacing.windowTime = 0;
-  GMPacing.windowsSinceHold = 0;
-  GMPacing.quietTime = 0;
-  GMPacing.deadline = 0;
-  GMPacing.ready.clear();
-  GMPacing.planners = [];
-  GMPacing.seenHostiles.clear();
-  GMPacing.hurtPlayers.clear();
-  GMPacing.downPlayers.clear();
+  GMPacing.reset();
   jest.clearAllMocks();
 });
 
@@ -84,7 +75,7 @@ describe('the plan-then-play loop', () => {
     scanSpy.mockRestore();
     GMPacing.update(0.1, scan());
     expect(GMPacing.phase).toBe('off');
-    GMPacing.configure({ mode: 'every' });
+    GMPacing.configure({ mode: 'rounds' });
     GMPacing.update(0.1, scan());
     expect(GMPacing.phase).toBe('plan');
     GMPacing.configure({ mode: 'off' });
@@ -138,7 +129,7 @@ describe('the plan-then-play loop', () => {
   });
 
   test('every 2 rounds: two rounds play between holds', () => {
-    GMPacing.mode = 'every2';
+    GMPacing.everyRounds = 2;
     GMPacing.update(0.1, scan());
     GMPacing.go('go');
     play(3.05);
@@ -146,6 +137,40 @@ describe('the plan-then-play loop', () => {
     play(3);
     expect(GMPacing.phase).toBe('plan');
     expect(GMPacing.round).toBe(3);
+  });
+
+  test('any number of rounds between holds, kept to 1..10', () => {
+    GMPacing.configure({ everyRounds: 4 });
+    GMPacing.update(0.1, scan());
+    GMPacing.go('go');
+    play(9.05);
+    expect(GMPacing.phase).toBe('play');
+    play(3);
+    expect(GMPacing.phase).toBe('plan');
+    expect(GMPacing.round).toBe(5);
+    GMPacing.configure({ everyRounds: 99 });
+    expect(GMPacing.everyRounds).toBe(10);
+    GMPacing.configure({ everyRounds: 0 });
+    expect(GMPacing.everyRounds).toBe(10);
+  });
+
+  test("older saves' 'every2'-style modes still load", () => {
+    GMPacing.configure({ mode: 'every3' as any });
+    expect(GMPacing.mode).toBe('rounds');
+    expect(GMPacing.everyRounds).toBe(3);
+    GMPacing.configure({ mode: 'every' as any, everyRounds: undefined });
+    expect(GMPacing.everyRounds).toBe(1);
+  });
+
+  test('reset clears everything a fight left behind', () => {
+    GMPacing.update(0.1, scan());
+    GMPacing.setReady('p1', true);
+    GMPacing.reset();
+    expect(GMPacing.phase).toBe('off');
+    expect(GMPacing.round).toBe(0);
+    expect(GMPacing.ready.size).toBe(0);
+    expect(GMPacing.planners).toEqual([]);
+    expect(GMPacing.seenHostiles.size).toBe(0);
   });
 
   test("the round's clock stops while the GM pauses or a wheel holds the world", () => {
@@ -221,5 +246,15 @@ describe('a planned move', () => {
   test('stays within one round of running', () => {
     expect(GMPacing.clampMove({ x: 0, y: 0 }, { x: 30, y: 40 }, 10)).toEqual({ x: 6, y: 8 });
     expect(GMPacing.clampMove({ x: 1, y: 1 }, { x: 2, y: 2 }, 10)).toEqual({ x: 2, y: 2 });
+  });
+});
+
+describe('requests from players', () => {
+  test('only someone planning this hold can be ready', () => {
+    GMPacing.update(0.1, scan());
+    GMPacing.setReady('stranger', true);
+    expect(GMPacing.ready.has('stranger')).toBe(false);
+    GMPacing.setReady('p1', true);
+    expect(GMPacing.ready.has('p1')).toBe(true);
   });
 });

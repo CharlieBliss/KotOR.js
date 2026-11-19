@@ -302,8 +302,8 @@ export class GMSessions {
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
     GMPacing.configure(save.rules?.pacing
-      ? { mode: save.rules.pacing.mode, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents }
-      : { mode: 'off', timeLimit: 0, showIntents: true });
+      ? { mode: save.rules.pacing.mode, everyRounds: save.rules.pacing.everyRounds, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents }
+      : { mode: 'off', everyRounds: 1, timeLimit: 0, showIntents: true });
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 

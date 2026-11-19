@@ -352,6 +352,10 @@ describe('Advancement in play (live recomputation, undo, respec, network sync)',
     expect(clientReplica.classes).toBe(classesBefore);
     expect(clientReplica.feats).toBe(featsBefore);
     expect(clientReplica.careersRules?.getStrainState().windedSeconds).toBe(5);
+    // A build changed some other way since is still put back by the same sheet
+    clientReplica.feats = [];
+    await GMPlayers.applySheetToCharacter(clientReplica, windedSheet);
+    expect(clientReplica.feats.map((f: any) => f.id)).toEqual(windedSheet.feats);
 
     // Undo last purchase drops campaignXpSpent from 55 -> 40 -> back to level 1
     expect(GMPlayers.undoCareersPurchase(cre)).toBe(true);
@@ -417,5 +421,54 @@ describe('review fixes: purchases, GM grants, and the player keeping their chara
     // Someone else's character isn't added
     expect(GMCareersCharacters.keepFromSession({ ...fromHost, id: 'car_someone_else' })).toBe(false);
     expect(GMCareersCharacters.list()).toHaveLength(1);
+  });
+});
+
+describe('second review: one seam on the creature, and untrusted requests rebuilt', () => {
+  test("the creature picks the rules: deflection and Force costs go through it for both rule sets", () => {
+    const classic = makeCreature();
+    expect(classic.getDeflectionBase()).toBe(classic.getBaseAttackBonus());
+    classic.currentForce = 10;
+    expect(classic.payForcePoints(4)).toBe(true);
+    expect(classic.getFP()).toBe(6);
+
+    const sheet = GMCareersCharacters.blank('human', 'jedi_guardian');
+    sheet.name = 'Bastila';
+    const cre = makeCreature();
+    cre.careersRules = new CareersRuntime(sheet, cre);
+    expect(cre.getDeflectionBase()).toBe(cre.careersRules.getDeflectionBase());
+    // 1 FP short of 3: pays the 2 it has and pushes the last one with 2 Strain
+    cre.currentForce = 2;
+    expect(cre.payForcePoints(3)).toBe(true);
+    expect(cre.getFP()).toBe(0);
+    expect(cre.careersRules.getStrainState().strain).toBe(2);
+    // Winded: nothing is spent and the power fizzles
+    (cre.careersRules as CareersRuntime).windedSeconds = 3;
+    cre.currentForce = 1;
+    expect(cre.payForcePoints(3)).toBe(false);
+    expect(cre.getFP()).toBe(1);
+  });
+
+  test('a purchase request keeps only the fields its kind has', () => {
+    expect(CareersAdvancement.parsePurchase({ kind: 'node', specId: 'commando', nodeId: 'r0c0', cost: -500, junk: 'x' }))
+      .toEqual({ kind: 'node', specId: 'commando', nodeId: 'r0c0' });
+    expect(CareersAdvancement.parsePurchase({ kind: 'power', spellId: '12' })).toEqual({ kind: 'power', spellId: 12 });
+    expect(CareersAdvancement.parsePurchase({ kind: 'power', spellId: 1.5 })).toBeNull();
+    expect(CareersAdvancement.parsePurchase({ kind: 'skill', skillId: 7 })).toBeNull();
+    expect(CareersAdvancement.parsePurchase({ kind: 'skill', skillId: 'x'.repeat(100) })).toBeNull();
+    expect(CareersAdvancement.parsePurchase({ kind: 'grant_everything' })).toBeNull();
+    expect(CareersAdvancement.parsePurchase('skill')).toBeNull();
+    expect(CareersAdvancement.parsePurchase(null)).toBeNull();
+  });
+
+  test("the host's record of a purchase carries no fields a player added", () => {
+    const sheet = GMCareersCharacters.blank('human', 'soldier');
+    sheet.name = 'Mira';
+    const cre = makeCreature();
+    cre.careersRules = new CareersRuntime(sheet, cre);
+    CareersAdvancement.syncToCreature(cre, sheet);
+    expect(GMPlayers.spendXpOnHost(cre, { kind: 'skill', skillId: 'melee', note: 'free stuff' })).toBe(true);
+    expect(Object.keys(sheet.purchases![0]).sort()).toEqual(['at', 'campaignXpPaid', 'cost', 'kind', 'skillId', 'startingXpPaid']);
+    expect(GMPlayers.spendXpOnHost(cre, { kind: 'skill' })).toBe(false);
   });
 });
