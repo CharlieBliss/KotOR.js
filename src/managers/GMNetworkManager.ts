@@ -1,5 +1,6 @@
 import type { GMCharacter, GMCheck, GMAtmosphereSettings } from "@/managers/gm/GMTypes";
 import type { ICharacterLimits } from "@/engine/rules/CharacterRules";
+import type { GMPacingState } from "@/managers/gm/GMPacing";
 import type { AreaSetPieceDef } from "@/module/AreaSetPiece";
 import { GameState } from "@/GameState";
 
@@ -45,7 +46,7 @@ export type GMJoinState = 'idle' | 'connecting' | 'waiting-for-host' | 'joining'
 /** How long a player waits for any answer from a GM before the join screen says it failed */
 const JOIN_ANSWER_TIMEOUT_MS = 12000;
 
-export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel';
+export type GMIntentKind = 'open' | 'use' | 'attack' | 'loot' | 'equip' | 'unequip' | 'cancel' | 'ability' | 'stealth' | 'mine' | 'levelup' | 'roll' | 'wheel' | 'ready' | 'move';
 
 /** Demolitions: lay a mine at your feet, set one on a door or container, disarm or recover one */
 export type GMMineAction = 'lay' | 'set' | 'disarm' | 'recover';
@@ -160,6 +161,12 @@ export interface GMClientIntent {
   check?: GMCheck;
   /** wheel: the player opened (true) or closed their power wheel (the tactical pause rule holds the world meanwhile) */
   open?: boolean;
+  /** ready: the player is ready (true) or not to play the planned round (GMPacing) */
+  ready?: boolean;
+  /** move: where the player plans to go in the coming round */
+  x?: number;
+  y?: number;
+  z?: number;
 }
 
 export interface GMPeerInfo {
@@ -190,6 +197,8 @@ export interface GMSerializedActor {
   combat?: boolean;
   /** A player's character: the icons of its combat action and what's queued after it, for its player's HUD */
   queue?: string[];
+  /** While the world holds to plan: what this NPC is about to do ("attacking Mira"), when the GM shows intents */
+  intent?: string;
   /** Host is executing an intent for this player-owned actor, so the host owns its position */
   hostDriven?: boolean;
   /** Last client intent sequence number the host has applied to this actor */
@@ -244,6 +253,10 @@ export interface GMSessionRules {
   cutscene?: { active: boolean; caption?: string };
   /** Tactical pause: a player's open power wheel holds the world; by names who is choosing now */
   tacticalPause?: { enabled: boolean; by?: string[] };
+  /** The GM paused the world: it holds on every machine */
+  paused?: boolean;
+  /** Plan-then-play fights (GMPacing) */
+  pacing?: GMPacingState;
 }
 
 export interface GMWorldSnapshot {
@@ -307,6 +320,9 @@ export const GM_INTENTS: Record<GMIntentKind, { hostDriven: boolean; interrupts:
   levelup: { hostDriven: false, interrupts: false },
   roll: { hostDriven: false, interrupts: false },
   wheel: { hostDriven: false, interrupts: false },
+  ready: { hostDriven: false, interrupts: false },
+  // Planned during the hold: it goes in front of what's queued, so it doesn't stop it
+  move: { hostDriven: true, interrupts: false },
 };
 
 /** Every packet a GM session sends, and what it carries */
@@ -816,7 +832,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean; ready?: boolean; x?: number; y?: number; z?: number } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {

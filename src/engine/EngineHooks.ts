@@ -49,6 +49,11 @@ export interface EngineHooks {
   // --- Questions
   /** The world is paused: projectiles and the module clock hold still */
   isWorldPaused(): boolean;
+  /**
+   * Movement input for creature, heading facing (radians): the mode uses it to steer a planned move instead (the
+   * world holds while everyone plans), and the character stays where it is. False: it moves as usual
+   */
+  steerPlannedMove(creature: ModuleObject, facing: number): boolean;
   /** The creature may not act (it is held by the mode) */
   isPlayerFrozen(creature: ModuleObject): boolean;
   /** The object is a player's character (knocked out when it falls, not a body to loot) */
@@ -141,6 +146,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   consumePlayerItem: () => false,
   giveRecoveredMine: () => false,
   isWorldPaused: () => false,
+  steerPlannedMove: () => false,
   isPlayerFrozen: () => false,
   isPlayerCharacter: () => false,
   isNetworkContainer: () => false,

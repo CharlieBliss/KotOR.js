@@ -440,13 +440,25 @@ export const GMPanel: React.FC = () => {
             <button
               className={`gm-btn small ${GMManager.worldPaused ? 'danger' : ''}`}
               onClick={() => {
-                GMManager.worldPaused = !GMManager.worldPaused;
+                GMManager.setWorldPaused(!GMManager.worldPaused);
                 forceUpdate();
               }}
               title="Freeze movement, combat and effects for everyone"
             >
               {GMManager.worldPaused ? 'Paused' : GMManager.wheelHolds.size ? 'Held: power wheel' : 'Pause'}
             </button>
+            {KotOR.GMPacing.phase !== 'off' && (
+              <span className="gm-row" style={{ gap: 4 }}>
+                <span className="gm-hint" title={KotOR.GMPacing.phase === 'plan' ? `Choosing: ${KotOR.GMPacing.state().waiting.join(', ') || 'nobody'}` : 'The planned round is playing'}>
+                  {KotOR.GMPacing.phase === 'plan'
+                    ? `Round ${KotOR.GMPacing.round}: planning ${KotOR.GMPacing.state().ready.length}/${KotOR.GMPacing.planners.length} ready`
+                    : `Round ${KotOR.GMPacing.round} playing`}
+                </span>
+                {KotOR.GMPacing.phase === 'plan' && (
+                  <button className="gm-btn small success" onClick={() => KotOR.GMPacing.go('the GM says go')} title="Play the planned round now">Go</button>
+                )}
+              </span>
+            )}
             <button
               className={`gm-btn small ${GMManager.npcAiEnabled ? '' : 'warning'}`}
               onClick={() => {

@@ -44,7 +44,8 @@ function commands(onOpenTab: (tab: DrawerTab) => void, onToggleTracker: () => vo
   const cmd = (id: string, label: string, detail: string, run: () => void, keywords = ''): PaletteEntry =>
     ({ id: `cmd:${id}`, label, detail, group: 'Command', haystack: `${label} ${detail} ${keywords}`.toLowerCase(), run });
   const list: PaletteEntry[] = [
-    cmd('pause', GMManager.worldPaused ? 'Resume the world' : 'Pause the world', 'Freeze movement, combat and effects for everyone', () => { GMManager.worldPaused = !GMManager.worldPaused; GMManager.notifyChange(); }, 'unpause freeze stop time'),
+    cmd('pause', GMManager.worldPaused ? 'Resume the world' : 'Pause the world', 'Freeze movement, combat and effects for everyone', () => GMManager.setWorldPaused(!GMManager.worldPaused), 'unpause freeze stop time'),
+    ...(KotOR.GMPacing.phase === 'plan' ? [cmd('go', 'Go: play the round', 'Play the planned round now, without waiting for everyone', () => KotOR.GMPacing.go('the GM says go'), 'pacing round plan ready')] : []),
     cmd('ai', GMManager.npcAiEnabled ? 'Turn NPC AI off' : 'Turn NPC AI on', 'Whether hostile NPCs pick fights on their own', () => { GMManager.npcAiEnabled = !GMManager.npcAiEnabled; GMManager.notifyChange(); }, 'npc ai fight'),
     cmd('watch', GMManager.playersFrozen ? 'Let players act again' : 'Players watch', "Players can't move or act, and NPCs leave them alone", () => GMManager.setPlayersFrozen(!GMManager.playersFrozen), 'freeze cutscene'),
     cmd('hidden', GMEditTools.placeHidden ? 'Place visible' : 'Place hidden', 'Whether new creatures and objects arrive hidden from players', () => { GMEditTools.placeHidden = !GMEditTools.placeHidden; GMManager.notifyChange(); }, 'reveal'),

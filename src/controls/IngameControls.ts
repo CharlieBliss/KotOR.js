@@ -491,6 +491,7 @@ export class IngameControls {
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
+      if(GameState.hooks.steerPlannedMove(followee, Utility.NormalizeRadian(FollowerCamera.facing + Math.PI/2))) return;
 
       GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
@@ -511,7 +512,8 @@ export class IngameControls {
       const followee = GameState.PartyManager.party[0];
       if(!followee) return;
       if(!followee.canMove()) return;
-      
+      if(GameState.hooks.steerPlannedMove(followee, Utility.NormalizeRadian(FollowerCamera.facing - Math.PI/2))) return;
+
       GameState.hooks.notifyLocalMovement();
       followee.clearAllActions(true);
       followee.force = 1;
@@ -988,13 +990,17 @@ export class IngameControls {
         if(followee){
           if(followee.canMove()){
             if( this.gamePad.stick_l_x.value || this.gamePad.stick_l_y.value ){
-              GameState.hooks.notifyLocalMovement();
-              followee.clearAllActions(true);
-              followee.force = 1;
-              followee.setFacing( Utility.NormalizeRadian( Math.atan2(-this.gamePad.stick_l_x.value, -this.gamePad.stick_l_y.value) + FollowerCamera.facing + Math.PI/2 ) , false, TURN_SPEED_FAST);
-              followee.controlled = true;
-              GameState.scene_cursor_holder.visible = false;
-              this.gamePadMovement = true;
+              const heading = Utility.NormalizeRadian( Math.atan2(-this.gamePad.stick_l_x.value, -this.gamePad.stick_l_y.value) + FollowerCamera.facing + Math.PI/2 );
+              // The mode can take the stick to steer a planned move instead (the world holds while everyone plans)
+              if(!GameState.hooks.steerPlannedMove(followee, heading)){
+                GameState.hooks.notifyLocalMovement();
+                followee.clearAllActions(true);
+                followee.force = 1;
+                followee.setFacing( heading , false, TURN_SPEED_FAST);
+                followee.controlled = true;
+                GameState.scene_cursor_holder.visible = false;
+                this.gamePadMovement = true;
+              }
             }
           }
         }

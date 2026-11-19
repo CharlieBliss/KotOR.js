@@ -171,6 +171,37 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </label>
           <div className="gm-hint">Good for one or two players or slow fights. Off: the wheel works in real time. Each pause lasts at most {GMManager.WHEEL_HOLD_SECONDS}s.</div>
         </div>
+        <div className="gm-section">
+          <div className="gm-section-title">Combat pacing</div>
+          <label className="gm-field" title="Plan-then-play: the world holds while everyone picks what to do, then one round (3 s) plays">
+            <span>World holds</span>
+            <select
+              className="gm-input"
+              value={KotOR.GMPacing.mode}
+              onChange={(e) => KotOR.GMPacing.configure({ mode: e.target.value as any })}
+            >
+              {KotOR.GM_PACING_MODES.map((m) => <option key={m.id} value={m.id} title={m.title}>{m.label}</option>)}
+            </select>
+          </label>
+          <label className="gm-field" title="After this long, the round plays even if someone is still choosing">
+            <span>Time to plan</span>
+            <select
+              className="gm-input"
+              value={KotOR.GMPacing.timeLimit}
+              onChange={(e) => KotOR.GMPacing.configure({ timeLimit: Number(e.target.value) })}
+            >
+              <option value={0}>No limit</option>
+              <option value={15}>15 seconds</option>
+              <option value={30}>30 seconds</option>
+              <option value={60}>60 seconds</option>
+            </select>
+          </label>
+          <label className="gm-checkbox" title="Players see what each enemy is about to do while they plan">
+            <input type="checkbox" checked={KotOR.GMPacing.showIntents} onChange={(e) => KotOR.GMPacing.configure({ showIntents: e.target.checked })} />
+            Show enemy intents
+          </label>
+          <div className="gm-hint">Only during fights. Players steer their move with the movement keys and press Ready (Space or R3); you can press Go any time. Change it mid-fight to speed up an easy one.</div>
+        </div>
         <CreationLimits />
         <details className="gm-section" open={GMSessions.getSavedSessions().length > 0}>
           <summary>Saved sessions <span className="gm-summary-note">{GMSessions.getSavedSessions().length} saved</span></summary>

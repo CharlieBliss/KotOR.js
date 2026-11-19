@@ -52,6 +52,7 @@ import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMMines } from "@/managers/gm/GMMines";
 import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import type { EngineHooks } from "@/engine/EngineHooks";
 
 export * from "@/managers/gm/GMTypes";
@@ -78,6 +79,14 @@ export class GMManager {
   static preservePartyOnWarp: boolean = true;
 
   static worldPaused: boolean = false;
+
+  /** The GM pauses (or resumes) the world, on every machine */
+  static setWorldPaused(paused: boolean) {
+    this.worldPaused = !!paused;
+    GMLog.info('host', paused ? 'the GM paused the world' : 'the GM resumed the world');
+    GMNetworkManager.broadcastSessionRules(this.sessionRules());
+    this.notifyChange();
+  }
 
   /** What the GM has selected, in the order it was picked (the Inspector edits all of them together) */
   static selection: ModuleObject[] = [];
@@ -128,6 +137,8 @@ export class GMManager {
     return {
       deathRule: GMPlayers.deathRule, frozen: this.playersFrozen, creation: GMPlayers.creationLimits, cutscene: GMCutscene.state(),
       tacticalPause: { enabled: this.tacticalPause, by: [...this.wheelHolds.values()].map((h) => h.name) },
+      paused: this.worldPaused,
+      pacing: GMPacing.state(),
     };
   }
 
@@ -164,8 +175,11 @@ export class GMManager {
    * On a player's machine, the host's word on wheels (the session rules).
    */
   static worldHeld(): boolean {
-    if (this.worldPaused) return true;
-    if (GMNetworkManager.role === 'client') return !!GMNetworkManager.sessionRules?.tacticalPause?.by?.length;
+    if (GMNetworkManager.role === 'client') {
+      const rules = GMNetworkManager.sessionRules;
+      return !!(rules?.paused || rules?.pacing?.phase === 'plan' || rules?.tacticalPause?.by?.length);
+    }
+    if (this.worldPaused || GMPacing.phase === 'plan') return true;
     return this.wheelHolds.size > 0;
   }
 
@@ -568,6 +582,8 @@ export class GMManager {
 
     this.sceneLoading = true;
     this.selectedObject = null;
+    // A new scene starts in real time
+    GMPacing.stop('a new scene');
     // What could be undone was in the old scene
     GMHistory.clear();
     // A new scene starts unfrozen, with its own start point (a scene plan sets them again)
@@ -1362,6 +1378,7 @@ export class GMManager {
     if (GMNetworkManager.role === 'client') GameState.GMConversationManager?.update(delta);
     else GameState.GMConversationManager?.updateHost(delta);
     GMCutscene.update(delta);
+    GMPlayerHud.updatePlannedMove(delta);
     if (GMNetworkManager.role === 'host') this.expireWheelHolds();
 
     // Fallen player characters: getting back up, respawning, telling the GM when everyone is down
@@ -1371,6 +1388,11 @@ export class GMManager {
         GMPlayers.updateDownedPlayers(GMPlayers.downedTimer);
         GMPlayers.downedTimer = 0;
       }
+    }
+
+    // Plan-then-play fights: the host holds the world for planning and plays one round at a time
+    if (GMNetworkManager.role !== 'client' && !this.sceneLoading) {
+      GMPacing.update(delta, GMPacing.scan(), this.worldPaused || this.wheelHolds.size > 0);
     }
 
     // NPCs run on the GM's machine only; players see the result through the world updates
@@ -1464,6 +1486,7 @@ export class GMManager {
     consumePlayerItem: (owner, item) => GMPlayers.consumePlayerItem(owner, item),
     giveRecoveredMine: (owner, resRef) => GMMines.giveRecoveredMine(owner, resRef),
     isWorldPaused: () => GMManager.worldHeld(),
+    steerPlannedMove: (creature, facing) => GMPlayerHud.steerPlannedMove(creature, facing),
     ownsCombatHud: () => GMPlayerHud.active(),
     padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),
     sharedWorld: () => GMNetworkManager.role !== 'offline',

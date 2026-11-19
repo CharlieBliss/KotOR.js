@@ -34,6 +34,8 @@ import {
   GM_INTENTS,
 } from "@/managers/GMNetworkManager";
 import { GMManager } from "@/managers/GMManager";
+import { GMPacing } from "@/managers/gm/GMPacing";
+import { CombatRound } from "@/combat/CombatRound";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMMines } from "@/managers/gm/GMMines";
@@ -698,6 +700,10 @@ export class GMPlayers {
     roll: (actor, intent) => !!GMChecks.rollForPlayer(actor, intent.check || Number(intent.abilityId)),
     cancel: (actor) => { actor.gmFightTarget = undefined; return false; },
     wheel: (actor, intent, peerId) => GMManager.holdForWheel(peerId, actor.getName() || 'A player', !!intent.open),
+    ready: (actor, intent, peerId) => GMPacing.setReady(peerId, !!intent.ready),
+    move: (actor, intent, peerId) => {
+      if (!GMPlayers.planMoveOnHost(actor, intent)) GMPlayers.tellPlayer(peerId, 'Moves are planned while the world holds.');
+    },
     mine: (actor, intent, peerId) => {
       actor.gmNetTarget = undefined;
       return GMMines.useMineOnHost(actor, intent).then((ok) => {
@@ -716,6 +722,34 @@ export class GMPlayers {
     attack: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
     use: (actor, intent) => GMPlayers.actOnTarget(actor, intent),
   };
+
+  /**
+   * Host: a move planned in the hold (GMPacing): the character runs there first when the round plays, then does
+   * what else it planned. At most one round's run from where it stands.
+   */
+  static planMoveOnHost(actor: ModuleCreature, intent: GMClientIntent): boolean {
+    if (GMPacing.phase !== 'plan' || ![intent.x, intent.y, intent.z].every((n) => Number.isFinite(n))) return false;
+    const reach = (actor.getRunSpeed?.() || 3.66) * CombatRound.ROUND_LENGTH / 1000;
+    const to = GMPacing.clampMove(actor.position, { x: intent.x as number, y: intent.y as number }, reach);
+    // A move planned again replaces the last one
+    const queue: any[] = actor.actionQueue as any;
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i]?.gmPlannedMove) queue.splice(i, 1);
+    const move: any = new GameState.ActionFactory.ActionMoveToPoint();
+    move.setParameter(0, ActionParameterType.FLOAT, to.x);
+    move.setParameter(1, ActionParameterType.FLOAT, to.y);
+    move.setParameter(2, ActionParameterType.FLOAT, intent.z as number);
+    move.setParameter(3, ActionParameterType.DWORD, GameState.module.area.id);
+    move.setParameter(4, ActionParameterType.DWORD, ModuleObjectConstant.OBJECT_INVALID);
+    move.setParameter(5, ActionParameterType.INT, 1);
+    move.setParameter(6, ActionParameterType.FLOAT, 0.5);
+    move.setParameter(7, ActionParameterType.INT, 0);
+    move.setParameter(8, ActionParameterType.FLOAT, 30.0);
+    move.gmPlannedMove = true;
+    actor.actionQueue.addFront(move);
+    actor.gmHostDriven = true;
+    GMLog.info('host', `${actor.getName()} plans to move ${Math.hypot(to.x - actor.position.x, to.y - actor.position.y).toFixed(1)} m`);
+    return true;
+  }
 
   /** Host: why a power, feat, skill or item a player asked for couldn't be used, in words they can act on */
   static whyNot(actor: ModuleCreature, intent: GMClientIntent): string {

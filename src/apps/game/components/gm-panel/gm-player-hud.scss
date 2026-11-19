@@ -130,6 +130,75 @@
   }
   .gm-hud-target .gm-hud-bar.hp > span { background: var(--hud-side); }
 
+  // Planning a round (GMPacing): the banner, the planned move and what enemies are about to do
+  .gm-hud-plan {
+    position: fixed;
+    // Below the target frame
+    top: 84px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 300px;
+    max-width: calc(100vw - 32px);
+    padding: 8px 16px 10px;
+    text-align: center;
+    background: rgba(6, 18, 30, 0.9);
+    border: 1px solid var(--hud-ally, #5fb0ff);
+    color: #dcecff;
+    pointer-events: auto;
+    &.playing {
+      min-width: 0;
+      padding: 3px 12px;
+      font-size: 12px;
+      opacity: 0.85;
+      pointer-events: none;
+    }
+    .gm-hud-plan-title { font-weight: 700; font-size: 15px; }
+    .gm-hud-plan-time { color: #ffd36b; }
+    .gm-hud-plan-hint { font-size: 12px; opacity: 0.8; margin-top: 2px; }
+    .gm-hud-plan-who {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      justify-content: center;
+      margin-top: 4px;
+      font-size: 12px;
+      .ready { color: #8fe38f; }
+      .waiting { color: #ffd36b; }
+    }
+    .gm-hud-plan-ready {
+      margin-top: 6px;
+      padding: 3px 14px;
+      font-weight: 700;
+      cursor: pointer;
+      &.on { background: rgba(60, 140, 60, 0.6); }
+      kbd { margin-left: 6px; font-size: 10px; opacity: 0.8; }
+    }
+  }
+  .gm-hud-ring.planned {
+    border-color: #ffd36b;
+    border-style: dashed;
+    box-shadow: 0 0 8px #ffd36b;
+  }
+  .gm-hud-plan-line {
+    position: fixed;
+    display: none;
+    height: 0;
+    border-top: 2px dotted #ffd36b;
+    transform-origin: 0 0;
+    pointer-events: none;
+  }
+  .gm-hud-intent {
+    position: fixed;
+    transform: translate(-50%, -100%);
+    padding: 1px 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    color: #ffd0d0;
+    background: rgba(40, 6, 6, 0.85);
+    border: 1px solid var(--hud-enemy, #ff5f5f);
+    pointer-events: none;
+  }
+
   .gm-hud-paused {
     position: fixed;
     top: 120px;

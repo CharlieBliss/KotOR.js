@@ -16,6 +16,7 @@ import type {
   GMSessionSave,
 } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
@@ -296,6 +297,7 @@ export class GMSessions {
     if (!save?.scene?.module) return false;
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
+    if (save.rules?.pacing) GMPacing.configure({ mode: save.rules.pacing.mode, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents });
     const networkPlayers = save.players.filter((p) => !p.local);
     this.reservedPlayers = new Map(networkPlayers.map((p) => [p.name.trim().toLowerCase(), p]));
 
