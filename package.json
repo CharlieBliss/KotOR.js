@@ -13,6 +13,7 @@
     "gm:server": "node scripts/gm-server.js",
     "gm:play": "electron scripts/gm-play.js",
     "test:gm-e2e": "electron scripts/gm-e2e.js",
+    "gm:table-export": "electron scripts/gm-table-export.js",
     "test:gm-duel": "electron scripts/gm-duel-check.js",
     "test:gm-regress": "electron scripts/gm-regress.js",
     "test:gm-regress:fast": "electron scripts/gm-regress.js --speed 4",
