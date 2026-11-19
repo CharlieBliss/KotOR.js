@@ -157,7 +157,7 @@ export class GMPacing {
     if (this.phase === 'plan') {
       this.updatePlanners(s.planners);
       if (this.planners.length && this.planners.every((p) => this.ready.has(p))) this.go('everyone is ready');
-      else if (this.deadline && this.now() >= this.deadline) this.go('time is up');
+      else if (!heldOtherwise && this.deadline && this.now() >= this.deadline) this.go('time is up');
       return;
     }
     // Playing: world time only (the GM's pause or an open wheel stops the clock too)
@@ -215,14 +215,15 @@ export class GMPacing {
       this.remember(scan);
       this.updatePlanners(scan.planners);
     }
-    // The enemies decide the coming round now, so what they're about to do shows while players plan
-    this.decideEnemies();
+    // Hold first so GMManager.worldHeld() is already true while enemies pick their intents for the coming round
     this.phase = 'plan';
     this.ready.clear();
     this.windowTime = 0;
     this.windowsSinceHold = 0;
     this.quietTime = 0;
     this.deadline = this.timeLimit ? this.now() + this.timeLimit * 1000 : 0;
+    // The enemies decide the coming round now, so what they're about to do shows while players plan
+    this.decideEnemies();
     GMLog.info('pacing', `round ${this.round}: planning (${reason})`);
     this.changed();
   }
@@ -301,12 +302,20 @@ export class GMPacing {
     const area = GameState.module?.area;
     const out: GMPacingScan = { fighting: false, hostilesInCombat: new Set(), players: [], planners: [] };
     if (!GM || !area) return out;
+    const hasActiveFightAction = (cre: any): boolean => {
+      if (cre?.combatData?.combatState) return true;
+      if (cre?.combatRound?.action || cre?.combatRound?.scheduledActionList?.length) return true;
+      if (cre?.gmFightTarget && !cre.gmFightTarget.isDead?.()) return true;
+      return (cre?.actionQueue || []).some((a: any) =>
+        a?.type === ActionType.ActionPhysicalAttacks || a?.type === ActionType.ActionCastSpell
+      );
+    };
     const players: ModuleCreature[] = (GM.spawnedPlayers || []).filter((p: any) => p && !p.destroyed);
     let playerInCombat = false;
     for (const p of players) {
       const max = p.getMaxHP?.() || 1;
       out.players.push({ id: p.getName?.() || String(p.gmNetId), health: (p.getHP?.() ?? max) / max });
-      if (p.combatData?.combatState) playerInCombat = true;
+      if (!p.isDead?.() && hasActiveFightAction(p)) playerInCombat = true;
       if (p.gmOwnerPeerId && !p.isDead?.() && GameState.GMNetworkManager?.peers?.has(p.gmOwnerPeerId)) {
         if (!out.planners.includes(p.gmOwnerPeerId)) out.planners.push(p.gmOwnerPeerId);
       }
@@ -318,7 +327,7 @@ export class GMPacing {
       const foes = players.filter((p) => c.isHostile?.(p) && !p.isDead?.());
       if (!foes.length) continue;
       if (foes.some((p) => c.position?.distanceTo?.(p.position) <= this.FIGHT_RANGE)) enemyNear = true;
-      if (!c.combatData?.combatState) continue;
+      if (!hasActiveFightAction(c)) continue;
       out.hostilesInCombat.add(c);
     }
     out.fighting = out.hostilesInCombat.size > 0 || (playerInCombat && enemyNear);

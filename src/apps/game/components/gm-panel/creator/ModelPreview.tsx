@@ -3,7 +3,9 @@ import * as THREE from "three";
 import * as KotOR from "@/apps/game/KotOR";
 import type { GMCharacter } from "@/managers/gm/GMTypes";
 
-type Previewed = Pick<GMCharacter, 'appearanceId' | 'appearanceLabel' | 'portraitId' | 'gender' | 'alignment' | 'gear'>;
+type Previewed = Pick<GMCharacter, 'appearanceId' | 'appearanceLabel' | 'portraitId' | 'gender' | 'gear'> & {
+  alignment?: 'neutral' | 'light' | 'dark';
+};
 
 /** Frames per second the preview draws at while it's on screen */
 const FPS = 30;

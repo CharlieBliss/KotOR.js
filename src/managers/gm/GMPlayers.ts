@@ -404,6 +404,13 @@ export class GMPlayers {
         const delta = alignment === 'light' ? points : -points;
         actor.goodEvil = Math.max(0, Math.min(100, before + delta));
       }
+      // Keep Careers sheet alignment in sync with story shifts (neutral 41..59, light >= 60, dark <= 40)
+      const careers = this.careersOf(actor);
+      if (careers) {
+        const after = Math.round(Number(actor.getGoodEvil?.() ?? actor.goodEvil ?? 50));
+        careers.alignment = after >= 60 ? 'light' : after <= 40 ? 'dark' : 'neutral';
+        careers.updated = Date.now();
+      }
     }
 
     const primary = recipients[0];

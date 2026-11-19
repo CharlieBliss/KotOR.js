@@ -131,8 +131,10 @@ export class GMReplication {
   /** While the world holds to plan, what an NPC in the fight is about to do (when the GM shows intents) */
   static intentOf(obj: ModuleObject): string | undefined {
     if (GMPacing.phase !== 'plan' || !GMPacing.showIntents || obj.gmOwnerPeerId || !GMObjectKind.isCreature(obj)) return undefined;
-    if (!(obj as ModuleCreature).combatData?.combatState || (obj as ModuleCreature).isDead?.()) return undefined;
-    return GMPacing.describeIntent(obj as ModuleCreature);
+    const cre = obj as ModuleCreature;
+    if (cre.isDead?.()) return undefined;
+    if (!cre.combatData?.combatState && !cre.combatRound?.action && !cre.combatRound?.scheduledActionList?.length) return undefined;
+    return GMPacing.describeIntent(cre);
   }
 
   static queueOf(cre: ModuleCreature): string[] {
@@ -518,6 +520,8 @@ export class GMReplication {
     if (!actor || actor.gmHostDriven) return;
     // Sent before the player's game had moved their character to where the GM teleported it
     if ((payload.teleportSeq ?? 0) < (actor.gmTeleportSeq || 0)) return;
+    // While the world is paused or holding to plan a round, players plan moves via intent:'move', not live walking
+    if (GMManager.worldHeld()) return;
     // Do not let client WASD override host-driven Force Push or debilitation positions
     if (typeof payload.x === 'number' && typeof payload.y === 'number' && !actor.isDebilitated?.() && !actor.isDead?.()) {
       this.setNetTarget(actor, payload.x, payload.y, payload.z);

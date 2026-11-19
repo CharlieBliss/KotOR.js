@@ -1677,13 +1677,15 @@ export class GameState implements EngineContext {
       GameState.forwardVector.z = -1;
     }
 
-    if(GameState.State != EngineState.PAUSED){
+    if(GameState.State != EngineState.PAUSED && !GameState.hooks.isWorldPaused()){
       GameState.updateTime(delta);
     }
 
-    //Handle Module Tick: a menu over the game (a loot window) holds it, unless the world is shared with others
+    //Handle Module Tick: a menu over the game (a loot window) holds it, unless the world is shared with others;
+    //a GM world pause or plan-then-play hold always pauses the module tick on host and clients alike.
     if(
-      (GameState.State == EngineState.PAUSED || GameState.MenuManager.activeModals.length) && !GameState.hooks.sharedWorld()
+      GameState.hooks.isWorldPaused() ||
+      ((GameState.State == EngineState.PAUSED || GameState.MenuManager.activeModals.length) && !GameState.hooks.sharedWorld())
     ){
       GameState.module.tickPaused(delta);
     }else{

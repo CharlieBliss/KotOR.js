@@ -11,6 +11,7 @@ import { ModelList } from "@/apps/game/components/gm-panel/creator/ModelList";
 import { creatorPortraits, portraitForModel } from "@/apps/game/components/gm-panel/creator/creatorData";
 import { Panel } from "@/apps/game/components/gm-panel/creator/sections";
 import { careerNodeTag, DedicationPicker, PowerTreeGrid } from "@/apps/game/components/gm-panel/creator/CareerTreeParts";
+import { startCreatorMusic } from "@/apps/game/components/gm-panel/creator/creatorMusic";
 import "@/apps/game/components/gm-panel/creator/creator.scss";
 import "@/apps/game/components/gm-panel/creator/careers-creator.scss";
 
@@ -61,6 +62,9 @@ export const CareersCreator: React.FC<{
     Store.listeners.add(refresh);
     return () => { Store.listeners.delete(refresh); };
   }, [Store]);
+
+  // Play the Onderon "Palace Grounds" theme while the Careers character creator is open
+  useEffect(() => startCreatorMusic(/palace\s*grounds/i, 'mus_a_506'), []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -310,14 +314,6 @@ export const CareersCreator: React.FC<{
     update({ powerNodes: { ...(draft.powerNodes || {}), [treeId]: [...current, nodeId] } });
   };
 
-  /** The power trees a character of this alignment may keep (the other side's trees are dropped) */
-  const keepPowerTrees = (alignment: 'light' | 'dark') => Object.fromEntries(
-    Object.entries(draft.powerNodes || {}).filter(([treeId]) => {
-      const side = KotOR.CAREERS_POWER_TREE_BY_ID.get(treeId)?.alignment;
-      return side === 'universal' || side === alignment;
-    })
-  );
-
   const stepIndex = STEPS.findIndex((s) => s.id === step);
 
   return (
@@ -332,6 +328,7 @@ export const CareersCreator: React.FC<{
 
         <div className="cc-body">
           <div className="cc-main">
+            <div className="cc-careers-stage">
             <div className="cc-xp-bar">
               <span>Starting XP: <strong>{d.startingXpRemaining}</strong> / {d.startingXpBudget} remaining</span>
               <span>Level {d.level} · {species.name} {career.name} ({spec.name})</span>
@@ -408,19 +405,18 @@ export const CareersCreator: React.FC<{
             {step === 'characteristics' && (
               <div>
                 <div className="cc-hint" style={{ marginBottom: 8 }}>
-                  Spend starting XP to raise characteristics (cost = 10 × new value, max 5 at creation). KotOR score = 6 + 2 × value.
+                  Spend starting XP to raise characteristics (cost = 10 × new value, max 5 at creation).
                 </div>
                 {KotOR.CAREER_ABILITIES.map((k) => {
                   const base = species.characteristics[k];
                   const val = draft.characteristics[k];
-                  const kotor = d.kotorAttributes[k];
                   const mod = d.modifiers[k];
                   const check = Rules.canRaiseCharacteristic(draft, k);
                   const lbl = KotOR.CAREER_ABILITY_LABELS[k];
                   return (
                     <div key={k} className="cc-char-row">
                       <strong>{lbl.kotor} ({lbl.short})</strong>
-                      <span>FFG {val} → KotOR {kotor} ({mod >= 0 ? `+${mod}` : mod})</span>
+                      <span><strong>{val}</strong> ({mod >= 0 ? `+${mod}` : mod})</span>
                       <button className="cc-button" disabled={val <= base} onClick={() => adjustCharacteristic(k, -1)}>−</button>
                       <button className="cc-button" disabled={!check.ok} title={check.reason || `Raise to ${check.nextValue} (${check.cost} XP)`} onClick={() => adjustCharacteristic(k, 1)}>
                         +{check.nextValue <= 5 ? ` (${check.cost} XP)` : ''}
@@ -632,30 +628,8 @@ export const CareersCreator: React.FC<{
                     onChange={(e) => update({ name: e.target.value })}
                   />
                 </label>
-                <div className="cc-field">
-                  <span>Alignment (controls which Force powers you can learn)</span>
-                  <div className="cc-chips">
-                    <button
-                      className={`cc-chip ${draft.alignment === 'light' ? 'on' : ''}`}
-                      onClick={() => update({
-                        alignment: 'light',
-                        powers: draft.powers.filter((id) => KotOR.CAREERS_POWER_BY_ID.get(id)?.alignment !== 'dark'),
-                        powerNodes: keepPowerTrees('light'),
-                      })}
-                    >
-                      Light side
-                    </button>
-                    <button
-                      className={`cc-chip ${draft.alignment === 'dark' ? 'on' : ''}`}
-                      onClick={() => update({
-                        alignment: 'dark',
-                        powers: draft.powers.filter((id) => KotOR.CAREERS_POWER_BY_ID.get(id)?.alignment !== 'light'),
-                        powerNodes: keepPowerTrees('dark'),
-                      })}
-                    >
-                      Dark side
-                    </button>
-                  </div>
+                <div className="cc-hint">
+                  Alignment starts neutral and shifts through your choices in play.
                 </div>
                 <div className="cc-hint">
                   Starting kit: weapon <code>{draft.gear?.rightHand || 'none'}</code>, armour <code>{draft.gear?.armor || 'none'}</code>.
@@ -663,6 +637,7 @@ export const CareersCreator: React.FC<{
                 </div>
               </div>
             )}
+            </div>
           </div>
 
           <aside className="cc-side" aria-label="Summary">
@@ -688,7 +663,7 @@ export const CareersCreator: React.FC<{
                 {KotOR.CAREER_ABILITIES.map((k) => (
                   <React.Fragment key={k}>
                     <dt>{KotOR.CAREER_ABILITY_LABELS[k].short}</dt>
-                    <dd>{d.effectiveCharacteristics[k]} ({d.kotorAttributes[k]})</dd>
+                    <dd>{d.effectiveCharacteristics[k]}</dd>
                   </React.Fragment>
                 ))}
               </dl>

@@ -9,6 +9,7 @@ const mockKotOR: any = {
   GameEngineType: { KOTOR: 1, TSL: 2 },
   GMFaction: { HOSTILE: 1, FRIENDLY: 2, NEUTRAL: 0 },
   ABILITIES: ["str", "dex", "con", "int", "wis", "cha"],
+  CAREER_ABILITIES: ["str", "dex", "con", "int", "wis", "cha"],
   gmFactionName: (id: number) => (id === 1 ? "Hostile" : id === 2 ? "Friendly" : "Neutral"),
   GMObjectKind: {
     isCreature: (o: any) => !!o?.isCreatureFlag,
@@ -82,6 +83,7 @@ const mockKotOR: any = {
     SKILL_NAMES: ["Computer Use", "Demolitions", "Stealth"],
     shownRolls: jest.fn((): any[] => []),
     checkBonus: jest.fn(() => 3),
+    checkLabel: jest.fn(() => "Skill"),
   },
   GMMines: {},
   GMSetPieces: {},
@@ -155,9 +157,21 @@ const mockKotOR: any = {
     listeners: new Set(),
   },
   CareersRules: {
-    derive: jest.fn(() => ({ level: 1 })),
+    derive: jest.fn(() => ({
+      level: 1,
+      forceSensitive: false,
+      effectiveCharacteristics: { str: 3, dex: 2, con: 3, int: 2, wis: 2, cha: 1 },
+      modifiers: { str: 2, dex: 0, con: 2, int: 0, wis: 0, cha: -2 },
+      maxStrain: 12,
+    })),
   },
+  ENGINE_SKILL_MULTIPLIER: 4,
   careersRuntimeOf: jest.fn((): any => undefined),
+  AudioEngine: {
+    GetAudioEngine: jest.fn((): any => null),
+    musicChannel: { getGainNode: jest.fn((): any => ({})) },
+  },
+  AudioLoader: { LoadMusic: jest.fn() },
   GMDifficulty: {
     enemyHp: 1, enemyDamage: 1, configure: jest.fn(),
     readout: () => ({ party: { count: 0, hp: 0, ac: 10, damagePerRound: 0 }, enemies: { count: 0, hp: 0, ac: 10, damagePerRound: 0 }, partyRounds: Infinity, enemyRounds: Infinity, verdict: 'none' }),
@@ -177,6 +191,7 @@ import { CombatTracker } from "@/apps/game/components/gm-panel/overlays/CombatTr
 import { CutsceneOverlay } from "@/apps/game/components/gm-panel/overlays/CutsceneOverlay";
 import { QuickPalette } from "@/apps/game/components/gm-panel/overlays/QuickPalette";
 import { CharacterSheet } from "@/apps/game/components/gm-panel/sheet/CharacterSheet";
+import { findMusicResRef, startCreatorMusic } from "@/apps/game/components/gm-panel/creator/creatorMusic";
 
 function makeMockCreature(name: string, opts: Record<string, any> = {}): any {
   return {
@@ -350,5 +365,65 @@ describe("GM Panel React UI & store", () => {
     expect(renderToStaticMarkup(React.createElement(PromptCard))).toBe("");
     expect(renderToStaticMarkup(React.createElement(DownedBanner))).toBe("");
     expect(renderToStaticMarkup(React.createElement(RollFeed))).toBe("");
+  });
+
+  test("Careers CharacterSheet hides KotOR stats and displays 1–6 characteristics and real Careers skill ranks", () => {
+    const careersChar = { name: "Kael", alignment: "neutral", speciesId: "human", careerId: "soldier" };
+    const hero = makeMockCreature("Kael", {
+      getGoodEvil: () => 50,
+      getSTR: () => 16,
+      getBaseAttackBonus: () => 7,
+      skills: [{ rank: 8 }, { rank: 4 }, { rank: 0 }],
+      gmPlayerConfig: { name: "Kael", careers: careersChar },
+    });
+    mockKotOR.careersRuntimeOf.mockReturnValue({
+      character: careersChar,
+      getStrainState: () => ({ strain: 3, maxStrain: 12, windedSeconds: 0 }),
+    });
+
+    const overviewHtml = renderToStaticMarkup(
+      React.createElement(CharacterSheet, { creature: hero, initialSection: "overview", gmView: false, onClose: jest.fn() })
+    );
+    expect(overviewHtml).toContain("Characteristics");
+    expect(overviewHtml).toContain("Strain");
+    expect(overviewHtml).toContain("3 / 12");
+    expect(overviewHtml).toContain("Neutral");
+    expect(overviewHtml).not.toContain("Base attack");
+    expect(overviewHtml).not.toContain("Ability scores");
+
+    const skillsHtml = renderToStaticMarkup(
+      React.createElement(CharacterSheet, { creature: hero, initialSection: "skills", gmView: false, onClose: jest.fn() })
+    );
+    // Raw engine rank 8 -> Careers rank 2, raw 4 -> Careers rank 1 (never showing engine rank 8)
+    expect(skillsHtml).toContain("2 ranks");
+    expect(skillsHtml).toContain("1 rank");
+    expect(skillsHtml).not.toContain("8 ranks");
+    mockKotOR.careersRuntimeOf.mockReturnValue(undefined);
+  });
+
+  test("creatorMusic resolves Palace Grounds from 2DA tables with mus_a_506 fallback and restores area music", () => {
+    mockKotOR.GameState.TwoDAManager.datatables = new Map();
+    mockKotOR.GameState.TLKManager = {
+      GetStringById: (id: number) => ({ Value: id === 101 ? "Onderon - Palace Grounds" : "" }),
+    };
+    expect(findMusicResRef(/palace\s*grounds/i, "mus_a_506")).toBe("mus_a_506");
+
+    mockKotOR.GameState.TwoDAManager.datatables.set("musictable", {
+      rows: { 0: { strrefname: 101, filename: "mus_a_506_palace" } },
+    });
+    expect(findMusicResRef(/palace\s*grounds/i, "mus_a_506")).toBe("mus_a_506_palace");
+
+    const areaEmitter = { playing: true, stop: jest.fn(), play: jest.fn() };
+    mockKotOR.AudioEngine.GetAudioEngine.mockReturnValue({
+      areaMusicLoaded: true,
+      areaMusicDayAudioEmitter: areaEmitter,
+      audioCtx: null,
+    });
+    const stop = startCreatorMusic(/palace\s*grounds/i, "mus_a_506");
+    expect(areaEmitter.stop).toHaveBeenCalledTimes(1);
+    stop();
+    expect(areaEmitter.play).toHaveBeenCalledTimes(1);
+    mockKotOR.AudioEngine.GetAudioEngine.mockReturnValue(null);
+    mockKotOR.GameState.TwoDAManager.datatables = new Map();
   });
 });

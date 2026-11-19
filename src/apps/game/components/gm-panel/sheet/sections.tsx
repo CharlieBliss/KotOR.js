@@ -28,23 +28,50 @@ const text = (strref: any, fallback = '') => KotOR.CharacterRules.text(strref, f
 // --- Overview: what the game's character screen shows -------------------------------------------------
 
 export const OverviewSection: React.FC<SheetSectionProps> = ({ creature: c }) => {
-  const abilities = KotOR.ABILITIES.map((k: string) => {
-    const getter = ({ str: 'getSTR', dex: 'getDEX', con: 'getCON', int: 'getINT', wis: 'getWIS', cha: 'getCHA' } as any)[k];
-    const score = Number(c[getter]?.()) || 0;
-    return { key: k, name: ABILITY_NAMES[k], score, mod: mod(score) };
-  });
+  const runtime = KotOR.careersRuntimeOf?.(c);
+  const careersChar = runtime?.character || c.gmPlayerConfig?.careers;
+  const derived = careersChar && KotOR.CareersRules ? KotOR.CareersRules.derive(careersChar) : null;
+  const strain = runtime?.getStrainState?.() || (derived ? { strain: 0, maxStrain: derived.maxStrain, windedSeconds: 0 } : null);
+
+  const abilities = derived
+    ? KotOR.CAREER_ABILITIES.map((k: string) => ({
+      key: k,
+      name: ABILITY_NAMES[k],
+      score: derived.effectiveCharacteristics[k as keyof typeof derived.effectiveCharacteristics],
+      mod: derived.modifiers[k as keyof typeof derived.modifiers],
+    }))
+    : KotOR.ABILITIES.map((k: string) => {
+      const getter = ({ str: 'getSTR', dex: 'getDEX', con: 'getCON', int: 'getINT', wis: 'getWIS', cha: 'getCHA' } as any)[k];
+      const score = Number(c[getter]?.()) || 0;
+      return { key: k, name: ABILITY_NAMES[k], score, mod: mod(score) };
+    });
   const goodEvil = Number(c.getGoodEvil?.() ?? 50);
+  const alignmentLabel = goodEvil >= 60 ? 'Light side' : goodEvil <= 40 ? 'Dark side' : 'Neutral';
   return (
     <>
       <Panel title="Vitals">
         <dl className="cc-stats sheet-stats">
           <dt>Vitality</dt><dd>{c.getHP()} / {c.getMaxHP()}</dd>
-          <dt>Force</dt><dd>{c.getFP?.() ?? 0} / {c.getMaxFP?.() ?? 0}</dd>
+          {strain && (
+            <>
+              <dt>Strain</dt>
+              <dd>{Math.round(strain.strain)} / {strain.maxStrain}{strain.windedSeconds > 0 ? ` · WINDED (${Math.ceil(strain.windedSeconds)}s)` : ''}</dd>
+            </>
+          )}
+          {(!derived || derived.forceSensitive || (c.getMaxFP?.() ?? 0) > 0) && (
+            <>
+              <dt>Force</dt><dd>{c.getFP?.() ?? 0} / {c.getMaxFP?.() ?? 0}</dd>
+            </>
+          )}
           <dt>Defense</dt><dd>{c.getAC?.() ?? '-'}</dd>
-          <dt>Base attack</dt><dd>{signed(Number(c.getBaseAttackBonus?.()) || 0)}</dd>
+          {!derived && (
+            <>
+              <dt>Base attack</dt><dd>{signed(Number(c.getBaseAttackBonus?.()) || 0)}</dd>
+            </>
+          )}
         </dl>
       </Panel>
-      <Panel title="Attributes">
+      <Panel title={derived ? "Characteristics" : "Attributes"}>
         <div className="cc-abilities">
           {abilities.map((a) => (
             <div key={a.key} className="sheet-ability">
@@ -55,7 +82,7 @@ export const OverviewSection: React.FC<SheetSectionProps> = ({ creature: c }) =>
           ))}
         </div>
       </Panel>
-      <Panel title="Alignment" extra={<span className="cc-hint">{goodEvil >= 50 ? 'Light side' : 'Dark side'} · {goodEvil}</span>}>
+      <Panel title="Alignment" extra={<span className="cc-hint">{alignmentLabel} · {goodEvil}</span>}>
         <div className="sheet-alignment" aria-label={`Alignment ${goodEvil} of 100`}>
           <div className="sheet-alignment-marker" style={{ left: `${Math.max(0, Math.min(100, goodEvil))}%` }} />
         </div>
@@ -92,6 +119,7 @@ const RollButton: React.FC<{ name: string; bonus: number; detail?: string; onRol
 
 export const SkillRollGrid: React.FC<{ creature: any; onRoll: (check: GMCheck) => void; who: 'player' | 'gm'; compact?: boolean }> = ({ creature: c, onRoll, who, compact = false }) => {
   useGMStore();
+  const isCareers = !!(KotOR.careersRuntimeOf?.(c) || c?.gmPlayerConfig?.careers);
   const bonus = (check: GMCheck) => KotOR.GMChecks.checkBonus(c, check);
   const shown = KotOR.GMChecks.shownRolls().filter((r: any) => r.netId === c?.gmNetId);
   const last = (check: GMCheck) => { const label = KotOR.GMChecks.checkLabel(check); return [...shown].reverse().find((r: any) => r.label === label); };
@@ -99,7 +127,8 @@ export const SkillRollGrid: React.FC<{ creature: any; onRoll: (check: GMCheck) =
     <div className={compact ? 'sheet-quick-rolls' : 'sheet-rolls-wrap'}>
       <div className="sheet-rolls">
         {KotOR.GMChecks.SKILL_NAMES.map((name: string, skill: number) => {
-          const ranks = Number(c?.skills?.[skill]?.rank ?? c?.getSkillRanks?.(skill) ?? 0);
+          const rawRanks = Number(c?.skills?.[skill]?.rank ?? c?.getSkillRanks?.(skill) ?? 0);
+          const ranks = isCareers ? Math.round(rawRanks / (KotOR.ENGINE_SKILL_MULTIPLIER || 4)) : rawRanks;
           return <RollButton key={name} name={name} bonus={bonus({ kind: 'skill', skill })} detail={compact ? undefined : `${ranks} rank${ranks === 1 ? '' : 's'}`} onRoll={() => onRoll({ kind: 'skill', skill })} who={who} last={last({ kind: 'skill', skill })} />;
         })}
       </div>

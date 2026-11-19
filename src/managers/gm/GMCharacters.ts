@@ -144,13 +144,13 @@ export class GMCharacters {
    * A creature template with just what shows: the body, portrait (for player heads), alignment (light or dark
    * head textures) and gear. For previewing a character's model without putting it in the world.
    */
-  static previewTemplate(character: Pick<GMCharacter, 'appearanceId' | 'appearanceLabel' | 'portraitId' | 'gender' | 'alignment' | 'gear'>): GFFObject {
+  static previewTemplate(character: Pick<GMCharacter, 'appearanceId' | 'appearanceLabel' | 'portraitId' | 'gender' | 'gear'> & { alignment?: 'light' | 'dark' | 'neutral' }): GFFObject {
     const template = new GFFObject();
     const root = template.RootNode;
     GMTemplates.set(root, GFFDataType.WORD, 'Appearance_Type', this.resolveAppearance(character));
     GMTemplates.set(root, GFFDataType.WORD, 'PortraitId', character.portraitId);
     GMTemplates.set(root, GFFDataType.BYTE, 'Gender', character.gender);
-    GMTemplates.set(root, GFFDataType.BYTE, 'GoodEvil', character.alignment === 'dark' ? 0 : 100);
+    GMTemplates.set(root, GFFDataType.BYTE, 'GoodEvil', character.alignment === 'dark' ? 0 : character.alignment === 'neutral' ? 50 : 100);
     GMTemplates.writeGear(root, {
       rightHandResRef: character.gear?.rightHand || '',
       leftHandResRef: character.gear?.leftHand || '',

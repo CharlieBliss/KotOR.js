@@ -355,4 +355,45 @@ describe('planning countdown', () => {
     GMPlayerHud.updatePlannedMove(0.016);
     expect(GMPlayerHud.planSecondsLeftNow()).toBeUndefined();
   });
+
+  test('WASD steering combines simultaneous axes diagonally and setPlannedMove clamps & sends', () => {
+    GMPlayerHud.planRound = -1;
+    GMPlayerHud.plannedMove = null;
+    const prevRole = GMNetworkManager.role;
+    const prevJoin = GMNetworkManager.joinState;
+    const prevNetId = GMNetworkManager.assignedActorNetId;
+    GMNetworkManager.role = 'client';
+    GMNetworkManager.joinState = 'playing';
+    GMNetworkManager.assignedActorNetId = 'net_hero';
+    const sendSpy = jest.spyOn(GMNetworkManager, 'sendIntent').mockImplementation(() => {});
+    (GMNetworkManager as any).sessionRules = {
+      deathRule: 'kotor',
+      pacing: { mode: 'rounds', phase: 'plan', round: 2, ready: [], waiting: ['Hero'], timeLimit: 0, showIntents: true },
+    };
+
+    try {
+      // Start round 2, then press W (facing 0 -> +Y) and D (facing -PI/2 -> +X) in the same frame
+      GMPlayerHud.updatePlannedMove(0.016);
+      expect(GMPlayerHud.steerPlannedMove(pc, 0)).toBe(true);
+      expect(GMPlayerHud.steerPlannedMove(pc, -Math.PI / 2)).toBe(true);
+      GMPlayerHud.updatePlannedMove(0.2);
+
+      expect(GMPlayerHud.plannedMove).not.toBeNull();
+      expect(GMPlayerHud.plannedMove!.x).toBeGreaterThan(0.1);
+      expect(GMPlayerHud.plannedMove!.y).toBeGreaterThan(0.1);
+      expect(GMPlayerHud.plannedMove!.x).toBeCloseTo(GMPlayerHud.plannedMove!.y, 3);
+
+      // Direct mouse placement clamps to one round's run and sends immediately when requested
+      const reach = GMPlayerHud.roundReach(pc);
+      expect(GMPlayerHud.setPlannedMove({ x: 100, y: 0, z: 0 }, true)).toBe(true);
+      expect(GMPlayerHud.plannedMove!.x).toBeCloseTo(reach, 3);
+      expect(GMPlayerHud.plannedMove!.y).toBeCloseTo(0, 3);
+      expect(sendSpy).toHaveBeenCalledWith('move', undefined, expect.objectContaining({ x: expect.any(Number), y: 0, z: 0 }));
+    } finally {
+      sendSpy.mockRestore();
+      GMNetworkManager.role = prevRole;
+      GMNetworkManager.joinState = prevJoin;
+      GMNetworkManager.assignedActorNetId = prevNetId;
+    }
+  });
 });

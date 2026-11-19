@@ -393,3 +393,44 @@ describe('Session rule-set switch and join validation', () => {
     GMManager.spawnedPlayers = [];
   });
 });
+
+describe('Neutral alignment at creation & in-play alignment shifts', () => {
+  test('new Careers characters start neutral and spawn at goodEvil 50 without a Light/Dark lock', () => {
+    const jedi = GMCareersCharacters.blank('human', 'jedi_guardian');
+    jedi.name = 'Exile';
+    expect(jedi.alignment).toBe('neutral');
+
+    const cfg = GMCareersCharacters.toSpawnConfig(jedi);
+    expect(cfg.goodEvil).toBe(50);
+    expect(cfg.alignment).toBeUndefined();
+
+    // Neutral Jedi can take universal Force powers, but Light/Dark-specific powers wait until alignment shifts
+    jedi.powers = [8]; // Burst of Speed (universal)
+    expect(CareersRules.validate(jedi)).toEqual([]);
+    jedi.powers = [43]; // Shock (dark)
+    expect(CareersRules.validate(jedi).some((p) => p.includes('dark-side'))).toBe(true);
+  });
+
+  test('GMPlayers.giveAlignment syncs Careers alignment when crossing Light/Dark thresholds', () => {
+    const jedi = GMCareersCharacters.blank('human', 'jedi_guardian');
+    jedi.name = 'Exile';
+    const creature: any = {
+      goodEvil: 50,
+      getName: () => 'Exile',
+      getGoodEvil() { return this.goodEvil; },
+      gmPlayerConfig: { name: 'Exile', careers: jedi },
+    };
+
+    GMPlayers.giveAlignment(creature, 'light', 15);
+    expect(creature.goodEvil).toBe(65);
+    expect(jedi.alignment).toBe('light');
+
+    GMPlayers.giveAlignment(creature, 'dark', 20);
+    expect(creature.goodEvil).toBe(45);
+    expect(jedi.alignment).toBe('neutral');
+
+    GMPlayers.giveAlignment(creature, 'dark', 10);
+    expect(creature.goodEvil).toBe(35);
+    expect(jedi.alignment).toBe('dark');
+  });
+});

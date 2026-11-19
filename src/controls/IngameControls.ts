@@ -545,6 +545,10 @@ export class IngameControls {
     KeyMapper.Actions[KeyMapAction.CameraRotateLeft].setProcessor( (keymap) => {
       // if(GameState.State == EngineState.PAUSED) return;
       if(GameState.Mode != EngineMode.INGAME) return;
+      if(keymap.keyboardInput.down && !this.gamePad.stick_r_x.value){
+        const followee = GameState.PartyManager.party[0];
+        if(followee?.canMove?.() && GameState.hooks.steerPlannedMove(followee, Utility.NormalizeRadian(FollowerCamera.facing + Math.PI))) return;
+      }
       if(
         (keymap.keyboardInput.down || 
         (keymap.gamepadInput as AnalogInput).value < 0)
@@ -565,6 +569,10 @@ export class IngameControls {
     KeyMapper.Actions[KeyMapAction.CameraRotateRight].setProcessor( (keymap) => {
       // if(GameState.State == EngineState.PAUSED) return;
       if(GameState.Mode != EngineMode.INGAME) return;
+      if(keymap.keyboardInput.down && !this.gamePad.stick_r_x.value){
+        const followee = GameState.PartyManager.party[0];
+        if(followee?.canMove?.() && GameState.hooks.steerPlannedMove(followee, Utility.NormalizeRadian(FollowerCamera.facing))) return;
+      }
       if(
         (keymap.keyboardInput.down || 
         (keymap.gamepadInput as AnalogInput).value > 0)

@@ -218,7 +218,7 @@ const PlanBanner: React.FC<{ padInUse: boolean }> = ({ padInUse }) => {
         Round {pacing.round} · Plan your move{left !== undefined ? <span className="gm-hud-plan-time"> · {left}s</span> : null}
       </div>
       <div className="gm-hud-plan-hint">
-        Pick an action, steer where to go with {padInUse ? 'the left stick' : 'W / S and the mouse'}, then Ready.
+        Pick an action, move your marker with {padInUse ? 'the left stick' : 'WASD or click/drag on the ground'}, then Ready.
       </div>
       {(pacing.ready.length > 0 || pacing.waiting.length > 0) && (
         <div className="gm-hud-plan-who">
@@ -824,6 +824,46 @@ export const PlayerHud: React.FC<{ onOpenSheet: (section?: SheetSectionId) => vo
       window.removeEventListener('keyup', onUp, true);
     };
   }, [openWheel, closeWheel, pick, use, act, sneak, say]);
+
+  // Mouse click/drag on empty ground while planning moves the planned-move indicator directly
+  useEffect(() => {
+    let dragging = false;
+    const isGroundTarget = (e: PointerEvent) => {
+      const s = live.current;
+      if (!s.visible || s.wheel.open || s.panel !== 'none' || !GMPlayerHud.planning()) return false;
+      const canvas = KotOR.GameState?.canvas || KotOR.GameState?.renderer?.domElement;
+      if (!canvas || e.target !== canvas) return false;
+      const hov = KotOR.GameState?.CursorManager?.hoveredObject;
+      if (hov && hov !== GMPlayerHud.player() && hov.isUseable?.()) return false;
+      return true;
+    };
+    const onDown = (e: PointerEvent) => {
+      if (e.button !== 0 || !isGroundTarget(e)) return;
+      dragging = true;
+      GMPlayerHud.pickPlannedMoveAtClientPoint(e.clientX, e.clientY, false);
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      if (!GMPlayerHud.planning()) { dragging = false; return; }
+      GMPlayerHud.pickPlannedMoveAtClientPoint(e.clientX, e.clientY, false);
+    };
+    const onUp = (e: PointerEvent) => {
+      if (!dragging || e.button !== 0) return;
+      dragging = false;
+      if (GMPlayerHud.planning()) GMPlayerHud.pickPlannedMoveAtClientPoint(e.clientX, e.clientY, true);
+    };
+    const onBlur = () => { dragging = false; };
+    window.addEventListener('pointerdown', onDown);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      window.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, []);
 
   // The controller (Xbox layout). KotOR's own pad bindings stay (stick moves, A interacts, B cancels, Y draws the
   // lightsaber, View sneaks, Menu is options); the buttons its hidden action menu had drive this HUD, and while one

@@ -719,10 +719,12 @@ export class GMPlayerHud {
     return this.active() && this.pacing()?.phase === 'plan';
   }
 
-  /** Where the player plans to go this round (moved by the movement keys or the left stick while planning) */
+  /** Where the player plans to go this round (moved by WASD, mouse click/drag, or the left stick while planning) */
   static plannedMove: THREE.Vector3 | null = null;
   /** The latest movement input while planning: its heading, and when (ms) */
   static steer: { facing: number; at: number } | null = null;
+  /** Per-frame accumulated WASD vector so simultaneous keys (e.g. W+D) move diagonally */
+  static steerVec: { x: number; y: number } = { x: 0, y: 0 };
   /** The planned move changed since it was sent */
   static moveDirty: boolean = false;
   /** This player said they are ready for this round */
@@ -741,8 +743,61 @@ export class GMPlayerHud {
   /** Movement input while planning steers the marker instead of the character (EngineHooks.steerPlannedMove) */
   static steerPlannedMove(creature: ModuleObject, facing: number): boolean {
     if (!this.planning() || creature !== this.player()) return false;
-    this.steer = { facing, at: performance.now() };
+    this.steerVec.x += Math.cos(facing + Math.PI / 2);
+    this.steerVec.y += Math.sin(facing + Math.PI / 2);
+    const len = Math.hypot(this.steerVec.x, this.steerVec.y);
+    const combinedFacing = len > 1e-4 ? Math.atan2(this.steerVec.y, this.steerVec.x) - Math.PI / 2 : facing;
+    this.steer = { facing: combinedFacing, at: performance.now() };
     return true;
+  }
+
+  /** Place the planned-move indicator directly at a world point (clamped to one round's run and snapped to walkmesh) */
+  static setPlannedMove(point: { x: number; y: number; z?: number }, sendNow: boolean = false): boolean {
+    const pc = this.player();
+    if (!this.planning() || !pc) return false;
+    const to = GMPacing.clampMove(pc.position, { x: point.x, y: point.y }, this.roundReach(pc));
+    const z = typeof point.z === 'number' && Number.isFinite(point.z) ? point.z : pc.position.z;
+    this.plannedMove = GMNpcOrders.walkable(new THREE.Vector3(to.x, to.y, z));
+    this.steer = null;
+    this.steerVec.x = 0;
+    this.steerVec.y = 0;
+    this.moveDirty = true;
+    (pc as any).force = 0;
+    (pc as any).controlled = false;
+    if (sendNow) this.sendPlannedMove();
+    return true;
+  }
+
+  /** Raycast from screen coordinates onto the walkmesh (or player ground plane) to move the planned-move indicator */
+  static pickPlannedMoveAtClientPoint(clientX: number, clientY: number, sendNow: boolean = false): boolean {
+    const pc = this.player();
+    if (!this.planning() || !pc) return false;
+    const canvas = (GameState.canvas || GameState.renderer?.domElement) as HTMLCanvasElement | undefined;
+    const cam = (GameState.currentCamera || GameState.followerCamera || GameState.camera) as THREE.Camera | undefined;
+    if (!canvas || !cam) return false;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return false;
+
+    const ndc = new THREE.Vector2(
+      ((clientX - rect.left) / rect.width) * 2 - 1,
+      -((clientY - rect.top) / rect.height) * 2 + 1
+    );
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(ndc, cam);
+
+    const walkTargets: THREE.Object3D[] = GameState.walkmeshList?.length ? [...GameState.walkmeshList] : [];
+    const hits = walkTargets.length ? raycaster.intersectObjects(walkTargets, true) : [];
+    if (hits.length > 0) {
+      return this.setPlannedMove(hits[0].point, sendNow);
+    }
+
+    // Fallback: intersect the horizontal plane at the player's feet
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -(pc.position?.z || 0));
+    const hit = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(plane, hit)) {
+      return this.setPlannedMove(hit, sendNow);
+    }
+    return false;
   }
 
   /** How far the character can run in one round (metres) */
@@ -760,6 +815,8 @@ export class GMPlayerHud {
       this.moveDirty = false;
       this.readySent = false;
       this.steer = null;
+      this.steerVec.x = 0;
+      this.steerVec.y = 0;
     }
     if (pacing !== this.planPacingRef) {
       this.planPacingRef = pacing;
@@ -767,14 +824,21 @@ export class GMPlayerHud {
       this.planSecondsLeft = pacing?.phase === 'plan' ? pacing.secondsLeft : undefined;
     }
     const pc = this.player();
-    if (!this.planning() || !pc) return;
+    if (!this.planning() || !pc) {
+      this.steerVec.x = 0;
+      this.steerVec.y = 0;
+      return;
+    }
     const now = performance.now();
-    if (this.steer && now - this.steer.at < 150) {
+    const vecLen = Math.hypot(this.steerVec.x, this.steerVec.y);
+    if (vecLen > 1e-4 || (this.steer && now - this.steer.at < 150)) {
       const from = this.plannedMove || pc.position;
       const step = this.roundReach(pc) / (CombatRound.ROUND_LENGTH / 1000) * this.MARKER_SPEED * delta;
+      const dx = vecLen > 1e-4 ? (this.steerVec.x / vecLen) : Math.cos(this.steer!.facing + Math.PI / 2);
+      const dy = vecLen > 1e-4 ? (this.steerVec.y / vecLen) : Math.sin(this.steer!.facing + Math.PI / 2);
       const to = GMPacing.clampMove(pc.position, {
-        x: from.x + Math.cos(this.steer.facing + Math.PI / 2) * step,
-        y: from.y + Math.sin(this.steer.facing + Math.PI / 2) * step,
+        x: from.x + dx * step,
+        y: from.y + dy * step,
       }, this.roundReach(pc));
       this.plannedMove = GMNpcOrders.walkable(new THREE.Vector3(to.x, to.y, from.z));
       this.moveDirty = true;
@@ -784,6 +848,8 @@ export class GMPlayerHud {
     } else if (this.moveDirty && (!this.steer || now - this.steer.at > 300)) {
       this.sendPlannedMove();
     }
+    this.steerVec.x = 0;
+    this.steerVec.y = 0;
   }
 
   static sendPlannedMove() {

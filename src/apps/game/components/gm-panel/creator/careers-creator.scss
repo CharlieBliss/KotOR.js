@@ -1,18 +1,41 @@
 // Extra layout styles for the Careers character creator (builds on creator.scss)
 
+.cc-careers-stage {
+  background: var(--cc-panel, #030b09);
+  border: 1px solid var(--cc-line, #1f7a62);
+  border-radius: var(--cc-radius, 10px);
+  padding: 12px 14px;
+  color: var(--cc-text, #72dfc0);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  .cc-chip {
+    background: var(--cc-panel-2, #071915);
+    color: var(--cc-text, #72dfc0);
+    &:hover { color: var(--cc-text-strong, #c7faea); }
+    &.on {
+      background: var(--cc-on, #0f4a3c);
+      color: var(--cc-text-strong, #c7faea);
+    }
+  }
+}
+
 .cc-xp-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 6px 10px;
-  margin-bottom: 10px;
-  border: 1px solid var(--cc-border, rgba(95, 195, 220, 0.35));
-  background: rgba(8, 22, 30, 0.55);
+  padding: 7px 10px;
+  margin-bottom: 4px;
+  border: 1px solid var(--cc-line, #1f7a62);
+  border-radius: 6px;
+  background: var(--cc-panel-2, #071915);
+  color: var(--cc-text, #72dfc0);
   font-size: 12px;
 
   strong {
-    color: #9be8ff;
+    color: var(--cc-text-strong, #c7faea);
     font-size: 13px;
   }
 }
@@ -26,26 +49,35 @@
 .cc-choice-card {
   text-align: left;
   padding: 10px;
-  border: 1px solid var(--cc-border, rgba(95, 195, 220, 0.35));
-  background: rgba(6, 18, 26, 0.55);
-  color: inherit;
+  border: 1px solid var(--cc-line, #1f7a62);
+  border-radius: 6px;
+  background: var(--cc-panel-2, #071915);
+  color: var(--cc-text, #72dfc0);
   cursor: pointer;
   display: flex;
   flex-direction: column;
   gap: 4px;
 
-  &:hover {
-    border-color: #8be4ff;
+  &:hover:not(:disabled) {
+    border-color: var(--cc-line-bright, #36d4a8);
+    color: var(--cc-text-strong, #c7faea);
   }
 
   &.on {
     border-color: #ffe27a;
-    background: rgba(34, 62, 76, 0.65);
+    background: var(--cc-on, #0f4a3c);
+    color: var(--cc-text-strong, #c7faea);
+  }
+
+  &:disabled {
+    opacity: 0.52;
+    cursor: not-allowed;
   }
 
   .cc-choice-title {
     font-weight: 600;
     font-size: 13px;
+    color: var(--cc-text-strong, #c7faea);
     display: flex;
     justify-content: space-between;
     gap: 6px;
@@ -53,24 +85,31 @@
 
   .cc-choice-meta {
     font-size: 11px;
-    opacity: 0.85;
+    color: var(--cc-text-dim, #4ea88e);
   }
 
   .cc-choice-desc {
     font-size: 11px;
-    opacity: 0.78;
+    color: var(--cc-text, #72dfc0);
     line-height: 1.35;
+    font-variant: normal;
+    letter-spacing: normal;
   }
 }
 
 .cc-char-row {
   display: grid;
-  grid-template-columns: 140px 1fr auto auto auto;
+  grid-template-columns: 150px 1fr auto auto auto;
   align-items: center;
   gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 6px 4px;
+  border-bottom: 1px solid rgba(114, 223, 192, 0.14);
   font-size: 12px;
+  color: var(--cc-text, #72dfc0);
+
+  strong {
+    color: var(--cc-text-strong, #c7faea);
+  }
 }
 
 .cc-skill-group {
@@ -81,7 +120,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    opacity: 0.8;
+    color: var(--cc-text-strong, #c7faea);
   }
 }
 
@@ -90,12 +129,14 @@
   grid-template-columns: 1fr auto auto auto;
   align-items: center;
   gap: 8px;
-  padding: 4px 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 5px 6px;
+  border-bottom: 1px solid rgba(114, 223, 192, 0.1);
   font-size: 12px;
+  color: var(--cc-text, #72dfc0);
 
   &.career {
-    background: rgba(95, 195, 220, 0.08);
+    background: rgba(54, 212, 168, 0.12);
+    color: var(--cc-text-strong, #c7faea);
   }
 }
 
@@ -109,9 +150,10 @@
 .cc-tree-node {
   text-align: left;
   padding: 8px;
-  border: 1px solid rgba(95, 195, 220, 0.35);
-  background: rgba(8, 22, 30, 0.55);
-  color: inherit;
+  border: 1px solid var(--cc-line, #1f7a62);
+  border-radius: 6px;
+  background: var(--cc-panel-2, #071915);
+  color: var(--cc-text, #72dfc0);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -120,7 +162,8 @@
 
   &.owned {
     border-color: #ffe27a;
-    background: rgba(48, 86, 98, 0.75);
+    background: var(--cc-on, #0f4a3c);
+    color: var(--cc-text-strong, #c7faea);
   }
 
   &.available {
@@ -128,7 +171,7 @@
   }
 
   &.locked {
-    opacity: 0.52;
+    opacity: 0.55;
     cursor: not-allowed;
   }
 
@@ -138,18 +181,21 @@
     gap: 6px;
     font-size: 12px;
     font-weight: 600;
+    color: var(--cc-text-strong, #c7faea);
   }
 
   .cc-node-cost {
     font-size: 11px;
-    opacity: 0.85;
+    color: var(--cc-text-dim, #4ea88e);
     white-space: nowrap;
   }
 
   .cc-node-desc {
     font-size: 11px;
-    opacity: 0.8;
+    color: var(--cc-text, #72dfc0);
     line-height: 1.3;
+    font-variant: normal;
+    letter-spacing: normal;
   }
 }
 

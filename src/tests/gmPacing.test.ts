@@ -282,3 +282,61 @@ describe('lasting effects end with a whole turn', () => {
     expect(GMPacing.turnAlignedSeconds(2)).toBeCloseTo(2, 5);
   });
 });
+
+describe('pause stability & combat continuity', () => {
+  test('hold() marks phase=plan before enemies pick intents so world stays held during enemy AI', () => {
+    let phaseDuringAi: string | undefined;
+    mockGMManager.updateNpcCombat.mockImplementationOnce(() => {
+      phaseDuringAi = GMPacing.phase;
+    });
+    GMPacing.update(0.1, scan());
+    expect(phaseDuringAi).toBe('plan');
+    expect(GMPacing.phase).toBe('plan');
+  });
+
+  test('time limit does not expire while the world is held by another pause', () => {
+    GMPacing.timeLimit = 10;
+    GMPacing.update(0.1, scan());
+    expect(GMPacing.phase).toBe('plan');
+    clock += 15000;
+    GMPacing.update(0.1, scan(), true);
+    expect(GMPacing.phase).toBe('plan');
+  });
+
+  test('scan() keeps fighting=true while a creature has active combat actions even after combatState drops', () => {
+    const hero: any = {
+      destroyed: false,
+      isDead: () => false,
+      getName: () => 'Hero',
+      getHP: () => 20,
+      getMaxHP: () => 20,
+      combatData: { combatState: false },
+      combatRound: { action: { actionType: CombatActionType.ATTACK, target: enemy }, scheduledActionList: [] },
+      actionQueue: [],
+    };
+    const foe: any = {
+      destroyed: false,
+      gmHidden: false,
+      isDead: () => false,
+      getName: () => 'Trooper',
+      isHostile: () => true,
+      combatData: { combatState: false },
+      combatRound: { action: null, scheduledActionList: [] },
+      actionQueue: [{ type: ActionType.ActionPhysicalAttacks, target: hero }],
+    };
+    mockGMManager.spawnedPlayers = [hero];
+    mockGMManager.findPlayerPeer = () => 'p1';
+    const gs: any = require("@/GameState").GameState;
+    gs.module = { area: { creatures: [hero, foe] } };
+
+    const result = GMPacing.scan();
+    expect(result.fighting).toBe(true);
+    expect(result.hostilesInCombat.has(foe)).toBe(true);
+
+    // Once both stop fighting (no combatState, no combat actions), fight ends
+    hero.combatRound.action = null;
+    foe.actionQueue = [];
+    const ended = GMPacing.scan();
+    expect(ended.fighting).toBe(false);
+  });
+});

@@ -262,6 +262,9 @@ export interface GMCareersNetworkState {
   cooldowns?: Record<string, number>;
 }
 
+/** Alignment on a Careers sheet (starts neutral at creation; shifts through story play) */
+export type CareerAlignment = 'neutral' | 'light' | 'dark';
+
 /**
  * Saved character under the Careers rule set. Kept separate from classic GMCharacter files and
  * explicitly tagged with `ruleset: 'careers'`.
@@ -300,7 +303,7 @@ export interface GMCareersCharacter {
   powers: number[];
   /** Purchased Force power tree nodes, keyed by power tree id (the root first) */
   powerNodes?: Record<string, string[]>;
-  alignment: 'light' | 'dark';
+  alignment: CareerAlignment;
   /** Starting XP spent during creation (does NOT count toward level) */
   startingXpSpent: number;
   /** Campaign XP awarded by the GM after creation */

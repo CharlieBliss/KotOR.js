@@ -25,16 +25,16 @@
 
   &[data-game="tsl"] {
     --cc-page: #000;
-    --cc-frame-bg: linear-gradient(135deg, #8a6a38 0%, #c9a463 22%, #6e5229 48%, #b48d4f 74%, #5a4220 100%);
+    --cc-frame-bg: linear-gradient(135deg, #6e542c 0%, #9c7e49 22%, #574020 48%, #8a6c3c 74%, #473318 100%);
     --cc-frame-edge: #3a2a12;
-    --cc-panel: #020807;
-    --cc-panel-2: #061411;
-    --cc-line: #1d6b57;
-    --cc-line-bright: #2fc39b;
-    --cc-text: #34b893;
-    --cc-text-dim: #1f7a63;
-    --cc-text-strong: #9ef0d6;
-    --cc-on: #0c3a2f;
+    --cc-panel: #030b09;
+    --cc-panel-2: #071915;
+    --cc-line: #1f7a62;
+    --cc-line-bright: #36d4a8;
+    --cc-text: #72dfc0;
+    --cc-text-dim: #4ea88e;
+    --cc-text-strong: #c7faea;
+    --cc-on: #0f4a3c;
     --cc-radius: 10px;
   }
 
@@ -329,6 +329,7 @@
   dd { margin: 0; text-align: right; color: var(--cc-text-strong); font-variant: normal; }
 }
 .cc-problems {
+  background: var(--cc-panel);
   border: 1px solid var(--cc-bad);
   border-radius: var(--cc-radius);
   padding: 8px 10px;
@@ -343,7 +344,14 @@
 
 // The saved list
 .cc-list { display: flex; flex-direction: column; gap: 6px; max-height: 56vh; overflow: auto; }
-.cc-empty { padding: 24px; text-align: center; color: var(--cc-text-dim); }
+.cc-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--cc-text);
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+}
 .cc-card {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr) auto;
@@ -360,7 +368,15 @@
 .cc-card-sub { color: var(--cc-text-dim); font-size: 12px; font-variant: normal; letter-spacing: normal; }
 .cc-card-actions { display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; }
 
-.cc-message { text-align: center; color: var(--cc-text-strong); font-size: 13px; }
+.cc-message {
+  text-align: center;
+  color: var(--cc-text-strong);
+  background: var(--cc-panel);
+  border: 1px solid var(--cc-line);
+  border-radius: var(--cc-radius);
+  padding: 5px 10px;
+  font-size: 13px;
+}
 
 // Bottom buttons: Back / Recommended / Save, as the game's button row
 .cc-buttons {
