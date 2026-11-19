@@ -513,7 +513,7 @@ export class Module {
 
   initEventQueue(){
     //Load module EventQueue after the area is intialized so that ModuleObject ID's are set
-    if(this.ifo.RootNode.hasField('EventQueue')){
+    if(this.ifo?.RootNode?.hasField('EventQueue')){
       let eventQueue = this.ifo.getFieldByLabel('EventQueue').getChildStructs();
       for(let i = 0; i < eventQueue.length; i++){
         let event_struct = eventQueue[i];

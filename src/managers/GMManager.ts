@@ -585,7 +585,13 @@ export class GMManager {
       );
     }
 
-    GameState.LoadModule(moduleResRef);
+    // A scene that won't load says so once and puts the game in the default scene, not on a stuck loading screen
+    GameState.LoadModule(moduleResRef).catch((e) => {
+      this.sceneLoading = false;
+      const fallback = this.defaultSceneModule();
+      GMNetworkManager.appendChat('System', `The "${moduleResRef}" area couldn't be loaded (${e?.message || e}).${moduleResRef === fallback ? '' : ` Loading ${fallback} instead.`}`);
+      if (GMNetworkManager.role !== 'client' && moduleResRef !== fallback) this.loadScene(fallback);
+    });
 
     // Once the new scene is up, bring the preserved players back (not awaited: callers only start the load)
     if (savedPlayerConfigs.length > 0 || savedNetworkPlayers.length > 0) {

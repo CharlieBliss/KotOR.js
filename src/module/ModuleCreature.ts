@@ -2843,24 +2843,29 @@ export class ModuleCreature extends ModuleObject {
     return this.walk;
   }
 
+  /** KotOR's usual speeds, for when a creature's tables don't give one (m/s) */
+  static DEFAULT_RUN_SPEED = 3.66;
+  static DEFAULT_WALK_SPEED = 1.75;
+
+  /**
+   * A speed from the tables: creaturespeed.2da's row for its walk rate, or (rate 7) its appearance's own. Always a
+   * usable number: a blank cell ('****') parsed to NaN, a missing row threw, and a NaN speed made its movement,
+   * its position, the camera on it and the audio listener NaN, every frame
+   */
+  private tableSpeed(column: 'runrate' | 'walkrate', appearanceField: 'rundist' | 'walkdist', fallback: number): number {
+    const usable = (v: any) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? n : undefined; };
+    const fromAppearance = usable((this.creatureAppearance as any)?.[appearanceField]);
+    if(this.getWalkRateId() == 7) return fromAppearance ?? fallback;
+    const row = GameState.TwoDAManager.datatables.get('creaturespeed')?.rows?.[this.getWalkRateId()];
+    return usable(row?.[column]) ?? fromAppearance ?? fallback;
+  }
+
   getRunSpeed(){
-    if(this.getWalkRateId() == 7){
-      return this.creatureAppearance?.rundist ?? 0;
-    }
-    const creaturespeed2DA = GameState.TwoDAManager.datatables.get('creaturespeed');
-    if(creaturespeed2DA){
-      return parseFloat(creaturespeed2DA.rows[this.getWalkRateId()].runrate);
-    }
+    return this.tableSpeed('runrate', 'rundist', ModuleCreature.DEFAULT_RUN_SPEED);
   }
 
   getWalkSpeed(){
-    if(this.getWalkRateId() == 7){
-      return this.creatureAppearance?.walkdist ?? 0;
-    }
-    const creaturespeed2DA = GameState.TwoDAManager.datatables.get('creaturespeed');
-    if(creaturespeed2DA){
-      return parseFloat(creaturespeed2DA.rows[this.getWalkRateId()].walkrate);
-    }
+    return this.tableSpeed('walkrate', 'walkdist', ModuleCreature.DEFAULT_WALK_SPEED);
   }
 
   getMovementSpeed(){
