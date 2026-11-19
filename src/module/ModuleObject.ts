@@ -508,7 +508,8 @@ export class ModuleObject {
         slower = Math.max(slower, Math.min(99, Math.max(0, percent)) / 100);
       }
     }
-    this.movementSpeed = faster * (1 - slower);
+    const speedScale = (this as any).careersRules?.getSpeedMultiplier?.() ?? 1;
+    this.movementSpeed = faster * (1 - slower) * speedScale;
   }
 
   /** What its effects decide, worked out again whenever one goes on or comes off */

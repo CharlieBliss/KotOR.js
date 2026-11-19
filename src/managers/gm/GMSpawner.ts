@@ -30,6 +30,7 @@ import { GMManager } from "@/managers/GMManager";
 import { GMViewport } from "@/managers/gm/GMViewport";
 import { GMReplication } from "@/managers/gm/GMReplication";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { CareersRuntime } from "@/managers/gm/careers/runtime";
 
 /** Spawning GM objects: creatures, placeables and player characters from presets, game templates or saved descriptions, and kits of them. */
 export class GMSpawner {
@@ -656,6 +657,9 @@ export class GMSpawner {
     }
     player.npcId = -1;
     player.load();
+    if (config.ruleset === 'careers' && config.careers) {
+      player.careersRules = new CareersRuntime({ ...config.careers }, player);
+    }
     GMManager.setCreatureHP(player, abilities.maxHp, abilities.maxHp);
 
     // Ensure runtime feats & spells are populated if not already

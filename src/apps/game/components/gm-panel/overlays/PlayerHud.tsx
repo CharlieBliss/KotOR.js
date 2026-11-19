@@ -338,6 +338,15 @@ const SelfFrame: React.FC<{ onOpenSheet: () => void }> = ({ onOpenSheet }) => {
             <em>Force {Math.max(0, Math.floor(fp))} / {maxFp}</em>
           </span>
         )}
+        {pc.careersRules && (() => {
+          const st = pc.careersRules.getStrainState();
+          return (
+            <span className={`gm-hud-bar strain ${st.windedSeconds > 0 ? 'winded' : ''}`} title={st.windedSeconds > 0 ? `Winded for ${Math.ceil(st.windedSeconds)}s: slowed, Strain abilities locked` : 'Strain (combat feats & pushes)'}>
+              <span style={{ width: pct(st.strain, st.maxStrain) }} />
+              <em>{st.windedSeconds > 0 ? `WINDED (${Math.ceil(st.windedSeconds)}s)` : `Strain ${Math.round(st.strain)} / ${st.maxStrain}`}</em>
+            </span>
+          );
+        })()}
       </span>
     </button>
   );

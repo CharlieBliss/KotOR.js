@@ -163,6 +163,33 @@ export interface CareerStarterPowerDef {
   description: string;
 }
 
+export interface CareersXpLogEntry {
+  amount: number;
+  reason: string;
+  at: number;
+}
+
+export type CareersPurchaseRequest =
+  | { kind: 'skill'; skillId: CareerSkillId }
+  | { kind: 'node'; specId: string; nodeId: string }
+  | { kind: 'specialization'; specId: string }
+  | { kind: 'power'; spellId: number };
+
+export type CareersPurchaseRecord = CareersPurchaseRequest & {
+  cost: number;
+  startingXpPaid: number;
+  campaignXpPaid: number;
+  at: number;
+};
+
+/** Live careers state synced from host to client in GMPlayerSheet */
+export interface GMCareersNetworkState {
+  character: GMCareersCharacter;
+  strain: number;
+  maxStrain: number;
+  windedSeconds: number;
+}
+
 /**
  * Saved character under the Careers rule set. Kept separate from classic GMCharacter files and
  * explicitly tagged with `ruleset: 'careers'`.
@@ -203,6 +230,10 @@ export interface GMCareersCharacter {
   campaignXpEarned: number;
   /** Campaign XP spent after creation (drives XP-derived level) */
   campaignXpSpent: number;
+  /** Log of GM XP awards (for advancement history) */
+  xpLog?: CareersXpLogEntry[];
+  /** Ordered post-creation purchases (for GM undo / full respec) */
+  purchases?: CareersPurchaseRecord[];
   /** Optional gear overrides (defaults to career's starting kit) */
   gear?: { rightHand?: string; leftHand?: string; armor?: string };
   updated: number;

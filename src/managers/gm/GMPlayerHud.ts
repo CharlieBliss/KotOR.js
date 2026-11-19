@@ -36,6 +36,8 @@ export interface GMHudAbility {
   aim: GMHudAim;
   /** Force points it costs (powers) */
   cost: number;
+  /** Strain cost (Careers combat feats or Force push) */
+  strainCost?: number;
   /** How many are carried (items) */
   count?: number;
   /** Can it be used right now, and if not, why not */
@@ -172,18 +174,28 @@ export class GMPlayerHud {
       entry: { action: { type: ActionType.ActionPhysicalAttacks } },
     });
 
+    const careers = pc.careersRules;
+
     // Combat feats: the best rank of each chain (Power Attack, not also its lesser ranks)
     for (const feat of GMCombatAI.bestRanks<any>(pc.getFeats?.() || [])) {
       if (feat?.category != MELEE_FEAT && feat?.category != RANGED_FEAT) continue;
       const forRanged = feat.category == RANGED_FEAT;
-      const usable = forRanged === ranged;
+      const strainCost = careers ? careers.getCombatFeatStrainCost(feat.id) : 0;
+      const windedBlock = !!(careers?.isWinded() && strainCost > 0);
+      const usable = forRanged === ranged && !windedBlock;
       const fRow = featRows?.[feat.id];
       out.push({
         key: `feat:${feat.id}`, kind: 'feat', name: CharacterRules.text(feat.name, feat.label || 'Combat feat'),
-        icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0, usable,
+        icon: String(feat.icon || '').toLowerCase(), aim: 'enemy', cost: 0,
+        ...(strainCost > 0 ? { strainCost } : {}),
+        usable,
         category: 'feat', isBestRank: true,
         description: CharacterRules.text(feat.description ?? fRow?.description, ''),
-        why: usable ? undefined : (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand'),
+        why: forRanged !== ranged
+          ? (forRanged ? 'Needs a ranged weapon in hand' : 'Needs a melee weapon in hand')
+          : windedBlock
+            ? 'Winded: can\'t spend Strain'
+            : undefined,
         entry: { talent: feat },
       });
     }
@@ -207,7 +219,15 @@ export class GMPlayerHud {
     const isFriendly = (s: any) => marked(s.forcefriendly);
     for (const spell of [...powers.filter(isHostile), ...powers.filter((s) => !isHostile(s) && isFriendly(s))]) {
       const cost = Number(spell.getForcePointCost?.(pc) ?? spell.forcepoints ?? 0) || 0;
-      const usable = cost <= fp;
+      const armorBlocked = !!spell.isBlockedByArmor?.(pc);
+      const canPushWithStrain = !!careers && !careers.isWinded();
+      const pushStrain = cost > fp && careers ? Math.ceil(cost - Math.max(0, fp)) * 2 : 0;
+      const usable = !armorBlocked && (cost <= fp || canPushWithStrain);
+      const why = armorBlocked
+        ? 'Can\'t be used in armour'
+        : cost > fp
+          ? (careers ? (careers.isWinded() ? 'Winded: can\'t push with Strain' : undefined) : `Needs ${cost} Force (you have ${Math.floor(fp)})`)
+          : undefined;
       const personal = String(spell.range || '').toUpperCase() === 'P';
       const sRow = spellRows?.[spell.id];
       const name = CharacterRules.text(spell.name, spell.label || `Power ${spell.id}`);
@@ -219,7 +239,9 @@ export class GMPlayerHud {
         onlyOn: GMCombatAI.powerTargetRule(spell.forcehostile),
         key: `power:${spell.id}`, kind: 'power', name,
         icon: String(spell.iconresref || '').toLowerCase(), aim: personal ? 'self' : hostile ? 'enemy' : 'ally',
-        cost, usable, why: usable ? undefined : `Needs ${cost} Force (you have ${Math.floor(fp)})`,
+        cost,
+        ...(pushStrain > 0 ? { strainCost: pushStrain } : {}),
+        usable, why,
         category,
         description: CharacterRules.text(spell.spelldesc ?? sRow?.spelldesc, ''),
         range: this.rangeLabel(spell.range ?? sRow?.range),

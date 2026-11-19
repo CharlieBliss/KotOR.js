@@ -129,6 +129,8 @@
     }
   }
   .gm-hud-target .gm-hud-bar.hp > span { background: var(--hud-side); }
+  .gm-hud-bar.strain > span { background: linear-gradient(90deg, #b88420, #e5b84b); }
+  .gm-hud-bar.strain.winded > span { background: linear-gradient(90deg, #b53434, #e05a5a); }
 
   // Planning a round (GMPacing): the banner, the planned move and what enemies are about to do
   .gm-hud-plan {

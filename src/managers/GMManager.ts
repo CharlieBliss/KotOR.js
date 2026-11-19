@@ -1408,6 +1408,12 @@ export class GMManager {
         GMPlayers.updateDownedPlayers(GMPlayers.downedTimer);
         GMPlayers.downedTimer = 0;
       }
+      // Careers Strain recovery and winded timers advance in world time on the host
+      for (const pc of this.spawnedPlayers) {
+        if (pc && !pc.destroyed && !pc.isDead?.() && pc.careersRules) {
+          pc.careersRules.tick(delta, !!pc.combatData?.combatState);
+        }
+      }
     }
 
     // Plan-then-play fights: the host holds the world for planning and plays one round at a time

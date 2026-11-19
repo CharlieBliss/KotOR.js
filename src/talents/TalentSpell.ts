@@ -14,6 +14,7 @@ import { TalentObjectType } from "@/enums/engine/TalentObjectType";
 import { TwoDAObject } from "@/resource/TwoDAObject";
 import { BitWise } from "@/utility/BitWise";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
+import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 
 const underscoreParser = (value: string = ''): number[] => {
   return value.split('_').map((val) => {
@@ -207,7 +208,26 @@ export class TalentSpell extends TalentObject {
     
   }
 
+  /** Whether equipped armour restricts this Force power (spells.2da forbiditemmask bit 0) */
+  isBlockedByArmor(oCaster?: ModuleObject): boolean {
+    if(!(this.forbiditemmask & 1)) return false;
+    const armor: any = (oCaster as any)?.equipment?.ARMOR;
+    if(!armor) return false;
+    const base = armor.getBaseItem?.() || armor.baseItem;
+    if(!base) return false;
+    const req = Number(base.requiredFeat0 ?? -1);
+    if(
+      req === CombatFeatType.ARMOUR_PROF_LIGHT ||
+      req === CombatFeatType.ARMOUR_PROF_MEDIUM ||
+      req === CombatFeatType.ARMOUR_PROF_HEAVY
+    ){
+      return true;
+    }
+    return !!base.armorCheckPen;
+  }
+
   useTalentOnObject(oTarget: ModuleObject, oCaster: ModuleObject){
+    if(this.isBlockedByArmor(oCaster)) return;
     super.useTalentOnObject(oTarget, oCaster);
 
     console.log('Talent.useTalentOnObject', this);

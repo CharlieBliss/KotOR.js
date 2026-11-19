@@ -7,10 +7,11 @@ import {
   EffectsSection, FeatsSection, OverviewSection, PowersSection, SkillsSection,
   type SheetActions, type SheetSectionProps,
 } from "@/apps/game/components/gm-panel/sheet/sections";
+import { CareersSheetSection } from "@/apps/game/components/gm-panel/sheet/CareersSheetSection";
 import "@/apps/game/components/gm-panel/creator/creator.scss";
 import "@/apps/game/components/gm-panel/sheet/sheet.scss";
 
-export type SheetSectionId = 'overview' | 'skills' | 'feats' | 'powers' | 'effects';
+export type SheetSectionId = 'overview' | 'skills' | 'feats' | 'powers' | 'effects' | 'careers';
 
 /** The sheet's tabs, in order. A new tab is one entry here and a section component. */
 export const SHEET_SECTIONS: { id: SheetSectionId; label: string; Section: React.FC<SheetSectionProps> }[] = [
@@ -79,14 +80,21 @@ export const CharacterSheet: React.FC<{
   if (!creature) return null;
 
   // XP toward the next level (exptable.2da: the total XP each level starts at)
-  const level = Number(creature.getTotalClassLevel?.()) || 1;
+  const careersChar = creature.careersRules?.character || creature.gmPlayerConfig?.careers;
+  const careersDerived = careersChar && KotOR.CareersRules ? KotOR.CareersRules.derive(careersChar) : null;
+  const level = careersDerived ? careersDerived.level : (Number(creature.getTotalClassLevel?.()) || 1);
   const expRows = KotOR.GameState.TwoDAManager.datatables.get('exptable')?.rows || {};
   const xp = Number(creature.experience) || 0;
   const thisLevelXp = Number(expRows[level - 1]?.xp) || 0;
   const nextLevelXp = Number(expRows[level]?.xp) || 0;
-  const progress = nextLevelXp > thisLevelXp ? Math.max(0, Math.min(1, (xp - thisLevelXp) / (nextLevelXp - thisLevelXp))) : 1;
-  const canLevelUp = !!creature.canLevelUp?.();
-  const classes = (creature.classes || []).map((c: any) => `${c.getName?.() || 'Class'} ${c.level}`).join(' / ');
+  const progress = careersDerived
+    ? ((careersChar.campaignXpSpent || 0) % 50) / 50
+    : (nextLevelXp > thisLevelXp ? Math.max(0, Math.min(1, (xp - thisLevelXp) / (nextLevelXp - thisLevelXp))) : 1);
+  const canLevelUp = !careersDerived && !!creature.canLevelUp?.();
+  // Hide the engine's placeholder class name on Careers characters
+  const classes = careersChar
+    ? `${KotOR.CAREERS_SPECIES_BY_ID?.get(careersChar.speciesId)?.name || careersChar.speciesId} ${KotOR.CAREERS_BY_ID?.get(careersChar.careerId)?.name || careersChar.careerId}`
+    : (creature.classes || []).map((c: any) => `${c.getName?.() || 'Class'} ${c.level}`).join(' / ');
   const goodEvil = Number(creature.getGoodEvil?.() ?? 50);
 
   const preview = {
@@ -101,6 +109,9 @@ export const CharacterSheet: React.FC<{
       armor: itemResRef(creature.equipment?.ARMOR),
     },
   };
+  const tabs = careersChar
+    ? [...SHEET_SECTIONS, { id: 'careers' as SheetSectionId, label: 'Careers & XP', Section: OverviewSection }]
+    : SHEET_SECTIONS;
   const Section = (SHEET_SECTIONS.find((s) => s.id === section) || SHEET_SECTIONS[0]).Section;
 
   return (
@@ -108,13 +119,15 @@ export const CharacterSheet: React.FC<{
       <div className="cc-frame wide sheet-frame" role="dialog" aria-label={`Character sheet: ${creature.getName?.()}`}>
         <div className="cc-titlebar">{gmView ? `Character sheet · ${creature.getName?.()}` : 'Character sheet'}</div>
         <nav className="cc-tabs" aria-label="Sections">
-          {SHEET_SECTIONS.map((s) => (
+          {tabs.map((s) => (
             <button key={s.id} className={`cc-tab ${section === s.id ? 'on' : ''}`} aria-current={section === s.id} onClick={() => setSection(s.id)}>{s.label}</button>
           ))}
         </nav>
         <div className="cc-body">
           <div className="cc-main">
-            <Section creature={creature} actions={actions} />
+            {section === 'careers' && careersChar
+              ? <CareersSheetSection creature={creature} gmView={gmView} />
+              : <Section creature={creature} actions={actions} />}
           </div>
           <aside className="cc-side" aria-label="Summary">
             <ModelPreview character={preview} />
@@ -126,10 +139,17 @@ export const CharacterSheet: React.FC<{
                   <div className="cc-hint">Level {level}</div>
                 </div>
               </div>
-              <div className="sheet-xp" aria-label={`Experience ${xp} of ${nextLevelXp}`}>
-                <div className="sheet-xp-bar"><div style={{ width: `${progress * 100}%` }} /></div>
-                <div className="cc-hint">{xp.toLocaleString()} / {nextLevelXp ? nextLevelXp.toLocaleString() : 'max'} XP</div>
-              </div>
+              {careersDerived ? (
+                <div className="sheet-xp" aria-label={`Available XP ${careersDerived.totalXpRemaining}`}>
+                  <div className="sheet-xp-bar"><div style={{ width: `${progress * 100}%` }} /></div>
+                  <div className="cc-hint">{careersDerived.totalXpRemaining} XP available · {careersChar.campaignXpSpent || 0} spent</div>
+                </div>
+              ) : (
+                <div className="sheet-xp" aria-label={`Experience ${xp} of ${nextLevelXp}`}>
+                  <div className="sheet-xp-bar"><div style={{ width: `${progress * 100}%` }} /></div>
+                  <div className="cc-hint">{xp.toLocaleString()} / {nextLevelXp ? nextLevelXp.toLocaleString() : 'max'} XP</div>
+                </div>
+              )}
               {canLevelUp && (
                 <button className="cc-button primary" onClick={() => actions.levelUp()} title={gmView ? 'Level this player up (the class\'s recommended picks)' : 'Level up with your class\'s recommended picks'}>
                   Auto level up

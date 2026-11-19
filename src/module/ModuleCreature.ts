@@ -68,6 +68,7 @@ import { ExperienceType } from "@/enums/engine/ExperienceType";
 import { ModuleObjectScript } from "@/enums/module/ModuleObjectScript";
 import { TalentObjectType } from "@/enums/engine/TalentObjectType";
 import { CombatFeatType } from "@/enums/combat/CombatFeatType";
+import type { ICareersCreatureRules } from "@/engine/CareersSeam";
 
 /**
 * ModuleCreature class.
@@ -104,6 +105,8 @@ export class ModuleCreature extends ModuleObject {
 
   challengeRating: number;
   classes: CreatureClass[];
+  /** Optional Careers rule-set seam (absent on enemies and classic KotOR characters) */
+  careersRules?: ICareersCreatureRules;
   comment: string;
   currentForce: number;
   currentHitPoints: number;
@@ -2672,8 +2675,12 @@ export class ModuleCreature extends ModuleObject {
     let baseac = 10;
     let classBonus = 0;
 
-    for(let i = 0; i < this.classes.length; i++){
-      classBonus += this.classes[i].getACBonus();
+    if(this.careersRules){
+      classBonus = this.careersRules.getDefenseBonus();
+    }else{
+      for(let i = 0; i < this.classes.length; i++){
+        classBonus += this.classes[i].getACBonus();
+      }
     }
 
     let armorAC = (this.equipment.ARMOR?.getACBonus() || 0);
@@ -2757,15 +2764,18 @@ export class ModuleCreature extends ModuleObject {
   }
 
   getFortitudeSave(){
-    return (this.fortitudeSaveThrow || 0) + (this.fortbonus || 0) + this.getSaveBonus(1);
+    const base = this.careersRules ? this.careersRules.getSaveBase('fortitude') : (this.fortitudeSaveThrow || 0);
+    return base + (this.fortbonus || 0) + this.getSaveBonus(1);
   }
 
   getReflexSave(){
-    return (this.reflexSaveThrow || 0) + (this.refbonus || 0) + this.getSaveBonus(2);
+    const base = this.careersRules ? this.careersRules.getSaveBase('reflex') : (this.reflexSaveThrow || 0);
+    return base + (this.refbonus || 0) + this.getSaveBonus(2);
   }
 
   getWillSave(){
-    return (this.willSaveThrow || 0) + (this.willbonus || 0) + this.getSaveBonus(3);
+    const base = this.careersRules ? this.careersRules.getSaveBase('will') : (this.willSaveThrow || 0);
+    return base + (this.willbonus || 0) + this.getSaveBonus(3);
   }
 
   getSaveBonus(saveType: number = 0): number {
