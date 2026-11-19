@@ -220,13 +220,16 @@ export class GMPlayerHud {
     for (const spell of [...powers.filter(isHostile), ...powers.filter((s) => !isHostile(s) && isFriendly(s))]) {
       const cost = Number(spell.getForcePointCost?.(pc) ?? spell.forcepoints ?? 0) || 0;
       const armorBlocked = !!spell.isBlockedByArmor?.(pc);
-      const canPushWithStrain = !!careers && !careers.isWinded();
-      const pushStrain = cost > fp && careers ? Math.ceil(cost - Math.max(0, fp)) * 2 : 0;
+      const pushCost = cost > fp && careers ? careers.strainToPush(cost, fp) : null;
+      const canPushWithStrain = pushCost !== null;
+      const pushStrain = pushCost || 0;
       const usable = !armorBlocked && (cost <= fp || canPushWithStrain);
       const why = armorBlocked
         ? 'Can\'t be used in armour'
         : cost > fp
-          ? (careers ? (careers.isWinded() ? 'Winded: can\'t push with Strain' : undefined) : `Needs ${cost} Force (you have ${Math.floor(fp)})`)
+          ? (careers
+            ? (careers.isWinded() ? 'Winded: can\'t push with Strain' : (canPushWithStrain ? undefined : `Needs ${cost} Force: too little Strain left to push`))
+            : `Needs ${cost} Force (you have ${Math.floor(fp)})`)
           : undefined;
       const personal = String(spell.range || '').toUpperCase() === 'P';
       const sRow = spellRows?.[spell.id];

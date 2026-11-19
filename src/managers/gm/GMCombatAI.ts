@@ -382,6 +382,8 @@ export class GMCombatAI {
     const kit: GMCombatKit = { heals: [], buffs: [], harms: [], grenades: [], meleeFeats: [], rangedFeats: [], meleeWeapons: [], rangedWeapons: [] };
 
     for (const spell of (npc.getSpells?.() || []) as TalentSpell[]) {
+      // A power its armour stops would be cast and do nothing, round after round
+      if (spell.isBlockedByArmor?.(npc)) continue;
       const entry = this.describeSpell(spell.id, { spell, cost: spell.getForcePointCost?.(npc) ?? 0 });
       this.sort(kit, entry, SPELL_ROW(spell.id));
     }

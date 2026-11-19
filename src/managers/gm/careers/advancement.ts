@@ -209,13 +209,27 @@ export class CareersAdvancement {
     // Engine skills
     derived.engineSkills.forEach((rank, i) => creature.skills?.[i]?.setRank(rank));
 
-    // Feats (exact sync)
+    // Feats and powers: the sheet's own, plus anything the GM granted by hand (not from the sheet before or now).
+    // Talents the creature already has are kept as they are, so their state survives
+    const previous = creature.careersRules instanceof CareersRuntime ? creature.careersRules.derived : undefined;
+    const sheetFeats = new Set(derived.featIds);
+    const oldSheetFeats = new Set(previous?.featIds || []);
     const featRows = GameState.TwoDAManager?.datatables?.get('feat')?.rows || {};
-    creature.feats = derived.featIds.map((id) => TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) }));
+    const haveFeats = new Map<number, any>((creature.feats || []).map((f: any) => [f.id, f]));
+    creature.feats = [
+      ...derived.featIds.map((id) => haveFeats.get(id) || TalentFeat.From2DA({ __index: id, ...(featRows[id] || {}) })),
+      ...[...haveFeats.values()].filter((f) => !sheetFeats.has(f.id) && !oldSheetFeats.has(f.id)),
+    ];
 
     // Force powers on placeholder class
     if (creature.classes?.[0]) {
-      creature.classes[0].spells = derived.spellIds.map((id) => new TalentSpell(id));
+      const sheetSpells = new Set(derived.spellIds);
+      const oldSheetSpells = new Set(previous?.spellIds || []);
+      const haveSpells = new Map<number, any>((creature.classes[0].spells || []).map((s: any) => [s.id, s]));
+      creature.classes[0].spells = [
+        ...derived.spellIds.map((id) => haveSpells.get(id) || new TalentSpell(id)),
+        ...[...haveSpells.values()].filter((s) => !sheetSpells.has(s.id) && !oldSheetSpells.has(s.id)),
+      ];
     }
 
     // Attach or refresh runtime rules seam

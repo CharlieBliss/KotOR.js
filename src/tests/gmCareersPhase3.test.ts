@@ -234,9 +234,29 @@ describe('Strain, Winded, combat feats paid in Strain, and Force pushing', () =>
     expect(rt.payForceCost(5, 2)).toEqual({ fpToSpend: 0, ok: false });
     expect(rt.payForceCost(5, 5)).toEqual({ fpToSpend: 5, ok: true });
   });
+
+  test('a push can tip Strain over by one point of Force at most, so no Force points is not free powers', () => {
+    const rt = new CareersRuntime(GMCareersCharacters.blank('human', 'jedi_guardian'), makeCreature());
+    // Max Strain 10: a 40 FP power with 0 FP would need 80 Strain
+    expect(rt.strainToPush(40, 0)).toBeNull();
+    expect(rt.payForceCost(40, 0)).toEqual({ fpToSpend: 0, ok: false });
+    expect(rt.strain).toBe(0);
+    // 6 missing FP is 12 Strain: 10 left plus one point's worth (2) is the most a push may take
+    expect(rt.strainToPush(6, 0)).toBe(12);
+    expect(rt.strainToPush(7, 0)).toBeNull();
+    expect(rt.strainToPush(5, 5)).toBe(0);
+  });
+
+  test('a feat queued before becoming winded gets KotOR penalties, not a free use', () => {
+    const rt = new CareersRuntime(GMCareersCharacters.blank('human', 'soldier'), makeCreature());
+    expect(rt.payCombatFeatStrain(CombatFeatType.POWER_ATTACK)).toBe(true);
+    rt.spendStrain(20); // winded
+    expect(rt.isWinded()).toBe(true);
+    expect(rt.payCombatFeatStrain(CombatFeatType.POWER_ATTACK)).toBe(false);
+  });
 });
 
-describe('Force powers in armour (forbiditemmask — both rule sets)', () => {
+describe('Force powers in armour (forbiditemmask — Careers characters only)', () => {
   test('blocks powers with forbiditemmask bit 0 when wearing light/medium/heavy armour, allows robes and unrestricted powers', () => {
     const speed = new TalentSpell(8);
     speed.forbiditemmask = 1;
@@ -246,10 +266,18 @@ describe('Force powers in armour (forbiditemmask — both rule sets)', () => {
     const lightArmor = { baseItem: { requiredFeat0: CombatFeatType.ARMOUR_PROF_LIGHT, armorCheckPen: true } };
     const jediRobe = { baseItem: { requiredFeat0: -1, armorCheckPen: false } };
 
-    const armored = makeCreature({ equipment: { ARMOR: lightArmor } });
-    const robed = makeCreature({ equipment: { ARMOR: jediRobe } });
-    const unarmored = makeCreature({ equipment: {} });
+    const careers = (cre: any) => {
+      const sheet = GMCareersCharacters.blank('human', 'jedi_guardian');
+      cre.careersRules = new CareersRuntime(sheet, cre);
+      return cre;
+    };
+    const armored = careers(makeCreature({ equipment: { ARMOR: lightArmor } }));
+    const robed = careers(makeCreature({ equipment: { ARMOR: jediRobe } }));
+    const unarmored = careers(makeCreature({ equipment: {} }));
+    // Classic characters, enemies and KotOR I keep KotOR's own rules
+    const classicArmored = makeCreature({ equipment: { ARMOR: lightArmor } });
 
+    expect(speed.isBlockedByArmor(classicArmored)).toBe(false);
     expect(speed.isBlockedByArmor(armored)).toBe(true);
     expect(speed.isBlockedByArmor(robed)).toBe(false);
     expect(speed.isBlockedByArmor(unarmored)).toBe(false);
@@ -326,5 +354,57 @@ describe('Advancement in play (live recomputation, undo, respec, network sync)',
     expect(sheet.campaignXpEarned).toBe(75);
     expect(cre.getHasFeat(CombatFeatType.ARMOUR_PROF_HEAVY)).toBe(false);
     expect(cre.classes[0].level).toBe(1);
+  });
+});
+
+describe('review fixes: purchases, GM grants, and the player keeping their character', () => {
+  test("a purchase request for a skill that doesn't exist is refused and books no XP", () => {
+    const sheet = GMCareersCharacters.blank('human', 'soldier');
+    sheet.name = 'Mira';
+    CareersAdvancement.awardXp(sheet, 50);
+    const res = CareersAdvancement.applyPurchase(sheet, { kind: 'skill', skillId: 'jedi_mind_tricks' as any });
+    expect(res.ok).toBe(false);
+    expect(sheet.campaignXpSpent).toBe(0);
+    expect(sheet.boughtSkillRanks).toEqual({});
+  });
+
+  test('an award or purchase keeps feats and powers the GM granted by hand, and drops what the sheet no longer has', () => {
+    const sheet = GMCareersCharacters.blank('human', 'soldier');
+    sheet.name = 'Carth';
+    const cre = makeCreature();
+    cre.careersRules = new CareersRuntime(sheet, cre);
+    CareersAdvancement.syncToCreature(cre, sheet);
+    // The GM hands out Sniper Shot through the Inspector
+    cre.feats.push(TalentFeat.From2DA({ __index: CombatFeatType.SNIPER_SHOT }));
+    CareersAdvancement.awardXp(sheet, 50);
+    expect(CareersAdvancement.applyPurchase(sheet, { kind: 'node', specId: 'commando', nodeId: 'r0c0' }).ok).toBe(true);
+    CareersAdvancement.syncToCreature(cre, sheet);
+    expect(cre.getHasFeat(CombatFeatType.SNIPER_SHOT)).toBe(true);
+    expect(cre.getHasFeat(CombatFeatType.POWER_ATTACK)).toBe(true);
+    // Undoing the purchase takes away the sheet's feat, not the GM's
+    CareersAdvancement.undoLastPurchase(sheet);
+    CareersAdvancement.syncToCreature(cre, sheet);
+    expect(cre.getHasFeat(CombatFeatType.POWER_ATTACK)).toBe(false);
+    expect(cre.getHasFeat(CombatFeatType.SNIPER_SHOT)).toBe(true);
+  });
+
+  test("the player's game saves the host's version of its character over the stored one, and never adds others", () => {
+    const store = new Map<string, string>();
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
+      setItem: (k: string, v: string) => { store.set(k, String(v)); },
+      removeItem: (k: string) => { store.delete(k); },
+    };
+    const made = GMCareersCharacters.blank('human', 'soldier');
+    made.name = 'Mira';
+    const saved = GMCareersCharacters.save(made);
+    const fromHost = { ...saved, campaignXpEarned: 75, xpLog: [{ amount: 75, reason: 'the ambush', at: 1 }] };
+    expect(GMCareersCharacters.keepFromSession(fromHost)).toBe(true);
+    expect(GMCareersCharacters.get(saved.id)?.campaignXpEarned).toBe(75);
+    // Nothing changed: no rewrite
+    expect(GMCareersCharacters.keepFromSession({ ...fromHost })).toBe(false);
+    // Someone else's character isn't added
+    expect(GMCareersCharacters.keepFromSession({ ...fromHost, id: 'car_someone_else' })).toBe(false);
+    expect(GMCareersCharacters.list()).toHaveLength(1);
   });
 });

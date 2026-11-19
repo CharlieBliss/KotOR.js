@@ -36,6 +36,8 @@ export interface ICareersCreatureRules {
    * Strain (2 Strain per missing FP) if not winded.
    */
   payForceCost(fpCost: number, currentFp: number): { fpToSpend: number; ok: boolean };
+  /** Strain a push would cost (0 when the Force points cover it), or null when the power can't be pushed */
+  strainToPush(fpCost: number, currentFp: number): number | null;
   /** Whether the creature is currently winded (unable to spend Strain and slowed) */
   isWinded(): boolean;
   /** Movement speed multiplier (1 normally, < 1 while winded) */

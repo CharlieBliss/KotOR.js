@@ -696,6 +696,8 @@ export class GMPlayers {
     this.applyingHostSheet = true;
     try {
       await this.applySheetToCharacter(cre, sheet);
+      // The GM's awards and our purchases go back into our own saved Careers character, so they come to the next session
+      if (sheet.careers?.character) GMCareersCharacters.keepFromSession(sheet.careers.character);
 
       const inventoryJson = JSON.stringify(sheet.inventory);
       if (inventoryJson !== this.lastAppliedInventoryJson) {
@@ -932,6 +934,9 @@ export class GMPlayers {
       if (cost > actor.getFP()) {
         if (actor.careersRules) {
           if (actor.careersRules.isWinded()) return `${name} is winded and cannot push with Strain.`;
+          if (actor.careersRules.strainToPush(cost, actor.getFP()) === null) {
+            return `Not enough Force or Strain: it needs ${cost} Force, ${name} has ${Math.floor(actor.getFP())} and too little Strain left to push.`;
+          }
         } else {
           return `Not enough Force: it needs ${cost}, ${name} has ${Math.floor(actor.getFP())}.`;
         }
@@ -1075,8 +1080,8 @@ export class GMPlayers {
         // Disable Droid on a person, and the like: it does nothing, so it isn't cast
         if (target !== actor && !GMCombatAI.worksOn(GMCombatAI.powerTargetRule(spell.forcehostile), target)) return false;
         const cost = Number(spell.getForcePointCost?.(actor) ?? 0);
-        // Only a Careers character can be winded (and then can't pay with Strain); classic characters never stop here
-        if (actor.careersRules?.isWinded() && cost > actor.getFP()) return false;
+        // Only a Careers character pushes with Strain (not while winded, nor past its Strain); classic characters never stop here
+        if (actor.careersRules && cost > actor.getFP() && actor.careersRules.strainToPush(cost, actor.getFP()) === null) return false;
         spell.useTalentOnObject(target, actor);
         return true;
       }

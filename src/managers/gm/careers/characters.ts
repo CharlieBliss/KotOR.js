@@ -48,6 +48,20 @@ export class GMCareersCharacters {
     return saved;
   }
 
+  /**
+   * A player's game: the host sent back our character as it now stands (XP awarded, purchases made). Save it over the
+   * stored character it was made from, when this machine has it and something changed. Never adds a character
+   */
+  static keepFromSession(character: GMCareersCharacter): boolean {
+    if (!this.isCareersCharacter(character) || !character.id) return false;
+    const stored = this.get(character.id);
+    if (!stored) return false;
+    const comparable = (c: GMCareersCharacter) => JSON.stringify({ ...c, updated: 0, startingXpSpent: 0 });
+    if (comparable(stored) === comparable({ ...stored, ...character })) return false;
+    this.save({ ...stored, ...character, id: stored.id });
+    return true;
+  }
+
   static remove(id: string) {
     this.write(this.list().filter((c) => c.id !== id));
   }

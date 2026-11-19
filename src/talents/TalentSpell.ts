@@ -208,8 +208,12 @@ export class TalentSpell extends TalentObject {
     
   }
 
-  /** Whether equipped armour restricts this Force power (spells.2da forbiditemmask bit 0) */
+  /**
+   * Whether equipped armour restricts this Force power (spells.2da forbiditemmask bit 0). A Careers rule: classic
+   * characters, enemies and KotOR I play as they always have
+   */
   isBlockedByArmor(oCaster?: ModuleObject): boolean {
+    if(!(oCaster as any)?.careersRules) return false;
     if(!(this.forbiditemmask & 1)) return false;
     const armor: any = (oCaster as any)?.equipment?.ARMOR;
     if(!armor) return false;

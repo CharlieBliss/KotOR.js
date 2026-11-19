@@ -331,6 +331,8 @@ export class CareersRules {
 
   /** Check whether a skill rank can be bought right now */
   static canBuySkillRank(c: GMCareersCharacter, skillId: CareerSkillId, atCreation: boolean = true, startingOnly: boolean = false): { ok: boolean; cost: number; nextRank: number; reason?: string } {
+    // A purchase can come from a player's request: a name outside the catalogue would book XP for nothing
+    if (!CAREER_SKILL_BY_ID.has(skillId)) return { ok: false, cost: 0, nextRank: 0, reason: `Unknown skill: ${skillId}.` };
     const derived = this.derive(c);
     const current = derived.skillRanks[skillId] || 0;
     const nextRank = current + 1;

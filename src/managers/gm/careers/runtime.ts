@@ -174,7 +174,8 @@ export class CareersRuntime implements ICareersCreatureRules {
   payCombatFeatStrain(featId: number): boolean {
     const cost = this.getCombatFeatStrainCost(featId);
     if (cost <= 0) return false;
-    this.spendStrain(cost);
+    // Winded (a feat queued before it came on): no Strain to pay, so KotOR's own penalties apply instead
+    if (!this.spendStrain(cost).ok) return false;
     return true;
   }
 
@@ -185,12 +186,25 @@ export class CareersRuntime implements ICareersCreatureRules {
   payForceCost(fpCost: number, currentFp: number): { fpToSpend: number; ok: boolean } {
     if (fpCost <= 0) return { fpToSpend: 0, ok: true };
     if (currentFp >= fpCost) return { fpToSpend: fpCost, ok: true };
-    if (this.isWinded()) return { fpToSpend: 0, ok: false };
-    const missingFp = Math.ceil(fpCost - Math.max(0, currentFp));
-    const strainCost = missingFp * CareersRuntime.STRAIN_PER_MISSING_FP;
+    const strainCost = this.strainToPush(fpCost, currentFp);
+    if (strainCost === null) return { fpToSpend: 0, ok: false };
     const paid = this.spendStrain(strainCost);
     if (!paid.ok) return { fpToSpend: 0, ok: false };
     return { fpToSpend: Math.max(0, currentFp), ok: true };
+  }
+
+  /**
+   * The Strain it takes to push a power the Force points don't cover (2 per missing point), or null when it can't
+   * be pushed: while winded, or when it needs more than the Strain left plus one point's worth. Without that limit a
+   * character with no Force points could cast any power, take the winded spell, and cast it again.
+   */
+  strainToPush(fpCost: number, currentFp: number): number | null {
+    const missingFp = Math.ceil(fpCost - Math.max(0, currentFp));
+    if (missingFp <= 0) return 0;
+    if (this.isWinded()) return null;
+    const strainCost = missingFp * CareersRuntime.STRAIN_PER_MISSING_FP;
+    const room = Math.max(0, this.derived.maxStrain - this.strain);
+    return strainCost > room + CareersRuntime.STRAIN_PER_MISSING_FP ? null : strainCost;
   }
 
   /** Advance Strain recovery and winded duration (world time in seconds) */
