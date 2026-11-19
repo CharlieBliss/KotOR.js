@@ -22,6 +22,12 @@ export const BASELINE_CAREER_FEATS: readonly number[] = [
   CombatFeatType.ARMOUR_PROF_MEDIUM,
 ];
 
+/**
+ * Granted to every Force-sensitive careers character as well: Jedi Defense (lightsaber deflection). KotOR II's Jedi
+ * robes require it to be worn (baseitems.2da reqfeat0 55), so without it a Jedi couldn't wear their starting robe.
+ */
+export const FORCE_SENSITIVE_BASELINE_FEATS: readonly number[] = [CombatFeatType.JEDI_DEFENSE];
+
 /** Force point base added to level * (4 + WIS mod) for Force-sensitive careers characters */
 export const CAREERS_FORCE_BASE = 10;
 
@@ -192,7 +198,8 @@ export const CAREERS_SPECIALIZATIONS: readonly CareerSpecializationDef[] = [
     nodes: [
       // Row 0 (5 XP) — open entry
       { id: 'r0c0', row: 0, col: 0, kind: 'feat', featId: CombatFeatType.FLURRY, label: 'Flurry', description: 'Strike with an extra lightsaber or melee attack per round (2 Strain).', links: ['r1c0'] },
-      { id: 'r0c1', row: 0, col: 1, kind: 'feat', featId: CombatFeatType.JEDI_DEFENSE, label: 'Jedi Defense', description: 'Deflect incoming blaster bolts with a lightsaber.', links: ['r1c1'] },
+      // (Jedi Defense itself comes free with Force sensitivity: FORCE_SENSITIVE_BASELINE_FEATS)
+      { id: 'r0c1', row: 0, col: 1, kind: 'feat', featId: CombatFeatType.ADVANCED_JEDI_DEFENSE, label: 'Improved Jedi Defense', description: 'Deflect blaster bolts more reliably with a lightsaber.', links: ['r1c1'] },
       { id: 'r0c2', row: 0, col: 2, kind: 'feat', featId: CombatFeatType.DUELING, label: 'Dueling', description: 'Bonus attack and defence when wielding a single blade.', links: ['r1c2'] },
       // Row 1 (10 XP)
       talentNode('r1c0', 1, 0, 'battle_focus', ['r0c0', 'r1c1', 'r2c0']),

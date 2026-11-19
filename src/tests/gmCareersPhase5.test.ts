@@ -19,6 +19,7 @@ import { EffectDamage } from "@/effects/EffectDamage";
 import { EffectForcePushed } from "@/effects/EffectForcePushed";
 import { EffectSetState } from "@/effects/EffectSetState";
 import { GameEffectSetStateType } from "@/enums/effects/GameEffectSetStateType";
+import { CombatFeatType } from "@/enums/combat/CombatFeatType";
 import { DamageType } from "@/enums/combat/DamageType";
 import { GameEffectDurationType } from "@/enums/effects/GameEffectDurationType";
 import { GameEffectType } from "@/enums/effects/GameEffectType";
@@ -32,6 +33,7 @@ import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { NWScriptDefK1 } from "@/nwscript/NWScriptDefK1";
 import {
   CAREERS_POWER_TREE_BY_ID,
+  CAREERS_SPECIALIZATIONS,
   CAREERS_POWER_TREES,
   CareersAdvancement,
   CareersRules,
@@ -379,5 +381,19 @@ describe('variants on the power wheel', () => {
     expect(GMPlayers.spellToCast(caster, FORCE_PUSH, 'yank')).toBeUndefined();
     expect(GMPlayers.spellToCast(caster, FORCE_WAVE, 'pull')).toBeUndefined();
     expect(GMPlayers.spellToCast(caster, FORCE_PUSH)?.careersVariant).toBeUndefined();
+  });
+});
+
+describe('Jedi Defense comes with Force sensitivity', () => {
+  test("every Force-sensitive character has it (KotOR II's robes need it); others don't; the tree sells the next rank", () => {
+    const has = (speciesId: string, careerId: string) => CareersRules.derive(GMCareersCharacters.blank(speciesId, careerId)).featIds.includes(CombatFeatType.JEDI_DEFENSE);
+    expect(has('human', 'jedi_guardian')).toBe(true);
+    expect(has('miraluka', 'soldier')).toBe(true); // Force-sensitive whatever the career
+    expect(has('human', 'soldier')).toBe(false);
+    expect(has('droid', 'soldier')).toBe(false);
+
+    const node = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'peacekeeper')!.nodes.find((n) => n.id === 'r0c1')!;
+    expect(node.featId).toBe(CombatFeatType.ADVANCED_JEDI_DEFENSE);
+    expect(CareersRules.canBuyNode(GMCareersCharacters.blank('human', 'jedi_guardian'), 'peacekeeper', 'r0c1', true).ok).toBe(true);
   });
 });

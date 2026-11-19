@@ -1,5 +1,6 @@
 import {
   BASELINE_CAREER_FEATS,
+  FORCE_SENSITIVE_BASELINE_FEATS,
   CAREERS_BY_ID,
   CAREERS_FORCE_BASE,
   CAREERS_POWER_BY_ID,
@@ -443,8 +444,10 @@ export class CareersRules {
   }
 
   /** Effective KotOR feat IDs: baseline proficiencies + bought feat nodes */
-  static ownedFeatIds(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId'>): Set<number> {
+  static ownedFeatIds(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId' | 'speciesId' | 'careerId'>): Set<number> {
     const featSet = new Set<number>(BASELINE_CAREER_FEATS);
+    // Force-sensitive characters have Jedi Defense from the start: blaster deflection, and KotOR II's robes need it
+    if (this.isForceSensitive(c)) for (const id of FORCE_SENSITIVE_BASELINE_FEATS) featSet.add(id);
     for (const { node } of this.ownedNodes(c)) {
       if (node.kind === 'feat' && typeof node.featId === 'number') featSet.add(node.featId);
     }
