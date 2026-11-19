@@ -1151,6 +1151,8 @@ export class ModuleCreature extends ModuleObject {
   }
 
   damage(amount = 0, oAttacker: ModuleObject, delayTime = 0){
+    // The mode may scale it (a GM's difficulty)
+    amount = GameState.hooks.scaleDamage(this, oAttacker, amount);
     if(delayTime){
       this.damageList.push({amount: amount, delay: delayTime});
     }else{

@@ -732,6 +732,8 @@ export class GMPlayerHud {
   /** When the hold began on this machine, and its seconds left then (the countdown) */
   static planStartedAt: number = 0;
   static planSecondsLeft: number | undefined;
+  /** The last pacing state seen from session rules, so mid-hold time-limit changes refresh the countdown */
+  static planPacingRef: GMPacingState | undefined;
 
   /** The marker moves this many times faster than the character runs, so a round's run is quick to set */
   static MARKER_SPEED = 2;
@@ -758,8 +760,11 @@ export class GMPlayerHud {
       this.moveDirty = false;
       this.readySent = false;
       this.steer = null;
+    }
+    if (pacing !== this.planPacingRef) {
+      this.planPacingRef = pacing;
       this.planStartedAt = performance.now();
-      this.planSecondsLeft = pacing?.secondsLeft;
+      this.planSecondsLeft = pacing?.phase === 'plan' ? pacing.secondsLeft : undefined;
     }
     const pc = this.player();
     if (!this.planning() || !pc) return;

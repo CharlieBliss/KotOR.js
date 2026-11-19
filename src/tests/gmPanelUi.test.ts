@@ -158,6 +158,11 @@ const mockKotOR: any = {
     derive: jest.fn(() => ({ level: 1 })),
   },
   careersRuntimeOf: jest.fn((): any => undefined),
+  GMDifficulty: {
+    enemyHp: 1, enemyDamage: 1, configure: jest.fn(),
+    readout: () => ({ party: { count: 0, hp: 0, ac: 10, damagePerRound: 0 }, enemies: { count: 0, hp: 0, ac: 10, damagePerRound: 0 }, partyRounds: Infinity, enemyRounds: Infinity, verdict: 'none' }),
+  },
+  GM_DIFFICULTY_STEPS: [0.5, 1, 2],
 };
 
 jest.mock("@/apps/game/KotOR", () => mockKotOR);

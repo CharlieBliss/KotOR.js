@@ -695,6 +695,17 @@
     gap: 6px;
   }
 
+  .gm-difficulty {
+    margin: 4px 0;
+    padding: 4px 8px;
+    font-size: 12px;
+    border-left: 3px solid #888;
+    &.verdict-easy { border-color: #5fbf5f; }
+    &.verdict-fair { border-color: #5fb0ff; }
+    &.verdict-hard { border-color: #e0a030; }
+    &.verdict-deadly { border-color: #e05050; }
+  }
+
   .gm-field {
     display: flex;
     flex-direction: column;

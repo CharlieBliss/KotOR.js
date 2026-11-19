@@ -13,6 +13,8 @@ import { ModuleItemProperty } from "@/enums/module/ModuleItemProperty";
 import { ModuleItem } from "@/module/ModuleItem";
 import { EffectSetState } from "@/effects/EffectSetState";
 import { EffectLightSaberThrow } from "@/effects/EffectLightSaberThrow";
+import { EffectDamage } from "@/effects/EffectDamage";
+import { TextSprite3D } from "@/engine/TextSprite3D";
 import { Dice } from "@/utility/Dice";
 import { GameState } from "@/GameState";
 
@@ -269,5 +271,37 @@ describe("a creature's speed is always a number", () => {
     cre.creatureAppearance = undefined;
     expect(cre.getRunSpeed()).toBe(ModuleCreature.DEFAULT_RUN_SPEED);
     delete (GameState as any).TwoDAManager;
+  });
+});
+
+describe("EffectDamage scaling feedback", () => {
+  test("a spell hit rounded to 0 by difficulty scaling doesn't pop up 'resisted'; 0 effective damage still does", () => {
+    const onceSpy = jest.spyOn(TextSprite3D, "CreateOnObjectOnce").mockImplementation(() => undefined as any);
+    const createSpy = jest.spyOn(TextSprite3D, "CreateOnObject").mockImplementation(() => undefined as any);
+    const origScale = GameState.hooks.scaleDamage;
+    try {
+      const target = creature({ subtractHP: jest.fn(), combatData: {} });
+      GameState.hooks.scaleDamage = () => 0;
+
+      const carried = new EffectDamage();
+      carried.setInt(0, 2);
+      carried.setSpellId(42);
+      carried.object = target;
+      carried.onApply();
+      expect(target.subtractHP).not.toHaveBeenCalled();
+      expect(onceSpy).not.toHaveBeenCalled();
+      expect(createSpy).not.toHaveBeenCalled();
+
+      // Genuine 0 effective damage (e.g. 100% immunity) still shows 'resisted'
+      target.effects.push(effect(GameEffectType.EffectDamageImmunityIncrease, 1, 100));
+      const resisted = new EffectDamage();
+      resisted.setInt(0, 2);
+      resisted.setSpellId(42);
+      resisted.object = target;
+      resisted.onApply();
+      expect(onceSpy).toHaveBeenCalledWith(target, "resisted", expect.anything(), 1500);
+    } finally {
+      GameState.hooks.scaleDamage = origScale;
+    }
   });
 });

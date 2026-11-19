@@ -54,6 +54,7 @@ import { GMMines } from "@/managers/gm/GMMines";
 import { GMSetPieces } from "@/managers/gm/GMSetPieces";
 import { GMChecks } from "@/managers/gm/GMChecks";
 import { GMPacing } from "@/managers/gm/GMPacing";
+import { GMDifficulty } from "@/managers/gm/GMDifficulty";
 import type { GMRuleset } from "@/managers/gm/careers/types";
 import { careersRuntimeOf } from "@/managers/gm/careers/runtime";
 import type { EngineHooks } from "@/engine/EngineHooks";
@@ -1540,6 +1541,7 @@ export class GMManager {
     alignEffectDuration: (seconds, effect) =>
       GMNetworkManager.role === 'client' || (effect && GMManager.COSMETIC_EFFECTS.has(effect.type)) ? seconds : GMPacing.turnAlignedSeconds(seconds),
     steerPlannedMove: (creature, facing) => GMPlayerHud.steerPlannedMove(creature, facing),
+    scaleDamage: (target, attacker, amount) => GMDifficulty.scale(target, attacker, amount),
     ownsCombatHud: () => GMPlayerHud.active(),
     padClaims: () => (GMPlayerHud.active() ? GMPlayerHud.padClaims : null),
     sharedWorld: () => GMNetworkManager.role !== 'offline',

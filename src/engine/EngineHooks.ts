@@ -59,6 +59,8 @@ export interface EngineHooks {
    * world holds while everyone plans), and the character stays where it is. False: it moves as usual
    */
   steerPlannedMove(creature: ModuleObject, facing: number): boolean;
+  /** Damage about to land on target from attacker: the mode may scale it (the GM's difficulty) */
+  scaleDamage(target: ModuleObject, attacker: ModuleObject | undefined, amount: number): number;
   /** The creature may not act (it is held by the mode) */
   isPlayerFrozen(creature: ModuleObject): boolean;
   /** The object is a player's character (knocked out when it falls, not a body to loot) */
@@ -153,6 +155,7 @@ export const DEFAULT_ENGINE_HOOKS: EngineHooks = {
   isWorldPaused: () => false,
   alignEffectDuration: (seconds) => seconds,
   steerPlannedMove: () => false,
+  scaleDamage: (_target, _attacker, amount) => amount,
   isPlayerFrozen: () => false,
   isPlayerCharacter: () => false,
   isNetworkContainer: () => false,

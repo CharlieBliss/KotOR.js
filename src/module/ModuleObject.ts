@@ -1757,7 +1757,8 @@ export class ModuleObject {
    * @param delayTime 
    */
   damage(amount = 0, oAttacker?: ModuleObject, delayTime = 0){
-    this.subtractHP(amount);
+    // The mode may scale it (a GM's difficulty)
+    this.subtractHP(GameState.hooks.scaleDamage(this, oAttacker, amount));
     this.combatData.lastDamager = oAttacker;
     this.combatData.lastAttacker = oAttacker;
     this.onDamaged();

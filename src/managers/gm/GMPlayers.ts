@@ -1076,6 +1076,10 @@ export class GMPlayers {
       this.tellPlayer(peerId, `${actor.getName()}'s queue is full: wait for what's queued, or Stop.`);
       return;
     }
+    // While planning, an order that clears the queue keeps the move already planned for the round
+    const plannedMove = (GMPacing.phase === 'plan' && intent.kind !== 'cancel' && meta.interrupts && !queues && !isInstantTalent)
+      ? ((actor.actionQueue as any) || []).find((a: any) => a?.gmPlannedMove)
+      : undefined;
     if (meta.interrupts && !queues && !isInstantTalent) actor.clearAllActions();
     const result = handler(actor, intent, peerId);
     if (!meta.interrupts) {
@@ -1083,7 +1087,10 @@ export class GMPlayers {
       return;
     }
     const report = (ok: boolean) => {
-      if (!isInstantTalent) actor.gmHostDriven = ok;
+      if (plannedMove && GMPacing.phase === 'plan' && !((actor.actionQueue as any) || []).some((a: any) => a?.gmPlannedMove)) {
+        actor.actionQueue.addFront(plannedMove);
+      }
+      if (!isInstantTalent) actor.gmHostDriven = ok || !!plannedMove;
       if (ok) GMLog.info('host', `${request}: on it`);
       else GMLog.warn('host', `${request}: can't be done`);
     };

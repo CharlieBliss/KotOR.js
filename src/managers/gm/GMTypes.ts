@@ -297,6 +297,8 @@ export interface GMSessionSave {
   players: GMSavedPlayer[];
   /** Added later; older saves use the default rules */
   rules?: GMSessionRules;
+  /** The GM's difficulty: enemies' vitality and the damage they deal, as multipliers (GMDifficulty) */
+  difficulty?: { enemyHp: number; enemyDamage: number };
   /** The scene's own objects the GM pinned (placed objects carry their own flag) */
   pinnedNetIds?: string[];
   /** Saved groups of the selection */

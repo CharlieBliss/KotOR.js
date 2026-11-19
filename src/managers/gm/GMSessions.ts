@@ -17,6 +17,7 @@ import type {
 } from "@/managers/gm/GMTypes";
 import { GMManager } from "@/managers/GMManager";
 import { GMPacing } from "@/managers/gm/GMPacing";
+import { GMDifficulty } from "@/managers/gm/GMDifficulty";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
 import { GMEditTools } from "@/managers/gm/GMEditTools";
@@ -223,6 +224,7 @@ export class GMSessions {
       doors,
       players,
       rules: GMManager.sessionRules(),
+      difficulty: { enemyHp: GMDifficulty.enemyHp, enemyDamage: GMDifficulty.enemyDamage },
       pinnedNetIds: pinnedNetIds.length ? pinnedNetIds : undefined,
       groups: groups.length ? groups : undefined,
       atmosphere: Object.keys(GMAtmosphere.current).length ? { ...GMAtmosphere.current } : undefined,
@@ -301,6 +303,7 @@ export class GMSessions {
       .filter(([, xp]) => Number.isFinite(xp) && xp >= 0));
     if (save.rules?.deathRule) GMPlayers.setDeathRule(save.rules.deathRule);
     if (save.rules?.tacticalPause) GMManager.setTacticalPause(!!save.rules.tacticalPause.enabled);
+    GMDifficulty.configure(save.difficulty || { enemyHp: 1, enemyDamage: 1 });
     GMPacing.configure(save.rules?.pacing
       ? { mode: save.rules.pacing.mode, everyRounds: save.rules.pacing.everyRounds, timeLimit: save.rules.pacing.timeLimit, showIntents: save.rules.pacing.showIntents }
       : { mode: 'off', everyRounds: 1, timeLimit: 0, showIntents: true });

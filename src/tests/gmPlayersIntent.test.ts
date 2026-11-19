@@ -6,6 +6,7 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 
 import * as THREE from "three";
 import { GMPlayers } from "@/managers/gm/GMPlayers";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
@@ -141,5 +142,33 @@ describe("GMPlayers rules, intents, and refusal explanations", () => {
     GMPlayers.applyClientIntentOnHost("peer_1", { seq: 4, netId: "pc_1", kind: "attack", targetNetId: "npc_1" });
     expect(pc.clearAllActions).not.toHaveBeenCalled();
     expect(pc.gmHostDriven).toBe(true);
+  });
+
+  test("during planning, an attack after a planned move keeps the move at the front; cancel drops it", () => {
+    const queue: any = [];
+    queue.addFront = (a: any) => queue.unshift(a);
+    const plannedMove = { gmPlannedMove: true };
+    const pc = makeActor("pc_1", {
+      actionQueue: queue,
+      clearAllActions: jest.fn(() => { queue.length = 0; }),
+      attackCreature: jest.fn(() => { queue.push({ kind: "attack" }); }),
+    });
+    makeActor("npc_1", { gmOwnerPeerId: undefined });
+    queue.push(plannedMove);
+
+    GMPacing.phase = "plan";
+    try {
+      GMPlayers.applyClientIntentOnHost("peer_1", { seq: 5, netId: "pc_1", kind: "attack", targetNetId: "npc_1" });
+      expect(pc.attackCreature).toHaveBeenCalled();
+      expect(queue[0]).toBe(plannedMove);
+      expect(queue[1]).toEqual({ kind: "attack" });
+      expect(pc.gmHostDriven).toBe(true);
+
+      // Cancel (Stop) still clears the planned move
+      GMPlayers.applyClientIntentOnHost("peer_1", { seq: 6, netId: "pc_1", kind: "cancel" });
+      expect(queue).toHaveLength(0);
+    } finally {
+      GMPacing.phase = "off";
+    }
   });
 });

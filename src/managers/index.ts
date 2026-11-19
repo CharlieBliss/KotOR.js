@@ -58,6 +58,7 @@ export * from "@/managers/gm/GMLog";
 export * from "@/managers/gm/GMPlayerRequests";
 export * from "@/managers/gm/GMCombatAI";
 export * from "@/managers/gm/GMPacing";
+export * from "@/managers/gm/GMDifficulty";
 export * from "@/managers/gm/careers";
 export * from "@/managers/gm/GMHistory";
 export * from "@/managers/gm/GMEditTools";

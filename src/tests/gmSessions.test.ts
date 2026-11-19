@@ -7,6 +7,8 @@ jest.mock("@/engine/FollowerCamera", () => ({ FollowerCamera: {} }));
 import * as THREE from "three";
 import { GameState } from "@/GameState";
 import { GMSessions } from "@/managers/gm/GMSessions";
+import { GMDifficulty } from "@/managers/gm/GMDifficulty";
+import { GMPacing } from "@/managers/gm/GMPacing";
 import { GMManager } from "@/managers/GMManager";
 import { GMNetworkManager } from "@/managers/GMNetworkManager";
 import { GMSpawner } from "@/managers/gm/GMSpawner";
@@ -226,8 +228,17 @@ describe("GMSessions blueprints, persistence cap & loadSession", () => {
       ],
     };
 
+    GMDifficulty.configure({ enemyHp: 2, enemyDamage: 1.5 });
+    GMPacing.configure({ mode: "every", timeLimit: 30, showIntents: false });
+
     const ok = await GMSessions.loadSession(save);
     expect(ok).toBe(true);
+    // Older save without difficulty/pacing resets both back to defaults
+    expect(GMDifficulty.enemyHp).toBe(1);
+    expect(GMDifficulty.enemyDamage).toBe(1);
+    expect(GMPacing.mode).toBe("off");
+    expect(GMPacing.timeLimit).toBe(0);
+    expect(GMPacing.showIntents).toBe(true);
     expect(setPiecesSpy).toHaveBeenCalledWith(save.sets);
     expect(door.setLocked).toHaveBeenCalledWith(true);
     expect(door.openDoor).toHaveBeenCalledWith(door);

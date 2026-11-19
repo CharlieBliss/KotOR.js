@@ -326,3 +326,33 @@ describe('descriptions, spell chains & active effects', () => {
     expect(byKey.get('item:medpac')).toMatchObject({ category: 'item', description: 'Restores 30 vitality.' });
   });
 });
+
+describe('planning countdown', () => {
+  test('refreshes secondsLeft when the GM adds or changes a time limit mid-hold', () => {
+    GMPlayerHud.planRound = -1;
+    GMPlayerHud.planPacingRef = undefined;
+    GMPlayerHud.planSecondsLeft = undefined;
+    (GMNetworkManager as any).sessionRules = {
+      deathRule: 'kotor',
+      pacing: { mode: 'every', phase: 'plan', round: 1, ready: [], waiting: ['Hero'], timeLimit: 0, showIntents: true },
+    };
+    GMPlayerHud.updatePlannedMove(0.016);
+    expect(GMPlayerHud.planSecondsLeftNow()).toBeUndefined();
+
+    // GM turns on a 15 s time limit during the same round
+    (GMNetworkManager as any).sessionRules = {
+      deathRule: 'kotor',
+      pacing: { mode: 'every', phase: 'plan', round: 1, ready: [], waiting: ['Hero'], secondsLeft: 15, timeLimit: 15, showIntents: true },
+    };
+    GMPlayerHud.updatePlannedMove(0.016);
+    expect(GMPlayerHud.planSecondsLeftNow()).toBe(15);
+
+    // GM turns the limit back off mid-hold
+    (GMNetworkManager as any).sessionRules = {
+      deathRule: 'kotor',
+      pacing: { mode: 'every', phase: 'plan', round: 1, ready: [], waiting: ['Hero'], timeLimit: 0, showIntents: true },
+    };
+    GMPlayerHud.updatePlannedMove(0.016);
+    expect(GMPlayerHud.planSecondsLeftNow()).toBeUndefined();
+  });
+});

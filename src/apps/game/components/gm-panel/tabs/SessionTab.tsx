@@ -1,10 +1,57 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import * as KotOR from "@/apps/game/KotOR";
 import {
   GMManager, GMNetworkManager, GMPlayers, GMSessions, useGMStore,
 } from "@/apps/game/components/gm-panel/gmPanelStore";
 import type { DrawerTab } from "@/apps/game/components/gm-panel/gmPanelStore";
 import type { GMJoinForm } from "@/apps/game/components/gm-panel/overlays/JoinCard";
+
+const VERDICT_TEXT: Record<string, string> = {
+  none: 'No fight in sight', easy: 'Easy', fair: 'Fair fight', hard: 'Hard', deadly: 'Deadly',
+};
+
+const rounds = (n: number) => (n > 50 ? 'more than 50 rounds' : Number.isFinite(n) ? `${Math.max(1, Math.round(n))} round${Math.round(n) === 1 ? '' : 's'}` : 'never');
+
+/**
+ * The GM's difficulty: enemies' vitality and damage as multipliers (any time, mid-fight too), and the party against
+ * the enemies in the scene, from their weapons, measured every few seconds while the tab is open
+ */
+const DifficultySection: React.FC<{ active: boolean }> = ({ active }) => {
+  const D = KotOR.GMDifficulty;
+  const [readout, setReadout] = useState(() => D.readout());
+  useEffect(() => {
+    if (!active) return;
+    setReadout(D.readout());
+    const id = window.setInterval(() => setReadout(D.readout()), 2000);
+    return () => window.clearInterval(id);
+  }, [active, D.enemyHp, D.enemyDamage]);
+  const step = (value: number, set: (n: number) => void, label: string, title: string) => (
+    <label className="gm-field" title={title}>
+      <span>{label}</span>
+      <select className="gm-input" value={value} onChange={(e) => set(Number(e.target.value))}>
+        {KotOR.GM_DIFFICULTY_STEPS.map((s) => <option key={s} value={s}>{s === 1 ? '×1 (as the game has it)' : `×${s}`}</option>)}
+      </select>
+    </label>
+  );
+  return (
+    <div className="gm-section">
+      <div className="gm-section-title">Difficulty</div>
+      {step(D.enemyHp, (n) => D.configure({ enemyHp: n }), 'Enemy vitality', 'Enemies hostile to the players take this much more punishment (they take less damage)')}
+      {step(D.enemyDamage, (n) => D.configure({ enemyDamage: n }), 'Enemy damage', 'Damage enemies deal to player characters')}
+      <div className={`gm-difficulty verdict-${readout.verdict}`} role="status">
+        <strong>{VERDICT_TEXT[readout.verdict]}</strong>
+        {readout.verdict !== 'none' && (
+          <span>
+            {' '}· {readout.party.count} player{readout.party.count === 1 ? '' : 's'} ({readout.party.hp} HP, {readout.party.damagePerRound}/round)
+            {' '}vs {readout.enemies.count} enem{readout.enemies.count === 1 ? 'y' : 'ies'} ({readout.enemies.hp} HP, {readout.enemies.damagePerRound}/round)
+            {' '}· the party wins in about {rounds(readout.partyRounds)}, falls in about {rounds(readout.enemyRounds)}
+          </span>
+        )}
+      </div>
+      <div className="gm-hint">From weapons only: powers, grenades and healing aren't counted. Changes apply at once, mid-fight too.</div>
+    </div>
+  );
+};
 
 /** Session tab: hosting or joining, session rules, saved sessions, and chat */
 export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab) => void; join: GMJoinForm }> = React.memo(({ active, onOpenTab, join }) => {
@@ -216,6 +263,7 @@ export const SessionTab: React.FC<{ active: boolean; onOpenTab: (tab: DrawerTab)
           </label>
           <div className="gm-hint">Only during fights. Players steer their move with the movement keys and press Ready (Space or R3); you can press Go any time. Change it mid-fight to speed up an easy one.</div>
         </div>
+        <DifficultySection active={active} />
         {KotOR.GameState.GameKey === KotOR.GameEngineType.TSL && (
           <div className="gm-section">
             <div className="gm-section-title">Rule set</div>

@@ -6,6 +6,7 @@ import { TextSprite3DType } from "@/enums/engine/TextSprite3DType";
 import { ModuleObjectType } from "@/enums/module/ModuleObjectType";
 import { TextSprite3D } from "@/engine/TextSprite3D";
 import { BitWise } from "@/utility/BitWise";
+import { GameState } from "@/GameState";
 import type { ModuleCreature } from "@/module/ModuleCreature";
 
 /**
@@ -54,14 +55,16 @@ export class EffectDamage extends GameEffect {
     super.onApply();
     
     if(BitWise.InstanceOf(this.object?.objectType, ModuleObjectType.ModuleObject)){
-      const damage = this.calculateEffectiveDamage();
+      const effective = this.calculateEffectiveDamage();
+      // The mode may scale it (a GM's difficulty)
+      const damage = GameState.hooks.scaleDamage(this.object, this.creator, effective);
       if(damage > 0){
         this.object.subtractHP(damage);
       }
       if(!this.mirrored && this.getSpellId() >= 0){
         // None of it got through: "resisted", once, however many of the power's effects say so
         if(damage > 0) TextSprite3D.CreateOnObject(this.object, damage.toString(), TextSprite3DType.HOSTILE, 1500);
-        else TextSprite3D.CreateOnObjectOnce(this.object, 'resisted', TextSprite3DType.NEUTRAL, 1500);
+        else if(effective <= 0) TextSprite3D.CreateOnObjectOnce(this.object, 'resisted', TextSprite3DType.NEUTRAL, 1500);
       }
       if(this.object.combatData){
         this.object.combatData.lastDamager = this.creator;
