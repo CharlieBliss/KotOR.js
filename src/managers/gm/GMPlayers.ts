@@ -443,6 +443,8 @@ export class GMPlayers {
     const careers = (actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers);
     if (careers) {
       if (!CareersAdvancement.awardXp(careers, xp, reason)) return false;
+      // The host's record of what it awarded, which a later join is held to
+      this.recordCareersXp(GMNetworkManager.peers.get(peerId)?.name, xp);
       CareersAdvancement.syncToCreature(actor, careers);
       const note = reason ? ` (${reason})` : '';
       GMNetworkManager.sendChatTo(peerId, 'GM', `You gained ${xp} campaign XP${note}.`);
@@ -468,6 +470,8 @@ export class GMPlayers {
       const careers = actor.careersRules instanceof CareersRuntime ? actor.careersRules.character : actor.gmPlayerConfig?.careers;
       if (!careers) continue;
       if (!CareersAdvancement.awardXp(careers, xp, reason)) continue;
+      // A connected player's award goes in the host's record (the GM's own characters never join)
+      if (actor.gmOwnerPeerId) this.recordCareersXp(GMNetworkManager.peers.get(actor.gmOwnerPeerId)?.name, xp);
       CareersAdvancement.syncToCreature(actor, careers);
       awarded++;
       if (actor.gmOwnerPeerId) {
