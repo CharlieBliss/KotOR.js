@@ -327,9 +327,10 @@ describe('Advancement in play (live recomputation, undo, respec, network sync)',
 
     expect(sheet.campaignXpSpent).toBe(55);
     expect(cre.classes[0].level).toBe(2);
-    expect(cre.maxHitPoints).toBe(22); // hpBase 10 + 2 * (6 + 0)
+    expect(cre.maxHitPoints).toBe(26); // hpBase 10 + 2 * (6 + 0) + Toughened (4)
     expect(cre.getHasFeat(CombatFeatType.ARMOUR_PROF_HEAVY)).toBe(true);
-    expect(cre.getHasFeat(CombatFeatType.MASTER_POWER_ATTACK)).toBe(true);
+    expect(cre.getHasFeat(CombatFeatType.POWER_ATTACK)).toBe(true);
+    expect((cre.careersRules as CareersRuntime).derived.talentRanks.lethal_blows).toBe(1);
 
     // Network sheet carries live careers state and restores it on a client replica
     (cre.careersRules as CareersRuntime).spendStrain(4);

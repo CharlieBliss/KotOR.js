@@ -51,6 +51,7 @@ export const CareersCreator: React.FC<{
   const [draft, setDraft] = useState<GMCareersCharacter | null>(() => (startEditing ? Store.blank() : null));
   const [step, setStep] = useState<StepId>('species');
   const [spendTab, setSpendTab] = useState<'tree' | 'skills' | 'powers'>('tree');
+  const [pickingCharNode, setPickingCharNode] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -105,7 +106,7 @@ export const CareersCreator: React.FC<{
       if (!career) return {};
       const startingSpecId = career.specializations[0];
       return {
-        careerId: career.id, startingSpecId, specializations: [startingSpecId], nodes: { [startingSpecId]: [] },
+        careerId: career.id, startingSpecId, specializations: [startingSpecId], nodes: { [startingSpecId]: [] }, nodeChoices: {},
         freeCareerSkills: [], freeSpecSkills: [], gear: KotOR.CareersRules.kitFor(career.id, sp.id),
       };
     })();
@@ -140,6 +141,7 @@ export const CareersCreator: React.FC<{
       freeSpecSkills: [],
       freeSpeciesSkills: [],
       nodes: { [startingSpecId]: [] },
+      nodeChoices: {},
       powers: forceOk ? draft.powers : [],
       gear: KotOR.CareersRules.kitFor(career.id, draft.speciesId),
     });
@@ -235,22 +237,42 @@ export const CareersCreator: React.FC<{
     update({ boughtSkillRanks: { ...draft.boughtSkillRanks, [skillId]: bought + 1 } });
   };
 
-  const toggleNode = (nodeId: string) => {
+  const toggleNode = (nodeId: string, ability?: CareerAbilityKey) => {
     const owned = draft.nodes[spec.id] || [];
+    const node = spec.nodes.find((n) => n.id === nodeId);
     if (owned.includes(nodeId)) {
       if (!Rules.canRemoveNode(draft, spec.id, nodeId)) {
         setMessage('Refund lower linked nodes first.');
         return;
       }
-      update({ nodes: { ...draft.nodes, [spec.id]: owned.filter((id) => id !== nodeId) } });
+      const nextChoices = { ...(draft.nodeChoices || {}) };
+      delete nextChoices[Rules.nodeChoiceKey(spec.id, nodeId)];
+      setPickingCharNode(null);
+      update({ nodes: { ...draft.nodes, [spec.id]: owned.filter((id) => id !== nodeId) }, nodeChoices: nextChoices });
       return;
     }
-    const check = Rules.canBuyNode(draft, spec.id, nodeId, true);
+    if (node?.kind === 'characteristic' && !ability) {
+      const check = Rules.canBuyNode(draft, spec.id, nodeId, true);
+      if (!check.ok) {
+        if (check.reason) setMessage(check.reason);
+        return;
+      }
+      setPickingCharNode(pickingCharNode === nodeId ? null : nodeId);
+      return;
+    }
+    const check = Rules.canBuyNode(draft, spec.id, nodeId, true, ability);
     if (!check.ok) {
       if (check.reason) setMessage(check.reason);
       return;
     }
-    update({ nodes: { ...draft.nodes, [spec.id]: [...owned, nodeId] } });
+    setPickingCharNode(null);
+    const nextChoices = ability
+      ? { ...(draft.nodeChoices || {}), [Rules.nodeChoiceKey(spec.id, nodeId)]: ability }
+      : draft.nodeChoices;
+    update({
+      nodes: { ...draft.nodes, [spec.id]: [...owned, nodeId] },
+      ...(nextChoices ? { nodeChoices: nextChoices } : {}),
+    });
   };
 
   const togglePower = (spellId: number) => {
@@ -468,6 +490,14 @@ export const CareersCreator: React.FC<{
                         const check = Rules.canBuyNode(draft, spec.id, node.id, true);
                         const cost = Rules.nodeCost(node.row);
                         const cls = owned ? 'owned' : check.ok ? 'available' : 'locked';
+                        const talent = node.kind === 'talent' && node.talentId ? KotOR.CAREERS_TALENT_BY_ID.get(node.talentId) : undefined;
+                        const chosenAbility = node.kind === 'characteristic' ? draft.nodeChoices?.[Rules.nodeChoiceKey(spec.id, node.id)] : undefined;
+                        const tag = node.kind === 'talent'
+                          ? (talent?.activation === 'active' ? `Active · ${talent.strainCost || 0} Strain` : 'Passive talent')
+                          : node.kind === 'feat' ? 'Feat'
+                          : node.kind === 'career_skill' ? 'Career skill'
+                          : node.kind === 'characteristic' ? (chosenAbility ? `+1 ${chosenAbility.toUpperCase()}` : '+1 Characteristic')
+                          : 'Capstone (Lv.17+)';
                         return (
                           <button
                             key={node.id}
@@ -479,11 +509,31 @@ export const CareersCreator: React.FC<{
                               <span>{node.label}</span>
                               <span className="cc-node-cost">{owned ? 'Owned' : `${cost} XP`}</span>
                             </div>
+                            <div className="cc-choice-meta">{tag}</div>
                             <div className="cc-node-desc">{node.description}</div>
                           </button>
                         );
                       })}
                     </div>
+                    {pickingCharNode && (
+                      <div className="cc-free-chips" style={{ marginTop: 8 }}>
+                        <span className="cc-hint">Pick +1 characteristic for Dedication:</span>
+                        {KotOR.CAREER_ABILITIES.map((ab) => {
+                          const cur = d.effectiveCharacteristics[ab];
+                          return (
+                            <button
+                              key={ab}
+                              className="cc-chip"
+                              disabled={cur >= 6}
+                              onClick={() => toggleNode(pickingCharNode, ab)}
+                            >
+                              {KotOR.CAREER_ABILITY_LABELS[ab].short} ({cur} → {cur + 1})
+                            </button>
+                          );
+                        })}
+                        <button className="cc-chip" onClick={() => setPickingCharNode(null)}>Cancel</button>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -612,7 +662,7 @@ export const CareersCreator: React.FC<{
                 {KotOR.CAREER_ABILITIES.map((k) => (
                   <React.Fragment key={k}>
                     <dt>{KotOR.CAREER_ABILITY_LABELS[k].short}</dt>
-                    <dd>{draft.characteristics[k]} ({d.kotorAttributes[k]})</dd>
+                    <dd>{d.effectiveCharacteristics[k]} ({d.kotorAttributes[k]})</dd>
                   </React.Fragment>
                 ))}
               </dl>

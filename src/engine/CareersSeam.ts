@@ -1,3 +1,4 @@
+import type { ModuleCreature } from "@/module/ModuleCreature";
 import type { ModuleItem } from "@/module/ModuleItem";
 
 /**
@@ -11,19 +12,77 @@ export interface ICareersStrainState {
 }
 
 /**
+ * Context passed to talent damage hooks during CombatAttackData.calculateDamage.
+ */
+export interface ICareersDamageContext {
+  weapon?: ModuleItem;
+  isCritical?: boolean;
+  isRanged?: boolean;
+  isOffHand?: boolean;
+}
+
+/**
+ * Active talent metadata exposed to the player HUD / power wheel without importing careers internals.
+ */
+export interface ICareersActiveTalentInfo {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  rank: number;
+  strainCost: number;
+  aim: 'self' | 'enemy' | 'ally';
+  category: 'feat' | 'buff' | 'heal';
+  cooldownRemaining: number;
+  usable: boolean;
+  why?: string;
+}
+
+/**
+ * Result of attempting to activate a custom Careers talent.
+ */
+export interface ICareersTalentActivationResult {
+  ok: boolean;
+  reason?: string;
+  message?: string;
+}
+
+/**
  * Single seam interface attached to spawned Careers creatures (`ModuleCreature.careersRules`).
- * Engine combat, defence, save, feat, and Force-casting methods check this first and fall back
- * to classic KotOR behaviour whenever it is absent (enemies, classic PCs, campaign creatures).
+ * Engine combat, defence, save, feat, skill, and Force-casting methods check this first (via
+ * ModuleCreature seam methods) and fall back to classic KotOR behaviour whenever it is absent
+ * (enemies, classic PCs, campaign creatures).
  */
 export interface ICareersCreatureRules {
   /** Base attack bonus replacing class BAB: combat skill rank * 2 + level baseline */
   getAttackBase(weapon?: ModuleItem): number;
   /** Blaster deflection base replacing class BAB: Lightsaber skill rank * 2 + level baseline */
   getDeflectionBase(): number;
-  /** Defence bonus replacing KotOR class AC bonus: level baseline (+ future talent bonuses) */
+  /** Defence bonus replacing KotOR class AC bonus: level baseline + passive/active talent defence */
   getDefenseBonus(): number;
-  /** Raw save skill base (rank * 2, without ability mod) replacing class save fields */
+  /** Conditional defence bonus against melee or ranged attacks from talents */
+  getDefenseBonusVs(isRanged: boolean): number;
+  /** Raw save skill base (rank * 2 + passive talent saves, without ability mod) replacing class save fields */
   getSaveBase(save: 'fortitude' | 'reflex' | 'will'): number;
+
+  /** Talent attack bonus (passive + active buffs) for a weapon */
+  getTalentAttackBonus(weapon?: ModuleItem): number;
+  /** Talent critical threat span bonus (passive + active buffs) for a weapon */
+  getCritThreatBonus(weapon?: ModuleItem): number;
+  /** Talent damage bonus (passive + crit + active buffs) for an attack */
+  getDamageBonus(ctx: ICareersDamageContext): number;
+  /** Flat damage reduction per incoming hit from passive + active talents */
+  getDamageReduction(): number;
+  /** Flat skill check bonus from talents for a KotOR SkillType (0..7) */
+  getSkillCheckBonus(engineSkill: number): number;
+
+  /** Force power cast modifiers from talents (and Phase 5 power upgrades) */
+  getSpellSaveDCBonus(): number;
+  getSpellCostReduction(): number;
+  getSpellDamageBonus(): number;
+  getSpellDurationBonus(): number;
+  getSpellRangeBonus(): number;
+
   /** Strain cost for a KotOR combat feat (0 if the feat does not cost Strain) */
   getCombatFeatStrainCost(featId: number): number;
   /**
@@ -44,6 +103,19 @@ export interface ICareersCreatureRules {
   getSpeedMultiplier(): number;
   /** Current Strain / winded state */
   getStrainState(): ICareersStrainState;
-  /** Advance Strain recovery and winded timers (host world time in seconds) */
+
+  /** Combat lifecycle triggers */
+  onCombatRoundStart(): void;
+  onAttackResolved(landed: boolean, isCritical: boolean, killedTarget: boolean): void;
+  onTakeDamage(amount: number): void;
+
+  /** Active talents for the player HUD / power wheel */
+  getActiveTalents(): ICareersActiveTalentInfo[];
+  /** Active talent buffs for HUD buff badges */
+  getActiveBuffs(): { label: string; secondsLeft?: number }[];
+  /** Execute an active talent on the host (validating ownership, winded, cooldown, Strain) */
+  activateTalent(talentId: string, target?: ModuleCreature): ICareersTalentActivationResult;
+
+  /** Advance Strain recovery, winded timers, active talent buffs, cooldowns, and combat transitions */
   tick(delta: number, inCombat: boolean): void;
 }

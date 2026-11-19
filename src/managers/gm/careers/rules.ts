@@ -14,6 +14,7 @@ import {
   COMBAT_SKILL_IDS,
   toEngineSkillRanks,
 } from "@/managers/gm/careers/skills";
+import { CAREERS_TALENT_BY_ID } from "@/managers/gm/careers/talents";
 import type {
   CareerAbilityKey,
   CareerAttributes,
@@ -75,17 +76,59 @@ export class CareersRules {
     return cap;
   }
 
-  /** Whether the character owns a capstone node for this skill (which opens rank 6 from level 17) */
-  static hasCapstone(c: Pick<GMCareersCharacter, 'nodes' | 'specializations'>, skillId: CareerSkillId): boolean {
+  /** Key in `character.nodeChoices` for a specialization tree node */
+  static nodeChoiceKey(specId: string, nodeId: string): string {
+    return `${specId}:${nodeId}`;
+  }
+
+  /** Owned (specId, node) entries across all owned specializations */
+  static ownedNodes(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId'>): { specId: string; node: CareerTreeNodeDef }[] {
+    const ownedSpecs = new Set(c.specializations?.length ? c.specializations : (c.startingSpecId ? [c.startingSpecId] : []));
+    const out: { specId: string; node: CareerTreeNodeDef }[] = [];
     for (const [specId, nodeIds] of Object.entries(c.nodes || {})) {
-      if (!Array.isArray(nodeIds) || !c.specializations?.includes(specId)) continue;
+      if (!Array.isArray(nodeIds) || (ownedSpecs.size > 0 && !ownedSpecs.has(specId))) continue;
       const spec = CAREERS_SPEC_BY_ID.get(specId);
       if (!spec) continue;
-      for (const node of spec.nodes) {
-        if (node.kind === 'capstone' && node.skillId === skillId && nodeIds.includes(node.id)) return true;
+      const byId = new Map(spec.nodes.map((n) => [n.id, n]));
+      for (const nodeId of nodeIds) {
+        const node = byId.get(nodeId);
+        if (node) out.push({ specId, node });
       }
     }
-    return false;
+    return out;
+  }
+
+  /** Stacked custom talent ranks across all owned specializations (no per-talent cap for ranked talents) */
+  static ownedTalentRanks(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId'>): Record<string, number> {
+    const ranks: Record<string, number> = {};
+    for (const { node } of this.ownedNodes(c)) {
+      if (node.kind === 'talent' && node.talentId) {
+        ranks[node.talentId] = (ranks[node.talentId] || 0) + 1;
+      }
+    }
+    return ranks;
+  }
+
+  /** Effective FFG characteristics: creation characteristics + owned Dedication ('characteristic') nodes */
+  static effectiveCharacteristics(c: Pick<GMCareersCharacter, 'speciesId' | 'characteristics' | 'nodes' | 'nodeChoices' | 'specializations' | 'startingSpecId'>): CareerAttributes {
+    const species = CAREERS_SPECIES_BY_ID.get(c.speciesId) || CAREERS_SPECIES_BY_ID.get('human')!;
+    const out = {} as CareerAttributes;
+    for (const k of CAREER_ABILITIES) {
+      out[k] = c.characteristics?.[k] ?? species.characteristics[k];
+    }
+    for (const { specId, node } of this.ownedNodes(c)) {
+      if (node.kind !== 'characteristic') continue;
+      const chosen = c.nodeChoices?.[this.nodeChoiceKey(specId, node.id)];
+      if (chosen && CAREER_ABILITIES.includes(chosen)) {
+        out[chosen] = (out[chosen] || 0) + 1;
+      }
+    }
+    return out;
+  }
+
+  /** Whether the character owns a capstone node for this skill (which opens rank 6 from level 17) */
+  static hasCapstone(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId'>, skillId: CareerSkillId): boolean {
+    return this.ownedNodes(c).some(({ node }) => node.kind === 'capstone' && node.skillId === skillId);
   }
 
   /** XP cost to raise a characteristic from (newValue - 1) to newValue at creation */
@@ -136,8 +179,18 @@ export class CareersRules {
     };
   }
 
-  /** All career skills granted by the character's career and owned specializations */
-  static careerSkillsOf(c: Pick<GMCareersCharacter, 'careerId' | 'specializations' | 'startingSpecId'>): Set<CareerSkillId> {
+  /** Career skills granted at creation (career + starting specialization) */
+  static creationCareerSkillsOf(c: Pick<GMCareersCharacter, 'careerId' | 'startingSpecId'>): Set<CareerSkillId> {
+    const set = new Set<CareerSkillId>();
+    const career = CAREERS_BY_ID.get(c.careerId);
+    if (career) for (const s of career.careerSkills) set.add(s);
+    const startSpec = CAREERS_SPEC_BY_ID.get(c.startingSpecId);
+    if (startSpec) for (const s of startSpec.bonusSkills) set.add(s);
+    return set;
+  }
+
+  /** All career skills granted by the character's career, owned specializations, and owned 'career_skill' nodes */
+  static careerSkillsOf(c: Pick<GMCareersCharacter, 'careerId' | 'specializations' | 'startingSpecId' | 'nodes'>): Set<CareerSkillId> {
     const set = new Set<CareerSkillId>();
     const career = CAREERS_BY_ID.get(c.careerId);
     if (career) for (const s of career.careerSkills) set.add(s);
@@ -145,6 +198,9 @@ export class CareersRules {
     for (const specId of specs) {
       const spec = CAREERS_SPEC_BY_ID.get(specId);
       if (spec) for (const s of spec.bonusSkills) set.add(s);
+    }
+    for (const { node } of this.ownedNodes(c)) {
+      if (node.kind === 'career_skill' && node.skillId) set.add(node.skillId);
     }
     return set;
   }
@@ -264,7 +320,13 @@ export class CareersRules {
   }
 
   /** Check whether a node in a specialization tree can be bought right now */
-  static canBuyNode(c: GMCareersCharacter, specId: string, nodeId: string, startingOnly: boolean = false): { ok: boolean; cost: number; reason?: string } {
+  static canBuyNode(
+    c: GMCareersCharacter,
+    specId: string,
+    nodeId: string,
+    startingOnly: boolean = false,
+    ability?: CareerAbilityKey
+  ): { ok: boolean; cost: number; reason?: string } {
     const spec = CAREERS_SPEC_BY_ID.get(specId);
     if (!spec) return { ok: false, cost: 0, reason: 'Unknown specialization.' };
     if (!c.specializations.includes(specId)) return { ok: false, cost: 0, reason: `You don't own ${spec.name}.` };
@@ -279,6 +341,31 @@ export class CareersRules {
     // Never sell a feat the character already has, from baseline proficiencies or another tree
     if (node.kind === 'feat' && typeof node.featId === 'number' && this.ownedFeatIds(c).has(node.featId)) {
       return { ok: false, cost, reason: `You already have ${node.label}.` };
+    }
+    if (node.kind === 'talent') {
+      const talent = node.talentId ? CAREERS_TALENT_BY_ID.get(node.talentId) : undefined;
+      if (!talent) return { ok: false, cost, reason: `Unknown talent: ${node.talentId || node.label}.` };
+      if (!talent.ranked && (this.ownedTalentRanks(c)[talent.id] || 0) > 0) {
+        return { ok: false, cost, reason: `You already have ${talent.name}.` };
+      }
+      if (talent.requirements?.forceSensitive && !this.isForceSensitive(c)) {
+        return { ok: false, cost, reason: `${talent.name} requires Force sensitivity.` };
+      }
+      if (talent.requirements?.alignment && talent.requirements.alignment !== c.alignment) {
+        return { ok: false, cost, reason: `${talent.name} requires ${talent.requirements.alignment}-side alignment.` };
+      }
+    }
+    if (node.kind === 'characteristic') {
+      const eff = this.effectiveCharacteristics(c);
+      if (ability !== undefined) {
+        if (!CAREER_ABILITIES.includes(ability)) return { ok: false, cost, reason: `Unknown characteristic: ${ability}.` };
+        if (eff[ability] >= 6) return { ok: false, cost, reason: `${ability.toUpperCase()} is already at the maximum of 6.` };
+      } else if (CAREER_ABILITIES.every((k) => eff[k] >= 6)) {
+        return { ok: false, cost, reason: 'All characteristics are already at the maximum of 6.' };
+      }
+    }
+    if ((node.kind === 'career_skill' || node.kind === 'capstone') && (!node.skillId || !CAREER_SKILL_BY_ID.has(node.skillId))) {
+      return { ok: false, cost, reason: `Unknown skill on ${node.label}.` };
     }
     const short = this.shortOfXp(this.derive(c), cost, startingOnly);
     if (short) return { ok: false, cost, reason: short };
@@ -297,16 +384,10 @@ export class CareersRules {
   }
 
   /** Effective KotOR feat IDs: baseline proficiencies + bought feat nodes */
-  static ownedFeatIds(c: Pick<GMCareersCharacter, 'nodes'>): Set<number> {
+  static ownedFeatIds(c: Pick<GMCareersCharacter, 'nodes' | 'specializations' | 'startingSpecId'>): Set<number> {
     const featSet = new Set<number>(BASELINE_CAREER_FEATS);
-    for (const [specId, nodeIds] of Object.entries(c.nodes || {})) {
-      const spec = CAREERS_SPEC_BY_ID.get(specId);
-      if (!spec || !Array.isArray(nodeIds)) continue;
-      const byId = new Map(spec.nodes.map((n) => [n.id, n]));
-      for (const nodeId of nodeIds) {
-        const node = byId.get(nodeId);
-        if (node?.kind === 'feat' && typeof node.featId === 'number') featSet.add(node.featId);
-      }
+    for (const { node } of this.ownedNodes(c)) {
+      if (node.kind === 'feat' && typeof node.featId === 'number') featSet.add(node.featId);
     }
     return featSet;
   }
@@ -365,10 +446,11 @@ export class CareersRules {
     const levelBaseline = this.levelBaseline(level);
     const forceSensitive = this.isForceSensitive(c);
 
+    const effectiveCharacteristics = this.effectiveCharacteristics(c);
     const kotorAttributes = {} as CareerAttributes;
     const modifiers = {} as CareerAttributes;
     for (const k of CAREER_ABILITIES) {
-      const ffg = c.characteristics?.[k] ?? species.characteristics[k];
+      const ffg = effectiveCharacteristics[k];
       kotorAttributes[k] = this.ffgToKotor(ffg);
       modifiers[k] = this.abilityMod(kotorAttributes[k]);
     }
@@ -376,11 +458,43 @@ export class CareersRules {
     const skillRanks = this.effectiveSkillRanks(c);
     const careerSkills = this.careerSkillsOf(c);
     const engineSkills = toEngineSkillRanks(skillRanks);
+    const talentRanks = this.ownedTalentRanks(c);
+
+    // Aggregate passive talent hooks (multiplied by stacked rank)
+    let hpBonus = 0;
+    let strainBonus = 0;
+    let fpBonus = 0;
+    let defenseTalentBonus = 0;
+    let damageReduction = 0;
+    const saveTalentBonus = { fortitude: 0, reflex: 0, will: 0 };
+    const skillBonuses: Partial<Record<CareerSkillId, number>> = {};
+
+    for (const [talentId, rank] of Object.entries(talentRanks)) {
+      if (!(rank > 0)) continue;
+      const def = CAREERS_TALENT_BY_ID.get(talentId);
+      if (!def) continue;
+      const h = def.hooks;
+      if (h.maxHp) hpBonus += h.maxHp * rank;
+      if (h.maxStrain) strainBonus += h.maxStrain * rank;
+      if (h.maxFp) fpBonus += h.maxFp * rank;
+      if (h.defense) defenseTalentBonus += h.defense * rank;
+      if (h.damageReduction) damageReduction += h.damageReduction * rank;
+      if (h.saves) {
+        if (h.saves.fortitude) saveTalentBonus.fortitude += h.saves.fortitude * rank;
+        if (h.saves.reflex) saveTalentBonus.reflex += h.saves.reflex * rank;
+        if (h.saves.will) saveTalentBonus.will += h.saves.will * rank;
+      }
+      if (h.skillBonus) {
+        for (const [skillId, bonus] of Object.entries(h.skillBonus) as [CareerSkillId, number][]) {
+          if (bonus) skillBonuses[skillId] = (skillBonuses[skillId] || 0) + bonus * rank;
+        }
+      }
+    }
 
     const saveRanks = {
-      fortitude: (skillRanks.resilience || 0) * 2,
-      reflex: (skillRanks.coordination || 0) * 2,
-      will: (skillRanks.discipline || 0) * 2,
+      fortitude: (skillRanks.resilience || 0) * 2 + saveTalentBonus.fortitude,
+      reflex: (skillRanks.coordination || 0) * 2 + saveTalentBonus.reflex,
+      will: (skillRanks.discipline || 0) * 2 + saveTalentBonus.will,
     };
     const saves = {
       fortitude: saveRanks.fortitude + modifiers.con,
@@ -394,13 +508,13 @@ export class CareersRules {
       combatAttack[id] = (skillRanks[id] || 0) * 2 + modifiers[def.ability] + levelBaseline;
     }
 
-    const baseDefense = 10 + modifiers.dex + levelBaseline;
+    const baseDefense = 10 + modifiers.dex + levelBaseline + defenseTalentBonus;
 
     const featSet = this.ownedFeatIds(c);
 
-    const maxHp = Math.max(1, species.hpBase + level * (6 + modifiers.con));
-    const maxStrain = Math.max(1, species.strainBase + modifiers.wis);
-    const maxFp = forceSensitive ? Math.max(0, CAREERS_FORCE_BASE + level * (4 + modifiers.wis)) : 0;
+    const maxHp = Math.max(1, species.hpBase + level * (6 + modifiers.con) + hpBonus);
+    const maxStrain = Math.max(1, species.strainBase + modifiers.wis + strainBonus);
+    const maxFp = forceSensitive ? Math.max(0, CAREERS_FORCE_BASE + level * (4 + modifiers.wis) + fpBonus) : 0;
 
     const totalPurchaseCost = this.totalPurchaseCost(c);
     const startingXpBudget = species.startingXp;
@@ -415,16 +529,22 @@ export class CareersRules {
       level,
       levelBaseline,
       forceSensitive,
+      effectiveCharacteristics,
       kotorAttributes,
       modifiers,
       maxHp,
       maxStrain,
       maxFp,
       saveRanks,
+      saveTalentBonus,
       saves,
+      defenseTalentBonus,
+      damageReduction,
       baseDefense,
       combatAttack,
       skillRanks,
+      skillBonuses,
+      talentRanks,
       engineSkills,
       careerSkills,
       featIds: [...featSet].sort((a, b) => a - b),
@@ -500,9 +620,9 @@ export class CareersRules {
       if (new Set(freeSpecies).size !== freeSpecies.length) {
         problems.push('Free species skills must be distinct.');
       }
-      const careerSkills = this.careerSkillsOf(c);
+      const creationCareerSkills = this.creationCareerSkillsOf(c);
       for (const s of freeSpecies) {
-        if (careerSkills.has(s)) problems.push(`Free species skill ${s} must be a non-career skill.`);
+        if (creationCareerSkills.has(s)) problems.push(`Free species skill ${s} must be a non-career skill.`);
       }
     }
 
@@ -531,7 +651,7 @@ export class CareersRules {
       }
     }
 
-    // Tree links
+    // Tree links and node rules (talents, Dedication characteristic choices)
     if (c.nodes) {
       for (const [specId, nodeIds] of Object.entries(c.nodes)) {
         if (!Array.isArray(nodeIds) || nodeIds.length === 0) continue;
@@ -543,6 +663,36 @@ export class CareersRules {
           const specName = CAREERS_SPEC_BY_ID.get(specId)?.name || specId;
           problems.push(`${specName} tree has nodes not linked from the top row.`);
         }
+      }
+    }
+
+    for (const { specId, node } of this.ownedNodes(c)) {
+      if (node.kind === 'talent') {
+        const talent = node.talentId ? CAREERS_TALENT_BY_ID.get(node.talentId) : undefined;
+        if (!talent) {
+          problems.push(`Unknown talent on node ${node.label}.`);
+        } else {
+          if (!talent.ranked && (derived.talentRanks[talent.id] || 0) > 1) {
+            problems.push(`${talent.name} cannot be taken more than once.`);
+          }
+          if (talent.requirements?.forceSensitive && !derived.forceSensitive) {
+            problems.push(`${talent.name} requires Force sensitivity.`);
+          }
+          if (talent.requirements?.alignment && talent.requirements.alignment !== c.alignment) {
+            problems.push(`${talent.name} requires ${talent.requirements.alignment}-side alignment.`);
+          }
+        }
+      } else if (node.kind === 'characteristic') {
+        const chosen = c.nodeChoices?.[this.nodeChoiceKey(specId, node.id)];
+        if (!chosen || !CAREER_ABILITIES.includes(chosen)) {
+          problems.push(`Choose a characteristic for ${node.label} (${specId}:${node.id}).`);
+        }
+      }
+    }
+
+    for (const k of CAREER_ABILITIES) {
+      if (derived.effectiveCharacteristics[k] > 6) {
+        problems.push(`Characteristic ${k.toUpperCase()} exceeds the maximum of 6.`);
       }
     }
 

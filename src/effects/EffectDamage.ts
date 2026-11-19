@@ -57,6 +57,9 @@ export class EffectDamage extends GameEffect {
       const damage = this.calculateEffectiveDamage();
       if(damage > 0){
         this.object.subtractHP(damage);
+        if(BitWise.InstanceOf(this.object.objectType, ModuleObjectType.ModuleCreature)){
+          (this.object as ModuleCreature).onDamageTaken?.(damage);
+        }
       }
       if(!this.mirrored && this.getSpellId() >= 0){
         // None of it got through: "resisted", once, however many of the power's effects say so
@@ -196,7 +199,15 @@ export class EffectDamage extends GameEffect {
       return 0;
     }
 
-    // 4. Improved Toughness / Master Toughness / Wookiee Toughness (-2 damage, min 1 if > 0)
+    // Spell damage bonus from Careers talents / Force power upgrades (0 for classic creatures)
+    if(this.getSpellId() >= 0 && this.creator && BitWise.InstanceOf(this.creator.objectType, ModuleObjectType.ModuleCreature)){
+      const spellBonus = (this.creator as ModuleCreature).getSpellDamageBonus?.() || 0;
+      if(spellBonus > 0 && totalDamage > 0){
+        totalDamage += spellBonus;
+      }
+    }
+
+    // 4. Improved Toughness / Master Toughness / Wookiee Toughness (-2 damage, min 1 if > 0) + Careers talent DR
     if(totalDamage > 0 && BitWise.InstanceOf(this.object.objectType, ModuleObjectType.ModuleCreature)){
       const creature = this.object as ModuleCreature;
       if(
@@ -209,6 +220,10 @@ export class EffectDamage extends GameEffect {
         )
       ){
         totalDamage = Math.max(1, totalDamage - 2);
+      }
+      const talentDr = creature.getTalentDamageReduction?.() || 0;
+      if(talentDr > 0){
+        totalDamage = Math.max(1, totalDamage - talentDr);
       }
     }
 

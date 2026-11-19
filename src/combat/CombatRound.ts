@@ -136,6 +136,7 @@ export class CombatRound {
     const owner: ModuleCreature = this.owner as any;
 
     this.roundStarted = true;
+    owner.onCombatRoundStart?.();
 
     this.onHandAttacks = owner.equipment.RIGHTHAND ? 1 : 0;
     this.additionalAttacks = 0;
@@ -552,7 +553,7 @@ export class CombatRound {
    */
   calculateAttackBonus(creature: ModuleCreature, weapon?: ModuleItem): number {
     if(!creature) return 0;
-    let bonus = creature.getAttackBase(weapon) + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0);
+    let bonus = creature.getAttackBase(weapon) + creature.getAttackAbilityModifier(weapon) + (weapon?.getAttackBonus() || 0) + (creature.getTalentAttackBonus?.(weapon) || 0);
 
     // If weapon.possessor wasn't bound, check Weapon Focus directly on creature
     if(weapon && weapon.possessor !== creature){
@@ -640,7 +641,7 @@ export class CombatRound {
    * @param feat - Optional active combat feat (e.g. Critical Strike / Sniper Shot)
    * @returns True if the attack roll is a critical hit, false otherwise
    */
-  isCritical(attackRoll: number, weapon: ModuleItem | undefined = undefined, feat?: TalentFeat): boolean {
+  isCritical(attackRoll: number, weapon: ModuleItem | undefined = undefined, feat?: TalentFeat, creature?: ModuleCreature): boolean {
     if(attackRoll > 20 || attackRoll < 1) return false;
     let threatSpan = 1;
     if(weapon){
@@ -670,7 +671,8 @@ export class CombatRound {
       }
     }
 
-    const minRoll = 21 - (threatSpan * mult);
+    const extraThreat = creature?.getTalentCritThreatBonus?.(weapon) || 0;
+    const minRoll = Math.max(2, 21 - (threatSpan * mult + extraThreat));
     return (attackRoll >= minRoll && attackRoll <= 20);
   }
 
@@ -845,10 +847,13 @@ export class CombatRound {
     }
 
     const attackRoll = naturalRoll + attackBonus;
-    const isCritical = naturalRoll !== 1 && this.isCritical(naturalRoll, weapon, combatAction.feat);
+    const isCritical = naturalRoll !== 1 && this.isCritical(naturalRoll, weapon, combatAction.feat, creature);
     const hasAssuredHit = creature.hasEffect(GameEffectType.EffectAssuredHit);
     const attack = this.attackList[this.currentAttack];
-    const targetAC = combatAction.target ? combatAction.target.getAC() : 10;
+    const isRangedWeapon = Boolean(weapon?.isRangedWeapon?.());
+    const targetAC = combatAction.target
+      ? combatAction.target.getAC() + ((combatAction.target as ModuleCreature).getDefenseBonusVs?.(isRangedWeapon) || 0)
+      : 10;
 
     let isHit = hasAssuredHit || naturalRoll === 20 || (naturalRoll !== 1 && (isCritical || attackRoll >= targetAC));
     // Concealment on the target, or a miss chance on the attacker, can still turn a hit into a miss
@@ -878,6 +883,11 @@ export class CombatRound {
       attack.attackWeapon = weapon;
       attack.attackResult = combatAction.attackResult;
     }
+
+    // Notify attacker seam (consumes next-attack buffs, triggers on-kill talents)
+    const landed = attack.attackResult === AttackResult.HIT_SUCCESSFUL ||
+      attack.attackResult === AttackResult.CRITICAL_HIT;
+    creature.onAttackResolved?.(landed, attack.attackResult === AttackResult.CRITICAL_HIT, Boolean(attack.killingBlow));
 
     // Log to combat menu - create feedback message for the attack result
     this.logAttackResult(creature, weapon, combatAction, isCritical, hasAssuredHit);

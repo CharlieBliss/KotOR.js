@@ -2,7 +2,9 @@ import { GameState } from "@/GameState";
 import { CAREERS_BY_ID, CAREERS_SPEC_BY_ID } from "@/managers/gm/careers/data";
 import { CareersRules } from "@/managers/gm/careers/rules";
 import { CareersRuntime } from "@/managers/gm/careers/runtime";
+import { CAREER_ABILITIES } from "@/managers/gm/careers/skills";
 import type {
+  CareerAbilityKey,
   CareerSkillId,
   CareersPurchaseRecord,
   CareersPurchaseRequest,
@@ -64,7 +66,12 @@ export class CareersAdvancement {
       }
       case 'node': {
         const specId = text(r.specId), nodeId = text(r.nodeId);
-        return specId && nodeId ? { kind: 'node', specId, nodeId } : null;
+        if (!specId || !nodeId) return null;
+        if (r.ability !== undefined) {
+          if (typeof r.ability !== 'string' || !CAREER_ABILITIES.includes(r.ability as CareerAbilityKey)) return null;
+          return { kind: 'node', specId, nodeId, ability: r.ability as CareerAbilityKey };
+        }
+        return { kind: 'node', specId, nodeId };
       }
       case 'specialization': {
         const specId = text(r.specId);
@@ -96,11 +103,20 @@ export class CareersAdvancement {
     }
 
     if (req.kind === 'node') {
-      const check = CareersRules.canBuyNode(character, req.specId, req.nodeId);
+      const spec = CAREERS_SPEC_BY_ID.get(req.specId);
+      const node = spec?.nodes.find((n) => n.id === req.nodeId);
+      if (node?.kind === 'characteristic' && !req.ability) {
+        return { ok: false, reason: 'Choose a characteristic to raise.' };
+      }
+      const check = CareersRules.canBuyNode(character, req.specId, req.nodeId, false, req.ability);
       if (!check.ok) return { ok: false, reason: check.reason };
       const res = this.spendAndRecord(character, req, check.cost);
       if (!character.nodes[req.specId]) character.nodes[req.specId] = [];
       character.nodes[req.specId].push(req.nodeId);
+      if (node?.kind === 'characteristic' && req.ability) {
+        if (!character.nodeChoices) character.nodeChoices = {};
+        character.nodeChoices[CareersRules.nodeChoiceKey(req.specId, req.nodeId)] = req.ability;
+      }
       return res;
     }
 
@@ -157,11 +173,20 @@ export class CareersAdvancement {
         const idx = list.lastIndexOf(last.nodeId);
         if (idx >= 0) list.splice(idx, 1);
       }
+      if (character.nodeChoices) {
+        delete character.nodeChoices[CareersRules.nodeChoiceKey(last.specId, last.nodeId)];
+      }
     } else if (last.kind === 'specialization') {
       const idx = character.specializations.lastIndexOf(last.specId);
       if (idx >= 0 && last.specId !== character.startingSpecId) {
         character.specializations.splice(idx, 1);
         delete character.nodes[last.specId];
+        if (character.nodeChoices) {
+          const prefix = `${last.specId}:`;
+          for (const key of Object.keys(character.nodeChoices)) {
+            if (key.startsWith(prefix)) delete character.nodeChoices[key];
+          }
+        }
       }
     } else if (last.kind === 'power') {
       const idx = character.powers.lastIndexOf(last.spellId);

@@ -132,7 +132,7 @@ describe('Careers vertical slice data & formulas', () => {
   test('no feat is sold twice across trees, and a capstone opens rank 6', () => {
     const peacekeeper = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'peacekeeper')!;
     const commando = CAREERS_SPECIALIZATIONS.find((s) => s.id === 'commando')!;
-    const feats = (s: typeof commando) => s.nodes.map((n) => n.featId);
+    const feats = (s: typeof commando) => s.nodes.filter((n) => n.kind === 'feat' && typeof n.featId === 'number').map((n) => n.featId!);
     expect(feats(peacekeeper).filter((f) => feats(commando).includes(f))).toEqual([]);
 
     // A guard for future data: a node whose feat you already own can't be bought
@@ -212,7 +212,8 @@ describe('XP purchases, tree links, and validation', () => {
     const d = CareersRules.derive(c);
     expect(d.startingXpUsed).toBe(15);
     expect(d.startingXpRemaining).toBe(95);
-    expect(d.featIds).toContain(CombatFeatType.TOUGHNESS);
+    expect(d.talentRanks.toughened).toBe(1);
+    expect(d.maxHp).toBe(20); // hpBase 10 + lv1 * 6 + Toughened 4
     expect(d.featIds).toContain(CombatFeatType.ARMOUR_PROF_HEAVY);
     expect(CareersRules.validate(c)).toEqual([]);
   });

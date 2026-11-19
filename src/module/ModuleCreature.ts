@@ -1,4 +1,5 @@
 import type { GMCreatureSpawnConfig } from "@/managers/gm/GMTypes";
+import type { ICareersDamageContext } from "@/engine/CareersSeam";
 import { bodyOwner, resolveStateRequest, allowsOneOffAnimation } from "@/module/creature/AnimationPriority";
 import { GFFObject } from "@/resource/GFFObject";
 import * as THREE from "three";
@@ -2749,7 +2750,7 @@ export class ModuleCreature extends ModuleObject {
       focusBonus = 1;
     }
     const level = this.getTotalClassLevel() || this.getSpellCasterLevel();
-    return 5 + level + wisMod + chaMod + focusBonus;
+    return 5 + level + wisMod + chaMod + focusBonus + this.getSpellSaveDCBonus();
   }
 
   getFortitudeSave(){
@@ -3048,6 +3049,66 @@ export class ModuleCreature extends ModuleObject {
     return true;
   }
 
+  /** Talent attack bonus (passive + active buffs); 0 for classic creatures */
+  getTalentAttackBonus(weapon?: ModuleItem): number {
+    return this.careersRules ? this.careersRules.getTalentAttackBonus(weapon) : 0;
+  }
+
+  /** Talent critical threat span increase; 0 for classic creatures */
+  getTalentCritThreatBonus(weapon?: ModuleItem): number {
+    return this.careersRules ? this.careersRules.getCritThreatBonus(weapon) : 0;
+  }
+
+  /** Talent damage bonus (passive + critical + active buffs); 0 for classic creatures */
+  getTalentDamageBonus(ctx: ICareersDamageContext): number {
+    return this.careersRules ? this.careersRules.getDamageBonus(ctx) : 0;
+  }
+
+  /** Conditional defence bonus against melee or ranged attacks from talents; 0 for classic creatures */
+  getDefenseBonusVs(isRanged: boolean): number {
+    return this.careersRules ? this.careersRules.getDefenseBonusVs(isRanged) : 0;
+  }
+
+  /** Flat damage reduction per incoming hit from passive + active talents; 0 for classic creatures */
+  getTalentDamageReduction(): number {
+    return this.careersRules ? this.careersRules.getDamageReduction() : 0;
+  }
+
+  /** Flat skill check bonus from talents for a KotOR SkillType; 0 for classic creatures */
+  getTalentSkillBonus(skill: number): number {
+    return this.careersRules ? this.careersRules.getSkillCheckBonus(skill) : 0;
+  }
+
+  /** Force power save DC bonus from talents; 0 for classic creatures */
+  getSpellSaveDCBonus(): number {
+    return this.careersRules ? this.careersRules.getSpellSaveDCBonus() : 0;
+  }
+
+  /** Force power FP cost reduction from talents; 0 for classic creatures */
+  getSpellCostReduction(): number {
+    return this.careersRules ? this.careersRules.getSpellCostReduction() : 0;
+  }
+
+  /** Force power damage bonus from talents; 0 for classic creatures */
+  getSpellDamageBonus(): number {
+    return this.careersRules ? this.careersRules.getSpellDamageBonus() : 0;
+  }
+
+  /** Combat lifecycle seam: start of combat round */
+  onCombatRoundStart(): void {
+    this.careersRules?.onCombatRoundStart();
+  }
+
+  /** Combat lifecycle seam: attack resolved (consumes single-attack buffs & runs on-kill hooks) */
+  onAttackResolved(landed: boolean, isCritical: boolean, killedTarget: boolean): void {
+    this.careersRules?.onAttackResolved(landed, isCritical, killedTarget);
+  }
+
+  /** Combat lifecycle seam: creature took damage */
+  onDamageTaken(amount: number): void {
+    if(amount > 0) this.careersRules?.onTakeDamage(amount);
+  }
+
   /** The ability an attack adds (KotOR): Dexterity with a ranged weapon, Strength in melee or unarmed */
   getAttackAbilityModifier(weapon?: any): number {
     const score = weapon?.isRangedWeapon?.() ? this.getDEX() : this.getSTR();
@@ -3174,7 +3235,7 @@ export class ModuleCreature extends ModuleObject {
     const ability = String(skill.keyAbility || '').toUpperCase();
     const score = ability === 'STR' ? this.getSTR() : ability === 'DEX' ? this.getDEX() : ability === 'CON' ? this.getCON() :
       ability === 'INT' ? this.getINT() : ability === 'WIS' ? this.getWIS() : ability === 'CHA' ? this.getCHA() : 10;
-    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value) + this.getSkillFeatBonus(value);
+    return (skill.rank || 0) + Math.floor((score - 10) / 2) + this.getSkillEffectBonus(value) + this.getSkillItemBonus(value) + this.getSkillFeatBonus(value) + this.getTalentSkillBonus(value);
   }
 
   /** Skill bonuses and penalties on what it wears (stealth units, Calrissian's belt...): subtype = SKILL_* */

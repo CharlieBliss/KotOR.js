@@ -28,9 +28,9 @@ export type GMHudCategory = 'attack' | 'feat' | 'offense' | 'buff' | 'heal' | 'i
 
 /** One thing the player can use from the power bar, wheel, or abilities drawer */
 export interface GMHudAbility {
-  /** Stable across sessions, for the saved bar: 'power:12', 'feat:30', 'item:g_i_medeqpmnt01', 'attack' */
+  /** Stable across sessions, for the saved bar: 'power:12', 'feat:30', 'talent:second_wind', 'item:g_i_medeqpmnt01', 'attack' */
   key: string;
-  kind: 'power' | 'feat' | 'item' | 'attack';
+  kind: 'power' | 'feat' | 'talent' | 'item' | 'attack';
   name: string;
   icon: string;
   aim: GMHudAim;
@@ -200,6 +200,27 @@ export class GMPlayerHud {
       });
     }
 
+    // Active Careers talents (cost Strain, appear alongside feats/powers on the wheel and hotbar)
+    if (careers?.getActiveTalents) {
+      for (const t of careers.getActiveTalents()) {
+        out.push({
+          key: `talent:${t.id}`,
+          kind: 'talent',
+          name: t.rank > 1 ? `${t.name} (${t.rank})` : t.name,
+          icon: t.icon.toLowerCase(),
+          aim: t.aim,
+          cost: 0,
+          ...(t.strainCost > 0 ? { strainCost: t.strainCost } : {}),
+          usable: t.usable,
+          why: t.why,
+          category: t.category,
+          description: t.description,
+          isBestRank: true,
+          entry: { careersTalentId: t.id },
+        });
+      }
+    }
+
     // Powers: hostile ones first, then friendly. Personal ones (range P: Battle Meditation, Force Speed) are cast on
     // yourself whatever else they do
     const spells: any[] = pc.getSpells?.() || [];
@@ -294,16 +315,22 @@ export class GMPlayerHud {
       const ms = Number(e.getDuration?.() ?? 0);
       out.push({ label, ...(ms > 0 ? { secondsLeft: Math.ceil(ms / 1000) } : {}) });
     }
+    for (const b of pc.careersRules?.getActiveBuffs?.() || []) {
+      if (!b.label || seen.has(b.label)) continue;
+      seen.add(b.label);
+      out.push(b);
+    }
     return out;
   }
 
-  /** The bar a character starts with: powers and grenades first, then combat feats, then what heals */
+  /** The bar a character starts with: powers and grenades first, then combat feats and active talents, then what heals */
   static defaultLoadout(abilities: GMHudAbility[]): (string | null)[] {
     const rank = (a: GMHudAbility) =>
       a.kind === 'attack' ? 9 :
       a.kind === 'power' && a.aim === 'enemy' ? 0 :
       a.kind === 'item' && a.aim === 'enemy' ? 1 :
       a.kind === 'feat' ? (a.usable ? 2 : 6) :
+      a.kind === 'talent' ? (a.usable ? 2.5 : 6.5) :
       a.kind === 'power' ? 3 : 4;
     const sorted = abilities.filter((a) => a.kind !== 'attack').sort((a, b) => rank(a) - rank(b));
     // Room kept for what helps (heals, medpacs, buffs): a Force user's attack powers filled the whole bar, and with
@@ -417,6 +444,17 @@ export class GMPlayerHud {
       const current = this.selected();
       const who = GMCombatAI.ruleText(ability.onlyOn);
       return { ok: false, message: this.relation(current, pc) === 'enemy' ? `${ability.name} only works on ${who}` : `No ${who === 'droids' ? 'droid' : 'Force user'} in sight` };
+    }
+    if (ability.kind === 'talent' && ability.entry?.careersTalentId) {
+      if (GMNetworkManager.role === 'client') {
+        const targetNetId = target && target !== pc ? (target.gmNetId as string | undefined) : undefined;
+        GMNetworkManager.sendIntent('ability', targetNetId, { ability: 'talent', talentId: ability.entry.careersTalentId });
+        return { ok: true, target };
+      }
+      const res = pc.careersRules?.activateTalent?.(ability.entry.careersTalentId, target as ModuleCreature);
+      if (!res?.ok) return { ok: false, message: res?.reason || "Can't use that talent now" };
+      GMManager.notifyChange();
+      return { ok: true, target };
     }
     GameState.ActionMenuManager.SetPC(pc);
     GameState.ActionMenuManager.runMenuItem(ability.entry, target);

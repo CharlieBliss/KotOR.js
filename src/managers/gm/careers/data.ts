@@ -143,7 +143,7 @@ export const CAREERS_BY_ID: ReadonlyMap<string, CareerDef> = new Map(
 
 /**
  * Vertical slice specialization trees (12 nodes each: 3 columns x 4 rows, costing 5/10/15/20 XP).
- * Phase 2 uses KotOR feats as the node kind; custom talents plug in at Phase 4.
+ * Mixes custom passive/active talents, KotOR feats, career skill unlocks, Dedication (+1 stat), and rank-6 capstones.
  */
 export const CAREERS_SPECIALIZATIONS: readonly CareerSpecializationDef[] = [
   {
@@ -154,21 +154,21 @@ export const CAREERS_SPECIALIZATIONS: readonly CareerSpecializationDef[] = [
     bonusSkills: ['brawl', 'melee', 'resilience', 'survival'],
     nodes: [
       // Row 0 (5 XP) — open entry
-      { id: 'r0c0', row: 0, col: 0, kind: 'feat', featId: CombatFeatType.POWER_ATTACK, label: 'Power Attack', description: 'Unleash heavy melee strikes for extra damage.', links: ['r1c0'] },
-      { id: 'r0c1', row: 0, col: 1, kind: 'feat', featId: CombatFeatType.TOUGHNESS, label: 'Toughness', description: 'Increase resilience and vitality under fire.', links: ['r1c1'] },
-      { id: 'r0c2', row: 0, col: 2, kind: 'feat', featId: CombatFeatType.RAPID_SHOT, label: 'Rapid Shot', description: 'Fire an extra blaster bolt in a single round.', links: ['r1c2'] },
+      { id: 'r0c0', row: 0, col: 0, kind: 'feat', featId: CombatFeatType.POWER_ATTACK, label: 'Power Attack', description: 'Unleash heavy melee strikes for extra damage (2 Strain).', links: ['r1c0'] },
+      { id: 'r0c1', row: 0, col: 1, kind: 'talent', talentId: 'toughened', label: 'Toughened', description: '+4 maximum Vitality per rank.', links: ['r1c1'] },
+      { id: 'r0c2', row: 0, col: 2, kind: 'feat', featId: CombatFeatType.RAPID_SHOT, label: 'Rapid Shot', description: 'Fire an extra blaster bolt in a single round (2 Strain).', links: ['r1c2'] },
       // Row 1 (10 XP)
-      { id: 'r1c0', row: 1, col: 0, kind: 'feat', featId: CombatFeatType.CRITICAL_STRIKE, label: 'Critical Strike', description: 'Aim for vulnerable points with doubled threat range and stun chance.', links: ['r0c0', 'r1c1', 'r2c0'] },
+      { id: 'r1c0', row: 1, col: 0, kind: 'talent', talentId: 'feral_strength', label: 'Feral Strength', description: '+2 damage with melee and unarmed attacks per rank.', links: ['r0c0', 'r1c1', 'r2c0'] },
       { id: 'r1c1', row: 1, col: 1, kind: 'feat', featId: CombatFeatType.ARMOUR_PROF_HEAVY, label: 'Heavy Armour', description: 'Unlocks wearing heavy battle armour.', links: ['r0c1', 'r1c0', 'r1c2', 'r2c1'] },
-      { id: 'r1c2', row: 1, col: 2, kind: 'feat', featId: CombatFeatType.SNIPER_SHOT, label: 'Sniper Shot', description: 'Lined-up ranged shot with expanded critical threat and stun.', links: ['r0c2', 'r1c1', 'r2c2'] },
+      { id: 'r1c2', row: 1, col: 2, kind: 'talent', talentId: 'point_blank', label: 'Point Blank', description: '+2 damage with ranged weapons per rank.', links: ['r0c2', 'r1c1', 'r2c2'] },
       // Row 2 (15 XP)
-      { id: 'r2c0', row: 2, col: 0, kind: 'feat', featId: CombatFeatType.IMPROVED_POWER_ATTACK, label: 'Improved Power Attack', description: 'Greater bonus damage on heavy melee attacks.', links: ['r1c0', 'r2c1', 'r3c0'] },
-      { id: 'r2c1', row: 2, col: 1, kind: 'feat', featId: CombatFeatType.IMPROVED_TOUGHNESS, label: 'Improved Toughness', description: 'Reduces incoming damage by 2 points per hit.', links: ['r1c1', 'r2c0', 'r2c2', 'r3c1'] },
-      { id: 'r2c2', row: 2, col: 2, kind: 'feat', featId: CombatFeatType.IMPROVED_RAPID_SHOT, label: 'Improved Rapid Shot', description: 'Faster sustained blaster fire with reduced penalties.', links: ['r1c2', 'r2c1', 'r3c2'] },
+      { id: 'r2c0', row: 2, col: 0, kind: 'talent', talentId: 'second_wind', label: 'Second Wind', description: 'Active (2 Strain): Rally through pain, restoring 8 Vitality per rank.', links: ['r1c0', 'r2c1', 'r3c0'] },
+      { id: 'r2c1', row: 2, col: 1, kind: 'talent', talentId: 'enduring', label: 'Enduring', description: 'Reduce incoming damage from hits by 2 per rank.', links: ['r1c1', 'r2c0', 'r2c2', 'r3c1'] },
+      { id: 'r2c2', row: 2, col: 2, kind: 'career_skill', skillId: 'awareness', label: 'Tactical Edge', description: 'Awareness becomes a career skill.', links: ['r1c2', 'r2c1', 'r3c2'] },
       // Row 3 (20 XP)
-      { id: 'r3c0', row: 3, col: 0, kind: 'feat', featId: CombatFeatType.MASTER_POWER_ATTACK, label: 'Master Power Attack', description: 'Devastating melee blows that shatter enemy guards.', links: ['r2c0', 'r3c1'] },
-      { id: 'r3c1', row: 3, col: 1, kind: 'feat', featId: CombatFeatType.MASTER_TOUGHNESS, label: 'Master Toughness', description: 'Peak physical grit and survivability.', links: ['r2c1', 'r3c0', 'r3c2'] },
-      { id: 'r3c2', row: 3, col: 2, kind: 'feat', featId: CombatFeatType.TWO_WEAPON_FIGHTING, label: 'Two-Weapon Fighting', description: 'Fight effectively with a weapon in each hand or double-bladed.', links: ['r2c2', 'r3c1'] },
+      { id: 'r3c0', row: 3, col: 0, kind: 'talent', talentId: 'lethal_blows', label: 'Lethal Blows', description: '+1 critical threat range and +4 critical hit damage per rank.', links: ['r2c0', 'r3c1'] },
+      { id: 'r3c1', row: 3, col: 1, kind: 'characteristic', label: 'Dedication', description: 'Permanently increase one characteristic by +1 (up to 6).', links: ['r2c1', 'r3c0', 'r3c2'] },
+      { id: 'r3c2', row: 3, col: 2, kind: 'capstone', skillId: 'ranged_heavy', label: 'Heavy Weapons Mastery', description: 'Unlocks Ranged (Heavy) rank 6 from level 17.', links: ['r2c2', 'r3c1'] },
     ],
   },
   {
@@ -179,21 +179,21 @@ export const CAREERS_SPECIALIZATIONS: readonly CareerSpecializationDef[] = [
     bonusSkills: ['awareness', 'discipline', 'lightsaber', 'resilience'],
     nodes: [
       // Row 0 (5 XP) — open entry
-      { id: 'r0c0', row: 0, col: 0, kind: 'feat', featId: CombatFeatType.FLURRY, label: 'Flurry', description: 'Strike with an extra lightsaber or melee attack per round.', links: ['r1c0'] },
+      { id: 'r0c0', row: 0, col: 0, kind: 'feat', featId: CombatFeatType.FLURRY, label: 'Flurry', description: 'Strike with an extra lightsaber or melee attack per round (2 Strain).', links: ['r1c0'] },
       { id: 'r0c1', row: 0, col: 1, kind: 'feat', featId: CombatFeatType.JEDI_DEFENSE, label: 'Jedi Defense', description: 'Deflect incoming blaster bolts with a lightsaber.', links: ['r1c1'] },
       { id: 'r0c2', row: 0, col: 2, kind: 'feat', featId: CombatFeatType.DUELING, label: 'Dueling', description: 'Bonus attack and defence when wielding a single blade.', links: ['r1c2'] },
       // Row 1 (10 XP)
-      { id: 'r1c0', row: 1, col: 0, kind: 'feat', featId: CombatFeatType.WEAPON_FOCUS_LIGHTSABER, label: 'Lightsaber Focus', description: 'Drilled forms: +1 to attack with a lightsaber.', links: ['r0c0', 'r1c1', 'r2c0'] },
-      { id: 'r1c1', row: 1, col: 1, kind: 'feat', featId: CombatFeatType.CONDITIONING, label: 'Conditioning', description: 'Steadfast focus that improves saving throws.', links: ['r0c1', 'r1c0', 'r1c2', 'r2c1'] },
-      { id: 'r1c2', row: 1, col: 2, kind: 'feat', featId: CombatFeatType.WEAPON_SPEC_LIGHTSABER, label: 'Lightsaber Specialization', description: 'Heavier, surer cuts: extra damage with a lightsaber.', links: ['r0c2', 'r1c1', 'r2c2'] },
+      { id: 'r1c0', row: 1, col: 0, kind: 'talent', talentId: 'battle_focus', label: 'Battle Focus', description: 'Active (2 Strain): +2 attack, +4 damage, and +1 crit threat on your next attack per rank.', links: ['r0c0', 'r1c1', 'r2c0'] },
+      { id: 'r1c1', row: 1, col: 1, kind: 'talent', talentId: 'parry_stance', label: 'Parry Stance', description: 'Active (2 Strain): Brace for 1 round, gaining +2 Defence and +3 damage reduction per rank.', links: ['r0c1', 'r1c0', 'r1c2', 'r2c1'] },
+      { id: 'r1c2', row: 1, col: 2, kind: 'talent', talentId: 'sidestep', label: 'Sidestep', description: '+1 Defence (+1 additional vs ranged attacks) per rank.', links: ['r0c2', 'r1c1', 'r2c2'] },
       // Row 2 (15 XP)
-      { id: 'r2c0', row: 2, col: 0, kind: 'feat', featId: CombatFeatType.IMPROVED_FLURRY, label: 'Improved Flurry', description: 'Fluid extra strikes with tighter guard.', links: ['r1c0', 'r2c1', 'r3c0'] },
-      { id: 'r2c1', row: 2, col: 1, kind: 'feat', featId: CombatFeatType.ADVANCED_JEDI_DEFENSE, label: 'Improved Jedi Defense', description: 'Deflect blaster fire more reliably and redirect bolts.', links: ['r1c1', 'r2c0', 'r2c2', 'r3c1'] },
-      { id: 'r2c2', row: 2, col: 2, kind: 'feat', featId: CombatFeatType.ADVANCED_DUELING, label: 'Improved Dueling', description: 'Sharper single-weapon attack and defence.', links: ['r1c2', 'r2c1', 'r3c2'] },
+      { id: 'r2c0', row: 2, col: 0, kind: 'talent', talentId: 'relentless', label: 'Relentless', description: 'On a kill, recover 2 Strain and gain +2 attack on your next strike per rank.', links: ['r1c0', 'r2c1', 'r3c0'] },
+      { id: 'r2c1', row: 2, col: 1, kind: 'talent', talentId: 'force_rating', label: 'Force Rating', description: '+6 max Force points, +2 Force power save DC, and -1 Force power cost per rank.', links: ['r1c1', 'r2c0', 'r2c2', 'r3c1'] },
+      { id: 'r2c2', row: 2, col: 2, kind: 'career_skill', skillId: 'negotiation', label: 'Diplomat\'s Poise', description: 'Negotiation becomes a career skill.', links: ['r1c2', 'r2c1', 'r3c2'] },
       // Row 3 (20 XP)
-      { id: 'r3c0', row: 3, col: 0, kind: 'feat', featId: CombatFeatType.MASTER_FLURRY, label: 'Master Flurry', description: 'Relentless extra strikes without sacrificing footing.', links: ['r2c0', 'r3c1'] },
-      { id: 'r3c1', row: 3, col: 1, kind: 'feat', featId: CombatFeatType.MASTER_JEDI_DEFENSE, label: 'Master Jedi Defense', description: 'Turn sustained blaster fire back on attackers.', links: ['r2c1', 'r3c0', 'r3c2'] },
-      { id: 'r3c2', row: 3, col: 2, kind: 'feat', featId: CombatFeatType.FORCE_JUMP, label: 'Force Jump', description: 'Leap across the battlefield directly into melee combat.', links: ['r2c2', 'r3c1'] },
+      { id: 'r3c0', row: 3, col: 0, kind: 'talent', talentId: 'calm_center', label: 'Calm Center', description: 'Recover 1 extra Strain each round and 4 Vitality when combat ends per rank.', links: ['r2c0', 'r3c1'] },
+      { id: 'r3c1', row: 3, col: 1, kind: 'characteristic', label: 'Dedication', description: 'Permanently increase one characteristic by +1 (up to 6).', links: ['r2c1', 'r3c0', 'r3c2'] },
+      { id: 'r3c2', row: 3, col: 2, kind: 'capstone', skillId: 'lightsaber', label: 'Lightsaber Mastery', description: 'Unlocks Lightsaber rank 6 from level 17.', links: ['r2c2', 'r3c1'] },
     ],
   },
 ];

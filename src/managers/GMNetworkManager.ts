@@ -63,8 +63,8 @@ export interface GMSerializedMine {
   detected: boolean;
 }
 
-/** What a player uses from KotOR's action menu: a Force power, feat, skill or item */
-export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item';
+/** What a player uses from KotOR's action menu or HUD: a Force power, feat, skill, item, or active Careers talent */
+export type GMAbilityKind = 'spell' | 'feat' | 'skill' | 'item' | 'talent';
 
 
 /**
@@ -158,6 +158,8 @@ export interface GMClientIntent {
   /** ability: what kind, and its id (spells.2da, feat.2da or skills.2da row) */
   ability?: GMAbilityKind;
   abilityId?: number;
+  /** ability === 'talent': custom Careers active talent id */
+  talentId?: string;
   /** mine: what to do (targetNetId is the mine, door or container; resRef the mine item) */
   mine?: GMMineAction;
   /** roll: the skill or save (older players send abilityId, a skill) */
@@ -849,7 +851,7 @@ export class GMNetworkManager {
    * Ask the host to perform an interaction with our assigned actor (NWN-style server authority).
    * The host walks the actor into range and resolves the action; we follow its updates until it finishes.
    */
-  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; mine?: GMMineAction; check?: GMCheck; open?: boolean; ready?: boolean; x?: number; y?: number; z?: number; purchase?: CareersPurchaseRequest } = {}) {
+  static sendIntent(kind: GMIntentKind, targetNetId?: string, extra: { slot?: number; resRef?: string; ability?: GMAbilityKind; abilityId?: number; talentId?: string; mine?: GMMineAction; check?: GMCheck; open?: boolean; ready?: boolean; x?: number; y?: number; z?: number; purchase?: CareersPurchaseRequest } = {}) {
     if (this.role !== 'client' || !this.assignedActorNetId) return;
     this.localIntentSeq++;
     if (GM_INTENTS[kind]?.hostDriven) {

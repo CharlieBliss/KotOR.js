@@ -471,6 +471,7 @@ const AbilitiesDrawer: React.FC<{
                     <small>
                       {a.aim === 'self' ? 'Self' : a.aim === 'ally' ? 'Ally' : 'Enemy'}
                       {a.cost > 0 ? ` · ${a.cost} FP` : ''}
+                      {a.strainCost ? ` · ${a.strainCost} Strain` : ''}
                       {a.count != null ? ` · ×${a.count}` : ''}
                     </small>
                   </span>
@@ -494,6 +495,7 @@ const AbilitiesDrawer: React.FC<{
                     </span>
                     {selected.range && <span className="gm-hud-pill">{selected.range}</span>}
                     {selected.cost > 0 && <span className="gm-hud-pill fp">{selected.cost} Force</span>}
+                    {selected.strainCost ? <span className="gm-hud-pill">{selected.strainCost} Strain</span> : null}
                     {selected.count != null && <span className="gm-hud-pill count">{selected.count} left</span>}
                     {selectedLand && (
                       <span className={`gm-hud-pill lands side-${selectedLand.side}`}>→ {selectedLand.text}</span>

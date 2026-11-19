@@ -614,6 +614,8 @@ export class GMPlayers {
       inventory: this.getPlayerInventory(cre).map((e) => ({ ...e })),
       ...(careersRuntime ? (() => {
         const st = careersRuntime.getStrainState();
+        const activeBuffs = careersRuntime.getActiveBuffs();
+        const cooldowns = careersRuntime.getCooldownSnapshot();
         return {
           careers: {
             character: careersRuntime.character,
@@ -621,6 +623,8 @@ export class GMPlayers {
             maxStrain: st.maxStrain,
             // Whole seconds avoid sub-second float jitter in sheet diffing while winded
             windedSeconds: Math.ceil(st.windedSeconds),
+            ...(activeBuffs.length ? { activeBuffs } : {}),
+            ...(Object.keys(cooldowns).length ? { cooldowns } : {}),
           },
         };
       })() : {}),
@@ -980,6 +984,13 @@ export class GMPlayers {
         return `${name} is winded and cannot spend Strain.`;
       }
     }
+    if (intent.ability === 'talent') {
+      if (!actor.careersRules) return `${name} doesn't have active talents.`;
+      const tId = typeof intent.talentId === 'string' ? intent.talentId : '';
+      const info = actor.careersRules.getActiveTalents().find((t) => t.id === tId);
+      if (!info) return `${name} doesn't have that talent.`;
+      if (info.why) return `${info.name}: ${info.why}.`;
+    }
     if (intent.ability === 'item' && intent.resRef && !this.getPlayerInventory(actor).some((e) => e.resRef === intent.resRef)) return `${name} has none of those left.`;
     if (intent.ability === 'skill') return `${name} doesn't have the skill for that.`;
     return `${name} can't use that right now.`;
@@ -1057,18 +1068,19 @@ export class GMPlayers {
     // A power, combat feat or item joins the combat queue behind what's there, as in KotOR (each one cleared
     // the queue: it never filled, and a power waiting for its round was dropped by the next click)
     const queues = intent.kind === 'ability' && this.QUEUED_ABILITIES.includes(String(intent.ability));
+    const isInstantTalent = intent.kind === 'ability' && intent.ability === 'talent';
     if (queues && (actor.combatRound?.scheduledActionList?.length || 0) >= this.QUEUE_LIMIT) {
       this.tellPlayer(peerId, `${actor.getName()}'s queue is full: wait for what's queued, or Stop.`);
       return;
     }
-    if (meta.interrupts && !queues) actor.clearAllActions();
+    if (meta.interrupts && !queues && !isInstantTalent) actor.clearAllActions();
     const result = handler(actor, intent, peerId);
     if (!meta.interrupts) {
       GMLog.info('host', request);
       return;
     }
     const report = (ok: boolean) => {
-      actor.gmHostDriven = ok;
+      if (!isInstantTalent) actor.gmHostDriven = ok;
       if (ok) GMLog.info('host', `${request}: on it`);
       else GMLog.warn('host', `${request}: can't be done`);
     };
@@ -1122,6 +1134,20 @@ export class GMPlayers {
         if (!feat) return false;
         if (actor.careersRules?.isWinded() && actor.careersRules.getCombatFeatStrainCost(id) > 0) return false;
         feat.useTalentOnObject(target, actor);
+        return true;
+      }
+      case 'talent': {
+        if (!actor.careersRules) return false;
+        const talentId = typeof intent.talentId === 'string' && intent.talentId.length > 0 && intent.talentId.length <= 64
+          ? intent.talentId
+          : '';
+        if (!talentId) return false;
+        const targetCreature = GMObjectKind.isCreature(target) ? (target as ModuleCreature) : actor;
+        const res = actor.careersRules.activateTalent(talentId, targetCreature);
+        if (!res.ok) return false;
+        if (res.message) GMLog.info('host', res.message);
+        this.updatePlayerSheets();
+        GMManager.notifyChange();
         return true;
       }
       case 'skill': {

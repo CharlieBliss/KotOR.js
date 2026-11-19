@@ -118,6 +118,8 @@ export interface CareerTreeNodeDef {
   description: string;
   /** KotOR feat.2da row (for kind === 'feat') */
   featId?: number;
+  /** Custom talent registry id (for kind === 'talent') */
+  talentId?: string;
   /** Skill made a career skill (for kind === 'career_skill') or unlocked to rank 6 (for kind === 'capstone') */
   skillId?: CareerSkillId;
   /** Neighbour node ids connected to this node (across or down) */
@@ -173,7 +175,7 @@ export interface CareersXpLogEntry {
 
 export type CareersPurchaseRequest =
   | { kind: 'skill'; skillId: CareerSkillId }
-  | { kind: 'node'; specId: string; nodeId: string }
+  | { kind: 'node'; specId: string; nodeId: string; ability?: CareerAbilityKey }
   | { kind: 'specialization'; specId: string }
   | { kind: 'power'; spellId: number };
 
@@ -190,6 +192,10 @@ export interface GMCareersNetworkState {
   strain: number;
   maxStrain: number;
   windedSeconds: number;
+  /** Active talent buffs currently ticking on the host (for HUD badges) */
+  activeBuffs?: { label: string; secondsLeft?: number }[];
+  /** Remaining active talent cooldowns in whole seconds (for HUD usability) */
+  cooldowns?: Record<string, number>;
 }
 
 /**
@@ -223,6 +229,8 @@ export interface GMCareersCharacter {
   boughtSkillRanks: Partial<Record<CareerSkillId, number>>;
   /** Purchased tree nodes, keyed by specialization id */
   nodes: Record<string, string[]>;
+  /** Chosen characteristic (+1) for owned 'characteristic' (Dedication) nodes, keyed by `${specId}:${nodeId}` */
+  nodeChoices?: Record<string, CareerAbilityKey>;
   /** Purchased Force powers (spells.2da rows) */
   powers: number[];
   alignment: 'light' | 'dark';
@@ -246,6 +254,8 @@ export interface GMCareersDerived {
   level: number;
   levelBaseline: number;
   forceSensitive: boolean;
+  /** Effective FFG-scale characteristics (creation + owned Dedication nodes, capped at 6) */
+  effectiveCharacteristics: CareerAttributes;
   /** KotOR-scale attributes (6 + 2 * FFG value) */
   kotorAttributes: CareerAttributes;
   /** Ability modifiers (FFG value - 2) */
@@ -253,19 +263,29 @@ export interface GMCareersDerived {
   maxHp: number;
   maxStrain: number;
   maxFp: number;
-  /** Raw save ranks * 2 (without ability modifier, for raw save fields / seams) */
+  /** Raw save ranks * 2 + passive talent save bonuses (without ability modifier, for raw save fields / seams) */
   saveRanks: { fortitude: number; reflex: number; will: number };
-  /** Total saves including ability modifiers */
+  /** Passive save bonuses from talents */
+  saveTalentBonus: { fortitude: number; reflex: number; will: number };
+  /** Total saves including ability modifiers and passive talents */
   saves: { fortitude: number; reflex: number; will: number };
-  /** Base unarmoured defence: 10 + DEX mod + level baseline */
+  /** Passive defence bonus from talents */
+  defenseTalentBonus: number;
+  /** Passive flat damage reduction from talents */
+  damageReduction: number;
+  /** Base unarmoured defence: 10 + DEX mod + level baseline + passive talent defence */
   baseDefense: number;
   /** Attack bonus per combat skill: rank * 2 + ability mod + level baseline */
   combatAttack: Record<CombatSkillId, number>;
   /** Effective skill ranks (free + bought) for all skills */
   skillRanks: Record<CareerSkillId, number>;
+  /** Flat check bonuses from passive talents (engine & narrative skills) */
+  skillBonuses: Partial<Record<CareerSkillId, number>>;
+  /** Total stacked ranks of each owned custom talent across all owned specializations */
+  talentRanks: Record<string, number>;
   /** 8-element KotOR skills.2da array (rank * 4; Persuade = max(Charm, Negotiation, Deception) * 4) */
   engineSkills: number[];
-  /** Full set of career skills (career + all owned specializations) */
+  /** Full set of career skills (career + all owned specializations + owned 'career_skill' nodes) */
   careerSkills: Set<CareerSkillId>;
   /** Effective KotOR feat IDs (baseline proficiencies + owned feat nodes) */
   featIds: number[];

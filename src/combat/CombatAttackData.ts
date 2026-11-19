@@ -298,6 +298,7 @@ export class CombatAttackData {
       this.applyActiveFeatBonusDamage(creature, damageMultiplier, feat, DamageType.BLUDGEONING);
       this.applyEffectDamageModifiers(creature, DamageType.BLUDGEONING);
       this.applySneakAttackDamage(creature, DamageType.BLUDGEONING);
+      this.applyTalentDamageModifiers(creature, isCritial, isOffHand, DamageType.BLUDGEONING);
       if(isCritial){
         this.applyCriticalFeatStun(creature, feat);
       }
@@ -364,6 +365,7 @@ export class CombatAttackData {
 
     this.applyEffectDamageModifiers(creature, baseDamageType);
     this.applySneakAttackDamage(creature, baseDamageType);
+    this.applyTalentDamageModifiers(creature, isCritial, isOffHand, baseDamageType);
 
     if(isCritial){
       this.applyCriticalFeatStun(creature, feat);
@@ -429,6 +431,21 @@ export class CombatAttackData {
           }
         }
       }
+    }
+  }
+
+  /**
+   * Apply Careers talent damage hooks (passive, critical damage, and active talent buffs); no-op for classic creatures
+   */
+  applyTalentDamageModifiers(creature: ModuleCreature, isCritical: boolean, isOffHand: boolean, damageSlot: number = DamageType.BASE){
+    const bonus = creature.getTalentDamageBonus?.({
+      weapon: this.attackWeapon,
+      isCritical,
+      isRanged: Boolean(this.attackWeapon?.isRangedWeapon?.()),
+      isOffHand,
+    }) || 0;
+    if(bonus > 0 && this.damageList[damageSlot]){
+      this.damageList[damageSlot].addDamage(bonus);
     }
   }
 
